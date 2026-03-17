@@ -34,13 +34,13 @@
 
     /* ── CSS-Variablen: Dark Mode ── */
     body.dark {
-      --bg-body:            #1a1a2e;
-      --bg-container:       transparent;
-      --container-shadow:   none;
+      --bg-body:            linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      --bg-container:       #16213e;
+      --container-shadow:   0 20px 60px rgba(0,0,0,0.4);
       --title-color:        #ffffff;
       --title-span-color:   #e94560;
       --subtitle-color:     #a8a8b3;
-      --card-bg:            #16213e;
+      --card-bg:            #1a2744;
       --card-border:        rgba(255,255,255,0.1);
       --card-hover-border:  #e94560;
       --card-shadow-hover:  0 12px 40px rgba(0,0,0,0.4);
@@ -147,9 +147,7 @@
       padding: clamp(0.8rem, 2vw, 2rem);
     }
 
-    body.dark .content-box {
-      padding: 0; box-shadow: none; background: transparent;
-    }
+    /* Dark Mode nutzt gleiche Container-Struktur wie Light Mode */
 
     /* ── Spiele-Grid ── */
     .games-grid {
