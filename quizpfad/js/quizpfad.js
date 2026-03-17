@@ -32,24 +32,106 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadFragen() {
+  // Shared question database (Risiko-Quiz format → QuizPfad format)
+  let rqData = null;
+
   try {
-    // Try server first
     if (window.location.protocol !== 'file:') {
       try {
-        const r = await fetch('../api.php?f=quizpfad-fragen');
-        if (r.ok) { fragenBank = await r.json(); return; }
+        const r = await fetch('../api.php?f=questions');
+        if (r.ok) rqData = await r.json();
       } catch (e) { /* fallback */ }
     }
-    // Direct file fetch
-    const r = await fetch('data/fragen.json');
-    if (r.ok) { fragenBank = await r.json(); return; }
+    if (!rqData) {
+      const r = await fetch('../risiko-quiz/data/questions.json');
+      if (r.ok) rqData = await r.json();
+    }
   } catch (e) { /* ignore */ }
 
-  // localStorage fallback
-  const ls = localStorage.getItem('quizpfad_fragen');
-  if (ls) { fragenBank = JSON.parse(ls); return; }
+  // localStorage fallback (Risiko-Quiz format)
+  if (!rqData) {
+    const ls = localStorage.getItem('rq_questions');
+    if (ls) try { rqData = JSON.parse(ls); } catch(e) {}
+  }
 
-  document.getElementById('setup-error').textContent = 'Keine Fragen geladen. Bitte fragen.json bereitstellen.';
+  if (rqData && rqData.categories) {
+    fragenBank = convertRQtoQuizPfad(rqData);
+    return;
+  }
+
+  document.getElementById('setup-error').textContent =
+    'Keine Fragen geladen. Bitte Fragen im Risiko-Quiz Admin anlegen.';
+}
+
+// Convert Risiko-Quiz format → QuizPfad format
+function convertRQtoQuizPfad(rqData) {
+  const kategorien = [];
+  const fragen = [];
+  const colors = ['#3498db','#2ecc71','#e74c3c','#9b59b6','#f39c12','#1abc9c','#e67e22','#2c3e50'];
+  let colorIdx = 0;
+
+  function collectLeafCategories(node, path, parentIcon) {
+    const subs = node.subcategories || [];
+    const hasQuestions = node.questions && node.questions.length > 0;
+    const hasChildren = subs.length > 0;
+
+    // Leaf node: has questions and no deeper subcategories with questions
+    if (hasQuestions) {
+      const katId = node.id;
+      const katName = path.join(' › ');
+      if (!kategorien.find(k => k.id === katId)) {
+        kategorien.push({
+          id: katId,
+          name: katName,
+          icon: parentIcon || '📚',
+          farbe: colors[colorIdx++ % colors.length]
+        });
+      }
+
+      node.questions.forEach(q => {
+        const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
+        let typ, antworten, richtig;
+
+        if (q.type === 'mc' && q.options && q.options.length > 0) {
+          typ = 'multiple_choice';
+          antworten = q.options.slice();
+          richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
+        } else {
+          typ = 'offen';
+          antworten = [];
+          richtig = -1;
+        }
+
+        fragen.push({
+          id: q.id,
+          kategorie: katId,
+          schwierigkeit: schwierigkeit,
+          frage: q.question || '',
+          typ: typ,
+          antworten: antworten,
+          richtig: richtig,
+          erklaerung: q.answer || q.hint || ''
+        });
+      });
+    }
+
+    subs.forEach(sub => collectLeafCategories(sub, [...path, sub.name], parentIcon));
+  }
+
+  const icons = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯'];
+  (rqData.categories || []).forEach((cat, i) => {
+    const icon = icons[i % icons.length];
+    // If top-level category has no subcategories, treat it as a leaf
+    if ((!cat.subcategories || cat.subcategories.length === 0) && cat.questions && cat.questions.length > 0) {
+      collectLeafCategories(cat, [cat.name], icon);
+    } else {
+      (cat.subcategories || []).forEach(sub => {
+        collectLeafCategories(sub, [cat.name, sub.name], icon);
+      });
+    }
+  });
+
+  return { kategorien, fragen };
 }
 
 // ── Setup Screen ─────────────────────────────────────────────

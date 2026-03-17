@@ -76,7 +76,7 @@ Add-File   $zip (Join-Path $qp "index.html")    "quizpfad/index.html"
 Add-File   $zip (Join-Path $qp "admin.html")    "quizpfad/admin.html"
 Add-Folder $zip (Join-Path $qp "js")            "quizpfad/js"
 Add-Folder $zip (Join-Path $qp "css")           "quizpfad/css"
-# data/fragen.json wird NICHT mitgepackt (Spieldaten)
+# QuizPfad nutzt die gemeinsame questions.json (Risiko-Quiz)
 
 # Escape Room
 $er = Join-Path $source "escape-room"

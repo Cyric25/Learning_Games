@@ -135,53 +135,21 @@
       </div>
     </div>
 
-    <div class="status-msg" id="status-msg"></div>
-
-    <div class="admin-tabs">
-      <button class="admin-tab active" onclick="switchTab('tab-edit')">Fragen bearbeiten</button>
-      <button class="admin-tab" onclick="switchTab('tab-import')">MD-Import</button>
-      <button class="admin-tab" onclick="switchTab('tab-categories')">Kategorien</button>
-    </div>
-
-    <!-- Tab: Fragen bearbeiten -->
-    <div class="tab-content active" id="tab-edit">
-      <div class="cat-list" id="cat-list"></div>
-    </div>
-
-    <!-- Tab: MD-Import -->
-    <div class="tab-content" id="tab-import">
-      <p style="margin-bottom:12px; color:var(--text-secondary); font-size:0.9rem;">
-        Fragen im Markdown-Format importieren. Format:<br>
-        <code>## Kategorie-ID</code><br>
-        <code>- typ | frage | antwort1 | antwort2 | ... | richtigIndex | erklaerung</code><br>
-        Typen: <code>mc</code>, <code>wf</code>, <code>offen</code>
+    <div class="admin-card" style="background:var(--bg-field);border:2px solid var(--border);border-radius:14px;padding:24px;text-align:center;">
+      <h2 style="color:var(--accent);margin-bottom:12px;">Gemeinsame Fragendatenbank</h2>
+      <p style="color:var(--text-secondary);margin-bottom:20px;font-size:1rem;line-height:1.6;">
+        QuizPfad verwendet dieselbe Fragendatenbank wie Risiko-Quiz.<br>
+        Fragen werden zentral im Risiko-Quiz Admin verwaltet.
       </p>
-      <textarea class="import-area" id="import-area" placeholder="## chemie
-- mc | Wie lautet das Symbol für Gold? | Au | Ag | Fe | Cu | 0 | Au kommt vom lateinischen Aurum.
-- wf | Helium ist ein Edelgas. | Wahr | Falsch | 0 | Helium steht in der 8. Hauptgruppe.
-- offen | Erkläre die Ionenbindung. | | | -1 | Übertragung von Elektronen zwischen Metall und Nichtmetall."></textarea>
-      <div style="margin-top:12px; display:flex; gap:10px;">
-        <button class="btn-primary" onclick="importMD()">Importieren</button>
-        <button class="btn-secondary" onclick="previewMD()">Vorschau</button>
-      </div>
-      <div class="import-preview" id="import-preview" style="display:none;"></div>
-    </div>
-
-    <!-- Tab: Kategorien -->
-    <div class="tab-content" id="tab-categories">
-      <div id="categories-editor"></div>
-      <div style="margin-top:12px;">
-        <button class="btn-sm" onclick="addCategory()">+ Kategorie</button>
-      </div>
-    </div>
-
-    <div class="save-bar">
-      <button class="btn-primary" onclick="saveAll()">💾 Speichern</button>
-      <button class="btn-secondary" onclick="downloadJSON()">⬇ JSON herunterladen</button>
+      <a href="../risiko-quiz/admin.html" class="btn-primary"
+         style="display:inline-block;padding:12px 28px;text-decoration:none;border-radius:12px;font-weight:700;font-size:1rem;">
+        ⚙ Fragen im Risiko-Quiz Admin bearbeiten
+      </a>
+      <p style="color:var(--text-light);margin-top:16px;font-size:0.85rem;">
+        Die Kategorien und Fragen werden automatisch für QuizPfad konvertiert.
+      </p>
     </div>
   </div>
-
-  <script src="js/quizpfad-admin.js"></script>
 
   <script>
   (function () {

@@ -71,7 +71,6 @@ $files = [
     'questions'    => __DIR__ . '/risiko-quiz/data/questions.json',
     'gamestate'    => __DIR__ . '/risiko-quiz/data/gamestate.json',
     'memory-pairs'     => __DIR__ . '/memory/data/pairs.json',
-    'quizpfad-fragen'  => __DIR__ . '/quizpfad/data/fragen.json',
 ];
 
 // ── Cleanup: Spiele älter als 24h löschen ───────────────────────────

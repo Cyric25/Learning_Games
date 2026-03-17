@@ -37,8 +37,6 @@ Spiele/
       quizpfad-admin.js         ← Editor-Logik (Fragen CRUD, MD-Import)
     css/
       quizpfad.css              ← Styles (Brettspiel Classic, responsive)
-    data/
-      fragen.json               ← Fragedatenbank (Kategorien + Fragen)
   escape-room/
     index.html                  ← Escape Room (Admin + Spieler, alles inline)
   risiko-quiz/
@@ -283,27 +281,21 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 ### Architektur
 - Lineares Brettspiel: Teams rücken durch richtige Antworten auf einem Mäander-Pfad vor
 - 30 Felder in Schlangen-Layout (6 Spalten, 5 Zeilen, abwechselnd L→R / R→L)
-- Eigene Fragenbank: `quizpfad/data/fragen.json`
-- API-Endpunkt: `?f=quizpfad-fragen` (GET/POST)
+- **Gemeinsame Fragendatenbank**: Nutzt `risiko-quiz/data/questions.json` (Risiko-Quiz-Format)
+- `quizpfad.js` konvertiert beim Laden automatisch: Kategorien → flat, Difficulty → leicht/mittel/schwer
+- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
 - Kein Multi-Game, kein SSE — reines Einzelspiel im Browser
 
-### Datenformat (`fragen.json`)
-```json
-{
-  "kategorien": [
-    { "id": "chemie", "name": "Chemie Grundlagen", "icon": "🧪", "farbe": "#3498db" }
-  ],
-  "fragen": [
-    {
-      "id": "q001", "kategorie": "chemie", "schwierigkeit": "leicht",
-      "frage": "...", "typ": "multiple_choice",
-      "antworten": ["A", "B", "C", "D"], "richtig": 0,
-      "erklaerung": "..."
-    }
-  ]
-}
-```
-Typen: `multiple_choice`, `wahr_falsch`, `offen` (Lehrer entscheidet)
+### Fragen-Konvertierung (Risiko-Quiz → QuizPfad)
+| Risiko-Quiz | QuizPfad |
+|-------------|----------|
+| `difficulty: 100-200` | `schwierigkeit: "leicht"` |
+| `difficulty: 300` | `schwierigkeit: "mittel"` |
+| `difficulty: 400-500` | `schwierigkeit: "schwer"` |
+| `type: "mc"` | `typ: "multiple_choice"` |
+| `type: "open"` | `typ: "offen"` |
+| `options` / `correctIndex` | `antworten` / `richtig` |
+| Nested subcategories | Flat `kategorien` (Blatt-Ebenen) |
 
 ### Bonusfelder
 | Typ | Effekt |
