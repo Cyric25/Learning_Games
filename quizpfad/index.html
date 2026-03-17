@@ -34,6 +34,16 @@
         <div class="team-config-list" id="team-config-list"></div>
       </div>
 
+      <div class="setup-section" id="category-section" style="display:none;">
+        <h3>Kategorien auswählen</h3>
+        <div class="cat-select-actions">
+          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle auswählen</button>
+          <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+        </div>
+        <div class="cat-select-list" id="cat-select-list"></div>
+        <div class="cat-select-info" id="cat-select-info"></div>
+      </div>
+
       <div class="setup-error" id="setup-error"></div>
 
       <div class="setup-actions">
@@ -61,6 +71,10 @@
       <div class="sidebar-actions">
         <button class="btn-answer" id="btn-answer" onclick="askQuestion()">Frage beantworten</button>
         <button class="btn-use-joker" id="btn-joker" onclick="useJoker()" style="display:none;">🃏 Joker einsetzen</button>
+      </div>
+      <div class="sidebar-legend" id="sidebar-legend">
+        <h3>Legende</h3>
+        <div class="legend-list" id="legend-list"></div>
       </div>
     </div>
   </div>

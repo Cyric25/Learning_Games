@@ -24,6 +24,8 @@ let pendingBonus = null;
 let pendingQuestionResult = null;
 let usedQuestionIds = new Set();
 let duelOpponentIdx = null;
+let selectedCategoryIds = new Set();
+let activeFragenBank = null; // filtered by selected categories
 
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -56,6 +58,7 @@ async function loadFragen() {
 
   if (rqData && rqData.categories) {
     fragenBank = convertRQtoQuizPfad(rqData);
+    renderCategorySelector();
     return;
   }
 
@@ -134,6 +137,68 @@ function convertRQtoQuizPfad(rqData) {
   return { kategorien, fragen };
 }
 
+// ── Category Selector ─────────────────────────────────────────
+function renderCategorySelector() {
+  if (!fragenBank || !fragenBank.kategorien.length) return;
+
+  const section = document.getElementById('category-section');
+  section.style.display = '';
+  const list = document.getElementById('cat-select-list');
+  list.innerHTML = '';
+
+  // Select all by default
+  selectedCategoryIds.clear();
+  fragenBank.kategorien.forEach(k => selectedCategoryIds.add(k.id));
+
+  fragenBank.kategorien.forEach(kat => {
+    const qCount = fragenBank.fragen.filter(q => q.kategorie === kat.id).length;
+    const item = document.createElement('div');
+    item.className = 'cat-select-item selected';
+    item.dataset.catId = kat.id;
+    item.innerHTML =
+      '<div class="cat-select-color" style="background:' + kat.farbe + ';"></div>' +
+      '<span class="cat-select-icon">' + kat.icon + '</span>' +
+      '<span class="cat-select-name">' + kat.name + '</span>' +
+      '<span class="cat-select-count">' + qCount + ' Fragen</span>' +
+      '<div class="cat-select-check">✓</div>';
+    item.onclick = () => {
+      if (selectedCategoryIds.has(kat.id)) {
+        selectedCategoryIds.delete(kat.id);
+        item.classList.remove('selected');
+      } else {
+        selectedCategoryIds.add(kat.id);
+        item.classList.add('selected');
+      }
+      updateCatSelectInfo();
+    };
+    list.appendChild(item);
+  });
+
+  updateCatSelectInfo();
+}
+
+function toggleAllCategories(selectAll) {
+  const items = document.querySelectorAll('.cat-select-item');
+  selectedCategoryIds.clear();
+  items.forEach(item => {
+    if (selectAll) {
+      selectedCategoryIds.add(item.dataset.catId);
+      item.classList.add('selected');
+    } else {
+      item.classList.remove('selected');
+    }
+  });
+  updateCatSelectInfo();
+}
+
+function updateCatSelectInfo() {
+  const total = fragenBank.kategorien.length;
+  const selected = selectedCategoryIds.size;
+  const qCount = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length;
+  document.getElementById('cat-select-info').textContent =
+    selected + ' von ' + total + ' Kategorien gewählt (' + qCount + ' Fragen)';
+}
+
 // ── Setup Screen ─────────────────────────────────────────────
 function renderTeamCountSelector(selected) {
   const row = document.getElementById('team-count-row');
@@ -182,6 +247,17 @@ function startGame() {
     return;
   }
 
+  if (selectedCategoryIds.size === 0) {
+    document.getElementById('setup-error').textContent = 'Bitte mindestens eine Kategorie auswählen!';
+    return;
+  }
+
+  // Filter fragenBank to selected categories
+  activeFragenBank = {
+    kategorien: fragenBank.kategorien.filter(k => selectedCategoryIds.has(k.id)),
+    fragen: fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie))
+  };
+
   // Build teams
   teams = [];
   document.querySelectorAll('.team-config-row').forEach((row, i) => {
@@ -215,7 +291,7 @@ function startGame() {
 // ── Board Generation ─────────────────────────────────────────
 function generateBoard() {
   const fields = [];
-  const kats = fragenBank.kategorien;
+  const kats = activeFragenBank.kategorien;
   const seed = Date.now();
 
   // Assign categories cyclically
@@ -298,10 +374,10 @@ function renderBoard() {
       if (field.type === 'goal') div.classList.add('goal-field');
       if (field.bonus) div.classList.add('bonus-field');
 
-      // Category color as left border accent
+      // Category fields get solid background color
       if (field.type === 'category') {
-        div.style.borderLeftColor = field.color;
-        div.style.borderLeftWidth = '4px';
+        div.classList.add('cat-field');
+        div.style.background = field.color;
       }
 
       // Highlight next field for active team
@@ -316,31 +392,21 @@ function renderBoard() {
       numEl.textContent = fieldIdx;
       div.appendChild(numEl);
 
-      // Icon
-      const iconEl = document.createElement('div');
-      iconEl.className = 'field-icon';
-      iconEl.textContent = field.icon;
-      div.appendChild(iconEl);
-
-      // Label (short)
-      if (field.type === 'category') {
-        const labelEl = document.createElement('div');
-        labelEl.className = 'field-label';
-        labelEl.textContent = field.label;
-        div.appendChild(labelEl);
-      }
-
-      // Bonus badge
+      // Icon or bonus symbol (large)
       if (field.bonus) {
         const bt = BONUS_TYPES.find(b => b.id === field.bonus);
         if (bt) {
-          div.style.borderColor = bt.color;
           const badge = document.createElement('div');
           badge.className = 'bonus-badge';
           badge.textContent = bt.icon;
           div.appendChild(badge);
         }
       }
+
+      const iconEl = document.createElement('div');
+      iconEl.className = 'field-icon';
+      iconEl.textContent = field.icon;
+      div.appendChild(iconEl);
 
       // Team pieces
       const piecesDiv = document.createElement('div');
@@ -416,6 +482,34 @@ function renderSidebar() {
   }
 
   document.getElementById('round-info').textContent = 'Runde ' + round;
+
+  // Render legend
+  renderLegend();
+}
+
+function renderLegend() {
+  const list = document.getElementById('legend-list');
+  if (!list || !activeFragenBank) return;
+  list.innerHTML = '';
+
+  activeFragenBank.kategorien.forEach(kat => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML =
+      '<div class="legend-color" style="background:' + kat.farbe + ';"></div>' +
+      '<span class="legend-name">' + kat.icon + ' ' + kat.name + '</span>';
+    list.appendChild(item);
+  });
+
+  // Bonus legend
+  BONUS_TYPES.forEach(bt => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML =
+      '<div class="legend-color" style="background:var(--bg-field);text-align:center;font-size:0.7rem;line-height:16px;">' + bt.icon + '</div>' +
+      '<span class="legend-name">' + bt.name + '</span>';
+    list.appendChild(item);
+  });
 }
 
 function updateTurnBanner() {
@@ -446,18 +540,18 @@ function askQuestion() {
 }
 
 function pickQuestion(kategorieId) {
-  if (!fragenBank || !fragenBank.fragen) return null;
+  if (!activeFragenBank || !activeFragenBank.fragen) return null;
 
   // Filter by category, exclude already used
-  let pool = fragenBank.fragen.filter(
+  let pool = activeFragenBank.fragen.filter(
     q => q.kategorie === kategorieId && !usedQuestionIds.has(q.id)
   );
 
   // If pool empty, reset used for this category
   if (pool.length === 0) {
-    const catIds = fragenBank.fragen.filter(q => q.kategorie === kategorieId).map(q => q.id);
+    const catIds = activeFragenBank.fragen.filter(q => q.kategorie === kategorieId).map(q => q.id);
     catIds.forEach(id => usedQuestionIds.delete(id));
-    pool = fragenBank.fragen.filter(q => q.kategorie === kategorieId);
+    pool = activeFragenBank.fragen.filter(q => q.kategorie === kategorieId);
   }
 
   if (pool.length === 0) return null;
@@ -471,7 +565,7 @@ function pickQuestion(kategorieId) {
 
 function showQuestionModal(question, field) {
   const modal = document.getElementById('question-modal');
-  const kat = fragenBank.kategorien.find(k => k.id === question.kategorie);
+  const kat = activeFragenBank.kategorien.find(k => k.id === question.kategorie);
 
   document.getElementById('q-cat-icon').textContent = kat ? kat.icon : '❓';
   document.getElementById('q-cat-name').textContent = kat ? kat.name : '';
@@ -711,7 +805,7 @@ function continueAfterBonus() {
 
 function startDuel(team1Idx, team2Idx) {
   // Pick a question from any category
-  const allKats = fragenBank.kategorien.map(k => k.id);
+  const allKats = activeFragenBank.kategorien.map(k => k.id);
   const randomKat = allKats[Math.floor(Math.random() * allKats.length)];
   const question = pickQuestion(randomKat);
 
@@ -733,7 +827,7 @@ function startDuel(team1Idx, team2Idx) {
 function showDuelQuestion(question, team1Idx, team2Idx, phase) {
   const modal = document.getElementById('question-modal');
   const team = teams[phase === 1 ? team1Idx : team2Idx];
-  const kat = fragenBank.kategorien.find(k => k.id === question.kategorie);
+  const kat = activeFragenBank.kategorien.find(k => k.id === question.kategorie);
 
   document.getElementById('q-cat-icon').textContent = '⚔️';
   document.getElementById('q-cat-name').textContent = 'Duell: ' + team.name;
