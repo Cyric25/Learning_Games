@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stadt Land Fluss - Spielgenerator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #E34F20;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .game-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: #E34F20;
+            border-radius: 2px;
+        }
+
+        /* Letter & Timer Row */
+        .letter-timer-row {
+            display: flex;
+            gap: 30px;
+            align-items: stretch;
+            margin: 20px 0;
+        }
+
+        .letter-timer-row > div {
+            flex: 1;
+        }
+
+        /* Letter Generator */
+        .letter-display {
+            background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+            color: white;
+            font-size: 8em;
+            font-weight: bold;
+            text-align: center;
+            padding: 40px;
+            border-radius: 15px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(227, 79, 32, 0.3);
+        }
+
+        .letter-display.spinning {
+            animation: spin 0.1s linear infinite;
+        }
+
+        @keyframes spin {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Excluded Letters */
+        .alphabet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .letter-btn {
+            padding: 12px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: 2px solid #E34F20;
+            background: white;
+            color: #E34F20;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .letter-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .letter-btn.excluded {
+            background: #e0e0e0;
+            color: #999;
+            border-color: #ccc;
+            text-decoration: line-through;
+        }
+
+        /* Timer */
+        .timer-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .timer-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .timer-input label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .timer-input input {
+            width: 80px;
+            padding: 10px;
+            font-size: 1em;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .timer-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        .timer-display {
+            font-size: 3.5em;
+            font-weight: bold;
+            text-align: center;
+            color: #E34F20;
+            margin: 15px 0;
+        }
+
+        .timer-display.warning {
+            color: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(227, 79, 32, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Categories */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin: 15px 0;
+        }
+
+        .category-item {
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .category-item:hover {
+            background: #e9ecef;
+            border-color: #E34F20;
+        }
+
+        .category-item.selected {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+            font-weight: 600;
+        }
+
+        .category-item.selected .category-check {
+            display: inline;
+        }
+
+        .category-check {
+            display: none;
+            color: #28a745;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .category-classic {
+            background: #fff3e0;
+            border-color: #E34F20;
+            font-weight: 600;
+        }
+
+        .category-classic.selected {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .category-delete {
+            background: none;
+            border: none;
+            color: #ccc;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .category-delete:hover {
+            color: #dc3545;
+            background: #fee;
+        }
+
+        .category-add-form {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .category-add-form input {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 1em;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+
+        .category-add-form input:focus {
+            outline: none;
+            border-color: #E34F20;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .info-box strong {
+            color: #856404;
+        }
+
+        /* Active Categories Display */
+        .active-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 20px;
+            background: #fff8f5;
+            border: 2px solid #E34F20;
+            border-radius: 15px;
+            min-height: 60px;
+            align-items: center;
+        }
+
+        .active-categories:empty::before {
+            content: 'Keine Kategorien gewählt – bitte unten auswählen';
+            color: #999;
+            font-style: italic;
+        }
+
+        .active-cat-tag {
+            background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 1.05em;
+            box-shadow: 0 2px 8px rgba(227, 79, 32, 0.25);
+        }
+
+        /* ── Dark Mode ───────────────────────────────────────── */
+        body.dark {
+            background: #1a1a2e;
+        }
+        body.dark .container {
+            background: #16213e;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        body.dark h1 { color: #f7971e; }
+        body.dark .section-title { color: #ffffff; }
+        body.dark .section-title::before { background: #f7971e; }
+        body.dark p { color: #a8a8b3; }
+        body.dark .letter-btn {
+            background: #0f3460;
+            border-color: #f7971e;
+            color: #f7971e;
+        }
+        body.dark .letter-btn:hover { background: #1a4a80; }
+        body.dark .letter-btn.excluded {
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.18);
+            border-color: rgba(255,255,255,0.08);
+        }
+        body.dark .timer-input label { color: #a8a8b3; }
+        body.dark .timer-input input {
+            background: #0f3460;
+            border-color: rgba(255,255,255,0.12);
+            color: #ffffff;
+        }
+        body.dark .timer-panel {
+            background: #0f3460;
+            box-shadow: none;
+        }
+        body.dark .timer-display { color: #f7971e; }
+        body.dark .btn-secondary { background: #0f3460; }
+        body.dark .category-item {
+            background: #0f3460;
+            border-color: rgba(255,255,255,0.1);
+            color: #a8a8b3;
+        }
+        body.dark .category-item:hover {
+            background: #1a4a80;
+            border-color: #f7971e;
+            color: #ffffff;
+        }
+        body.dark .category-item.selected {
+            background: rgba(46,204,113,0.12);
+            border-color: #2ecc71;
+            color: #2ecc71;
+        }
+        body.dark .category-classic {
+            border-color: rgba(247,151,30,0.45);
+            color: #ffffff;
+        }
+        body.dark .category-classic.selected {
+            background: rgba(46,204,113,0.12);
+            border-color: #2ecc71;
+        }
+        body.dark .category-delete { color: rgba(255,255,255,0.2); }
+        body.dark .category-delete:hover { color: #e74c3c; background: rgba(231,76,60,0.12); }
+        body.dark .category-add-form input {
+            background: #0f3460;
+            border-color: rgba(255,255,255,0.12);
+            color: #ffffff;
+        }
+        body.dark .info-box {
+            background: rgba(247,151,30,0.08);
+            border-color: rgba(247,151,30,0.25);
+            color: #a8a8b3;
+        }
+        body.dark .info-box strong { color: #f7971e; }
+        body.dark .active-categories {
+            background: #0f3460;
+            border-color: #f7971e;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .letter-timer-row {
+                flex-direction: column;
+            }
+
+            .letter-display {
+                font-size: 5em;
+                padding: 30px;
+                min-height: 160px;
+            }
+
+            .alphabet-grid {
+                grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            }
+
+            .timer-display {
+                font-size: 2em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+
+            .container {
+                padding: 15px;
+                border-radius: 14px;
+            }
+
+            h1 { font-size: 1.5em; margin-bottom: 20px; }
+
+            /* Buchstaben-Buttons: Touch-freundlich (min 44px) */
+            .letter-btn {
+                padding: 14px 6px;
+                min-height: 44px;
+                font-size: 1.1em;
+            }
+
+            .alphabet-grid {
+                grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+                gap: 6px;
+            }
+
+            /* Gezogener Buchstabe kleiner */
+            .letter-display {
+                font-size: 4em;
+                padding: 20px;
+                min-height: 130px;
+            }
+
+            /* Timer */
+            .timer-display { font-size: 1.8em; }
+            .timer-panel { padding: 20px 15px; }
+
+            /* Kategorien: eine Spalte */
+            .categories-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Aktive Tags kleiner */
+            .active-cat-tag { font-size: 0.95em; padding: 6px 12px; }
+
+            /* Buttons: volle Breite, stapeln */
+            .button-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn { padding: 14px 20px; text-align: center; }
+
+            /* Timer-Input */
+            .timer-controls { gap: 10px; }
+            .timer-input input { width: 65px; }
+
+            /* Section-Titel */
+            .section-title { font-size: 1.1em; }
+
+            /* Kategorie-hinzufügen */
+            .category-add-form { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <a href="../spiele.html" id="back-link" style="color:rgba(0,0,0,0.4);text-decoration:none;font-size:0.9rem;">← Übersicht</a>
+          <button id="btn-theme" onclick="toggleTheme()"
+            style="background:rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.15);border-radius:20px;
+                   padding:0.35rem 0.9rem;font-size:0.82rem;font-weight:600;cursor:pointer;color:#555;">
+            🌙 Darkmode
+          </button>
+        </div>
+        <h1>🎲 Stadt Land Fluss</h1>
+
+        <!-- Active Categories Display -->
+        <div class="game-section">
+            <h2 class="section-title">Aktive Kategorien</h2>
+            <div class="active-categories" id="activeCategories"></div>
+        </div>
+
+        <!-- Letter & Timer Side by Side -->
+        <div class="game-section">
+            <div class="letter-timer-row">
+                <div>
+                    <h2 class="section-title">Buchstabengenerator</h2>
+                    <div class="letter-display" id="letterDisplay">?</div>
+                    <div class="button-group" style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="generateLetter()">📝 Buchstabe ziehen</button>
+                        <button class="btn btn-secondary" onclick="resetExcludedLetters()">🔄 Neues Spiel (Reset)</button>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="section-title">Timer</h2>
+                    <div class="timer-panel">
+                        <div class="timer-controls">
+                            <div class="timer-input">
+                                <label for="timerMinutes">Min:</label>
+                                <input type="number" id="timerMinutes" min="0" max="59" value="3">
+                            </div>
+                            <div class="timer-input">
+                                <label for="timerSeconds">Sek:</label>
+                                <input type="number" id="timerSeconds" min="0" max="59" value="0">
+                            </div>
+                        </div>
+                        <div class="timer-display" id="timerDisplay">3:00</div>
+                        <div class="button-group">
+                            <button class="btn btn-success" onclick="startTimer()">▶️ Start</button>
+                            <button class="btn btn-danger" onclick="stopTimer()">⏸️ Stopp</button>
+                            <button class="btn btn-secondary" onclick="resetTimer()">🔄 Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Excluded Letters -->
+        <div class="game-section">
+            <h2 class="section-title">Buchstaben ausschließen</h2>
+            <p style="color: #666; margin-bottom: 10px;">Klicke auf Buchstaben, um sie auszuschließen:</p>
+            <div class="alphabet-grid" id="alphabetGrid"></div>
+        </div>
+
+        <!-- Categories -->
+        <div class="game-section">
+            <h2 class="section-title">Kategorien</h2>
+
+            <div class="info-box">
+                <strong>📌 Klassische Kategorien</strong> (hell hervorgehoben) &mdash; Eigene Kategorien können hinzugefügt und gelöscht werden.
+            </div>
+
+            <div class="category-add-form">
+                <input type="text" id="newCategoryInput" placeholder="Neue Kategorie eingeben..." onkeydown="if(event.key==='Enter') addCategory()">
+                <button class="btn btn-primary" onclick="addCategory()" style="padding: 12px 24px;">+ Hinzufügen</button>
+            </div>
+
+            <div class="categories-grid" id="categoriesGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        let excludedLetters = new Set(['Q', 'X', 'Y']);
+        let drawnLetters = new Set();
+        let timerInterval = null;
+        let remainingSeconds = 0;
+        let selectedCategories = new Set();
+        let allCategories = []; // merged list from JSON + localStorage
+
+        // ─── Category Storage (JSON file + localStorage overlay) ───
+        const LS_ADDED = 'slf_added_categories';
+        const LS_DELETED = 'slf_deleted_categories';
+
+        function getAddedCategories() {
+            return JSON.parse(localStorage.getItem(LS_ADDED) || '[]');
+        }
+
+        function getDeletedCategories() {
+            return JSON.parse(localStorage.getItem(LS_DELETED) || '[]');
+        }
+
+        function saveAddedCategory(name) {
+            const added = getAddedCategories();
+            added.push({ name, type: 'custom' });
+            localStorage.setItem(LS_ADDED, JSON.stringify(added));
+        }
+
+        function saveDeletedCategory(name) {
+            // If it was a user-added category, remove from added list
+            const added = getAddedCategories();
+            const idx = added.findIndex(c => c.name === name);
+            if (idx !== -1) {
+                added.splice(idx, 1);
+                localStorage.setItem(LS_ADDED, JSON.stringify(added));
+            } else {
+                // It's from the JSON file → mark as deleted
+                const deleted = getDeletedCategories();
+                deleted.push(name);
+                localStorage.setItem(LS_DELETED, JSON.stringify(deleted));
+            }
+        }
+
+        // Fallback if fetch fails (e.g. file:// protocol)
+        const fallbackCategories = [
+            { name: 'Stadt', type: 'classic' }, { name: 'Land', type: 'classic' },
+            { name: 'Fluss', type: 'classic' }, { name: 'Name', type: 'classic' },
+            { name: 'Tier', type: 'classic' }, { name: 'Beruf', type: 'classic' },
+            { name: 'Pflanze', type: 'standard' }, { name: 'Lebensmittel', type: 'standard' },
+            { name: 'Marke', type: 'standard' }, { name: 'Prominenter', type: 'standard' },
+            { name: 'Film/Serie', type: 'standard' }, { name: 'Musikband', type: 'standard' },
+            { name: 'Sportart', type: 'standard' }, { name: 'Hobby', type: 'standard' },
+            { name: 'Kleidungsstück', type: 'standard' }, { name: 'Farbe', type: 'standard' },
+            { name: 'Chemisches Element', type: 'school' }, { name: 'Historische Person', type: 'school' },
+            { name: 'Hauptstadt', type: 'school' }, { name: 'Gebirge', type: 'school' },
+            { name: 'Sprache', type: 'school' }, { name: 'Erfindung', type: 'school' },
+            { name: 'Krankheit', type: 'school' }, { name: 'Körperteil', type: 'school' },
+            { name: 'Schulfach', type: 'school' }, { name: 'Mathematischer Begriff', type: 'school' },
+            { name: 'Etwas Rundes', type: 'creative' }, { name: 'Etwas Weiches', type: 'creative' },
+            { name: 'Etwas im Bad', type: 'creative' }, { name: 'Etwas in der Küche', type: 'creative' },
+            { name: 'Etwas im Garten', type: 'creative' }, { name: 'Etwas das fliegt', type: 'creative' },
+            { name: 'Etwas das stinkt', type: 'creative' }, { name: 'Etwas Leckeres', type: 'creative' },
+            { name: 'Etwas Teures', type: 'creative' }, { name: 'Etwas das man sammeln kann', type: 'creative' },
+            { name: 'Automarke', type: 'advanced' }, { name: 'Getränk', type: 'advanced' },
+            { name: 'Werkzeug', type: 'advanced' }, { name: 'Möbelstück', type: 'advanced' },
+            { name: 'Musikinstrument', type: 'advanced' }, { name: 'Website', type: 'advanced' },
+            { name: 'App', type: 'advanced' }, { name: 'Videospiel', type: 'advanced' },
+            { name: 'Comic/Manga', type: 'advanced' }, { name: 'Superheld', type: 'advanced' }
+        ];
+
+        async function loadCategories() {
+            let baseCategories = [];
+            try {
+                const response = await fetch('categories.json');
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const data = await response.json();
+                baseCategories = data.categories || [];
+            } catch (e) {
+                console.warn('categories.json nicht erreichbar, verwende Fallback:', e.message);
+                baseCategories = fallbackCategories;
+            }
+
+            const deleted = getDeletedCategories();
+            const added = getAddedCategories();
+
+            allCategories = baseCategories
+                .filter(c => !deleted.includes(c.name))
+                .concat(added);
+        }
+
+        // ─── Initialize ───
+        async function init() {
+            await loadCategories();
+            createAlphabetGrid();
+            displayCategories();
+            updateTimerDisplay();
+        }
+
+        // ─── Alphabet Grid ───
+        function createAlphabetGrid() {
+            const grid = document.getElementById('alphabetGrid');
+            grid.innerHTML = '';
+            alphabet.forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = 'letter-btn';
+                btn.textContent = letter;
+                if (drawnLetters.has(letter)) {
+                    btn.classList.add('excluded');
+                    btn.title = 'Bereits gezogen';
+                } else if (excludedLetters.has(letter)) {
+                    btn.classList.add('excluded');
+                    btn.title = 'Ausgeschlossen';
+                } else {
+                    btn.title = 'Klicken zum Ausschließen';
+                }
+                btn.onclick = () => toggleLetter(letter);
+                grid.appendChild(btn);
+            });
+        }
+
+        function toggleLetter(letter) {
+            if (drawnLetters.has(letter)) return;
+            if (excludedLetters.has(letter)) {
+                excludedLetters.delete(letter);
+            } else {
+                excludedLetters.add(letter);
+            }
+            createAlphabetGrid();
+        }
+
+        function resetExcludedLetters() {
+            excludedLetters.clear();
+            drawnLetters.clear();
+            excludedLetters.add('Q');
+            excludedLetters.add('X');
+            excludedLetters.add('Y');
+            createAlphabetGrid();
+        }
+
+        // ─── Letter Generator ───
+        function generateLetter() {
+            const availableLetters = alphabet.filter(l => !excludedLetters.has(l) && !drawnLetters.has(l));
+            if (availableLetters.length === 0) {
+                alert('Alle verfügbaren Buchstaben wurden bereits gezogen! Setze die Liste zurück, um weiterzuspielen.');
+                return;
+            }
+            stopTimer();
+            const display = document.getElementById('letterDisplay');
+            display.classList.add('spinning');
+            let counter = 0;
+            const spinInterval = setInterval(() => {
+                display.textContent = availableLetters[Math.floor(Math.random() * availableLetters.length)];
+                counter++;
+                if (counter > 20) {
+                    clearInterval(spinInterval);
+                    display.classList.remove('spinning');
+                    const finalLetter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
+                    display.textContent = finalLetter;
+                    drawnLetters.add(finalLetter);
+                    createAlphabetGrid();
+                    showCountdownAndStartTimer();
+                }
+            }, 100);
+        }
+
+        function showCountdownAndStartTimer() {
+            startTimer();
+        }
+
+        // ─── Timer ───
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            const display = document.getElementById('timerDisplay');
+            display.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            if (remainingSeconds <= 10 && remainingSeconds > 0) {
+                display.classList.add('warning');
+            } else {
+                display.classList.remove('warning');
+            }
+        }
+
+        function startTimer() {
+            if (timerInterval) return;
+            const minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
+            const seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
+            remainingSeconds = minutes * 60 + seconds;
+            if (remainingSeconds === 0) { alert('Bitte gib eine Zeit ein!'); return; }
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                updateTimerDisplay();
+                if (remainingSeconds <= 0) {
+                    stopTimer();
+                    alert('⏰ Zeit ist um!');
+                    playSound();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+
+        function resetTimer() {
+            stopTimer();
+            const minutes = parseInt(document.getElementById('timerMinutes').value) || 0;
+            const seconds = parseInt(document.getElementById('timerSeconds').value) || 0;
+            remainingSeconds = minutes * 60 + seconds;
+            updateTimerDisplay();
+        }
+
+        function playSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            for (let i = 0; i < 3; i++) {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 880;
+                oscillator.type = 'square';
+                const startTime = audioContext.currentTime + (i * 0.3);
+                const endTime = startTime + 0.2;
+                gainNode.gain.setValueAtTime(0.5, startTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, endTime);
+                oscillator.start(startTime);
+                oscillator.stop(endTime);
+            }
+        }
+
+        // ─── Active Categories Display ───
+        function updateActiveDisplay() {
+            const container = document.getElementById('activeCategories');
+            container.innerHTML = '';
+            selectedCategories.forEach(name => {
+                const tag = document.createElement('span');
+                tag.className = 'active-cat-tag';
+                tag.textContent = name;
+                container.appendChild(tag);
+            });
+        }
+
+        // ─── Categories ───
+        function displayCategories() {
+            const grid = document.getElementById('categoriesGrid');
+            grid.innerHTML = '';
+
+            // Sort: classic first, then by name
+            const sorted = [...allCategories].sort((a, b) => {
+                if (a.type === 'classic' && b.type !== 'classic') return -1;
+                if (a.type !== 'classic' && b.type === 'classic') return 1;
+                return a.name.localeCompare(b.name, 'de');
+            });
+
+            sorted.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'category-item' + (cat.type === 'classic' ? ' category-classic' : '');
+                if (selectedCategories.has(cat.name)) item.classList.add('selected');
+
+                const check = document.createElement('span');
+                check.className = 'category-check';
+                check.textContent = '✓';
+
+                const label = document.createElement('span');
+                label.textContent = cat.name;
+                label.style.flex = '1';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'category-delete';
+                deleteBtn.textContent = '✕';
+                deleteBtn.title = 'Kategorie löschen';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    saveDeletedCategory(cat.name);
+                    selectedCategories.delete(cat.name);
+                    allCategories = allCategories.filter(c => c.name !== cat.name);
+                    displayCategories();
+                    updateActiveDisplay();
+                };
+
+                item.onclick = () => {
+                    if (selectedCategories.has(cat.name)) {
+                        selectedCategories.delete(cat.name);
+                        item.classList.remove('selected');
+                    } else {
+                        selectedCategories.add(cat.name);
+                        item.classList.add('selected');
+                    }
+                    updateActiveDisplay();
+                };
+
+                item.appendChild(check);
+                item.appendChild(label);
+                item.appendChild(deleteBtn);
+                grid.appendChild(item);
+            });
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategoryInput');
+            const name = input.value.trim();
+            if (!name) return;
+
+            if (allCategories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                alert('Diese Kategorie existiert bereits!');
+                return;
+            }
+
+            const newCat = { name, type: 'custom' };
+            saveAddedCategory(name);
+            allCategories.push(newCat);
+            input.value = '';
+            displayCategories();
+        }
+
+        // Initialize on load
+        init();
+
+        // ─── Theme Toggle ───
+        (function () {
+            const KEY = 'spiele_theme';
+            function applyTheme(dark) {
+                document.body.classList.toggle('dark', dark);
+                var btn = document.getElementById('btn-theme');
+                var link = document.getElementById('back-link');
+                if (btn) {
+                    btn.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+                    btn.style.background = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+                    btn.style.borderColor = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+                    btn.style.color = dark ? '#a8a8b3' : '#555';
+                }
+                if (link) link.style.color = dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+            }
+            window.toggleTheme = function () {
+                var isDark = !document.body.classList.contains('dark');
+                localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+                applyTheme(isDark);
+            };
+            applyTheme(localStorage.getItem(KEY) === 'dark');
+        })();
+    </script>
+</body>
+</html>

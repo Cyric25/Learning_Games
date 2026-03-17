@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Übungsmodus – Risiko-Quiz</title>
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    /* practice.html spezifisch – überschreibt body-overflow aus game.css */
+    body {
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pr-screen { display: none; flex-direction: column; flex: 1; }
+    .pr-screen.active { display: flex; }
+
+    /* ── Header ── */
+    .pr-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .pr-header-left { display: flex; align-items: center; gap: 0.8rem; }
+    .pr-header-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .pr-header-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .pr-btn {
+      padding: 0.55rem 1.2rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      color: #fff;
+    }
+    .pr-btn:hover { opacity: 0.85; transform: scale(1.03); }
+    .pr-btn-back    { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); }
+    .pr-btn-accent  { background: var(--accent); }
+    .pr-btn-success { background: var(--success); }
+    .pr-btn-danger  { background: var(--danger); }
+    .pr-btn-muted   { background: var(--bg-card); color: var(--text-secondary); }
+    .pr-btn-theme   { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ── Setup Screen ── */
+    .pr-setup-body {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 2rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+
+    .pr-section {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      border: 1px solid var(--border);
+    }
+    .pr-section-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-primary);
+      margin-bottom: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pr-select-all-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.7rem;
+    }
+    .pr-small-btn {
+      font-size: 0.78rem;
+      padding: 0.25rem 0.7rem;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .pr-small-btn:hover { background: var(--bg-card-hover); }
+
+    /* Category tree */
+    .pr-cat-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.4rem 0.2rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      user-select: none;
+      border-radius: 6px;
+    }
+    .pr-cat-header:hover { background: var(--bg-secondary); }
+    .pr-cat-arrow { font-size: 0.75rem; color: var(--text-secondary); transition: transform 0.2s; flex-shrink: 0; }
+    .pr-cat-header.collapsed .pr-cat-arrow { transform: rotate(-90deg); }
+    .pr-cat-children { padding-left: 0.8rem; }
+    .pr-cat-children.collapsed { display: none; }
+
+    .pr-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.25rem 0.4rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .pr-sub-row:hover { background: var(--bg-secondary); }
+    .pr-sub-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+    .pr-sub-label { font-size: 0.9rem; color: var(--text-primary); flex: 1; cursor: pointer; }
+    .pr-sub-count { font-size: 0.75rem; color: var(--text-secondary); }
+
+    /* Filter row */
+    .pr-filter-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .pr-radio-btn {
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .pr-radio-btn.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+    .pr-radio-btn:hover:not(.active) { border-color: var(--text-secondary); }
+
+    .pr-timer-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .pr-timer-row label { font-size: 0.9rem; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
+    .pr-timer-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+    .pr-timer-row input[type="number"] {
+      width: 70px;
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+    .pr-timer-row span { font-size: 0.85rem; color: var(--text-secondary); }
+
+    .pr-start-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .pr-start-btn {
+      padding: 0.85rem 2.5rem;
+      font-size: 1.1rem;
+      background: var(--accent);
+      border-radius: 10px;
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .pr-start-btn:hover { opacity: 0.88; transform: scale(1.03); }
+    .pr-start-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #pr-question-count-label { color: var(--text-secondary); font-size: 0.9rem; }
+
+    /* ── Question Screen ── */
+    .pr-q-body {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 1.2rem 1rem 2rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    /* Progress */
+    .pr-progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .pr-progress-label { font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; }
+    .pr-score-display {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--warning);
+    }
+    .pr-progress-bar-wrap {
+      background: var(--bg-card);
+      border-radius: 4px;
+      height: 6px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .pr-progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    /* Timer */
+    .pr-timer-bar-wrap {
+      background: var(--bg-card);
+      border-radius: 4px;
+      height: 5px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .pr-timer-bar-fill {
+      height: 100%;
+      background: var(--success);
+      border-radius: 4px;
+      transition: width 1s linear, background 0.5s;
+    }
+    .pr-timer-bar-fill.warn { background: var(--warning); }
+    .pr-timer-bar-fill.crit { background: var(--danger); }
+    .pr-timer-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: right;
+      margin-top: 0.2rem;
+    }
+
+    /* Question card */
+    .pr-question-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 1.6rem 1.8rem;
+      border: 1px solid var(--border);
+    }
+    .pr-q-meta {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      margin-bottom: 0.9rem;
+    }
+    .pr-q-type-badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 10px;
+      font-weight: 600;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+    .pr-q-type-badge.mc { background: rgba(52,152,219,0.2); color: #3498db; }
+    .pr-q-type-badge.open { background: rgba(46,204,113,0.15); color: var(--success); }
+    .pr-q-difficulty {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .pr-q-cat-label { font-size: 0.78rem; color: var(--text-secondary); }
+    .pr-q-text {
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      font-weight: 600;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+    .pr-q-hint {
+      margin-top: 0.7rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    /* MC Options */
+    .pr-mc-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+    .pr-mc-btn {
+      width: 100%;
+      padding: 0.9rem 1.2rem;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .pr-mc-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--bg-card-hover); }
+    .pr-mc-btn:disabled { cursor: default; }
+    .pr-mc-btn.correct  { border-color: var(--success); background: rgba(46,204,113,0.15); color: var(--success); }
+    .pr-mc-btn.wrong    { border-color: var(--danger); background: rgba(231,76,60,0.12); color: var(--danger); }
+    .pr-mc-btn.neutral  { opacity: 0.5; }
+    .pr-mc-letter {
+      font-weight: 700;
+      font-size: 0.9rem;
+      min-width: 1.6rem;
+      height: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .pr-mc-btn.correct .pr-mc-letter { background: var(--success); color: #fff; }
+    .pr-mc-btn.wrong .pr-mc-letter   { background: var(--danger); color: #fff; }
+
+    /* Open question */
+    .pr-open-section { margin-top: 1rem; }
+    .pr-reveal-btn {
+      width: 100%;
+      padding: 0.9rem;
+      border-radius: 10px;
+      border: 2px dashed var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .pr-reveal-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .pr-answer-box {
+      display: none;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      font-size: 1rem;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+    .pr-answer-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--success);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .pr-self-rate {
+      display: none;
+      gap: 0.8rem;
+      margin-top: 0.8rem;
+    }
+    .pr-self-rate .pr-btn {
+      flex: 1;
+      padding: 0.75rem;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    /* Feedback strip */
+    .pr-feedback {
+      display: none;
+      border-radius: 10px;
+      padding: 0.9rem 1.2rem;
+      font-size: 1rem;
+      font-weight: 700;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .pr-feedback.correct { background: rgba(46,204,113,0.15); color: var(--success); border: 1px solid rgba(46,204,113,0.3); }
+    .pr-feedback.wrong   { background: rgba(231,76,60,0.12); color: var(--danger); border: 1px solid rgba(231,76,60,0.3); }
+
+    /* Next button */
+    .pr-next-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.8rem;
+    }
+    .pr-next-btn {
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      display: none;
+    }
+    .pr-next-btn:hover { opacity: 0.88; transform: scale(1.03); }
+    .pr-next-btn.visible { display: block; }
+
+    /* ── Results Screen ── */
+    .pr-results-body {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 2rem 1rem 2rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    .pr-results-trophy { font-size: 5rem; line-height: 1; }
+    .pr-results-title { font-size: 2rem; font-weight: 800; color: var(--text-primary); }
+    .pr-results-score { font-size: 3rem; font-weight: 800; color: var(--warning); }
+    .pr-results-stats {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .pr-stat-box {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      text-align: center;
+      min-width: 120px;
+      border: 1px solid var(--border);
+    }
+    .pr-stat-num { font-size: 2rem; font-weight: 800; }
+    .pr-stat-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
+    .pr-results-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+
+    /* Category breakdown */
+    .pr-cat-results {
+      width: 100%;
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      border: 1px solid var(--border);
+    }
+    .pr-cat-results h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.9rem; color: var(--text-primary); }
+    .pr-cat-result-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    .pr-cat-result-row:last-child { border-bottom: none; }
+    .pr-cat-result-name { flex: 1; color: var(--text-primary); }
+    .pr-cat-result-correct { color: var(--success); font-weight: 600; min-width: 30px; text-align: center; }
+    .pr-cat-result-total { color: var(--text-secondary); min-width: 40px; }
+    .pr-cat-result-bar-wrap { width: 80px; background: var(--bg-secondary); border-radius: 3px; height: 5px; flex-shrink: 0; }
+    .pr-cat-result-bar { height: 100%; border-radius: 3px; background: var(--success); }
+
+    /* No questions warning */
+    .pr-no-q-msg {
+      color: var(--danger);
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.5rem 0;
+    }
+
+    @media (max-width: 520px) {
+      .pr-question-card { padding: 1rem 1rem; }
+      .pr-mc-btn { font-size: 0.85rem; padding: 0.75rem 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- Screen 1: Setup                                           -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-setup" class="pr-screen active">
+
+  <header class="pr-header">
+    <div class="pr-header-left">
+      <button class="pr-btn pr-btn-back" onclick="window.location.href='../spiele.html'">← Zurück</button>
+      <div>
+        <div class="pr-header-title">📚 Übungsmodus</div>
+        <div class="pr-header-subtitle">Alleine lernen &amp; üben</div>
+      </div>
+    </div>
+    <button class="pr-btn pr-btn-theme" id="btn-theme" onclick="toggleTheme()">☀️ Light</button>
+  </header>
+
+  <div class="pr-setup-body">
+
+    <!-- Kategorie-Auswahl -->
+    <div class="pr-section">
+      <div class="pr-section-title">
+        <span>📂 Kategorien wählen</span>
+        <div class="pr-select-all-row">
+          <button class="pr-small-btn" onclick="selectAllSubs(true)">Alle</button>
+          <button class="pr-small-btn" onclick="selectAllSubs(false)">Keine</button>
+        </div>
+      </div>
+      <div id="pr-cat-list">
+        <div style="color:var(--text-secondary);font-size:0.9rem;">Fragen werden geladen…</div>
+      </div>
+    </div>
+
+    <!-- Fragentyp -->
+    <div class="pr-section">
+      <div class="pr-section-title">🎯 Fragentyp</div>
+      <div class="pr-filter-row" id="pr-type-filter">
+        <button class="pr-radio-btn active" data-val="all" onclick="setTypeFilter(this)">Alle</button>
+        <button class="pr-radio-btn" data-val="mc" onclick="setTypeFilter(this)">Nur MC</button>
+        <button class="pr-radio-btn" data-val="open" onclick="setTypeFilter(this)">Nur Offen</button>
+      </div>
+    </div>
+
+    <!-- Timer -->
+    <div class="pr-section">
+      <div class="pr-section-title">⏱ Timer</div>
+      <div class="pr-timer-row">
+        <label>
+          <input type="checkbox" id="pr-timer-enabled"> Timer aktivieren
+        </label>
+        <input type="number" id="pr-timer-seconds" value="30" min="5" max="300" step="5">
+        <span>Sekunden</span>
+      </div>
+    </div>
+
+    <!-- Start -->
+    <div class="pr-start-row">
+      <button class="pr-start-btn" id="pr-start-btn" onclick="startPractice()" disabled>
+        ▶ Üben starten
+      </button>
+      <span id="pr-question-count-label"></span>
+    </div>
+    <div id="pr-no-q-msg" class="pr-no-q-msg" style="display:none;">
+      Keine Fragen für die gewählten Filter vorhanden.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- Screen 2: Question                                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-question" class="pr-screen">
+
+  <header class="pr-header">
+    <div class="pr-header-left">
+      <div>
+        <div class="pr-header-title" id="pr-q-header-title">Frage 1 / 10</div>
+        <div class="pr-header-subtitle" id="pr-q-header-sub"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.7rem;">
+      <span class="pr-score-display" id="pr-header-score">0 Punkte</span>
+      <button class="pr-btn pr-btn-muted" onclick="abortPractice()">✕ Abbrechen</button>
+    </div>
+  </header>
+
+  <div class="pr-q-body">
+
+    <!-- Progress bar -->
+    <div>
+      <div class="pr-progress-row">
+        <span class="pr-progress-label" id="pr-progress-label">Frage 1 von 10</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary)" id="pr-score-label">0 Pkt.</span>
+      </div>
+      <div class="pr-progress-bar-wrap" style="margin-top:0.4rem;">
+        <div class="pr-progress-bar-fill" id="pr-progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Timer bar (optional) -->
+    <div id="pr-timer-section" style="display:none;">
+      <div class="pr-timer-bar-wrap">
+        <div class="pr-timer-bar-fill" id="pr-timer-fill"></div>
+      </div>
+      <div class="pr-timer-label" id="pr-timer-text">30s</div>
+    </div>
+
+    <!-- Question card -->
+    <div class="pr-question-card">
+      <div class="pr-q-meta">
+        <span class="pr-q-type-badge" id="pr-q-type-badge">MC</span>
+        <span class="pr-q-difficulty" id="pr-q-difficulty-badge">100</span>
+        <span class="pr-q-cat-label" id="pr-q-cat-label"></span>
+      </div>
+      <div class="pr-q-text" id="pr-q-text"></div>
+      <div class="pr-q-hint" id="pr-q-hint" style="display:none;"></div>
+
+      <!-- MC options -->
+      <div class="pr-mc-options" id="pr-mc-options" style="display:none;"></div>
+
+      <!-- Open question -->
+      <div class="pr-open-section" id="pr-open-section" style="display:none;">
+        <button class="pr-reveal-btn" id="pr-reveal-btn" onclick="revealAnswer()">
+          💡 Lösung anzeigen
+        </button>
+        <div class="pr-answer-box" id="pr-answer-box">
+          <div class="pr-answer-label">Antwort</div>
+          <div id="pr-answer-text"></div>
+        </div>
+        <div class="pr-self-rate" id="pr-self-rate" style="display:flex;">
+          <button class="pr-btn pr-btn-success" onclick="rateAnswer(true)">✓ Richtig</button>
+          <button class="pr-btn pr-btn-danger"  onclick="rateAnswer(false)">✗ Falsch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="pr-feedback" id="pr-feedback"></div>
+
+    <!-- Next -->
+    <div class="pr-next-row">
+      <button class="pr-next-btn" id="pr-next-btn" onclick="nextQuestion()">Weiter →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- Screen 3: Results                                         -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-results" class="pr-screen">
+
+  <header class="pr-header">
+    <div class="pr-header-left">
+      <div class="pr-header-title">Ergebnis</div>
+    </div>
+    <button class="pr-btn pr-btn-back" onclick="window.location.href='../spiele.html'">← Startseite</button>
+  </header>
+
+  <div class="pr-results-body">
+    <div class="pr-results-trophy" id="pr-results-trophy">🏆</div>
+    <div class="pr-results-title" id="pr-results-title">Gut gemacht!</div>
+    <div class="pr-results-score" id="pr-results-score">0</div>
+    <div style="color:var(--text-secondary);font-size:0.9rem;">Punkte</div>
+
+    <div class="pr-results-stats">
+      <div class="pr-stat-box">
+        <div class="pr-stat-num" id="pr-stat-correct" style="color:var(--success)">0</div>
+        <div class="pr-stat-label">Richtig</div>
+      </div>
+      <div class="pr-stat-box">
+        <div class="pr-stat-num" id="pr-stat-wrong" style="color:var(--danger)">0</div>
+        <div class="pr-stat-label">Falsch</div>
+      </div>
+      <div class="pr-stat-box">
+        <div class="pr-stat-num" id="pr-stat-pct" style="color:var(--warning)">0%</div>
+        <div class="pr-stat-label">Trefferquote</div>
+      </div>
+    </div>
+
+    <!-- Per-category breakdown -->
+    <div class="pr-cat-results" id="pr-cat-results"></div>
+
+    <div class="pr-results-actions">
+      <button class="pr-start-btn" onclick="resetToSetup()">🔄 Nochmal</button>
+      <button class="pr-btn pr-btn-back" style="padding:0.75rem 1.5rem;font-size:1rem;"
+        onclick="window.location.href='../spiele.html'">← Startseite</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<script src="js/shared.js"></script>
+<script>
+  // ── State ─────────────────────────────────────────────────
+  let questionBank   = { categories: [] };
+  let selectedQs     = [];
+  let currentIdx     = 0;
+  let score          = 0;
+  let correctCount   = 0;
+  let wrongCount     = 0;
+  let answered       = false;
+  let typeFilter     = 'all';   // 'all' | 'mc' | 'open'
+  let timerEnabled   = false;
+  let timerSeconds   = 30;
+  let timerLeft      = 0;
+  let timerInterval  = null;
+  let catStats       = {};   // subId → { correct, total, name }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function el(id) { return document.getElementById(id); }
+
+  function showScreen(id) {
+    document.querySelectorAll('.pr-screen').forEach(s => s.classList.remove('active'));
+    el(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function diffColor(d) {
+    const map = { 100: '#3498db', 200: '#2ecc71', 300: '#f39c12', 400: '#e67e22', 500: '#e74c3c' };
+    return map[d] || '#888';
+  }
+
+  function getAllQsInNode(node, subId, subName) {
+    let qs = (node.questions || []).map(q => ({ ...q, _subId: subId, _subName: subName }));
+    for (const child of (node.subcategories || [])) {
+      qs = qs.concat(getAllQsInNode(child, subId, subName));
+    }
+    return qs;
+  }
+
+  // ── Load ──────────────────────────────────────────────────
+  async function init() {
+    questionBank = await StorageManager.loadQuestions();
+    buildCategoryList();
+    updateQuestionCount();
+  }
+
+  // ── Category selection UI ─────────────────────────────────
+  function buildCategoryList() {
+    const container = el('pr-cat-list');
+    const cats = questionBank.categories || [];
+
+    if (cats.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-secondary);font-size:0.9rem;">Keine Fragen gefunden. Bitte zuerst Fragen im Admin-Bereich anlegen.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    cats.forEach(cat => {
+      const subs = cat.subcategories || [];
+      if (subs.length === 0) return;
+
+      // Main category header
+      const catDiv = document.createElement('div');
+      catDiv.style.marginBottom = '0.5rem';
+
+      const header = document.createElement('div');
+      header.className = 'pr-cat-header';
+      header.innerHTML = `<span class="pr-cat-arrow">▼</span> <span>${escHtml(cat.name)}</span>`;
+      header.onclick = () => {
+        header.classList.toggle('collapsed');
+        childrenDiv.classList.toggle('collapsed');
+      };
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'pr-cat-children';
+
+      subs.forEach(sub => {
+        const allQs = getAllQsInNode(sub, sub.id, sub.name);
+        if (allQs.length === 0) return;
+
+        const row = document.createElement('div');
+        row.className = 'pr-sub-row';
+        row.onclick = (e) => { if (e.target !== cb) cb.click(); };
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.dataset.subId = sub.id;
+        cb.className = 'sub-check';
+        cb.addEventListener('change', updateQuestionCount);
+
+        const lbl = document.createElement('span');
+        lbl.className = 'pr-sub-label';
+        lbl.textContent = sub.name;
+
+        const cnt = document.createElement('span');
+        cnt.className = 'pr-sub-count';
+        cnt.textContent = `(${allQs.length})`;
+
+        row.appendChild(cb);
+        row.appendChild(lbl);
+        row.appendChild(cnt);
+        childrenDiv.appendChild(row);
+      });
+
+      catDiv.appendChild(header);
+      catDiv.appendChild(childrenDiv);
+      container.appendChild(catDiv);
+    });
+  }
+
+  function selectAllSubs(checked) {
+    document.querySelectorAll('.sub-check').forEach(cb => { cb.checked = checked; });
+    updateQuestionCount();
+  }
+
+  function setTypeFilter(btn) {
+    document.querySelectorAll('#pr-type-filter .pr-radio-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    typeFilter = btn.dataset.val;
+    updateQuestionCount();
+  }
+
+  function collectSelectedQuestions() {
+    const checkedIds = new Set(
+      [...document.querySelectorAll('.sub-check:checked')].map(cb => cb.dataset.subId)
+    );
+    const cats = questionBank.categories || [];
+    let qs = [];
+    cats.forEach(cat => {
+      (cat.subcategories || []).forEach(sub => {
+        if (checkedIds.has(sub.id)) {
+          qs = qs.concat(getAllQsInNode(sub, sub.id, sub.name));
+        }
+      });
+    });
+    // Type filter
+    if (typeFilter === 'mc') qs = qs.filter(q => q.type === 'mc');
+    if (typeFilter === 'open') qs = qs.filter(q => q.type === 'open');
+    return qs;
+  }
+
+  function updateQuestionCount() {
+    const qs = collectSelectedQuestions();
+    const n = qs.length;
+    const btn = el('pr-start-btn');
+    const lbl = el('pr-question-count-label');
+    const noQ = el('pr-no-q-msg');
+    if (n === 0) {
+      btn.disabled = true;
+      lbl.textContent = '';
+      noQ.style.display = 'block';
+    } else {
+      btn.disabled = false;
+      lbl.textContent = `${n} Frage${n !== 1 ? 'n' : ''} verfügbar`;
+      noQ.style.display = 'none';
+    }
+  }
+
+  // ── Start ─────────────────────────────────────────────────
+  function startPractice() {
+    const qs = collectSelectedQuestions();
+    if (qs.length === 0) return;
+
+    selectedQs   = shuffle(qs);
+    currentIdx   = 0;
+    score        = 0;
+    correctCount = 0;
+    wrongCount   = 0;
+    catStats     = {};
+    timerEnabled = el('pr-timer-enabled').checked;
+    timerSeconds = parseInt(el('pr-timer-seconds').value) || 30;
+
+    showScreen('screen-question');
+    displayQuestion();
+  }
+
+  function abortPractice() {
+    stopTimer();
+    showResults();
+  }
+
+  // ── Question display ──────────────────────────────────────
+  function displayQuestion() {
+    const q = selectedQs[currentIdx];
+    answered = false;
+
+    // Header / progress
+    const total = selectedQs.length;
+    const num   = currentIdx + 1;
+    el('pr-q-header-title').textContent = `Frage ${num} / ${total}`;
+    el('pr-q-header-sub').textContent   = q._subName || '';
+    el('pr-header-score').textContent   = `${score} Pkt.`;
+    el('pr-progress-label').textContent = `Frage ${num} von ${total}`;
+    el('pr-score-label').textContent    = `${score} Pkt.`;
+    el('pr-progress-fill').style.width  = `${((num - 1) / total) * 100}%`;
+
+    // Meta
+    const typeBadge = el('pr-q-type-badge');
+    typeBadge.textContent = q.type === 'mc' ? 'Multiple Choice' : 'Offen';
+    typeBadge.className = `pr-q-type-badge ${q.type}`;
+    const diffBadge = el('pr-q-difficulty-badge');
+    diffBadge.textContent = `${q.difficulty} Pkt.`;
+    diffBadge.style.background = diffColor(q.difficulty);
+    el('pr-q-cat-label').textContent = q._subName || '';
+
+    // Question text
+    el('pr-q-text').textContent = q.question;
+
+    // Hint
+    if (q.hint) {
+      el('pr-q-hint').textContent = `Hinweis: ${q.hint}`;
+      el('pr-q-hint').style.display = '';
+    } else {
+      el('pr-q-hint').style.display = 'none';
+    }
+
+    // Reset UI
+    el('pr-feedback').style.display = 'none';
+    el('pr-feedback').className     = 'pr-feedback';
+    el('pr-next-btn').classList.remove('visible');
+
+    if (q.type === 'mc') {
+      buildMcOptions(q);
+      el('pr-mc-options').style.display = '';
+      el('pr-open-section').style.display = 'none';
+    } else {
+      el('pr-mc-options').style.display = 'none';
+      el('pr-open-section').style.display = '';
+      el('pr-reveal-btn').style.display = '';
+      el('pr-answer-box').style.display = 'none';
+      el('pr-self-rate').style.display = 'none';
+      el('pr-answer-text').textContent = q.answer || '';
+    }
+
+    // Timer
+    if (timerEnabled) {
+      el('pr-timer-section').style.display = '';
+      startTimer(timerSeconds);
+    } else {
+      el('pr-timer-section').style.display = 'none';
+    }
+  }
+
+  function buildMcOptions(q) {
+    const container = el('pr-mc-options');
+    container.innerHTML = '';
+    const letters = ['A', 'B', 'C', 'D'];
+    (q.options || []).forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'pr-mc-btn';
+      btn.innerHTML = `<span class="pr-mc-letter">${letters[idx]}</span>${escHtml(opt)}`;
+      btn.onclick = () => selectMcOption(idx, q);
+      container.appendChild(btn);
+    });
+  }
+
+  // ── MC answer ─────────────────────────────────────────────
+  function selectMcOption(idx, q) {
+    if (answered) return;
+    answered = true;
+    stopTimer();
+
+    const correct = idx === q.correctIndex;
+    const btns = el('pr-mc-options').querySelectorAll('.pr-mc-btn');
+    btns.forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === q.correctIndex) btn.classList.add('correct');
+      else if (i === idx && !correct) btn.classList.add('wrong');
+      else btn.classList.add('neutral');
+    });
+
+    showFeedback(correct, q);
+    updateStats(correct, q);
+  }
+
+  // ── Open answer ───────────────────────────────────────────
+  function revealAnswer() {
+    el('pr-reveal-btn').style.display = 'none';
+    el('pr-answer-box').style.display = '';
+    el('pr-self-rate').style.display  = 'flex';
+  }
+
+  function rateAnswer(correct) {
+    if (answered) return;
+    answered = true;
+    stopTimer();
+    el('pr-self-rate').querySelectorAll('button').forEach(b => b.disabled = true);
+    showFeedback(correct, selectedQs[currentIdx]);
+    updateStats(correct, selectedQs[currentIdx]);
+  }
+
+  function showFeedback(correct, q) {
+    const fb = el('pr-feedback');
+    fb.style.display = 'flex';
+    if (correct) {
+      fb.className = 'pr-feedback correct';
+      fb.textContent = `✓ Richtig! +${q.difficulty} Punkte`;
+    } else {
+      fb.className = 'pr-feedback wrong';
+      fb.textContent = '✗ Falsch';
+    }
+    el('pr-next-btn').classList.add('visible');
+  }
+
+  function updateStats(correct, q) {
+    if (correct) {
+      score += q.difficulty;
+      correctCount++;
+    } else {
+      wrongCount++;
+    }
+    el('pr-header-score').textContent = `${score} Pkt.`;
+    el('pr-score-label').textContent  = `${score} Pkt.`;
+
+    // Per-category stats
+    const sid = q._subId || 'other';
+    if (!catStats[sid]) catStats[sid] = { name: q._subName || sid, correct: 0, total: 0 };
+    catStats[sid].total++;
+    if (correct) catStats[sid].correct++;
+  }
+
+  // ── Timer ─────────────────────────────────────────────────
+  function startTimer(seconds) {
+    stopTimer();
+    timerLeft = seconds;
+    updateTimerBar(seconds, seconds);
+
+    timerInterval = setInterval(() => {
+      timerLeft--;
+      updateTimerBar(timerLeft, seconds);
+      if (timerLeft <= 0) {
+        stopTimer();
+        playTimerSound();
+        // Mark as wrong if not yet answered (only for auto-advance)
+        if (!answered) {
+          if (selectedQs[currentIdx].type === 'mc') {
+            // Reveal correct answer without scoring
+            answered = true;
+            const btns = el('pr-mc-options').querySelectorAll('.pr-mc-btn');
+            const q = selectedQs[currentIdx];
+            btns.forEach((btn, i) => {
+              btn.disabled = true;
+              if (i === q.correctIndex) btn.classList.add('correct');
+              else btn.classList.add('neutral');
+            });
+            updateStats(false, q);
+            showFeedback(false, q);
+          } else {
+            // Open: just show "Zeit abgelaufen"
+            const fb = el('pr-feedback');
+            fb.style.display = 'flex';
+            fb.className = 'pr-feedback wrong';
+            fb.textContent = '⏱ Zeit abgelaufen!';
+            el('pr-reveal-btn').style.display = 'none';
+            el('pr-answer-box').style.display = '';
+            el('pr-self-rate').style.display = 'none';
+            el('pr-next-btn').classList.add('visible');
+          }
+        }
+      }
+    }, 1000);
+  }
+
+  function updateTimerBar(left, total) {
+    const pct = Math.max(0, left / total) * 100;
+    const fill = el('pr-timer-fill');
+    fill.style.width = `${pct}%`;
+    el('pr-timer-text').textContent = `${left}s`;
+    fill.className = 'pr-timer-bar-fill';
+    if (pct <= 30) fill.classList.add('crit');
+    else if (pct <= 60) fill.classList.add('warn');
+  }
+
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function playTimerSound() {
+    try {
+      const ctx = new (window.AudioContext || /** @type {any} */(window).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.6, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.8);
+    } catch { /* AudioContext not available */ }
+  }
+
+  // ── Next / Results ────────────────────────────────────────
+  function nextQuestion() {
+    currentIdx++;
+    if (currentIdx >= selectedQs.length) {
+      showResults();
+    } else {
+      displayQuestion();
+    }
+  }
+
+  function showResults() {
+    stopTimer();
+    const total = selectedQs.length;
+    const played = correctCount + wrongCount;
+    const pct = played > 0 ? Math.round(correctCount / played * 100) : 0;
+
+    // Trophy
+    let trophy = '🏆';
+    let title  = 'Ausgezeichnet!';
+    if (pct < 50) { trophy = '📚'; title = 'Weiter üben!'; }
+    else if (pct < 75) { trophy = '👍'; title = 'Gut gemacht!'; }
+    else if (pct < 90) { trophy = '⭐'; title = 'Sehr gut!'; }
+
+    el('pr-results-trophy').textContent = trophy;
+    el('pr-results-title').textContent  = title;
+    el('pr-results-score').textContent  = score;
+    el('pr-stat-correct').textContent   = correctCount;
+    el('pr-stat-wrong').textContent     = wrongCount;
+    el('pr-stat-pct').textContent       = `${pct}%`;
+
+    // Per-category breakdown
+    const catResultsEl = el('pr-cat-results');
+    if (Object.keys(catStats).length > 0) {
+      let html = '<h3>Nach Kategorie</h3>';
+      Object.values(catStats).sort((a, b) => b.total - a.total).forEach(s => {
+        const subPct = s.total > 0 ? Math.round(s.correct / s.total * 100) : 0;
+        html += `
+          <div class="pr-cat-result-row">
+            <span class="pr-cat-result-name">${escHtml(s.name)}</span>
+            <span class="pr-cat-result-correct">${s.correct}</span>
+            <span class="pr-cat-result-total">/ ${s.total}</span>
+            <div class="pr-cat-result-bar-wrap">
+              <div class="pr-cat-result-bar" style="width:${subPct}%"></div>
+            </div>
+          </div>`;
+      });
+      catResultsEl.innerHTML = html;
+      catResultsEl.style.display = '';
+    } else {
+      catResultsEl.style.display = 'none';
+    }
+
+    showScreen('screen-results');
+  }
+
+  function resetToSetup() {
+    showScreen('screen-setup');
+    updateQuestionCount();
+  }
+
+  // ── XSS-safe ─────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Theme (Dark Standard) ─────────────────────────────────
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(light) {
+      document.body.classList.toggle('light', light);
+      const btn = el('btn-theme');
+      if (btn) btn.textContent = light ? '🌙 Dark' : '☀️ Light';
+    }
+    window.toggleTheme = function () {
+      const isLight = !document.body.classList.contains('light');
+      localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+      applyTheme(isLight);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'light');
+  })();
+
+  // ── Init ──────────────────────────────────────────────────
+  init();
+</script>
+</body>
+</html>

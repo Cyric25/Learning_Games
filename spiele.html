@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spiele – Unterricht</title>
+  <style>
+    /* ── CSS-Variablen: Light Mode (SLF-Stil, Standard) ── */
+    :root {
+      --bg-body:            linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+      --bg-container:       #ffffff;
+      --container-shadow:   0 20px 60px rgba(0,0,0,0.25);
+      --title-color:        #ffffff;
+      --title-span-color:   rgba(255,255,255,0.82);
+      --subtitle-color:     rgba(255,255,255,0.85);
+      --card-bg:            #f8f9fa;
+      --card-border:        #e0e0e0;
+      --card-hover-border:  #E34F20;
+      --card-shadow-hover:  0 12px 35px rgba(227,79,32,0.2);
+      --card-title-color:   #222;
+      --card-desc-color:    #555;
+      --tag-bg:             #ffe8df;
+      --tag-color:          #c73518;
+      --btn-play-bg:        linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+      --btn-admin-bg:       #6c757d;
+      --btn-admin-color:    #fff;
+      --btn-admin-border:   transparent;
+      --footer-color:       rgba(255,255,255,0.75);
+      --footer-border:      rgba(255,255,255,0.2);
+      --toggle-bg:          rgba(255,255,255,0.18);
+      --toggle-border:      rgba(255,255,255,0.3);
+      --toggle-color:       #ffffff;
+    }
+
+    /* ── CSS-Variablen: Dark Mode ── */
+    body.dark {
+      --bg-body:            #1a1a2e;
+      --bg-container:       transparent;
+      --container-shadow:   none;
+      --title-color:        #ffffff;
+      --title-span-color:   #e94560;
+      --subtitle-color:     #a8a8b3;
+      --card-bg:            #16213e;
+      --card-border:        rgba(255,255,255,0.1);
+      --card-hover-border:  #e94560;
+      --card-shadow-hover:  0 12px 40px rgba(0,0,0,0.4);
+      --card-title-color:   #ffffff;
+      --card-desc-color:    #a8a8b3;
+      --tag-bg:             #0f3460;
+      --tag-color:          #a8a8b3;
+      --btn-play-bg:        #e94560;
+      --btn-admin-bg:       #0f3460;
+      --btn-admin-color:    #ffffff;
+      --btn-admin-border:   rgba(255,255,255,0.1);
+      --footer-color:       #a8a8b3;
+      --footer-border:      rgba(255,255,255,0.1);
+      --toggle-bg:          rgba(255,255,255,0.07);
+      --toggle-border:      rgba(255,255,255,0.12);
+      --toggle-color:       #a8a8b3;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-body);
+      color: var(--card-title-color);
+      display: flex;
+      flex-direction: column;
+      transition: background 0.35s;
+    }
+
+    /* ── Seiten-Container ── */
+    .page-wrap {
+      width: 100%;
+      padding: clamp(0.8rem, 2vw, 2rem) clamp(0.8rem, 2vw, 2rem) 0;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.5rem, 1vh, 1rem);
+    }
+
+    /* ── Header ── */
+    .page-header {
+      text-align: center;
+      padding: clamp(0.5rem, 1.5vh, 1.5rem) 0 clamp(0.3rem, 0.8vh, 0.8rem);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .page-header h1 {
+      font-size: clamp(1.6rem, 4vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: var(--title-color);
+    }
+
+    .page-header h1 span { color: var(--title-span-color); }
+
+    .page-header p {
+      color: var(--subtitle-color);
+      margin-top: 0.3rem;
+      font-size: clamp(0.85rem, 1.3vw, 1.2rem);
+    }
+
+    /* ── Header-Buttons oben rechts ── */
+    .header-controls {
+      position: absolute;
+      top: clamp(0.5rem, 1.5vh, 1.5rem);
+      right: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .header-btn {
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      color: var(--toggle-color);
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: clamp(0.75rem, 1vw, 0.95rem);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: opacity 0.2s, transform 0.15s;
+      white-space: nowrap;
+    }
+
+    .header-btn:hover { opacity: 0.8; transform: scale(1.04); }
+
+    /* Lehrermodus-Badge */
+    #btn-teacher-mode {
+      background: rgba(46, 204, 113, 0.25);
+      border-color: rgba(46, 204, 113, 0.5);
+      color: #fff;
+      display: none; /* wird per JS gesteuert */
+    }
+
+    body.teacher #btn-teacher-mode {
+      display: flex;
+    }
+
+    /* ── Inhalt-Box ── */
+    .content-box {
+      background: var(--bg-container);
+      border-radius: clamp(12px, 1.5vw, 20px);
+      box-shadow: var(--container-shadow);
+      padding: clamp(0.8rem, 2vw, 2rem);
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.dark .content-box {
+      padding: 0;
+      box-shadow: none;
+      background: transparent;
+    }
+
+    /* ── Spiele-Grid ── */
+    .games-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(1rem, 2vw, 2rem);
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Spielkarte ── */
+    .game-card {
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: clamp(10px, 1.2vw, 16px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      min-height: 0;
+    }
+
+    .game-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--card-shadow-hover);
+      border-color: var(--card-hover-border);
+    }
+
+    .card-banner {
+      height: clamp(100px, 18vh, 260px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(3rem, 8vw, 8rem);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .card-banner::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.15);
+    }
+
+    .card-emoji { position: relative; z-index: 1; }
+
+    .card-body {
+      padding: clamp(0.8rem, 1.8vw, 1.8rem) clamp(1rem, 2vw, 2rem);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .card-title {
+      font-size: clamp(1.2rem, 2.2vw, 2.4rem);
+      font-weight: 700;
+      margin-bottom: clamp(0.3rem, 0.8vh, 0.8rem);
+      color: var(--card-title-color);
+    }
+
+    .card-desc {
+      color: var(--card-desc-color);
+      font-size: clamp(0.82rem, 1.2vw, 1.3rem);
+      line-height: 1.55;
+      flex: 1;
+      margin-bottom: clamp(0.5rem, 1vh, 1rem);
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: clamp(0.3rem, 0.5vw, 0.5rem);
+      margin-bottom: clamp(0.5rem, 1vh, 1rem);
+    }
+
+    .tag {
+      background: var(--tag-bg);
+      border-radius: 4px;
+      padding: clamp(0.15rem, 0.4vh, 0.3rem) clamp(0.4rem, 0.7vw, 0.8rem);
+      font-size: clamp(0.72rem, 0.95vw, 1rem);
+      color: var(--tag-color);
+      font-weight: 500;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: clamp(0.4rem, 0.8vw, 0.8rem);
+    }
+
+    .btn {
+      padding: clamp(0.5rem, 1vh, 0.9rem) clamp(0.9rem, 1.5vw, 1.6rem);
+      border-radius: clamp(6px, 0.8vw, 10px);
+      border: none;
+      font-size: clamp(0.85rem, 1.3vw, 1.3rem);
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; transform: scale(1.03); }
+
+    .btn-play {
+      background: var(--btn-play-bg);
+      color: #fff;
+    }
+
+    .btn-admin {
+      background: var(--btn-admin-bg);
+      color: var(--btn-admin-color);
+      border: 1px solid var(--btn-admin-border);
+    }
+
+    /* Admin-Buttons: nur im Lehrermodus sichtbar */
+    .teacher-only {
+      display: none;
+    }
+
+    body.teacher .teacher-only {
+      display: inline-flex;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: clamp(0.6rem, 1.2vh, 1.2rem) 2rem;
+      color: var(--footer-color);
+      font-size: clamp(0.75rem, 1vw, 0.9rem);
+      border-top: 1px solid var(--footer-border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    /* Im Lehrermodus ausblenden */
+    body.teacher #footer-lp-link { display: none; }
+
+    /* ── Passwort-Modal ── */
+    #pw-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pw-modal.open { display: flex; }
+
+    #pw-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      width: min(400px, 90vw);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    body.dark #pw-card {
+      background: #16213e;
+      color: #ffffff;
+    }
+
+    #pw-card h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-align: center;
+      color: inherit;
+    }
+
+    #pw-card p {
+      font-size: 0.95rem;
+      color: #666;
+      text-align: center;
+    }
+
+    body.dark #pw-card p { color: #a8a8b3; }
+
+    #pw-input {
+      width: 100%;
+      padding: 0.9rem 1.2rem;
+      border-radius: 10px;
+      border: 2px solid #e0e0e0;
+      font-size: 1.2rem;
+      letter-spacing: 0.15em;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+      background: #f8f9fa;
+      color: #222;
+    }
+
+    body.dark #pw-input {
+      background: #0f3460;
+      border-color: rgba(255,255,255,0.15);
+      color: #ffffff;
+    }
+
+    #pw-input:focus { border-color: #E34F20; }
+
+    #pw-error {
+      font-size: 0.9rem;
+      color: #dc3545;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .pw-actions {
+      display: flex;
+      gap: 0.8rem;
+    }
+
+    .pw-btn {
+      flex: 1;
+      padding: 0.8rem;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .pw-btn:hover { opacity: 0.85; transform: scale(1.02); }
+
+    .pw-btn-confirm {
+      background: linear-gradient(135deg, #f7971e, #E34F20);
+      color: #fff;
+    }
+
+    .pw-btn-cancel {
+      background: #e9ecef;
+      color: #495057;
+    }
+
+    body.dark .pw-btn-cancel {
+      background: #0f3460;
+      color: #a8a8b3;
+    }
+
+    @media (max-width: 600px) {
+      .games-grid { grid-template-columns: 1fr; }
+
+      /* Mobile: natürliches Scrollen statt Viewport-Fitting */
+      html, body { height: auto; min-height: 100svh; }
+      .page-wrap { flex: 0 0 auto; padding-bottom: 0; }
+      .content-box { flex: 0 0 auto; height: auto; }
+      .games-grid { flex: none; height: auto; }
+
+      /* Karten-Banner kleiner */
+      .card-banner { height: 110px; font-size: 3rem; }
+
+      /* Header: Controls nicht mehr absolut über dem Titel */
+      .page-header { text-align: left; padding-top: clamp(0.5rem, 1.5vh, 1rem); }
+      .page-header h1 { font-size: clamp(1.4rem, 5vw, 2rem); text-align: center; }
+      .page-header p { text-align: center; font-size: 0.85rem; }
+      .header-controls {
+        position: static;
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.5rem;
+      }
+      .header-btn { font-size: 0.78rem; padding: 0.35rem 0.7rem; }
+
+      /* Card-Actions umbrechen */
+      .card-actions { flex-wrap: wrap; }
+      .btn { font-size: 0.85rem; padding: 0.5rem 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Passwort-Modal ─────────────────────────────────────── -->
+<div id="pw-modal">
+  <div id="pw-card">
+    <h2>🔐 Lehrermodus</h2>
+    <p>Passwort eingeben, um den Lehrermodus zu aktivieren.</p>
+    <input type="password" id="pw-input" placeholder="Passwort"
+      autocomplete="off" autocorrect="off" autocapitalize="off"
+      onkeydown="if(event.key==='Enter') submitPassword()">
+    <div id="pw-error"></div>
+    <div class="pw-actions">
+      <button class="pw-btn pw-btn-cancel" onclick="closePasswordModal()">Abbrechen</button>
+      <button class="pw-btn pw-btn-confirm" onclick="submitPassword()">Bestätigen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Seite ──────────────────────────────────────────────── -->
+<div class="page-wrap">
+
+  <header class="page-header">
+    <div class="header-controls">
+      <!-- Lehrermodus Login (nur sichtbar wenn nicht im Lehrermodus) -->
+      <button class="header-btn" id="footer-lp-link" onclick="openPasswordModal()">
+        🔒 Lehrermodus
+      </button>
+      <!-- Lehrermodus aktiv: Anzeige + Abmelden -->
+      <button class="header-btn" id="btn-teacher-mode" onclick="exitTeacherMode()">
+        ✓ Lehrermodus &nbsp;·&nbsp; Beenden
+      </button>
+      <!-- Theme-Toggle -->
+      <button class="header-btn" id="theme-toggle" onclick="toggleTheme()">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-label">Darkmode</span>
+      </button>
+    </div>
+    <h1>🎮 Unterrichts<span>spiele</span></h1>
+    <p>Interaktive Lernspiele für den Unterricht – auf der digitalen Tafel</p>
+  </header>
+
+  <div class="content-box">
+    <div class="games-grid">
+
+      <!-- Stadt Land Fluss -->
+      <div class="game-card">
+        <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
+          <span class="card-emoji">🗺️</span>
+        </div>
+        <div class="card-body">
+          <div class="card-title">Stadt Land Fluss</div>
+          <div class="card-desc">
+            Klassisches Wortspiel für die ganze Klasse. Buchstabe ziehen, Kategorien befüllen,
+            Punkte sammeln. Mit anpassbaren Kategorien und Timer.
+          </div>
+          <div class="card-tags">
+            <span class="tag">Wortspiel</span>
+            <span class="tag">Klassenspiel</span>
+            <span class="tag">Kategorien</span>
+            <span class="tag">Timer</span>
+          </div>
+          <div class="card-actions">
+            <a href="stadt-land-fluss/index.html" class="btn btn-play">▶ Spielen</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risiko-Quiz -->
+      <div class="game-card">
+        <div class="card-banner" style="background: linear-gradient(135deg, #e94560, #0f3460);">
+          <span class="card-emoji">🎯</span>
+        </div>
+        <div class="card-body">
+          <div class="card-title">Risiko-Quiz</div>
+          <div class="card-desc">
+            Jeopardy-ähnliches Teamquiz. Teams setzen ihren Punktestand ein, um Fragen aus
+            Kategorien zu beantworten. Richtig = Punkte dazu, Falsch = Punkte weg.
+          </div>
+          <div class="card-tags">
+            <span class="tag">Quiz</span>
+            <span class="tag">Teams</span>
+            <span class="tag">Kategorien</span>
+            <span class="tag">Timer</span>
+            <span class="tag">MC + Offen</span>
+          </div>
+          <div class="card-actions" style="flex-wrap:wrap;">
+            <a href="risiko-quiz/index.html"    class="btn btn-play">🎮 Spielen</a>
+            <a href="risiko-quiz/practice.html" class="btn btn-play" style="background:linear-gradient(135deg,#2ecc71,#27ae60);">📚 Üben</a>
+            <a href="risiko-quiz/admin.html"    class="btn btn-admin teacher-only">⚙ Fragen</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <span>Unterrichtsspiele – offline nutzbar, keine externen Abhängigkeiten</span>
+  </footer>
+
+</div>
+
+<script>
+  const STORAGE_KEY   = 'spiele_theme';
+  const SESSION_KEY   = 'spiele_lp_mode';
+  const LP_PASSWORD   = 'LP@FOS';
+
+  // ── Theme ────────────────────────────────────────────────
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('theme-icon').textContent  = dark ? '☀️' : '🌙';
+    document.getElementById('theme-label').textContent = dark ? 'Lightmode' : 'Darkmode';
+  }
+
+  function toggleTheme() {
+    const isDark = !document.body.classList.contains('dark');
+    localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+    applyTheme(isDark);
+  }
+
+  // ── Lehrermodus ──────────────────────────────────────────
+  function applyMode(teacher) {
+    document.body.classList.toggle('teacher', teacher);
+  }
+
+  function openPasswordModal() {
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-error').textContent = '';
+    document.getElementById('pw-modal').classList.add('open');
+    setTimeout(() => document.getElementById('pw-input').focus(), 80);
+  }
+
+  function closePasswordModal() {
+    document.getElementById('pw-modal').classList.remove('open');
+  }
+
+  function submitPassword() {
+    const val = document.getElementById('pw-input').value;
+    if (val === LP_PASSWORD) {
+      sessionStorage.setItem(SESSION_KEY, '1');
+      applyMode(true);
+      closePasswordModal();
+    } else {
+      const err = document.getElementById('pw-error');
+      err.textContent = 'Falsches Passwort.';
+      document.getElementById('pw-input').value = '';
+      document.getElementById('pw-input').focus();
+      setTimeout(() => { err.textContent = ''; }, 2500);
+    }
+  }
+
+  function exitTeacherMode() {
+    sessionStorage.removeItem(SESSION_KEY);
+    applyMode(false);
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  applyTheme(localStorage.getItem(STORAGE_KEY) === 'dark');
+  applyMode(sessionStorage.getItem(SESSION_KEY) === '1');
+</script>
+
+</body>
+</html>

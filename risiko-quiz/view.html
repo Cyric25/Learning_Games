@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risiko-Quiz – Spieleransicht</title>
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    .board-cell { cursor: default !important; pointer-events: none; }
+
+    /* ── Fragen-Overlay ─────────────────────────────────── */
+    #student-question {
+      display: none; position: fixed; inset: 0;
+      background: rgba(10,10,20,0.97); z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem 2rem 1rem; animation: fadeIn 0.25s ease;
+    }
+    #student-question.open { display: flex; }
+
+    #sq-meta {
+      display: flex; justify-content: space-between;
+      width: 100%; max-width: min(1000px, 92vw); margin-bottom: 1.2rem;
+      font-size: clamp(0.9rem,1.8vw,1.3rem); color: var(--text-secondary);
+    }
+    #sq-meta span:first-child { font-weight: 700; color: var(--text-primary); }
+    #sq-meta span:last-child  { font-weight: 800; font-size: clamp(1.2rem,2vw,1.8rem); }
+
+    #sq-content-row {
+      display: flex; gap: 2rem; align-items: center;
+      width: 100%; max-width: min(1000px, 92vw);
+    }
+    #sq-box {
+      flex: 1; min-width: 0; background: var(--bg-secondary);
+      border-radius: 16px; padding: clamp(1.5rem,3vw,2.5rem);
+      text-align: center; border: 2px solid var(--border);
+    }
+    #sq-text {
+      font-size: clamp(1.6rem,4vw,3rem); font-weight: 600;
+      line-height: 1.4; color: var(--text-primary); margin-bottom: 1rem;
+    }
+    #sq-mc {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1rem;
+    }
+    @media (max-width: 540px) {
+      #sq-mc { grid-template-columns: 1fr; }
+      #sq-content-row { flex-direction: column; gap: 1rem; }
+      #sq-timer { width: clamp(80px, 22vw, 130px); height: clamp(80px, 22vw, 130px); align-self: center; }
+      #sq-action-area { margin-top: 0.5rem; }
+      .btn-weiss-nicht-team, .btn-ich-weiss-es { width: 100%; }
+    }
+    .sq-mc-opt {
+      background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: 10px; padding: 0.9rem 1.2rem;
+      font-size: clamp(1.1rem,2.2vw,1.7rem); color: var(--text-primary);
+      text-align: left; transition: border-color 0.3s, background 0.3s; cursor: default;
+    }
+    .sq-mc-opt.clickable { cursor: pointer; }
+    .sq-mc-opt.clickable:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.3); }
+    .sq-mc-opt.mc-selected-pending { background: rgba(243,156,18,0.25); border-color: var(--warning); }
+    .sq-mc-opt.correct { background: rgba(46,204,113,0.2); border-color: var(--success); }
+    .sq-mc-opt.wrong   { background: rgba(231,76,60,0.2);  border-color: var(--danger); }
+
+    #sq-answer {
+      display: none; background: rgba(46,204,113,0.12); border: 2px solid var(--success);
+      border-radius: 10px; padding: 0.9rem 1.5rem;
+      font-size: clamp(1.2rem,2.5vw,1.8rem); color: var(--success);
+      margin-top: 1rem; font-weight: 600;
+    }
+
+    /* ── Timer ──────────────────────────────────────────── */
+    #sq-timer {
+      position: relative; width: clamp(130px,16vw,200px); height: clamp(130px,16vw,200px); flex-shrink: 0;
+    }
+    #sq-timer svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .sq-ring-bg  { fill: none; stroke: rgba(255,255,255,0.18); stroke-width: 8; }
+    .sq-ring-fill {
+      fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round;
+      stroke-dasharray: 326.73; stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.4s;
+    }
+    #sq-timer-num {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: clamp(1.8rem,4vw,3rem); font-weight: 800; font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+    #sq-timer.warning .sq-ring-fill { stroke: var(--warning); }
+    #sq-timer.danger  .sq-ring-fill { stroke: var(--danger); }
+    #sq-timer.danger  #sq-timer-num { color: var(--danger); animation: pulseDot 0.5s ease-in-out infinite alternate; }
+    body.light .sq-ring-bg { stroke: rgba(255,255,255,0.28); }
+
+    /* ── Turn-Indikator ─────────────────────────────────── */
+    #turn-indicator {
+      background: rgba(233,69,96,0.15); border: 2px solid var(--accent);
+      border-radius: 12px; padding: 0.8rem 2rem;
+      font-size: clamp(1.2rem,2.5vw,1.6rem); font-weight: 700;
+      color: var(--accent); text-align: center; animation: fadeIn 0.3s ease;
+    }
+    #turn-other { color: var(--text-secondary); font-size: clamp(0.85rem,1.5vw,1rem); text-align: center; }
+
+    #sq-action-area {
+      width: 100%; max-width: min(1000px,92vw); margin-top: 1rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0.8rem;
+    }
+
+    /* ── Statusleiste ───────────────────────────────────── */
+    #view-status {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg-secondary); border-top: 1px solid var(--border);
+      padding: 0.3rem 1rem; font-size: 0.78rem; color: var(--text-secondary);
+      display: flex; align-items: center; gap: 0.5rem; z-index: 50;
+    }
+    #poll-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulseDot 2s ease-in-out infinite; }
+    #poll-dot.err { background: var(--danger); animation: none; }
+
+    @keyframes pulseDot { 0%,100% { transform:scale(1);opacity:1; } 50% { transform:scale(1.6);opacity:0.4; } }
+    @keyframes fadeIn   { from { opacity:0;transform:scale(0.97); } to { opacity:1;transform:scale(1); } }
+
+    #team-bar { padding-bottom: 2rem; }
+
+    /* ── Board: Spieler-Perspektive ─────────────────────── */
+    .board-cell.sq-locked { opacity: 0.35; background: var(--locked,#1e1e30) !important; }
+    .board-cell.sq-locked .cell-value { color: var(--played-text,#555577); }
+
+    /* ── Screens ────────────────────────────────────────── */
+    #screen-no-game, #screen-team-select {
+      display: none; position: fixed; inset: 0; background: var(--bg-primary); z-index: 500;
+      flex-direction: column; align-items: center; justify-content: center; padding: 2rem;
+      text-align: center; gap: 1rem;
+    }
+    #screen-no-game.active,
+    #screen-team-select.active { display: flex; }
+
+    /* Team-Auswahl */
+    .vq-team-list {
+      display: flex; flex-direction: column; gap: 0.7rem;
+      width: 100%; max-width: 480px; max-height: 60vh; overflow-y: auto;
+    }
+    .vq-team-option {
+      display: flex; align-items: center; gap: 0.9rem;
+      background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: 14px; padding: 1rem 1.2rem; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .vq-team-option:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+    .vq-team-option.eliminated { opacity: 0.4; cursor: default; pointer-events: none; }
+    .vq-team-color-bar { width: 8px; height: 42px; border-radius: 4px; flex-shrink: 0; }
+    .vq-team-label { flex: 1; text-align: left; }
+    .vq-team-btn-name { display: block; font-size: clamp(1.1rem,2.5vw,1.4rem); font-weight: 700; color: var(--text-primary); }
+    .vq-team-btn-sub  { display: block; font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.1rem; }
+    .vq-team-arrow { color: var(--text-secondary); font-size: 1.4rem; }
+    .vq-team-option.spectator .vq-team-btn-name { color: var(--text-secondary); }
+
+    /* Buttons */
+    .vq-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 12px;
+      padding: 0.85rem 2.5rem; font-size: clamp(1.1rem,2vw,1.4rem); font-weight: 700;
+      cursor: pointer; transition: opacity 0.2s;
+    }
+    .vq-btn:hover { opacity: 0.85; }
+    .vq-btn.secondary {
+      background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border);
+    }
+
+    /* ── Game-Container ──────────────────────────────────── */
+    #game-container { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+    #game-container.active { display: flex; }
+
+    /* Role-Banner */
+    .vq-role-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .vq-role-badge {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.8rem;
+      border-radius: 20px; border: 1.5px solid var(--border);
+      font-size: clamp(0.85rem,1.5vw,1rem); font-weight: 600; color: var(--text-primary);
+    }
+    .vq-role-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .vq-switch-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-secondary);
+      border-radius: 8px; padding: 0.3rem 0.8rem; font-size: 0.8rem; cursor: pointer;
+    }
+    .vq-switch-btn:hover { background: var(--bg-card); }
+
+    /* Steal-Picked-Banner */
+    .steal-picked-banner {
+      background: var(--accent); color: #fff; border-radius: 12px; padding: 1rem 2rem;
+      font-size: clamp(1.2rem,2.5vw,1.6rem); font-weight: 700; text-align: center;
+    }
+
+    /* Aktions-Buttons */
+    .btn-weiss-nicht-team {
+      background: var(--warning); color: #fff; border: none; border-radius: 10px;
+      padding: 0.8rem 2rem; font-size: clamp(1.1rem,2.2vw,1.5rem); font-weight: 700; cursor: pointer;
+    }
+    .btn-ich-weiss-es {
+      background: var(--success); color: #fff; border: none; border-radius: 10px;
+      padding: 0.8rem 2rem; font-size: clamp(1.2rem,2.5vw,1.8rem); font-weight: 700; cursor: pointer;
+    }
+    .btn-ich-weiss-es:disabled, .btn-weiss-nicht-team:disabled { opacity: 0.6; cursor: default; }
+  </style>
+</head>
+<body>
+
+<!-- ──── SCREEN 1: Kein Spiel ────────────────────────────────── -->
+<div id="screen-no-game" class="active">
+  <h2 style="font-size:clamp(1.6rem,4vw,2.5rem);color:var(--accent);margin:0;">Risiko-Quiz</h2>
+  <p id="no-game-msg" style="font-size:clamp(1rem,2vw,1.3rem);color:var(--text-secondary);margin:0;">
+    Verbinde mit Server…
+  </p>
+</div>
+
+<!-- ──── SCREEN 2: Team-Auswahl ──────────────────────────────── -->
+<div id="screen-team-select">
+  <h2 style="font-size:clamp(1.6rem,3.5vw,2.4rem);color:var(--accent);margin:0;">Wähle dein Team</h2>
+  <p style="color:var(--text-secondary);font-size:clamp(0.85rem,1.5vw,1rem);margin:0;">
+    Klicke auf dein Team.
+  </p>
+  <div class="vq-team-list" id="team-list"></div>
+</div>
+
+<!-- ──── SCREEN 3: Spielansicht ──────────────────────────────── -->
+<div id="game-container">
+
+  <div class="vq-role-banner">
+    <div class="vq-role-badge">
+      <div class="vq-role-dot" id="role-dot"></div>
+      <span id="role-name">Zuschauer</span>
+      <span id="role-score"></span>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <button class="header-btn" id="btn-theme" onclick="toggleTheme()">☀️</button>
+      <button class="vq-switch-btn" onclick="switchTeam()">Team wechseln</button>
+    </div>
+  </div>
+
+  <header id="header" style="display:none;flex-shrink:0;">
+    <div id="game-title">Risiko-Quiz</div>
+  </header>
+
+  <main id="main" style="display:none;flex:1;overflow:hidden;">
+    <div id="board"></div>
+  </main>
+
+  <footer id="team-bar" style="display:none;flex-shrink:0;"></footer>
+
+  <!-- Fragen-Overlay -->
+  <div id="student-question">
+    <div id="sq-meta">
+      <span id="sq-category"></span>
+      <span id="sq-risk"></span>
+    </div>
+    <div id="sq-content-row">
+      <div id="sq-box">
+        <div id="sq-text"></div>
+        <div id="sq-mc"></div>
+        <div id="sq-answer"></div>
+      </div>
+      <div id="sq-timer">
+        <svg viewBox="0 0 120 120">
+          <circle class="sq-ring-bg"  cx="60" cy="60" r="52"/>
+          <circle class="sq-ring-fill" id="sq-ring-fill" cx="60" cy="60" r="52"/>
+        </svg>
+        <span id="sq-timer-num">–</span>
+      </div>
+    </div>
+    <div id="sq-action-area">
+      <div id="turn-indicator" style="display:none;">🎯 Du bist dran!</div>
+      <div id="turn-other"     style="display:none;"></div>
+      <button class="btn-weiss-nicht-team" id="btn-sq-weiss-nicht"
+        style="display:none;" onclick="pressWeissNicht()">❓ Weiß nicht</button>
+      <button class="btn-ich-weiss-es" id="btn-sq-ich-weiss-es"
+        style="display:none;" onclick="pressIchWeissEs()">🙋 Ich weiß es!</button>
+      <div class="steal-picked-banner" id="steal-picked-banner" style="display:none;">
+        🎯 Du bist dran! Beantworte die Frage.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ──── STATUSLEISTE ─────────────────────────────────────────── -->
+<div id="view-status">
+  <span id="poll-dot"></span>
+  <span id="status-text">Verbinde…</span>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+// ── Kompatibilität ──────────────────────────────────────────────
+if (typeof GameModel !== 'undefined') {
+  if (!GameModel.isTeamEliminated)
+    GameModel.isTeamEliminated = t => (t.score ?? 1) <= 0;
+  if (!GameModel.canTeamSteal)
+    GameModel.canTeamSteal = t => (t.score ?? 0) >= 100 && !GameModel.isTeamEliminated(t);
+}
+
+// ── State ───────────────────────────────────────────────────────
+let viewData    = null;
+let sqTimerInt  = null;
+let lastLiveQId = null;
+let myTeamId    = null;   // null | 'spectator' | numeric team.id
+let hasRaisedHand = false;
+let questionsCache = { categories: [] };
+let sseSubscription = null;
+const CIRC = 326.73;
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  // Code aus URL lesen
+  const params = new URLSearchParams(window.location.search);
+  const code = (params.get('code') || '').toUpperCase();
+
+  if (!code) {
+    showNoGame('Kein Spielcode angegeben. Bitte über den Spielleiter-Link beitreten.');
+    return;
+  }
+
+  StorageManager.setGameCode(code);
+
+  // Questions einmalig laden
+  questionsCache = await StorageManager.loadQuestions();
+
+  // Erstes Laden
+  await poll();
+
+  // SSE-Subscription starten
+  if (StorageManager._hasServer()) {
+    sseSubscription = StorageManager.subscribeGameState(code, (gs) => {
+      onGameStateUpdate(gs);
+    });
+  } else {
+    // Offline-Fallback: Polling
+    setInterval(poll, 1000);
+  }
+}
+
+// ── SSE-Callback ────────────────────────────────────────────────
+function onGameStateUpdate(gs) {
+  try {
+    document.getElementById('poll-dot').classList.remove('err');
+
+    if (!gs?.meta) { myTeamId = null; showNoGame('Warte auf Spielstart…'); return; }
+    if (gs.status === 'finished') { myTeamId = null; showNoGame('Das Spiel ist beendet.'); return; }
+
+    if (myTeamId !== null && myTeamId !== 'spectator') {
+      if (!gs.teams?.find(t => t.id === myTeamId)) myTeamId = null;
+    }
+
+    viewData = gs;
+    viewData.categories = questionsCache?.categories || [];
+
+    if (gs.status === 'setup') {
+      if (myTeamId === null) {
+        showTeamSelect(gs);
+      } else {
+        const name = myTeamId === 'spectator' ? 'Zuschauer'
+          : gs.teams?.find(t => t.id === myTeamId)?.name || 'Team';
+        showNoGame(`✓ ${name} – Warte auf Spielstart…`);
+      }
+      return;
+    }
+
+    if (myTeamId === null) showTeamSelect(gs);
+    else                   showGame(gs);
+
+    setStatus('Live · ' + new Date().toLocaleTimeString('de-AT'));
+  } catch(e) {
+    document.getElementById('poll-dot').classList.add('err');
+    setStatus('Fehler beim Verarbeiten');
+  }
+}
+
+// ── Poll (Fallback + initialer Ladevorgang) ─────────────────────
+async function poll() {
+  try {
+    const gs = await StorageManager.loadGameState();
+    document.getElementById('poll-dot').classList.remove('err');
+    if (gs) onGameStateUpdate(gs);
+    else showNoGame('Warte auf Spielstart…');
+  } catch(e) {
+    document.getElementById('poll-dot').classList.add('err');
+    setStatus('Verbindungsfehler');
+  }
+}
+
+// ── Screens ─────────────────────────────────────────────────────
+function showScreen(name) {
+  document.getElementById('screen-no-game').classList.toggle('active',    name === 'no-game');
+  document.getElementById('screen-team-select').classList.toggle('active', name === 'team-select');
+  document.getElementById('game-container').classList.toggle('active',    name === 'game');
+}
+
+function showNoGame(msg) {
+  document.getElementById('no-game-msg').textContent = msg;
+  showScreen('no-game');
+}
+
+// ── Team-Auswahl ─────────────────────────────────────────────────
+function showTeamSelect(gs) {
+  showScreen('team-select');
+  const list = document.getElementById('team-list');
+  list.innerHTML = '';
+
+  const teams = GameModel.getActiveTeams(gs);
+  (teams.length ? teams : (gs.teams || [])).forEach(team => {
+    const isElim = GameModel.isTeamEliminated(team) && (team.history?.length ?? 0) > 0;
+    const div = document.createElement('div');
+    div.className = 'vq-team-option' + (isElim ? ' eliminated' : '');
+    div.innerHTML = `
+      <div class="vq-team-color-bar" style="background:${team.color || '#888'}"></div>
+      <div class="vq-team-label">
+        <span class="vq-team-btn-name">${esc(team.name)}</span>
+        <span class="vq-team-btn-sub">${isElim ? '❌ Ausgeschieden' : '✓ Beitreten'}</span>
+      </div>
+      <span class="vq-team-arrow">›</span>`;
+    if (!isElim) div.addEventListener('click', () => joinTeam(team, gs));
+    list.appendChild(div);
+  });
+
+  // Tafelmodus
+  const spec = document.createElement('div');
+  spec.className = 'vq-team-option spectator';
+  spec.innerHTML = `
+    <div class="vq-team-color-bar" style="background:var(--text-secondary)"></div>
+    <div class="vq-team-label">
+      <span class="vq-team-btn-name">👁 Tafelmodus</span>
+      <span class="vq-team-btn-sub">Zuschauer – nur ansehen</span>
+    </div>
+    <span class="vq-team-arrow">›</span>`;
+  spec.addEventListener('click', () => joinSpectator(gs));
+  list.appendChild(spec);
+}
+
+function joinTeam(team, gs) {
+  myTeamId = team.id;
+  if (gs.status === 'running') showGame(gs);
+  else showNoGame(`✓ ${team.name} – Warte auf Spielstart…`);
+}
+
+function joinSpectator(gs) {
+  myTeamId = 'spectator';
+  if (gs.status === 'running') showGame(gs);
+  else showNoGame('Zuschauer – Warte auf Spielstart…');
+}
+
+function switchTeam() {
+  myTeamId = null;
+  if (viewData) showTeamSelect(viewData);
+  else showScreen('team-select');
+}
+
+// ── Spielansicht ─────────────────────────────────────────────────
+function showGame(gs) {
+  showScreen('game');
+  document.getElementById('header').style.display   = 'flex';
+  document.getElementById('main').style.display     = 'flex';
+  document.getElementById('team-bar').style.display = 'flex';
+  document.getElementById('game-title').textContent = gs.meta.title || 'Risiko-Quiz';
+  updateRoleBanner(gs);
+  renderBoard(gs);
+  renderTeams(gs);
+  updateLiveQuestion(gs);
+}
+
+function updateRoleBanner(gs) {
+  const dotEl   = document.getElementById('role-dot');
+  const nameEl  = document.getElementById('role-name');
+  const scoreEl = document.getElementById('role-score');
+  if (myTeamId === 'spectator' || myTeamId === null) {
+    dotEl.style.background = 'var(--text-secondary)';
+    nameEl.textContent = '👁 Zuschauer';
+    if (scoreEl) scoreEl.textContent = '';
+    return;
+  }
+  const team = gs.teams?.find(t => t.id === myTeamId);
+  if (team) {
+    dotEl.style.background = team.color;
+    nameEl.textContent = team.name;
+    if (scoreEl) scoreEl.textContent = '· ' + team.score + ' Pkt.';
+  }
+}
+
+// ── Board ────────────────────────────────────────────────────────
+function renderBoard(gs) {
+  const board = document.getElementById('board');
+  const slots = gs.boardSlots || [];
+  const diffs = GameModel.DIFFICULTIES;
+  if (!slots.length) return;
+  board.style.gridTemplateColumns = `repeat(${slots.length}, 1fr)`;
+  board.style.gridTemplateRows    = `auto repeat(${diffs.length}, minmax(0,1fr))`;
+  board.innerHTML = '';
+
+  const myTeam = (myTeamId && myTeamId !== 'spectator')
+    ? gs.teams?.find(t => t.id === myTeamId) : null;
+
+  slots.forEach(slot => {
+    const h = document.createElement('div');
+    h.className = 'category-header'; h.textContent = slot.displayName || '';
+    board.appendChild(h);
+  });
+  diffs.forEach(diff => {
+    slots.forEach(slot => {
+      const cell = document.createElement('div');
+      cell.className = 'board-cell'; cell.dataset.diff = diff;
+      const isPlayed = GameModel.isCellPlayed(gs, slot, diff);
+      if (isPlayed) {
+        cell.classList.add('played');
+        const qs = GameModel.getSlotQuestionsForDiff(gs, slot, diff);
+        const pq = qs.find(q => gs.session?.playedQuestions?.[q.id]);
+        if (pq) {
+          const info = gs.session.playedQuestions[pq.id];
+          const team = gs.teams?.find(t => t.id == info.playedBy);
+          if (team) { const dot = document.createElement('div'); dot.className = 'cell-team-marker'; dot.style.background = team.color; cell.appendChild(dot); }
+        }
+      } else if (myTeam) {
+        if (myTeam.score >= diff) cell.classList.add('sq-available');
+        else                      cell.classList.add('sq-locked');
+      }
+      const v = document.createElement('span'); v.className = 'cell-value'; v.textContent = diff;
+      cell.appendChild(v); board.appendChild(cell);
+    });
+  });
+}
+
+// ── Teams ────────────────────────────────────────────────────────
+function renderTeams(gs) {
+  const bar  = document.getElementById('team-bar');
+  bar.innerHTML = '';
+  const curr = GameModel.getCurrentTeam(gs);
+  GameModel.getActiveTeams(gs).forEach(team => {
+    const isElim = GameModel.isTeamEliminated(team);
+    const c = document.createElement('div');
+    c.className = 'team-card' + (team.id === curr?.id ? ' active' : '') + (isElim ? ' eliminated' : '');
+    c.innerHTML = `<div class="team-color-dot" style="background:${team.color}"></div>
+      <span class="team-name">${esc(team.name)}</span>
+      <span class="team-score">${team.score}</span>`;
+    bar.appendChild(c);
+  });
+}
+
+// ── Live Question ────────────────────────────────────────────────
+function updateLiveQuestion(gs) {
+  const lq = gs.liveQuestion;
+  if (!lq || !lq.id) { hideSQ(); return; }
+  const q = GameModel.findQuestion(gs, lq.id);
+  if (!q) { hideSQ(); return; }
+
+  if (lastLiveQId !== lq.id) {
+    lastLiveQId = lq.id; hasRaisedHand = false; buildSQ(q, gs, lq);
+  }
+  if (lq.selectedMcIndex !== null && lq.selectedMcIndex !== undefined) {
+    document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
+      if (!el.classList.contains('correct') && !el.classList.contains('wrong'))
+        el.classList.toggle('mc-selected-pending', i === lq.selectedMcIndex);
+    });
+  }
+  if (lq.resolved || lq.answer) showSQAnswer(q, lq);
+  updateActionButtons(gs, q, lq);
+  document.getElementById('student-question').classList.add('open');
+}
+
+function buildSQ(q, gs, lq) {
+  const cat = GameModel.findCategoryForQuestion(gs, lq.id);
+  const sub = GameModel.findSubcategoryForQuestion(gs, lq.id);
+  document.getElementById('sq-category').textContent = cat && sub ? `${cat.name} / ${sub.name}` : (cat?.name || '');
+  document.getElementById('sq-risk').textContent = q.difficulty + ' Punkte';
+  document.getElementById('sq-text').textContent = q.question;
+  document.getElementById('sq-answer').style.display = 'none';
+
+  const mcEl = document.getElementById('sq-mc');
+  mcEl.innerHTML = '';
+  if (q.type === 'mc' && q.options?.length) {
+    mcEl.style.display = 'grid';
+    const activeTeamId = lq.teamId ?? GameModel.getCurrentTeam(gs)?.id;
+    const isMyTurn = myTeamId && myTeamId !== 'spectator' && activeTeamId === myTeamId;
+    q.options.forEach((opt, idx) => {
+      const d = document.createElement('div');
+      d.className = 'sq-mc-opt' + (isMyTurn ? ' clickable' : '');
+      d.textContent = opt;
+      if (isMyTurn) d.addEventListener('click', () => selectMcOption(idx, q, lq));
+      mcEl.appendChild(d);
+    });
+  } else { mcEl.style.display = 'none'; }
+
+  ['btn-sq-weiss-nicht','btn-sq-ich-weiss-es','steal-picked-banner','turn-indicator','turn-other'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('btn-sq-weiss-nicht').disabled = false;
+  document.getElementById('btn-sq-weiss-nicht').textContent = '❓ Weiß nicht';
+  document.getElementById('btn-sq-ich-weiss-es').disabled = false;
+  document.getElementById('btn-sq-ich-weiss-es').textContent = '🙋 Ich weiß es!';
+
+  const timerEnabled = gs.meta?.settings?.timerEnabled !== false;
+  if (timerEnabled) startSQTimer(lq, gs.meta?.settings?.timerSeconds || 30);
+  else document.getElementById('sq-timer-num').textContent = '∞';
+}
+
+function updateActionButtons(gs, q, lq) {
+  if (!lq || (!lq.stealPhase && (lq.resolved || lq.answer))) {
+    ['btn-sq-weiss-nicht','btn-sq-ich-weiss-es','steal-picked-banner','turn-indicator','turn-other']
+      .forEach(id => document.getElementById(id).style.display = 'none');
+    return;
+  }
+  const isSpectator = !myTeamId || myTeamId === 'spectator';
+  if (isSpectator) { document.getElementById('turn-indicator').style.display = 'none'; document.getElementById('turn-other').style.display = 'none'; return; }
+
+  const myTeam = gs.teams?.find(t => t.id === myTeamId);
+  if (!myTeam) return;
+  const activeTeamId = lq.teamId ?? GameModel.getCurrentTeam(gs)?.id;
+  const isMyTurn = activeTeamId === myTeamId;
+  const settings = gs.meta?.settings || {};
+
+  document.getElementById('turn-indicator').style.display = isMyTurn ? '' : 'none';
+  const turnOther = document.getElementById('turn-other');
+  if (!isMyTurn) {
+    const activeName = gs.teams?.find(t => t.id == activeTeamId)?.name || '';
+    turnOther.style.display = activeName ? '' : 'none';
+    turnOther.textContent   = activeName ? `Gerade dran: ${activeName}` : '';
+  } else { turnOther.style.display = 'none'; }
+
+  const showWeissNicht = isMyTurn && q.type !== 'mc' && settings.stealMode && !lq.stealPhase;
+  document.getElementById('btn-sq-weiss-nicht').style.display = showWeissNicht ? '' : 'none';
+
+  if (lq.stealPhase) {
+    if (lq.stealPickedTeam === myTeamId) {
+      document.getElementById('steal-picked-banner').style.display = '';
+      document.getElementById('btn-sq-ich-weiss-es').style.display = 'none';
+      return;
+    }
+    document.getElementById('steal-picked-banner').style.display = 'none';
+    const alreadyRaised = hasRaisedHand || (lq.stealCandidates || []).some(c => c.teamId == myTeamId);
+    const canSteal = GameModel.canTeamSteal(myTeam) && myTeamId !== lq.teamId;
+    if (canSteal && !alreadyRaised) {
+      document.getElementById('btn-sq-ich-weiss-es').style.display = '';
+    } else if (alreadyRaised) {
+      const btn = document.getElementById('btn-sq-ich-weiss-es');
+      btn.style.display = ''; btn.disabled = true; btn.textContent = '✋ Gemeldet!';
+    } else { document.getElementById('btn-sq-ich-weiss-es').style.display = 'none'; }
+  } else {
+    document.getElementById('btn-sq-ich-weiss-es').style.display = 'none';
+    document.getElementById('steal-picked-banner').style.display = 'none';
+  }
+}
+
+function showSQAnswer(q, lq) {
+  clearInterval(sqTimerInt);
+  if (q.type === 'mc') {
+    document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
+      el.classList.remove('mc-selected-pending', 'clickable'); el.style.cursor = 'default';
+      if (i === q.correctIndex) el.classList.add('correct');
+      else if (i === lq.selectedMcIndex && i !== q.correctIndex) el.classList.add('wrong');
+    });
+  }
+  if (lq.answer) { const el = document.getElementById('sq-answer'); el.textContent = '✓ Antwort: ' + lq.answer; el.style.display = 'block'; }
+  ['btn-sq-weiss-nicht','btn-sq-ich-weiss-es','steal-picked-banner'].forEach(id => document.getElementById(id).style.display = 'none');
+}
+
+function hideSQ() {
+  lastLiveQId = null; hasRaisedHand = false; clearInterval(sqTimerInt);
+  document.getElementById('student-question').classList.remove('open');
+}
+
+// ── Team-Aktionen ────────────────────────────────────────────────
+async function selectMcOption(idx, q, lq) {
+  if (!myTeamId || myTeamId === 'spectator') return;
+  try {
+    const gs = await StorageManager.loadGameState();
+    if (!gs?.liveQuestion || gs.liveQuestion.id !== lq.id) return;
+    if (gs.liveQuestion.resolved || gs.liveQuestion.autoResolved) return;
+    const activeId = gs.liveQuestion.teamId ?? GameModel.getCurrentTeam(gs)?.id;
+    if (activeId !== myTeamId) return;
+    const isCorrect = (idx === q.correctIndex);
+    gs.liveQuestion.selectedMcIndex = idx;
+    gs.liveQuestion.autoResolved    = true;
+    gs.liveQuestion.autoCorrect     = isCorrect;
+    await StorageManager.saveGameState(gs);
+    document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
+      el.classList.remove('mc-selected-pending', 'clickable'); el.style.cursor = 'default';
+      if (i === q.correctIndex) el.classList.add('correct');
+      else if (i === idx && !isCorrect) el.classList.add('wrong');
+    });
+    document.getElementById('turn-indicator').style.display = 'none';
+    document.getElementById('turn-other').style.display     = 'none';
+  } catch {}
+}
+
+async function pressWeissNicht() {
+  const btn = document.getElementById('btn-sq-weiss-nicht');
+  btn.disabled = true; btn.textContent = '⏳ Warte auf Spielleiter…';
+  try {
+    const gs = await StorageManager.loadGameState();
+    if (!gs?.liveQuestion) { btn.disabled = false; btn.textContent = '❓ Weiß nicht'; return; }
+    gs.liveQuestion.teamPassedQuestion = true;
+    await StorageManager.saveGameState(gs);
+  } catch { btn.disabled = false; btn.textContent = '❓ Weiß nicht'; }
+}
+
+async function pressIchWeissEs() {
+  if (hasRaisedHand) return;
+  const btn = document.getElementById('btn-sq-ich-weiss-es');
+  btn.disabled = true;
+  try {
+    const gs = await StorageManager.loadGameState();
+    if (!gs?.liveQuestion) { btn.disabled = false; return; }
+    const myTeam = gs.teams?.find(t => t.id === myTeamId);
+    if (!myTeam) { btn.disabled = false; return; }
+    const candidates = gs.liveQuestion.stealCandidates || [];
+    if (!candidates.find(c => c.teamId == myTeamId)) {
+      candidates.push({ teamId: myTeamId, teamName: myTeam.name, timestamp: Date.now() });
+      gs.liveQuestion.stealCandidates = candidates;
+      await StorageManager.saveGameState(gs);
+    }
+    hasRaisedHand = true; btn.textContent = '✋ Gemeldet!';
+  } catch { btn.disabled = false; }
+}
+
+// ── Timer ────────────────────────────────────────────────────────
+function startSQTimer(lq, total) {
+  clearInterval(sqTimerInt);
+  const timerEl = document.getElementById('sq-timer');
+  const ringFill = document.getElementById('sq-ring-fill');
+  const numEl   = document.getElementById('sq-timer-num');
+  let soundPlayed = false;
+  function tick() {
+    const elapsed = Math.floor((Date.now() - lq.openedAt) / 1000);
+    const remaining = Math.max(0, total - elapsed);
+    numEl.textContent = remaining;
+    ringFill.style.strokeDashoffset = CIRC * (1 - remaining / total);
+    timerEl.className = remaining <= 5 ? 'danger' : remaining <= 10 ? 'warning' : '';
+    if (remaining <= 0 && !soundPlayed) { soundPlayed = true; playTimerSound(); }
+  }
+  tick(); sqTimerInt = setInterval(tick, 500);
+}
+
+function playTimerSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.8, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.8);
+  } catch {}
+}
+
+// ── Utils ────────────────────────────────────────────────────────
+function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Theme ────────────────────────────────────────────────────────
+(function() {
+  const KEY = 'spiele_theme';
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = light ? '🌙' : '☀️';
+  }
+  window.toggleTheme = function() {
+    const isLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+    applyTheme(isLight);
+  };
+  applyTheme(localStorage.getItem(KEY) === 'light');
+})();
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

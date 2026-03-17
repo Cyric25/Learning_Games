@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risiko-Quiz</title>
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    /* ── Responsive: Setup-Screen ─────────────────── */
+    @media (max-width: 540px) {
+      #team-select-screen { padding: 1.2rem; }
+      #team-select-screen h2 { font-size: 1.4rem; }
+      /* Settings rows: label + input nebeneinander → untereinander */
+      #team-select-screen [style*="justify-content:space-between"] {
+        flex-direction: column; gap: 0.5rem; align-items: flex-start;
+      }
+      /* Number inputs volle Breite */
+      #ts-start-capital, #ts-timer-seconds {
+        width: 100% !important; text-align: left;
+      }
+      /* Select volle Breite */
+      #ts-question-filter { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ──── JOIN SCREEN (Spielcode eingeben) ───────────────────── -->
+<div id="join-screen" style="display:none; position:fixed; inset:0;
+  background:var(--bg-primary); z-index:500; flex-direction:column;
+  align-items:center; justify-content:center; padding:2rem;">
+  <h1 style="color:var(--accent);font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;">Risiko-Quiz</h1>
+  <p style="color:var(--text-secondary);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;">Spielcode eingeben um beizutreten</p>
+  <input id="join-code" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+    placeholder="CODE"
+    style="font-size:clamp(2rem,5vw,3.5rem); text-align:center; letter-spacing:0.4em;
+      width:7em; padding:0.5em 0.3em; background:var(--bg-secondary); color:var(--text-primary);
+      border:2px solid var(--border); border-radius:14px; font-family:inherit; font-weight:700;
+      outline:none; text-transform:uppercase; transition:border-color 0.2s;"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')joinGame()">
+  <button onclick="joinGame()" style="margin-top:1.2rem; padding:0.8rem 3rem;
+    font-size:clamp(1.1rem,2vw,1.4rem); font-weight:700; background:var(--accent);
+    color:#fff; border:none; border-radius:12px; cursor:pointer; transition:opacity 0.2s;"
+    onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+    Beitreten
+  </button>
+  <p id="join-error" style="display:none; color:var(--danger); margin-top:1rem;
+    font-size:clamp(0.9rem,1.5vw,1.1rem); font-weight:600;"></p>
+  <div style="margin-top:2.5rem; border-top:1px solid var(--border); padding-top:1.5rem; text-align:center;">
+    <p style="color:var(--text-secondary); font-size:0.95rem; margin:0 0 0.8rem;">Oder als Spielleiter:</p>
+    <button onclick="createNewGame()" style="padding:0.6rem 2rem;
+      font-size:clamp(0.95rem,1.5vw,1.1rem); font-weight:700; background:var(--success, #2ecc71);
+      color:#fff; border:none; border-radius:10px; cursor:pointer; transition:opacity 0.2s;"
+      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      + Neues Spiel erstellen
+    </button>
+  </div>
+  <div style="margin-top:1.5rem;">
+    <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;">← Zurück zur Übersicht</a>
+  </div>
+</div>
+
+<!-- ──── TEAM SELECT SCREEN ────────────────────────────────── -->
+<div id="team-select-screen" style="display:none; position:fixed; inset:0;
+  background:var(--bg-primary); z-index:491; flex-direction:column;
+  align-items:center; overflow-y:auto; padding:2rem;">
+
+  <div id="ts-game-code" style="display:none; text-align:center; margin-bottom:1rem;
+    padding:0.6rem 1.2rem; background:var(--bg-card); border-radius:12px; border:2px solid var(--accent); max-width:520px; width:100%;">
+    <span style="color:var(--text-secondary);font-size:0.85rem;">Spielcode:</span>
+    <span style="color:var(--accent);font-size:1.4rem;font-weight:800;letter-spacing:0.15em;margin-left:0.5rem;cursor:pointer;"
+      onclick="copyCode(this)" id="ts-code-value"></span>
+    <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem;">(klicken zum Kopieren)</span>
+  </div>
+  <h2 style="color:var(--accent);font-size:2rem;margin-bottom:0.5rem;">Teams &amp; Einstellungen</h2>
+  <p style="color:var(--text-secondary);margin-bottom:1.5rem;text-align:center;max-width:520px;">
+    Teams auswählen, umbenennen und das Spiel konfigurieren.
+  </p>
+
+  <!-- Teams -->
+  <div id="team-select-list" style="max-width:520px;width:100%;margin-bottom:1.5rem;"></div>
+
+  <!-- Spieleinstellungen -->
+  <div style="max-width:520px;width:100%;margin-bottom:1.5rem;">
+
+    <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+      color:var(--text-secondary);margin-bottom:0.8rem;padding-bottom:0.5rem;
+      border-bottom:2px solid var(--border);">
+      ⚙ Spieleinstellungen
+    </div>
+
+    <!-- Startkapital -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      margin-bottom:0.6rem;border:2px solid transparent;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">💰 Startkapital</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Punkte zu Spielbeginn
+        </div>
+      </div>
+      <input type="number" id="ts-start-capital" min="0" max="9999" step="100"
+        style="width:100px;min-width:0;padding:0.4rem 0.6rem;border-radius:8px;
+          border:1px solid var(--border);background:rgba(255,255,255,0.07);
+          color:var(--text-primary);font-size:1.1rem;font-weight:700;text-align:center;outline:none;">
+    </div>
+
+    <!-- Timer -->
+    <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      margin-bottom:0.6rem;border:2px solid transparent;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;">
+          <input type="checkbox" id="ts-timer-enabled"
+            style="width:22px;height:22px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
+          <div>
+            <div style="font-weight:700;font-size:1rem;">⏱ Timer</div>
+            <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+              Zeitlimit pro Frage
+            </div>
+          </div>
+        </label>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <input type="number" id="ts-timer-seconds" min="5" max="120" step="5"
+            style="width:80px;min-width:0;padding:0.4rem 0.6rem;border-radius:8px;
+              border:1px solid var(--border);background:rgba(255,255,255,0.07);
+              color:var(--text-primary);font-size:1.1rem;font-weight:700;text-align:center;outline:none;">
+          <span style="color:var(--text-secondary);font-size:0.9rem;">Sek.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Antwort anzeigen -->
+    <label style="display:flex;align-items:center;gap:1rem;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      cursor:pointer;margin-bottom:0.6rem;border:2px solid transparent;transition:border-color 0.2s;">
+      <input type="checkbox" id="ts-show-answer"
+        style="width:22px;height:22px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">📢 Antwort für alle anzeigen</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Antwort nach Auflösung öffentlich einblenden (Bildschirm + Spieler-Ansicht)
+        </div>
+      </div>
+    </label>
+
+    <!-- Negative Punkte -->
+    <label style="display:flex;align-items:center;gap:1rem;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      cursor:pointer;margin-bottom:0.6rem;border:2px solid transparent;transition:border-color 0.2s;">
+      <input type="checkbox" id="ts-allow-negative"
+        style="width:22px;height:22px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">📉 Negative Punkte</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Punktestand darf unter 0 fallen
+        </div>
+      </div>
+    </label>
+
+    <!-- Klau-Modus -->
+    <label style="display:flex;align-items:center;gap:1rem;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;"
+      id="steal-mode-row">
+      <input type="checkbox" id="ts-steal-mode"
+        style="width:22px;height:22px;accent-color:var(--warning);cursor:pointer;flex-shrink:0;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">⚡ Klau-Modus</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Bei falscher Antwort können andere Teams klauen (nur offene Fragen)
+        </div>
+      </div>
+    </label>
+
+    <!-- Klau-Abzug bei Weiß nicht -->
+    <label style="display:flex;align-items:center;gap:1rem;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      cursor:pointer;margin-top:0.6rem;border:2px solid transparent;transition:border-color 0.2s;">
+      <input type="checkbox" id="ts-steal-penalty"
+        style="width:22px;height:22px;accent-color:var(--warning);cursor:pointer;flex-shrink:0;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">💸 Abzug bei „Weiß nicht"</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Punkteabzug auch wenn Team nicht antwortet (nur im Klau-Modus)
+        </div>
+      </div>
+    </label>
+
+    <!-- Fragentyp-Filter -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      background:rgba(255,255,255,0.05);border-radius:12px;padding:0.9rem 1.2rem;
+      margin-top:0.6rem;border:2px solid transparent;">
+      <div>
+        <div style="font-weight:700;font-size:1rem;">🎯 Fragentyp</div>
+        <div style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.1rem;">
+          Welche Fragetypen sollen gespielt werden
+        </div>
+      </div>
+      <select id="ts-question-filter"
+        style="padding:0.4rem 0.8rem;border-radius:8px;border:1px solid var(--border);
+          background:rgba(255,255,255,0.07);color:var(--text-primary);
+          font-size:0.95rem;font-weight:600;outline:none;cursor:pointer;">
+        <option value="all">Alle Fragen</option>
+        <option value="mc">Nur Multiple Choice</option>
+        <option value="open">Nur Offen</option>
+      </select>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+    <button class="setup-btn" id="btn-team-confirm">▶ Spiel starten</button>
+    <button class="setup-btn setup-btn-ghost" id="btn-team-back">← Zurück</button>
+  </div>
+</div>
+
+<!-- ──── SLOT SCREEN ───────────────────────────────────────── -->
+<div id="slot-screen">
+  <div class="slot-container">
+
+    <div class="slot-header">
+      <div id="slot-game-code" style="display:none; text-align:center; margin-bottom:0.8rem;
+        padding:0.6rem 1.2rem; background:var(--bg-card); border-radius:12px; border:2px solid var(--accent);">
+        <span style="color:var(--text-secondary);font-size:0.85rem;">Spielcode:</span>
+        <span style="color:var(--accent);font-size:1.4rem;font-weight:800;letter-spacing:0.15em;margin-left:0.5rem;cursor:pointer;"
+          onclick="copyCode(this)" id="slot-code-value"></span>
+      </div>
+      <h2>Spielfeld konfigurieren</h2>
+      <div class="slot-progress">
+        <span id="slot-count">0</span><span> / 8 Spalten</span>
+        <div class="slot-progress-bar">
+          <div class="slot-progress-fill" id="slot-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slot-panels">
+      <div>
+        <div class="slot-panel-title">Verfügbare Kategorien</div>
+        <div id="slot-source-list"></div>
+      </div>
+      <div>
+        <div class="slot-panel-title">Ausgewählte Spalten</div>
+        <div id="slot-selected-list"></div>
+      </div>
+    </div>
+
+    <div class="slot-actions">
+      <button class="setup-btn" id="btn-slot-confirm">▶ Weiter</button>
+      <button class="setup-btn setup-btn-ghost" id="btn-slot-back">← Zurück</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ──── SETUP SCREEN ─────────────────────────────────────── -->
+<div id="setup-screen">
+  <h1>Risiko-Quiz</h1>
+  <p id="setup-msg">Kein Spiel geladen.</p>
+<button class="setup-btn" id="btn-configure-slots" style="display:none;">
+    ⚙ Spielfeld konfigurieren
+  </button>
+  <button class="setup-btn" id="btn-start-game" style="display:none;">
+    ▶ Spiel starten
+  </button>
+  <button class="setup-btn setup-btn-ghost"
+    onclick="window.location.href='../spiele.html'">
+    ← Übersicht
+  </button>
+  <button class="setup-btn setup-btn-ghost" id="btn-theme-setup"
+    onclick="toggleTheme()">
+    ☀️ Lightmode
+  </button>
+</div>
+
+<!-- ──── HEADER ───────────────────────────────────────────── -->
+<header id="header" style="display:none;">
+  <div id="game-title">Risiko-Quiz</div>
+  <div id="header-game-code" style="display:none; background:var(--bg-card); padding:0.2rem 0.8rem;
+    border-radius:8px; border:1px solid var(--accent); cursor:pointer; font-weight:700;
+    color:var(--accent); letter-spacing:0.1em; font-size:0.95rem;"
+    onclick="copyCode(this)" title="Spielcode kopieren"></div>
+  <div id="header-right">
+    <div id="timer-display">00:30</div>
+    <button class="header-btn" id="btn-theme" title="Design wechseln" onclick="toggleTheme()">☀️</button>
+    <button class="header-btn" id="btn-fullscreen" title="Vollbild">⛶</button>
+    <button class="header-btn" id="btn-menu">⚙ Menü</button>
+  </div>
+</header>
+
+<!-- ──── MAIN BOARD ───────────────────────────────────────── -->
+<main id="main" style="display:none;">
+  <div id="board"></div>
+</main>
+
+<!-- ──── TEAM BAR ─────────────────────────────────────────── -->
+<footer id="team-bar" style="display:none;"></footer>
+
+<!-- ──── QUESTION MODAL ───────────────────────────────────── -->
+<div id="question-modal">
+  <div id="modal-meta">
+    <span id="modal-category"></span>
+    <span id="modal-risk"></span>
+  </div>
+
+  <div id="modal-team-info">
+    <div class="team-badge" id="modal-team-badge">
+      <span id="modal-team-dot" style="width:16px;height:16px;border-radius:50%;display:inline-block;"></span>
+      <span id="modal-team-name"></span>
+    </div>
+    <span id="modal-score-preview"></span>
+  </div>
+
+  <div id="modal-content-row">
+    <div id="modal-question-box">
+      <div id="modal-question-text"></div>
+      <div id="modal-mc-options"></div>
+      <div id="modal-answer-reveal"></div>
+    </div>
+
+    <div id="modal-timer">
+      <svg id="timer-ring" viewBox="0 0 120 120">
+        <circle class="timer-ring-bg" cx="60" cy="60" r="52"/>
+        <circle class="timer-ring-fill" id="timer-ring-fill" cx="60" cy="60" r="52"/>
+      </svg>
+      <span id="timer-number">30</span>
+    </div>
+  </div>
+
+  <!-- ── Klau-Phase ───────────────────────────────────────── -->
+  <div id="modal-steal-section" style="display:none;width:100%;max-width:min(1100px,90vw);
+    margin-bottom:0.5rem;border-top:1px solid var(--border);padding-top:1rem;">
+    <div style="text-align:center;color:var(--warning);font-size:1.1rem;font-weight:700;
+      margin-bottom:0.9rem;">⚡ Klauen? Welches Team kennt die Antwort?</div>
+    <!-- Kandidaten aus view.html (Teams die "Ich weiß es!" gedrückt haben) -->
+    <div id="steal-candidates-list" style="margin-bottom:0.7rem;"></div>
+    <!-- Manuelle Auswahl (alle berechtigten Teams) -->
+    <div id="steal-team-buttons" style="display:flex;flex-wrap:wrap;gap:0.8rem;
+      justify-content:center;margin-bottom:0.9rem;"></div>
+    <div style="display:flex;justify-content:center;">
+      <button class="action-btn btn-close" id="btn-steal-skip"
+        style="min-width:auto;padding:0.8rem 2rem;font-size:1.1rem;">Weiter →</button>
+    </div>
+  </div>
+
+  <!-- Spielleiter-Antwort: immer sichtbar, nicht für Schüler -->
+  <div id="modal-sl-info" style="display:none;"></div>
+
+  <div id="modal-actions">
+    <button class="action-btn btn-show-answer" id="btn-show-answer" style="display:none;">📢 Lösung für alle zeigen</button>
+    <button class="action-btn btn-weiss-nicht" id="btn-weiss-nicht" style="display:none;">❓ Weiß nicht</button>
+    <button class="action-btn btn-correct" id="btn-correct">✅ Richtig</button>
+    <button class="action-btn btn-wrong"   id="btn-wrong">❌ Falsch</button>
+    <button class="action-btn btn-close"   id="btn-modal-close" style="display:none;">Weiter</button>
+  </div>
+</div>
+
+<!-- ──── MENU OVERLAY ─────────────────────────────────────── -->
+<div id="menu-overlay">
+  <div id="menu-backdrop"></div>
+  <div id="menu-panel">
+    <div class="menu-item" id="menu-fullscreen">
+      <span class="menu-icon">⛶</span> Vollbild
+    </div>
+    <div class="menu-item" id="menu-save">
+      <span class="menu-icon">💾</span> Spielstand speichern
+    </div>
+    <div class="menu-item" id="menu-correct-scores">
+      <span class="menu-icon">✏</span> Punkte korrigieren
+    </div>
+    <div class="menu-item menu-teacher-only" id="menu-admin">
+      <span class="menu-icon">⚙</span> Admin
+    </div>
+    <div class="menu-item menu-lp-login" id="menu-lp"
+      onclick="closeMenu(); openLpPw();">
+      <span class="menu-icon">🔒</span> Lehrermodus
+    </div>
+    <div class="menu-item" id="menu-home">
+      <span class="menu-icon">🏠</span> Übersicht
+    </div>
+    <div class="menu-item danger" id="menu-reset">
+      <span class="menu-icon">↺</span> Spiel zurücksetzen
+    </div>
+  </div>
+</div>
+
+<!-- ──── SCORE CORRECTION MODAL ───────────────────────────── -->
+<div id="correction-modal">
+  <div id="correction-panel">
+    <h3>✏ Punkte korrigieren</h3>
+    <div id="correction-team-rows"></div>
+    <div class="correction-actions">
+      <button class="btn btn-secondary" id="btn-correction-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="btn-correction-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ──── END SCREEN ───────────────────────────────────────── -->
+<div id="end-screen">
+  <h1>🏆 Spiel beendet!</h1>
+  <p class="subtitle" id="end-subtitle"></p>
+  <ul id="ranking-list"></ul>
+  <div id="end-buttons">
+    <button class="action-btn btn-correct" id="btn-end-replay">↺ Nochmal spielen</button>
+    <button class="action-btn btn-close" id="btn-end-admin" onclick="var c=StorageManager.getGameCode();window.location.href=c?'admin.html?code='+c:'admin.html'">⚙ Admin</button>
+    <button class="action-btn btn-close" id="btn-end-home" onclick="window.location.href='../spiele.html'">🏠 Übersicht</button>
+  </div>
+</div>
+
+<!-- ──── PASSWORT-MODAL (Lehrermodus) ─────────────────────── -->
+<div id="pw-modal" style="display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);z-index:600;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-secondary);border-radius:16px;padding:2rem;
+    width:min(380px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    display:flex;flex-direction:column;gap:1rem;border:1px solid var(--border);">
+    <h2 style="font-size:1.3rem;font-weight:700;text-align:center;color:var(--text-primary);">
+      🔐 Lehrermodus
+    </h2>
+    <p style="font-size:0.9rem;color:var(--text-secondary);text-align:center;">
+      Passwort eingeben, um den Lehrermodus zu aktivieren.
+    </p>
+    <input type="password" id="pw-input" placeholder="Passwort" autocomplete="off"
+      style="width:100%;padding:0.8rem 1rem;border-radius:8px;
+        border:2px solid var(--border);background:rgba(255,255,255,0.06);
+        color:var(--text-primary);font-size:1.1rem;letter-spacing:0.12em;
+        text-align:center;outline:none;transition:border-color 0.2s;"
+      onkeydown="if(event.key==='Enter') submitLpPw();"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--border)'">
+    <div id="pw-error"
+      style="font-size:0.85rem;color:var(--danger);text-align:center;min-height:1.1em;"></div>
+    <div style="display:flex;gap:0.8rem;">
+      <button onclick="closeLpPw()"
+        style="flex:1;padding:0.75rem;border-radius:8px;border:1px solid var(--border);
+          background:var(--bg-card);color:var(--text-primary);
+          font-size:0.95rem;font-weight:600;cursor:pointer;">
+        Abbrechen
+      </button>
+      <button onclick="submitLpPw()"
+        style="flex:1;padding:0.75rem;border-radius:8px;border:none;
+          background:var(--accent);color:#fff;
+          font-size:0.95rem;font-weight:700;cursor:pointer;">
+        Bestätigen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script src="js/game.js"></script>
+<script>
+(function () {
+  const KEY    = 'spiele_theme';
+  const LP_KEY = 'spiele_lp_mode';
+  const LP_PW  = 'LP@FOS';
+
+  // ── Theme ──────────────────────────────────────────────
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    ['btn-theme', 'btn-theme-setup'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = light ? '🌙 Darkmode' : '☀️ Lightmode';
+    });
+  }
+  window.toggleTheme = function () {
+    var isLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+    applyTheme(isLight);
+  };
+
+  // ── Lehrermodus ────────────────────────────────────────
+  window.openLpPw = function () {
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-error').textContent = '';
+    document.getElementById('pw-modal').style.display = 'flex';
+    setTimeout(function () { document.getElementById('pw-input').focus(); }, 80);
+  };
+
+  window.closeLpPw = function () {
+    document.getElementById('pw-modal').style.display = 'none';
+  };
+
+  window.submitLpPw = function () {
+    var val = document.getElementById('pw-input').value;
+    if (val === LP_PW) {
+      sessionStorage.setItem(LP_KEY, '1');
+      document.body.classList.add('teacher');
+      window.closeLpPw();
+    } else {
+      var err = document.getElementById('pw-error');
+      err.textContent = 'Falsches Passwort.';
+      document.getElementById('pw-input').value = '';
+      document.getElementById('pw-input').focus();
+      setTimeout(function () { err.textContent = ''; }, 2500);
+    }
+  };
+
+  // ── Init ───────────────────────────────────────────────
+  applyTheme(localStorage.getItem(KEY) === 'light');
+  if (sessionStorage.getItem(LP_KEY) === '1') {
+    document.body.classList.add('teacher');
+  }
+})();
+</script>
+</body>
+</html>

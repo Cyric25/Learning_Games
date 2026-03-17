@@ -1,0 +1,4 @@
+Options -Indexes
+
+# Disable output buffering for SSE
+SetEnvIf Request_URI "api\.php.*f=sse" no-gzip=1

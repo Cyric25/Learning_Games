@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risiko-Quiz – Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- ──── SPIELWÄHLER-SCREEN ──────────────────────────────────── -->
+<div id="game-selector" style="display:none;">
+  <div class="gs-container">
+    <div class="gs-header">
+      <h1 style="font-size:clamp(1.5rem,3vw,2rem);margin:0;">Risiko-Quiz <span style="color:var(--accent);">Admin</span></h1>
+      <div style="display:flex;gap:0.6rem;">
+        <a href="../spiele.html" class="btn btn-secondary">← Übersicht</a>
+        <button class="btn btn-secondary" id="btn-theme-selector" onclick="toggleTheme()">☀️</button>
+      </div>
+    </div>
+    <div class="gs-body">
+      <h2 style="font-size:1.3rem;margin:0 0 0.5rem;">Spiel auswählen</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 1.2rem;">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+      <div id="gs-game-list" class="gs-game-list">
+        <p style="color:var(--text-secondary);">Lade Spiele...</p>
+      </div>
+      <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
+        <button class="btn btn-success btn-lg" id="btn-gs-create">+ Neues Spiel erstellen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header id="admin-header" style="display:none;">
+  <h1>Risiko-Quiz <span>Admin</span></h1>
+  <div style="display:flex;gap:0.8rem;align-items:center;">
+    <span id="game-code-badge" class="game-code-badge" title="Spielcode kopieren" onclick="copyGameCode()"></span>
+    <span id="current-game-label" style="color:var(--text-secondary);font-size:0.9rem;"></span>
+    <a id="link-start-game" href="index.html" class="btn btn-primary">▶ Spiel starten</a>
+    <button class="btn btn-secondary" id="btn-switch-game" onclick="showGameSelector()">↻ Spiel wechseln</button>
+    <a href="../spiele.html" class="btn btn-secondary">← Übersicht</a>
+    <button class="btn btn-secondary" id="btn-theme-admin" onclick="toggleTheme()" title="Design wechseln">☀️</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button class="tab-btn active" data-tab="tab-setup">⚙ Einstellungen</button>
+  <button class="tab-btn" data-tab="tab-questions">❓ Fragen</button>
+  <button class="tab-btn" data-tab="tab-import">📥 MD-Import</button>
+  <button class="tab-btn" data-tab="tab-save">💾 Speichern</button>
+</nav>
+
+<main id="content">
+
+  <!-- ──── TAB: EINSTELLUNGEN ──────────────────────────────── -->
+  <section id="tab-setup" class="tab-panel active">
+    <h2 class="section-title">Spiel-Einstellungen</h2>
+
+    <div class="card">
+      <div class="form-group">
+        <label>Spieltitel</label>
+        <input type="text" id="s-title" placeholder="z.B. Chemie-Quiz Klasse 4BT" maxlength="60">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Startkapital (Punkte)</label>
+          <div class="range-row">
+            <input type="range" id="s-capital" min="100" max="2000" step="100" value="500">
+            <span class="range-val" id="s-capital-val">500</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Timer (Sekunden)</label>
+          <div class="range-row">
+            <input type="range" id="s-timer-sec" min="10" max="120" step="5" value="30">
+            <span class="range-val" id="s-timer-sec-val">30 s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Timer aktiviert</label>
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" id="s-timer-on" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="s-timer-on-label">Timer an</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Negativstand erlaubt</label>
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" id="s-negative">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="s-negative-label">Nicht erlaubt</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Richtige Antwort nach Auflösung zeigen</label>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="s-show-answer" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="s-show-answer-label">Wird angezeigt</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>⚡ Klau-Modus <span style="color:var(--text-secondary);font-size:0.85rem;font-weight:400;">(nur offene Fragen)</span></label>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="s-steal-mode">
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="s-steal-mode-label">Deaktiviert</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary btn-lg" id="btn-save-settings">✓ Einstellungen übernehmen</button>
+    </div>
+
+    <div id="settings-alert" style="margin-top:1rem;"></div>
+  </section>
+
+  <!-- ──── TAB: TEAMS ───────────────────────────────────────── -->
+  <!-- ──── TAB: FRAGEN ──────────────────────────────────────── -->
+  <section id="tab-questions" class="tab-panel">
+    <h2 class="section-title">Fragen & Kategorien</h2>
+
+    <div class="btn-group" style="margin-bottom:1.2rem;">
+      <button class="btn btn-success" id="btn-add-cat">+ Kategorie hinzufügen</button>
+    </div>
+
+    <div id="questions-alert"></div>
+    <div id="category-blocks"></div>
+  </section>
+
+  <!-- ──── TAB: IMPORT ──────────────────────────────────────── -->
+  <section id="tab-import" class="tab-panel">
+    <h2 class="section-title">Fragen aus Markdown importieren</h2>
+
+    <div id="dropzone">
+      <p>📂 MD-Datei hier ablegen oder klicken</p>
+      <p style="font-size:0.85rem;">Unterstützt .md und .txt Dateien</p>
+      <input type="file" id="import-file" accept=".md,.txt" style="display:none;">
+    </div>
+
+    <div id="import-preview" style="display:none;">
+      <div class="card">
+        <h4 id="import-title-preview" style="margin-bottom:0.8rem;font-size:1.1rem;color:var(--text-secondary);"></h4>
+        <ul class="validation-list" id="import-validation-list"></ul>
+      </div>
+      <div id="import-content-preview" class="import-preview"></div>
+      <div class="btn-group">
+        <button class="btn btn-success btn-lg" id="btn-import-confirm">+ Importieren</button>
+        <button class="btn btn-secondary" id="btn-import-cancel">Abbrechen</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem;">
+      <h4 style="margin-bottom:0.8rem;">MD-Format Referenz</h4>
+      <pre style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;overflow-x:auto;">## Unterkategoriename
+
+### 100
+- type: open
+- q: Fragetext
+- a: Antwort
+- hint: Optionaler Hinweis
+
+### 200
+- type: mc
+- q: MC-Fragetext
+- o: Option A | Option B | Option C | Option D
+- a: Option B
+
+## Weitere Unterkategorie
+
+### 100
+...</pre>
+      <div style="margin-top:1rem;">
+        <a href="data/templates/vorlage.md" download class="btn btn-secondary btn-sm">📥 Vorlage herunterladen</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ──── TAB: SPEICHERN ───────────────────────────────────── -->
+  <section id="tab-save" class="tab-panel">
+    <h2 class="section-title">Speichern & Exportieren</h2>
+
+    <div id="validate-result" style="margin-bottom:1.2rem;"></div>
+    <div id="save-alert" style="margin-bottom:1rem;"></div>
+
+    <div class="card">
+      <h3 style="margin-bottom:1rem;">Auf Server speichern</h3>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">
+        Fragen (questions.json) und Spielstand (gamestate.json) werden separat gespeichert und sind für alle Geräte im Netzwerk sichtbar.
+      </p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-validate">✓ Validieren</button>
+        <button class="btn btn-success" id="btn-save-questions">💾 Fragen speichern</button>
+        <button class="btn btn-primary" id="btn-save-gamestate">💾 Einstellungen speichern</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">Backup / Export</h3>
+      <div class="btn-group">
+        <button class="btn btn-success" id="btn-export-json">⬇ Fragen als JSON</button>
+        <button class="btn btn-warning" id="btn-export-md">⬇ Fragen als MD</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">Fragen aus JSON laden</h3>
+      <input type="file" id="load-json-file" accept=".json" style="display:none;">
+      <button class="btn btn-secondary" id="btn-load-json">📂 JSON-Datei öffnen</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ──── QUESTION MODAL ─────────────────────────────────────── -->
+<div id="q-modal">
+  <div id="q-modal-panel">
+    <h3 id="q-modal-title">Frage bearbeiten</h3>
+
+    <div class="form-row form-row-3" style="margin-bottom:0.5rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Hauptkategorie</label>
+        <select id="qm-cat"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>1. Unterkat</label>
+        <select id="qm-subcat"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>2. Unterkat</label>
+        <select id="qm-subsubcat">
+          <option value="">– Direkt –</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:1.2rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>3. Unterkat</label>
+        <select id="qm-l4cat">
+          <option value="">– Direkt –</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Schwierigkeit</label>
+        <select id="qm-diff">
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="300">300</option>
+          <option value="400">400</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Fragetyp</label>
+      <select id="qm-type">
+        <option value="open">Offene Frage</option>
+        <option value="mc">Multiple Choice</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Fragetext</label>
+      <textarea id="qm-question" rows="3" placeholder="Fragetext eingeben..."></textarea>
+    </div>
+
+    <div id="qm-open-section">
+      <div class="form-group">
+        <label>Korrekte Antwort</label>
+        <textarea id="qm-answer" rows="2" placeholder="Antwort..."></textarea>
+      </div>
+    </div>
+
+    <div id="qm-mc-section" style="display:none;">
+      <div class="form-group">
+        <label>Antwortoptionen <span style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <div class="mc-options-editor" id="qm-mc-options">
+          <!-- dynamic -->
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-add-mc-option" style="margin-top:0.5rem;">+ Option hinzufügen</button>
+      </div>
+      <div class="form-group">
+        <label>Korrekte Antwort (für Anzeige)</label>
+        <input type="text" id="qm-mc-answer-text" placeholder="Wird automatisch gesetzt" readonly style="opacity:0.6;">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Hinweis <span style="color:var(--text-secondary);font-size:0.85rem;">(optional)</span></label>
+      <input type="text" id="qm-hint" placeholder="Lösungshinweis (optional)">
+    </div>
+
+    <div id="qm-alert" style="margin-bottom:0.8rem;"></div>
+
+    <div class="btn-group" style="justify-content:flex-end;margin-top:1rem;">
+      <button class="btn btn-secondary" id="btn-qm-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="btn-qm-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ──── NAME DIALOG (ersetzt browser prompt()) ──────────────── -->
+<div id="name-dialog" style="display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:14px; padding:1.8rem; min-width:320px; max-width:460px; width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <h3 id="nd-title" style="margin-bottom:1.2rem; font-size:1.2rem;">Name eingeben</h3>
+    <input type="text" id="nd-input" class="nd-input-field"
+      style="width:100%; padding:0.7rem 0.9rem; background:var(--input-bg);
+        border:1px solid var(--border); border-radius:8px; color:var(--text-primary);
+        font-size:1rem; font-family:inherit; outline:none; transition:border-color 0.2s;"
+      placeholder="">
+    <div style="display:flex; gap:0.8rem; justify-content:flex-end; margin-top:1.2rem;">
+      <button class="btn btn-secondary" id="nd-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="nd-confirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ──── CONFIRM DIALOG (ersetzt browser confirm()) ─────────── -->
+<div id="confirm-dialog" style="display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:14px; padding:1.8rem; min-width:300px; max-width:420px; width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <p id="cd-message" style="font-size:1rem; margin-bottom:1.4rem; line-height:1.5;"></p>
+    <div style="display:flex; gap:0.8rem; justify-content:flex-end;">
+      <button class="btn btn-secondary" id="cd-cancel">Abbrechen</button>
+      <button class="btn btn-danger" id="cd-confirm">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script src="js/admin.js"></script>
+<script>
+(function () {
+  const KEY = 'spiele_theme';
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    var el = document.getElementById('btn-theme-admin');
+    if (el) el.textContent = light ? '🌙' : '☀️';
+  }
+  window.toggleTheme = function () {
+    var isLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+    applyTheme(isLight);
+  };
+  applyTheme(localStorage.getItem(KEY) === 'light');
+})();
+</script>
+</body>
+</html>
