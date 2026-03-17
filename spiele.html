@@ -276,6 +276,22 @@
       display: inline-flex;
     }
 
+    /* Coming Soon: im Lehrermodus aktiviert */
+    .coming-soon {
+      opacity: 0.5; pointer-events: none; position: relative;
+    }
+    body.teacher .coming-soon {
+      opacity: 1; pointer-events: auto;
+    }
+    .coming-soon-badge {
+      position: absolute; top: 16px; right: 16px;
+      padding: 4px 12px; border-radius: 8px;
+      font-size: 0.8rem; font-weight: 700; z-index: 2;
+    }
+    body.teacher .coming-soon-badge {
+      display: none;
+    }
+
     /* ── Footer ── */
     footer {
       text-align: center;
@@ -519,8 +535,8 @@
         </div>
       </div>
 
-      <!-- QuizPfad (Coming Soon) -->
-      <div class="game-card" style="opacity:0.5;pointer-events:none;position:relative;">
+      <!-- QuizPfad (Coming Soon / Lehrermodus aktiv) -->
+      <div class="game-card coming-soon">
         <div class="card-banner" style="background: linear-gradient(135deg, #f4a261, #e76f51);">
           <span class="card-emoji">🎲</span>
         </div>
@@ -537,14 +553,15 @@
             <span class="tag">Bonusfelder</span>
           </div>
           <div class="card-actions">
-            <span class="btn btn-play" style="opacity:0.6;cursor:default;">Bald verfügbar</span>
+            <a href="quizpfad/index.html" class="btn btn-play">▶ Spielen</a>
+            <a href="quizpfad/admin.html" class="btn btn-admin teacher-only">⚙ Fragen</a>
           </div>
         </div>
-        <div style="position:absolute;top:16px;right:16px;background:#e76f51;color:#fff;padding:4px 12px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:2;">Coming Soon</div>
+        <div class="coming-soon-badge" style="background:#e76f51;color:#fff;">Coming Soon</div>
       </div>
 
-      <!-- Memory (Coming Soon) -->
-      <div class="game-card" style="opacity:0.5;pointer-events:none;position:relative;">
+      <!-- Memory (Coming Soon / Lehrermodus aktiv) -->
+      <div class="game-card coming-soon">
         <div class="card-banner" style="background: linear-gradient(135deg, #9b59b6, #3498db);">
           <span class="card-emoji">🧠</span>
         </div>
@@ -561,14 +578,15 @@
             <span class="tag">Kategorien</span>
           </div>
           <div class="card-actions">
-            <span class="btn btn-play" style="opacity:0.6;cursor:default;">Bald verfügbar</span>
+            <a href="memory/index.html" class="btn btn-play">▶ Spielen</a>
+            <a href="memory/admin.html" class="btn btn-admin teacher-only">⚙ Paare</a>
           </div>
         </div>
-        <div style="position:absolute;top:16px;right:16px;background:#e94560;color:#fff;padding:4px 12px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:2;">Coming Soon</div>
+        <div class="coming-soon-badge" style="background:#e94560;color:#fff;">Coming Soon</div>
       </div>
 
-      <!-- Escape Room (Coming Soon) -->
-      <div class="game-card" style="opacity:0.5;pointer-events:none;position:relative;">
+      <!-- Escape Room (Coming Soon / Lehrermodus aktiv) -->
+      <div class="game-card coming-soon">
         <div class="card-banner" style="background: linear-gradient(135deg, #0a0a2e, #1a1a3e);">
           <span class="card-emoji">🔐</span>
         </div>
@@ -585,10 +603,11 @@
             <span class="tag">Timer</span>
           </div>
           <div class="card-actions">
-            <span class="btn btn-play" style="opacity:0.6;cursor:default;">Bald verfügbar</span>
+            <a href="escape-room/index.html" class="btn btn-play">▶ Spielen</a>
+            <a href="escape-room/index.html?admin=true" class="btn btn-admin teacher-only">⚙ Admin</a>
           </div>
         </div>
-        <div style="position:absolute;top:16px;right:16px;background:#d4a853;color:#0a0a1a;padding:4px 12px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:2;">Coming Soon</div>
+        <div class="coming-soon-badge" style="background:#d4a853;color:#0a0a1a;">Coming Soon</div>
       </div>
 
     </div>
