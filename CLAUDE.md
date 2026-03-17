@@ -39,6 +39,8 @@ Spiele/
       quizpfad.css              ← Styles (Brettspiel Classic, responsive)
     data/
       fragen.json               ← Fragedatenbank (Kategorien + Fragen)
+  escape-room/
+    index.html                  ← Escape Room (Admin + Spieler, alles inline)
   risiko-quiz/
     index.html                  ← Risiko-Quiz Spieloberfläche (Join-Screen + Board)
     admin.html                  ← Risiko-Quiz Admin (Spielwähler + Editor)
@@ -76,6 +78,7 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 | `stadt-land-fluss/index.html` | Light (SLF-Stil) | `body.dark` |
 | `quizpfad/index.html` | Light (Brettspiel) | `body.dark` |
 | `quizpfad/admin.html` | Light (Brettspiel) | `body.dark` |
+| `escape-room/index.html` | Dark (Mystery) / Hell (Admin) | `body.player-mode` / `body.admin-mode` |
 | `risiko-quiz/index.html` | Dark | `body.light` |
 | `risiko-quiz/admin.html` | Dark | `body.light` |
 
@@ -315,3 +318,46 @@ Typen: `multiple_choice`, `wahr_falsch`, `offen` (Lehrer entscheidet)
 - Standard: Light (Brettspiel Classic, warmes Beige)
 - `body.dark` überschreibt alle CSS-Variablen (warme Brauntöne)
 - Toggle-Script am Ende jeder HTML-Datei als IIFE
+
+---
+
+## Escape Room
+
+### Architektur
+- Single-HTML-File-Anwendung: `escape-room/index.html` (Admin + Spieler in einer Datei)
+- Kein Server nötig — rein localStorage-basiert
+- Admin-Modus über URL-Parameter: `?admin=true`
+- Spieler-Modus: ohne Parameter (Standard)
+- Multiple Games: Lehrkraft erstellt mehrere Spiele, Schüler wählen aus
+- Mehrere Teams können gleichzeitig auf verschiedenen Geräten dasselbe Spiel spielen
+- Google Fonts: Cinzel (Überschriften), Crimson Text (Fließtext)
+
+### localStorage Keys
+| Key | Inhalt |
+|-----|--------|
+| `escaperoom_library` | JSON-Array aller Spiele (vom Admin angelegt) |
+| `escaperoom_scores_{gameId}` | Rangliste pro Spiel |
+| `escaperoom_team_{gameId}_{teamname}` | Spielstand pro Team pro Spiel |
+
+### Datenformat (Spiel-Objekt)
+```json
+{
+  "id": "game_...",
+  "game": { "title": "...", "description": "...", "totalTimer": 2400, "mode": "chain|single" },
+  "rooms": [{
+    "id": "room_1", "name": "...", "subject": "...", "description": "...",
+    "backgroundImage": "", "unlockCode": "4823",
+    "questions": [{
+      "id": "q1", "type": "multiple_choice|text_input|number_code",
+      "text": "...", "options": [], "correctAnswer": "...",
+      "caseSensitive": false, "hint": "", "codeDigit": "4"
+    }]
+  }]
+}
+```
+Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
+
+### Theme (Escape Room spezifisch)
+- Spieler-Modus: Dark/Mystery (`body.player-mode`) — Tiefes Dunkelblau, Gold-Akzente, Noise-Overlay
+- Admin-Modus: Light/Clean (`body.admin-mode`) — Weißes Interface, Blau-Akzente
+- Kein Shared-Theme-Toggle (eigenes System, nicht `spiele_theme`)

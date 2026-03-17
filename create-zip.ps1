@@ -78,6 +78,10 @@ Add-Folder $zip (Join-Path $qp "js")            "quizpfad/js"
 Add-Folder $zip (Join-Path $qp "css")           "quizpfad/css"
 # data/fragen.json wird NICHT mitgepackt (Spieldaten)
 
+# Escape Room
+$er = Join-Path $source "escape-room"
+Add-File   $zip (Join-Path $er "index.html")    "escape-room/index.html"
+
 # Stadt-Land-Fluss
 $slf = Join-Path $source "stadt-land-fluss"
 Add-File $zip (Join-Path $slf "index.html")      "stadt-land-fluss/index.html"

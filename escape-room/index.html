@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escape Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* ══════════════════════════════════════════════════════
+       RESET & BASE
+       ══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      min-height: 100%; font-family: 'Crimson Text', Georgia, serif;
+      font-size: 16px; line-height: 1.6; overflow-x: hidden;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PLAYER MODE — Mystery / Thriller
+       ══════════════════════════════════════════════════════ */
+    :root {
+      --bg-deep: #0a0a1a;
+      --bg-card: #111128;
+      --bg-card-hover: #1a1a3a;
+      --gold: #d4a853;
+      --gold-dim: #b8860b;
+      --gold-glow: rgba(212, 168, 83, 0.3);
+      --amber: #f0c040;
+      --text-primary: #e8e0d0;
+      --text-secondary: #9a9080;
+      --text-muted: #605848;
+      --success: #2ecc71;
+      --danger: #e74c3c;
+      --danger-dim: rgba(231, 76, 60, 0.15);
+      --success-dim: rgba(46, 204, 113, 0.15);
+      --border: rgba(212, 168, 83, 0.15);
+      --border-strong: rgba(212, 168, 83, 0.3);
+      --shadow: 0 4px 24px rgba(0,0,0,0.5);
+      --radius: 12px;
+      --radius-lg: 18px;
+    }
+
+    body.player-mode {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+    }
+
+    /* Noise overlay */
+    body.player-mode::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+
+    body.player-mode > div { position: relative; z-index: 1; }
+
+    /* ── Player Typography ── */
+    body.player-mode h1, body.player-mode h2, body.player-mode h3 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      letter-spacing: 0.02em;
+    }
+    body.player-mode h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 700; }
+    body.player-mode h2 { font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 600; }
+
+    /* ── Player Buttons ── */
+    .btn-gold {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 28px; border: 2px solid var(--gold);
+      background: linear-gradient(135deg, rgba(212,168,83,0.15), rgba(184,134,11,0.08));
+      color: var(--gold); font-family: 'Cinzel', serif; font-weight: 600;
+      font-size: 1rem; border-radius: var(--radius); cursor: pointer;
+      transition: all 0.3s ease; text-decoration: none;
+    }
+    .btn-gold:hover {
+      background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+      color: var(--bg-deep); box-shadow: 0 0 20px var(--gold-glow);
+      transform: translateY(-2px);
+    }
+    .btn-gold:active { transform: translateY(0); }
+
+    .btn-ghost {
+      padding: 10px 20px; border: 1px solid var(--border-strong);
+      background: transparent; color: var(--text-secondary);
+      font-family: 'Crimson Text', serif; font-size: 0.95rem;
+      border-radius: var(--radius); cursor: pointer; transition: all 0.3s;
+    }
+    .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── Player Cards ── */
+    .game-tile {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+      cursor: pointer; transition: all 0.4s ease; position: relative;
+      overflow: hidden;
+    }
+    .game-tile::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 40%, rgba(212,168,83,0.06) 60%, transparent 80%);
+      background-size: 200% 200%; animation: shimmer 6s ease infinite;
+      pointer-events: none;
+    }
+    .game-tile:hover {
+      border-color: var(--gold-dim); transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px var(--gold-glow);
+    }
+    .game-tile h3 { font-size: 1.3rem; margin-bottom: 8px; }
+    .game-tile p { color: var(--text-secondary); font-size: 0.95rem; }
+    .game-tile .meta { display: flex; gap: 16px; margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ── Player Layout ── */
+    .player-container {
+      max-width: 800px; margin: 0 auto;
+      padding: clamp(20px, 4vh, 40px) clamp(16px, 3vw, 40px);
+      min-height: 100vh;
+    }
+    .player-header {
+      text-align: center; margin-bottom: 32px;
+    }
+    .player-header h1 { margin-bottom: 8px; }
+    .player-header p { color: var(--text-secondary); font-size: 1.05rem; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--text-muted); font-size: 0.9rem; cursor: pointer;
+      margin-bottom: 20px; border: none; background: none;
+      font-family: 'Crimson Text', serif; transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--gold); }
+
+    /* ── Player Input ── */
+    .player-input {
+      width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.04);
+      border: 2px solid var(--border); border-radius: var(--radius);
+      color: var(--text-primary); font-family: 'Crimson Text', serif;
+      font-size: 1.1rem; transition: border-color 0.3s;
+    }
+    .player-input:focus { outline: none; border-color: var(--gold); }
+    .player-input::placeholder { color: var(--text-muted); }
+
+    /* ── Timer ── */
+    .timer-display {
+      position: fixed; top: 16px; right: 16px; z-index: 100;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 8px 16px;
+      font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--gold);
+      box-shadow: var(--shadow);
+    }
+    .timer-display.urgent { color: var(--danger); border-color: var(--danger); animation: pulse 1s infinite; }
+
+    /* ── Progress ── */
+    .progress-bar {
+      width: 100%; height: 6px; background: rgba(255,255,255,0.06);
+      border-radius: 3px; overflow: hidden; margin: 16px 0;
+    }
+    .progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+      border-radius: 3px; transition: width 0.5s ease;
+    }
+
+    /* ── Code Digits ── */
+    .code-digits {
+      display: flex; gap: 12px; justify-content: center; margin: 24px 0;
+    }
+    .code-digit {
+      width: 64px; height: 80px; display: flex; align-items: center; justify-content: center;
+      font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 700;
+      background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: var(--radius); color: var(--text-muted);
+      transition: all 0.5s ease; perspective: 600px;
+    }
+    .code-digit.revealed {
+      color: var(--gold); border-color: var(--gold);
+      box-shadow: 0 0 16px var(--gold-glow);
+      animation: digitReveal 0.6s ease;
+    }
+    .code-digit.locked::after { content: '?'; }
+
+    /* ── Code Input ── */
+    .code-input-group {
+      display: flex; gap: 10px; justify-content: center; margin: 24px 0;
+    }
+    .code-input-field {
+      width: 56px; height: 70px; text-align: center;
+      font-family: 'Cinzel', serif; font-size: 1.8rem; font-weight: 700;
+      background: rgba(255,255,255,0.04); border: 2px solid var(--border);
+      border-radius: var(--radius); color: var(--gold);
+      transition: border-color 0.3s;
+    }
+    .code-input-field:focus { outline: none; border-color: var(--gold); }
+
+    /* ── Question Options ── */
+    .option-btn {
+      display: block; width: 100%; padding: 14px 20px; margin-bottom: 10px;
+      background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: var(--radius); color: var(--text-primary);
+      font-family: 'Crimson Text', serif; font-size: 1.05rem;
+      cursor: pointer; transition: all 0.3s; text-align: left;
+    }
+    .option-btn:hover:not(.disabled) { border-color: var(--gold); transform: translateX(4px); }
+    .option-btn.correct { border-color: var(--success); background: var(--success-dim); }
+    .option-btn.wrong { border-color: var(--danger); background: var(--danger-dim); }
+    .option-btn.disabled { pointer-events: none; opacity: 0.6; }
+
+    .hint-box {
+      margin-top: 16px; padding: 12px 16px;
+      background: rgba(240, 192, 64, 0.08); border: 1px solid rgba(240, 192, 64, 0.2);
+      border-radius: var(--radius); color: var(--amber); font-size: 0.95rem;
+    }
+
+    /* ── Room Intro ── */
+    .room-intro-card {
+      text-align: center; padding: 40px 24px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+    .room-intro-card .subject-badge {
+      display: inline-block; padding: 4px 14px; border-radius: 20px;
+      background: rgba(212,168,83,0.12); color: var(--gold);
+      font-size: 0.85rem; font-weight: 600; margin-bottom: 16px;
+    }
+    .room-intro-card .room-description {
+      color: var(--text-secondary); font-size: 1.1rem; font-style: italic;
+      max-width: 600px; margin: 16px auto 24px;
+    }
+
+    /* ── Scoreboard ── */
+    .scoreboard { margin-top: 24px; }
+    .score-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+    }
+    .score-row:first-child { border-top: 1px solid var(--border); }
+    .score-rank { font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold); width: 30px; }
+    .score-name { flex: 1; color: var(--text-primary); }
+    .score-time { font-family: 'Cinzel', serif; color: var(--text-secondary); }
+
+    /* ── Room Select Grid ── */
+    .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 20px; }
+    .room-tile {
+      padding: 20px; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); text-align: center; cursor: pointer;
+      transition: all 0.3s;
+    }
+    .room-tile:hover:not(.locked) { border-color: var(--gold); transform: translateY(-2px); }
+    .room-tile.locked { opacity: 0.4; pointer-events: none; }
+    .room-tile.completed { border-color: var(--success); }
+    .room-tile .room-icon { font-size: 2rem; margin-bottom: 8px; }
+    .room-tile h3 { font-size: 1rem; }
+
+    /* ══════════════════════════════════════════════════════
+       ADMIN MODE — Clean / Light
+       ══════════════════════════════════════════════════════ */
+    body.admin-mode {
+      background: #f5f5f7; color: #1a1a1a;
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+    }
+    body.admin-mode h1, body.admin-mode h2, body.admin-mode h3 {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      color: #1a1a1a; letter-spacing: normal;
+    }
+
+    .admin-container {
+      max-width: 960px; margin: 0 auto;
+      padding: clamp(16px, 3vh, 32px) clamp(16px, 3vw, 32px);
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 10px;
+    }
+    .admin-header h1 { font-size: 1.4rem; font-weight: 700; }
+
+    .admin-card {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 12px;
+      padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .admin-btn {
+      padding: 8px 18px; border: 1px solid #d0d0d0; border-radius: 8px;
+      background: #fff; color: #333; font-size: 0.9rem; cursor: pointer;
+      font-weight: 500; transition: all 0.2s;
+    }
+    .admin-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+    .admin-btn.primary {
+      background: #3b82f6; color: #fff; border-color: #3b82f6;
+    }
+    .admin-btn.primary:hover { background: #2563eb; }
+    .admin-btn.danger { color: #e74c3c; }
+    .admin-btn.danger:hover { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+    .admin-btn.sm { padding: 5px 12px; font-size: 0.8rem; }
+
+    .admin-input {
+      width: 100%; padding: 8px 12px; border: 1px solid #d0d0d0;
+      border-radius: 8px; font-size: 0.95rem; color: #333;
+      background: #fafafa; transition: border-color 0.2s;
+    }
+    .admin-input:focus { outline: none; border-color: #3b82f6; background: #fff; }
+
+    .admin-textarea {
+      width: 100%; padding: 8px 12px; border: 1px solid #d0d0d0;
+      border-radius: 8px; font-size: 0.95rem; color: #333;
+      background: #fafafa; resize: vertical; min-height: 80px;
+      font-family: inherit;
+    }
+    .admin-textarea:focus { outline: none; border-color: #3b82f6; background: #fff; }
+
+    .admin-label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: #666; margin-bottom: 4px; margin-top: 12px;
+    }
+
+    .admin-tabs {
+      display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .admin-tab {
+      padding: 8px 18px; border: 1px solid #d0d0d0; border-radius: 8px;
+      background: #fff; color: #666; cursor: pointer; font-weight: 600;
+      font-size: 0.85rem; transition: all 0.2s;
+    }
+    .admin-tab:hover { border-color: #3b82f6; color: #3b82f6; }
+    .admin-tab.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+    .admin-game-row {
+      display: flex; align-items: center; gap: 12px; padding: 14px;
+      border-bottom: 1px solid #eee; flex-wrap: wrap;
+    }
+    .admin-game-row:last-child { border-bottom: none; }
+    .admin-game-row .game-info { flex: 1; min-width: 150px; }
+    .admin-game-row .game-info h3 { font-size: 1rem; margin-bottom: 2px; }
+    .admin-game-row .game-info p { font-size: 0.8rem; color: #888; }
+    .admin-game-row .game-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* Admin question editor */
+    .question-editor {
+      background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 10px;
+      padding: 14px; margin-bottom: 10px;
+    }
+    .question-editor .q-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .question-editor .q-header select {
+      padding: 5px 8px; border: 1px solid #d0d0d0; border-radius: 6px;
+      font-size: 0.85rem; background: #fff;
+    }
+
+    /* Room editor accordion */
+    .room-editor {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .room-editor-header {
+      display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+      background: #fafafa; cursor: pointer; border-bottom: 1px solid #eee;
+      flex-wrap: wrap;
+    }
+    .room-editor-header:hover { background: #f0f0f0; }
+    .room-editor-header .room-title { flex: 1; font-weight: 600; font-size: 0.95rem; }
+    .room-editor-body { padding: 16px; }
+    .room-editor-body.collapsed { display: none; }
+
+    /* ══════════════════════════════════════════════════════
+       ANIMATIONS
+       ══════════════════════════════════════════════════════ */
+    @keyframes shimmer {
+      0%, 100% { background-position: 200% 0; }
+      50% { background-position: -200% 0; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+
+    @keyframes digitReveal {
+      0% { transform: rotateX(90deg) scale(0.5); opacity: 0; }
+      60% { transform: rotateX(-10deg) scale(1.1); }
+      100% { transform: rotateX(0) scale(1); opacity: 1; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { box-shadow: 0 0 8px var(--gold-glow); }
+      50% { box-shadow: 0 0 24px var(--gold-glow), 0 0 48px rgba(212,168,83,0.1); }
+    }
+
+    @keyframes correctFlash {
+      0% { background: var(--success-dim); }
+      50% { background: rgba(46,204,113,0.3); }
+      100% { background: var(--success-dim); }
+    }
+
+    @keyframes wrongFlash {
+      0% { background: var(--danger-dim); }
+      50% { background: rgba(231,76,60,0.3); }
+      100% { background: var(--danger-dim); }
+    }
+
+    /* Door animation */
+    .door-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; pointer-events: none;
+    }
+    .door-half {
+      flex: 1; background: #0d0d20;
+      border: 2px solid var(--gold-dim);
+      transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .door-half.left { border-right: 1px solid var(--gold-dim); transform-origin: left; }
+    .door-half.right { border-left: 1px solid var(--gold-dim); transform-origin: right; }
+    .door-overlay.open .door-half.left { transform: translateX(-100%); }
+    .door-overlay.open .door-half.right { transform: translateX(100%); }
+    .door-handle {
+      position: absolute; top: 50%; width: 16px; height: 40px;
+      background: var(--gold); border-radius: 4px; transform: translateY(-50%);
+    }
+    .door-half.left .door-handle { right: 20px; }
+    .door-half.right .door-handle { left: 20px; }
+
+    /* Confetti */
+    .confetti-container {
+      position: fixed; inset: 0; z-index: 300; pointer-events: none; overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute; width: 10px; height: 10px;
+      top: -20px; animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* View transitions */
+    .view { display: none; animation: fadeIn 0.4s ease; }
+    .view.active { display: block; }
+
+    /* ══════════════════════════════════════════════════════
+       UTILITY
+       ══════════════════════════════════════════════════════ */
+    .text-center { text-align: center; }
+    .mt-8 { margin-top: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mt-24 { margin-top: 24px; }
+    .mb-16 { margin-bottom: 16px; }
+    .gap-8 { gap: 8px; }
+    .gap-16 { gap: 16px; }
+    .flex { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .hidden { display: none !important; }
+
+    /* ══════════════════════════════════════════════════════
+       RESPONSIVE
+       ══════════════════════════════════════════════════════ */
+    @media (max-width: 600px) {
+      .code-digit { width: 52px; height: 66px; font-size: 1.6rem; }
+      .code-input-field { width: 48px; height: 60px; font-size: 1.5rem; }
+      .option-btn { padding: 12px 16px; font-size: 1rem; }
+      .game-tile { padding: 16px; }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PRINT (Admin: Raum-Codes)
+       ══════════════════════════════════════════════════════ */
+    @media print {
+      body.admin-mode .admin-header, body.admin-mode .admin-tabs,
+      body.admin-mode .admin-btn, body.admin-mode .question-editor { display: none; }
+      body.admin-mode .room-editor-body { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════
+       PLAYER VIEWS
+       ════════════════════════════════════════════════════ -->
+
+  <!-- View: Game Select -->
+  <div id="view-game-select" class="view">
+    <div class="player-container">
+      <div class="player-header">
+        <h1>Escape Room</h1>
+        <p>Wähle dein Spiel und stelle dich den Rätseln</p>
+      </div>
+      <div id="game-list"></div>
+      <div id="no-games" class="hidden" style="text-align:center;margin-top:40px;">
+        <p style="color:var(--text-muted);font-size:1.1rem;">Noch kein Spiel angelegt — bitte Admin fragen.</p>
+      </div>
+      <div style="text-align:center;margin-top:32px;">
+        <a href="../spiele.html" class="btn-ghost">← Zurück zur Übersicht</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- View: Player Home -->
+  <div id="view-player-home" class="view">
+    <div class="player-container">
+      <button class="back-link" onclick="showView('game-select')">← Zurück zur Spielauswahl</button>
+      <div class="room-intro-card">
+        <h1 id="ph-title"></h1>
+        <p class="room-description" id="ph-desc"></p>
+        <div class="meta justify-center" id="ph-meta"></div>
+        <div class="mt-24">
+          <label style="display:block;margin-bottom:8px;color:var(--text-secondary);font-size:0.9rem;">Teamname eingeben:</label>
+          <input type="text" class="player-input" id="team-name-input" placeholder="z.B. Team Alpha" style="max-width:320px;margin:0 auto;display:block;" maxlength="30">
+        </div>
+        <div class="mt-16 flex justify-center gap-8 flex-wrap">
+          <button class="btn-gold" id="btn-start-game" onclick="startGame()">Spiel starten</button>
+          <button class="btn-ghost hidden" id="btn-resume-game" onclick="resumeGame()">Fortsetzen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View: Room Select (mode=single) -->
+  <div id="view-room-select" class="view">
+    <div class="player-container">
+      <button class="back-link" onclick="showView('player-home')">← Zurück</button>
+      <h2 class="text-center mb-16">Wähle einen Raum</h2>
+      <div class="room-grid" id="room-grid"></div>
+    </div>
+  </div>
+
+  <!-- View: Room Intro -->
+  <div id="view-room-intro" class="view">
+    <div class="player-container">
+      <div class="room-intro-card" id="room-intro-content"></div>
+    </div>
+  </div>
+
+  <!-- View: Room Questions -->
+  <div id="view-room-questions" class="view">
+    <div class="player-container">
+      <div id="timer-el" class="timer-display"></div>
+      <div id="question-progress"></div>
+      <div class="progress-bar"><div class="progress-fill" id="q-progress-bar"></div></div>
+      <div class="code-digits" id="room-code-digits"></div>
+      <div id="question-area"></div>
+    </div>
+  </div>
+
+  <!-- View: Code Reveal -->
+  <div id="view-code-reveal" class="view">
+    <div class="player-container text-center">
+      <h2 style="margin-bottom:8px;">Alle Rätsel gelöst!</h2>
+      <p style="color:var(--text-secondary);margin-bottom:24px;">Der Code für diesen Raum lautet:</p>
+      <div class="code-digits" id="reveal-code-digits"></div>
+      <div class="mt-24">
+        <button class="btn-gold" onclick="goToUnlock()">Code eingeben →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View: Room Unlock -->
+  <div id="view-room-unlock" class="view">
+    <div class="player-container text-center">
+      <h2 style="margin-bottom:8px;" id="unlock-title">Code eingeben</h2>
+      <p style="color:var(--text-secondary);margin-bottom:24px;">Gib den Code ein, um den Raum zu verlassen.</p>
+      <div class="code-input-group" id="unlock-inputs"></div>
+      <div class="mt-16">
+        <button class="btn-gold" onclick="checkUnlockCode()">Überprüfen</button>
+      </div>
+      <p id="unlock-error" class="hidden" style="color:var(--danger);margin-top:12px;"></p>
+    </div>
+  </div>
+
+  <!-- View: Game Complete -->
+  <div id="view-game-complete" class="view">
+    <div class="player-container text-center">
+      <h1 style="font-size:2rem;margin-bottom:8px;">Geschafft!</h1>
+      <p id="complete-team" style="color:var(--text-secondary);font-size:1.2rem;"></p>
+      <p id="complete-time" style="color:var(--gold);font-family:'Cinzel',serif;font-size:1.6rem;margin-top:8px;"></p>
+      <div class="scoreboard" id="scoreboard"></div>
+      <div class="mt-24 flex justify-center gap-8 flex-wrap">
+        <button class="btn-gold" onclick="showView('game-select');currentGame=null;currentTeam=null;">Neues Spiel</button>
+        <a href="../spiele.html" class="btn-ghost">← Übersicht</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- View: Time Up Modal -->
+  <div id="time-up-modal" class="hidden" style="position:fixed;inset:0;z-index:250;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card);border:2px solid var(--danger);border-radius:var(--radius-lg);padding:32px;text-align:center;max-width:400px;">
+      <h2 style="color:var(--danger);">Zeit abgelaufen!</h2>
+      <p style="color:var(--text-secondary);margin:12px 0;">Du kannst trotzdem weiterspielen — die Überzeit wird gezählt.</p>
+      <button class="btn-gold" onclick="document.getElementById('time-up-modal').classList.add('hidden')">Weiterspielen</button>
+    </div>
+  </div>
+
+  <!-- Door Animation Overlay -->
+  <div id="door-overlay" class="door-overlay hidden">
+    <div class="door-half left"><div class="door-handle"></div></div>
+    <div class="door-half right"><div class="door-handle"></div></div>
+  </div>
+
+  <!-- Confetti Container -->
+  <div id="confetti-container" class="confetti-container hidden"></div>
+
+  <!-- ════════════════════════════════════════════════════
+       ADMIN VIEWS
+       ════════════════════════════════════════════════════ -->
+
+  <!-- Admin: Library -->
+  <div id="admin-library" class="view">
+    <div class="admin-container">
+      <div class="admin-header">
+        <h1>🔐 Escape Room — Admin</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="index.html" class="admin-btn">▶ Spieler-Ansicht</a>
+          <a href="../spiele.html" class="admin-btn">← Übersicht</a>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="admin-btn primary" onclick="createNewGame()">+ Neues Spiel</button>
+        <button class="admin-btn" onclick="document.getElementById('import-file').click()">📥 Spiel importieren</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importGameFile(event)">
+        <button class="admin-btn" onclick="loadDemoGame()">📋 Demo-Spiel laden</button>
+      </div>
+      <div class="admin-card">
+        <h3 style="margin-bottom:12px;">Spielbibliothek</h3>
+        <div id="admin-game-list"></div>
+        <div id="admin-no-games" class="hidden" style="padding:20px;text-align:center;color:#999;">
+          Noch keine Spiele angelegt.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin: Editor -->
+  <div id="admin-editor" class="view">
+    <div class="admin-container">
+      <div class="admin-header">
+        <h1 id="editor-title">Spiel bearbeiten</h1>
+        <button class="admin-btn" onclick="showAdminView('admin-library')">← Zurück</button>
+      </div>
+
+      <div class="admin-tabs" id="editor-tabs">
+        <button class="admin-tab active" onclick="switchEditorTab('tab-general', this)">Allgemein</button>
+        <button class="admin-tab" onclick="switchEditorTab('tab-rooms', this)">Räume</button>
+        <button class="admin-tab" onclick="switchEditorTab('tab-export', this)">Export</button>
+      </div>
+
+      <!-- Tab: General -->
+      <div id="tab-general" class="editor-tab">
+        <div class="admin-card">
+          <label class="admin-label">Spieltitel</label>
+          <input type="text" class="admin-input" id="ed-title" placeholder="z.B. Operation Zellkern">
+          <label class="admin-label">Beschreibung</label>
+          <textarea class="admin-textarea" id="ed-desc" placeholder="Kurzbeschreibung für die Spielauswahl..."></textarea>
+          <label class="admin-label">Gesamt-Timer (Minuten)</label>
+          <input type="number" class="admin-input" id="ed-timer" min="1" max="180" value="40" style="max-width:120px;">
+          <label class="admin-label">Modus</label>
+          <div style="display:flex;gap:12px;margin-top:4px;">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="radio" name="ed-mode" value="chain" checked> Kette (Räume der Reihe nach)
+            </label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input type="radio" name="ed-mode" value="single"> Einzeln (frei wählbar)
+            </label>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="admin-btn primary" onclick="saveCurrentGame()">💾 Speichern</button>
+        </div>
+      </div>
+
+      <!-- Tab: Rooms -->
+      <div id="tab-rooms" class="editor-tab hidden">
+        <div style="margin-bottom:12px;">
+          <button class="admin-btn primary" onclick="addRoom()">+ Raum hinzufügen</button>
+        </div>
+        <div id="rooms-list"></div>
+        <div style="margin-top:12px;">
+          <button class="admin-btn primary" onclick="saveCurrentGame()">💾 Speichern</button>
+        </div>
+      </div>
+
+      <!-- Tab: Export -->
+      <div id="tab-export" class="editor-tab hidden">
+        <div class="admin-card">
+          <h3 style="margin-bottom:12px;">Export & Verwaltung</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="admin-btn" onclick="exportCurrentGame()">📤 Spiel als JSON exportieren</button>
+            <button class="admin-btn danger" onclick="resetGameScores()">🗑 Spielstände zurücksetzen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Status Message -->
+  <div id="admin-status" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:10px;font-weight:600;font-size:0.9rem;z-index:500;display:none;"></div>
+
+  <!-- ════════════════════════════════════════════════════
+       JAVASCRIPT
+       ════════════════════════════════════════════════════ -->
+  <script>
+  (function() {
+    'use strict';
+
+    // ══════════════════════════════════════════════════════
+    // STATE
+    // ══════════════════════════════════════════════════════
+    let isAdmin = new URLSearchParams(window.location.search).has('admin');
+    let library = [];         // All games
+    let currentGame = null;   // Selected game object
+    let currentTeam = null;   // { gameId, teamName, startTime, currentRoom, completedRooms, roomProgress }
+    let currentRoomIdx = 0;
+    let currentQuestionIdx = 0;
+    let timerInterval = null;
+    let editingGameId = null;
+    let editingGame = null;   // Deep copy for editing
+    let timeUpShown = false;
+
+    // ══════════════════════════════════════════════════════
+    // INIT
+    // ══════════════════════════════════════════════════════
+    loadLibrary();
+
+    if (isAdmin) {
+      document.body.classList.add('admin-mode');
+      showAdminView('admin-library');
+    } else {
+      document.body.classList.add('player-mode');
+      showView('game-select');
+    }
+
+    // ══════════════════════════════════════════════════════
+    // LIBRARY (localStorage)
+    // ══════════════════════════════════════════════════════
+    function loadLibrary() {
+      try {
+        library = JSON.parse(localStorage.getItem('escaperoom_library') || '[]');
+      } catch(e) { library = []; }
+      // Load demo on first run
+      if (library.length === 0 && !localStorage.getItem('escaperoom_initialized')) {
+        library = [createDemoGame()];
+        saveLibrary();
+        localStorage.setItem('escaperoom_initialized', '1');
+      }
+    }
+
+    function saveLibrary() {
+      localStorage.setItem('escaperoom_library', JSON.stringify(library));
+    }
+
+    function getGame(id) {
+      return library.find(g => g.id === id);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // VIEW ROUTER
+    // ══════════════════════════════════════════════════════
+    window.showView = function(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const el = document.getElementById(viewId);
+      if (el) el.classList.add('active');
+
+      if (viewId === 'game-select') renderGameSelect();
+      if (viewId === 'view-game-complete') launchConfetti();
+    };
+
+    function showAdminView(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      if (viewId === 'admin-library') renderAdminLibrary();
+    }
+    window.showAdminView = showAdminView;
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Game Select
+    // ══════════════════════════════════════════════════════
+    function renderGameSelect() {
+      const list = document.getElementById('game-list');
+      const noGames = document.getElementById('no-games');
+      list.innerHTML = '';
+
+      if (library.length === 0) {
+        noGames.classList.remove('hidden');
+        return;
+      }
+      noGames.classList.add('hidden');
+
+      library.forEach(g => {
+        const tile = document.createElement('div');
+        tile.className = 'game-tile';
+        tile.style.marginBottom = '16px';
+        const mins = Math.floor((g.game.totalTimer || 2400) / 60);
+        tile.innerHTML =
+          '<h3>' + esc(g.game.title) + '</h3>' +
+          '<p>' + esc(g.game.description) + '</p>' +
+          '<div class="meta">' +
+            '<span>🚪 ' + g.rooms.length + ' Räume</span>' +
+            '<span>⏱ ' + mins + ' Min</span>' +
+            '<span>' + (g.game.mode === 'chain' ? '🔗 Kette' : '🎯 Einzeln') + '</span>' +
+          '</div>';
+        tile.onclick = () => selectGame(g.id);
+        list.appendChild(tile);
+      });
+    }
+
+    window.selectGame = function(gameId) {
+      currentGame = getGame(gameId);
+      if (!currentGame) return;
+      renderPlayerHome();
+      showView('view-player-home');
+    };
+
+    function renderPlayerHome() {
+      document.getElementById('ph-title').textContent = currentGame.game.title;
+      document.getElementById('ph-desc').textContent = currentGame.game.description;
+      const mins = Math.floor((currentGame.game.totalTimer || 2400) / 60);
+      document.getElementById('ph-meta').innerHTML =
+        '<span>🚪 ' + currentGame.rooms.length + ' Räume</span><span>⏱ ' + mins + ' Min</span>';
+      document.getElementById('team-name-input').value = '';
+      document.getElementById('btn-resume-game').classList.add('hidden');
+
+      // Check for existing save
+      document.getElementById('team-name-input').oninput = function() {
+        const name = this.value.trim();
+        const save = loadTeamState(currentGame.id, name);
+        const btn = document.getElementById('btn-resume-game');
+        if (save) btn.classList.remove('hidden');
+        else btn.classList.add('hidden');
+      };
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Team State
+    // ══════════════════════════════════════════════════════
+    function teamKey(gameId, teamName) {
+      return 'escaperoom_team_' + gameId + '_' + teamName.toLowerCase().replace(/\s+/g, '_');
+    }
+
+    function loadTeamState(gameId, teamName) {
+      if (!teamName) return null;
+      try { return JSON.parse(localStorage.getItem(teamKey(gameId, teamName))); }
+      catch(e) { return null; }
+    }
+
+    function saveTeamState() {
+      if (!currentTeam) return;
+      localStorage.setItem(teamKey(currentTeam.gameId, currentTeam.teamName), JSON.stringify(currentTeam));
+    }
+
+    window.startGame = function() {
+      const name = document.getElementById('team-name-input').value.trim();
+      if (!name) { document.getElementById('team-name-input').focus(); return; }
+
+      currentTeam = {
+        gameId: currentGame.id,
+        teamName: name,
+        startTime: 0,
+        currentRoom: 0,
+        completedRooms: [],
+        roomProgress: {}
+      };
+      timeUpShown = false;
+      saveTeamState();
+      enterRoom(0);
+    };
+
+    window.resumeGame = function() {
+      const name = document.getElementById('team-name-input').value.trim();
+      currentTeam = loadTeamState(currentGame.id, name);
+      if (!currentTeam) return;
+      timeUpShown = false;
+
+      if (currentTeam.completedRooms.length >= currentGame.rooms.length) {
+        showGameComplete();
+        return;
+      }
+
+      if (currentGame.game.mode === 'single') {
+        renderRoomSelect();
+        showView('view-room-select');
+      } else {
+        enterRoom(currentTeam.currentRoom);
+      }
+      startTimer();
+    };
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Room Flow
+    // ══════════════════════════════════════════════════════
+    function enterRoom(roomIdx) {
+      currentRoomIdx = roomIdx;
+      currentQuestionIdx = 0;
+
+      const room = currentGame.rooms[roomIdx];
+      if (!room) { showGameComplete(); return; }
+
+      // Init room progress
+      if (!currentTeam.roomProgress[room.id]) {
+        currentTeam.roomProgress[room.id] = { solvedQuestions: [], failCounts: {}, completed: false, completedAt: null };
+      }
+      currentTeam.currentRoom = roomIdx;
+      saveTeamState();
+
+      renderRoomIntro(room);
+      playDoorAnimation(() => showView('view-room-intro'));
+    }
+
+    function renderRoomIntro(room) {
+      const el = document.getElementById('room-intro-content');
+      el.innerHTML =
+        '<span class="subject-badge">' + esc(room.subject || '') + '</span>' +
+        '<h2>' + esc(room.name) + '</h2>' +
+        '<p class="room-description">' + esc(room.description) + '</p>' +
+        (room.backgroundImage ? '<img src="' + esc(room.backgroundImage) + '" style="max-width:100%;border-radius:12px;margin-top:16px;" alt="">' : '') +
+        '<div class="mt-24"><button class="btn-gold" onclick="enterRoomQuestions()">Raum betreten</button></div>';
+    }
+
+    window.enterRoomQuestions = function() {
+      // Start timer on first room entry
+      if (!currentTeam.startTime) {
+        currentTeam.startTime = Date.now();
+        saveTeamState();
+      }
+      startTimer();
+
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+
+      // Find first unsolved question
+      currentQuestionIdx = 0;
+      for (let i = 0; i < room.questions.length; i++) {
+        if (!progress.solvedQuestions.includes(room.questions[i].id)) {
+          currentQuestionIdx = i;
+          break;
+        }
+      }
+
+      renderRoomQuestions();
+      showView('view-room-questions');
+    };
+
+    function renderRoomQuestions() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      const total = room.questions.length;
+      const solved = progress.solvedQuestions.length;
+
+      // Progress
+      document.getElementById('question-progress').innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="color:var(--text-secondary);font-size:0.9rem;">' + esc(room.name) + '</span>' +
+          '<span style="color:var(--text-muted);font-size:0.85rem;">Frage ' + (solved + 1) + ' von ' + total + '</span>' +
+        '</div>';
+      document.getElementById('q-progress-bar').style.width = (solved / total * 100) + '%';
+
+      // Code digits
+      const digitsEl = document.getElementById('room-code-digits');
+      digitsEl.innerHTML = '';
+      room.questions.forEach((q, i) => {
+        const d = document.createElement('div');
+        d.className = 'code-digit' + (progress.solvedQuestions.includes(q.id) ? ' revealed' : '');
+        d.textContent = progress.solvedQuestions.includes(q.id) ? q.codeDigit : '?';
+        digitsEl.appendChild(d);
+      });
+
+      // Check if all solved
+      if (solved >= total) {
+        showCodeReveal();
+        return;
+      }
+
+      // Render current question
+      const q = room.questions[currentQuestionIdx];
+      // Skip if already solved
+      if (progress.solvedQuestions.includes(q.id)) {
+        for (let i = 0; i < total; i++) {
+          if (!progress.solvedQuestions.includes(room.questions[i].id)) {
+            currentQuestionIdx = i;
+            renderRoomQuestions();
+            return;
+          }
+        }
+        showCodeReveal();
+        return;
+      }
+
+      const fails = progress.failCounts[q.id] || 0;
+      const area = document.getElementById('question-area');
+      let html = '<div class="admin-card" style="background:var(--bg-card);border-color:var(--border);">';
+      html += '<h3 style="font-size:1.15rem;margin-bottom:16px;color:var(--text-primary);font-family:\'Crimson Text\',serif;font-weight:600;">' + esc(q.text) + '</h3>';
+
+      if (q.type === 'multiple_choice') {
+        (q.options || []).forEach((opt, i) => {
+          html += '<button class="option-btn" onclick="checkMC(this, ' + i + ', \'' + esc(q.correctAnswer).replace(/'/g, "\\'") + '\')">' + esc(opt) + '</button>';
+        });
+      } else if (q.type === 'text_input') {
+        html += '<div style="display:flex;gap:8px;">' +
+          '<input type="text" class="player-input" id="text-answer" placeholder="Antwort eingeben..." style="flex:1;">' +
+          '<button class="btn-gold" onclick="checkTextAnswer()">Prüfen</button></div>';
+      } else if (q.type === 'number_code') {
+        html += '<div style="display:flex;gap:8px;">' +
+          '<input type="text" inputmode="numeric" class="player-input" id="number-answer" placeholder="Zahl eingeben..." style="flex:1;max-width:200px;">' +
+          '<button class="btn-gold" onclick="checkNumberAnswer()">Prüfen</button></div>';
+      }
+
+      // Hint
+      if (fails >= 2 && q.hint) {
+        html += '<div class="hint-box">💡 ' + esc(q.hint) + '</div>';
+      }
+
+      html += '</div>';
+      area.innerHTML = html;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Answer Checking
+    // ══════════════════════════════════════════════════════
+    window.checkMC = function(btn, idx, correctAnswer) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const selected = q.options[idx];
+      const isCorrect = selected === q.correctAnswer;
+
+      // Disable all buttons
+      document.querySelectorAll('.option-btn').forEach(b => b.classList.add('disabled'));
+
+      if (isCorrect) {
+        btn.classList.add('correct');
+        onCorrectAnswer(q);
+      } else {
+        btn.classList.add('wrong');
+        // Show correct
+        document.querySelectorAll('.option-btn').forEach(b => {
+          if (b.textContent === q.correctAnswer) b.classList.add('correct');
+        });
+        onWrongAnswer(q);
+      }
+    };
+
+    window.checkTextAnswer = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const input = document.getElementById('text-answer');
+      const answer = input.value.trim();
+      if (!answer) return;
+
+      let correct, given;
+      if (q.caseSensitive) {
+        correct = q.correctAnswer.trim();
+        given = answer;
+      } else {
+        correct = q.correctAnswer.trim().toLowerCase();
+        given = answer.toLowerCase();
+      }
+
+      if (given === correct) {
+        input.style.borderColor = 'var(--success)';
+        onCorrectAnswer(q);
+      } else {
+        input.style.borderColor = 'var(--danger)';
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+        onWrongAnswer(q);
+      }
+    };
+
+    window.checkNumberAnswer = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const input = document.getElementById('number-answer');
+      const answer = input.value.trim();
+      if (!answer) return;
+
+      if (answer === String(q.correctAnswer)) {
+        input.style.borderColor = 'var(--success)';
+        onCorrectAnswer(q);
+      } else {
+        input.style.borderColor = 'var(--danger)';
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+        onWrongAnswer(q);
+      }
+    };
+
+    function onCorrectAnswer(q) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      progress.solvedQuestions.push(q.id);
+      saveTeamState();
+
+      setTimeout(() => {
+        renderRoomQuestions();
+      }, 1200);
+    }
+
+    function onWrongAnswer(q) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      if (!progress.failCounts[q.id]) progress.failCounts[q.id] = 0;
+      progress.failCounts[q.id]++;
+      saveTeamState();
+
+      // Re-render after delay to show hint if needed
+      setTimeout(() => {
+        renderRoomQuestions();
+      }, 1500);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Code Reveal & Unlock
+    // ══════════════════════════════════════════════════════
+    function showCodeReveal() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      progress.completed = true;
+      progress.completedAt = Date.now();
+      saveTeamState();
+
+      const digitsEl = document.getElementById('reveal-code-digits');
+      digitsEl.innerHTML = '';
+      room.questions.forEach((q, i) => {
+        const d = document.createElement('div');
+        d.className = 'code-digit';
+        d.textContent = q.codeDigit;
+        digitsEl.appendChild(d);
+        setTimeout(() => {
+          d.classList.add('revealed');
+          d.style.animation = 'glowPulse 2s ease infinite';
+        }, i * 400);
+      });
+
+      showView('view-code-reveal');
+    }
+
+    window.goToUnlock = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      document.getElementById('unlock-title').textContent = 'Code für: ' + room.name;
+      const inputsEl = document.getElementById('unlock-inputs');
+      inputsEl.innerHTML = '';
+      const codeLen = room.unlockCode.length;
+      for (let i = 0; i < codeLen; i++) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.maxLength = 1;
+        inp.className = 'code-input-field';
+        inp.inputMode = 'numeric';
+        inp.dataset.idx = i;
+        inp.oninput = function() {
+          if (this.value && i < codeLen - 1) {
+            this.nextElementSibling && this.nextElementSibling.focus();
+          }
+        };
+        inp.onkeydown = function(e) {
+          if (e.key === 'Backspace' && !this.value && i > 0) {
+            this.previousElementSibling && this.previousElementSibling.focus();
+          }
+        };
+        inputsEl.appendChild(inp);
+      }
+      inputsEl.children[0].focus();
+      document.getElementById('unlock-error').classList.add('hidden');
+      showView('view-room-unlock');
+    };
+
+    window.checkUnlockCode = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const inputs = document.getElementById('unlock-inputs').querySelectorAll('input');
+      let code = '';
+      inputs.forEach(inp => code += inp.value);
+
+      if (code === room.unlockCode) {
+        // Mark room completed
+        if (!currentTeam.completedRooms.includes(currentRoomIdx)) {
+          currentTeam.completedRooms.push(currentRoomIdx);
+        }
+        saveTeamState();
+
+        // Next room or game complete
+        const nextIdx = currentRoomIdx + 1;
+        if (nextIdx >= currentGame.rooms.length) {
+          stopTimer();
+          showGameComplete();
+        } else if (currentGame.game.mode === 'single') {
+          renderRoomSelect();
+          showView('view-room-select');
+        } else {
+          enterRoom(nextIdx);
+        }
+      } else {
+        // Wrong code
+        const errEl = document.getElementById('unlock-error');
+        errEl.textContent = 'Falscher Code! Versuche es erneut.';
+        errEl.classList.remove('hidden');
+        document.getElementById('unlock-inputs').classList.add('shake');
+        setTimeout(() => document.getElementById('unlock-inputs').classList.remove('shake'), 400);
+      }
+    };
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Room Select (mode=single)
+    // ══════════════════════════════════════════════════════
+    function renderRoomSelect() {
+      const grid = document.getElementById('room-grid');
+      grid.innerHTML = '';
+      currentGame.rooms.forEach((room, idx) => {
+        const completed = currentTeam.completedRooms.includes(idx);
+        const tile = document.createElement('div');
+        tile.className = 'room-tile' + (completed ? ' completed' : '');
+        tile.innerHTML =
+          '<div class="room-icon">' + (completed ? '✅' : '🚪') + '</div>' +
+          '<h3>' + esc(room.name) + '</h3>' +
+          '<p style="font-size:0.85rem;color:var(--text-muted);">' + esc(room.subject || '') + '</p>';
+        if (!completed) {
+          tile.onclick = () => enterRoom(idx);
+        }
+        grid.appendChild(tile);
+      });
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Game Complete
+    // ══════════════════════════════════════════════════════
+    function showGameComplete() {
+      stopTimer();
+      const elapsed = getElapsed();
+      document.getElementById('complete-team').textContent = currentTeam.teamName;
+      document.getElementById('complete-time').textContent = formatTime(elapsed);
+
+      // Save score
+      saveScore(currentGame.id, currentTeam.teamName, elapsed);
+      renderScoreboard(currentGame.id);
+
+      showView('view-game-complete');
+    }
+
+    function saveScore(gameId, teamName, elapsedSeconds) {
+      const key = 'escaperoom_scores_' + gameId;
+      let scores = [];
+      try { scores = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+
+      // Remove existing entry for this team
+      scores = scores.filter(s => s.teamName !== teamName);
+      scores.push({ teamName, elapsedSeconds, completedAt: Date.now() });
+      scores.sort((a, b) => a.elapsedSeconds - b.elapsedSeconds);
+      localStorage.setItem(key, JSON.stringify(scores));
+    }
+
+    function renderScoreboard(gameId) {
+      const key = 'escaperoom_scores_' + gameId;
+      let scores = [];
+      try { scores = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+
+      const el = document.getElementById('scoreboard');
+      if (scores.length === 0) { el.innerHTML = ''; return; }
+
+      let html = '<h3 style="margin-bottom:12px;color:var(--gold);font-family:\'Cinzel\',serif;">Rangliste</h3>';
+      scores.forEach((s, i) => {
+        html += '<div class="score-row">' +
+          '<span class="score-rank">' + (i + 1) + '.</span>' +
+          '<span class="score-name">' + esc(s.teamName) + '</span>' +
+          '<span class="score-time">' + formatTime(s.elapsedSeconds) + '</span>' +
+        '</div>';
+      });
+      el.innerHTML = html;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // TIMER
+    // ══════════════════════════════════════════════════════
+    function startTimer() {
+      if (timerInterval) return;
+      const el = document.getElementById('timer-el');
+      el.classList.remove('hidden');
+
+      timerInterval = setInterval(() => {
+        const elapsed = getElapsed();
+        const totalTimer = currentGame.game.totalTimer || 2400;
+        const remaining = totalTimer - elapsed;
+
+        if (remaining > 0) {
+          el.textContent = '⏱ ' + formatTime(remaining);
+          el.classList.toggle('urgent', remaining < 300);
+        } else {
+          el.textContent = '⏱ +' + formatTime(Math.abs(remaining));
+          el.classList.add('urgent');
+          if (!timeUpShown) {
+            timeUpShown = true;
+            const modal = document.getElementById('time-up-modal');
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+          }
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      document.getElementById('timer-el').classList.add('hidden');
+    }
+
+    function getElapsed() {
+      if (!currentTeam || !currentTeam.startTime) return 0;
+      return Math.floor((Date.now() - currentTeam.startTime) / 1000);
+    }
+
+    function formatTime(seconds) {
+      const s = Math.abs(Math.floor(seconds));
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ANIMATIONS
+    // ══════════════════════════════════════════════════════
+    function playDoorAnimation(callback) {
+      const overlay = document.getElementById('door-overlay');
+      overlay.classList.remove('hidden', 'open');
+      overlay.style.display = 'flex';
+
+      setTimeout(() => {
+        overlay.classList.add('open');
+        setTimeout(() => {
+          overlay.style.display = 'none';
+          overlay.classList.add('hidden');
+          overlay.classList.remove('open');
+          if (callback) callback();
+        }, 1300);
+      }, 100);
+    }
+
+    function launchConfetti() {
+      const container = document.getElementById('confetti-container');
+      container.classList.remove('hidden');
+      container.innerHTML = '';
+      const colors = ['#d4a853', '#e74c3c', '#2ecc71', '#3498db', '#f39c12', '#9b59b6'];
+
+      for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.width = (Math.random() * 8 + 6) + 'px';
+        piece.style.height = (Math.random() * 8 + 6) + 'px';
+        piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        piece.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        piece.style.animationDelay = (Math.random() * 1.5) + 's';
+        container.appendChild(piece);
+      }
+
+      setTimeout(() => {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+      }, 5000);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Library
+    // ══════════════════════════════════════════════════════
+    function renderAdminLibrary() {
+      const list = document.getElementById('admin-game-list');
+      const noGames = document.getElementById('admin-no-games');
+      list.innerHTML = '';
+
+      if (library.length === 0) {
+        noGames.classList.remove('hidden');
+        return;
+      }
+      noGames.classList.add('hidden');
+
+      library.forEach(g => {
+        const row = document.createElement('div');
+        row.className = 'admin-game-row';
+        const mins = Math.floor((g.game.totalTimer || 2400) / 60);
+        row.innerHTML =
+          '<div class="game-info">' +
+            '<h3>' + esc(g.game.title) + '</h3>' +
+            '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
+          '</div>' +
+          '<div class="game-actions">' +
+            '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' +
+            '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
+            '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
+            '<button class="admin-btn sm danger" onclick="deleteGame(\'' + g.id + '\')">Löschen</button>' +
+          '</div>';
+        list.appendChild(row);
+      });
+    }
+
+    window.createNewGame = function() {
+      const g = {
+        id: 'game_' + Date.now(),
+        game: { title: 'Neues Spiel', description: '', totalTimer: 2400, mode: 'chain' },
+        rooms: []
+      };
+      library.push(g);
+      saveLibrary();
+      editGame(g.id);
+    };
+
+    window.editGame = function(gameId) {
+      editingGameId = gameId;
+      editingGame = JSON.parse(JSON.stringify(getGame(gameId)));
+      renderEditor();
+      showAdminView('admin-editor');
+    };
+
+    window.duplicateGame = function(gameId) {
+      const orig = getGame(gameId);
+      if (!orig) return;
+      const dup = JSON.parse(JSON.stringify(orig));
+      dup.id = 'game_' + Date.now();
+      dup.game.title += ' (Kopie)';
+      library.push(dup);
+      saveLibrary();
+      renderAdminLibrary();
+      showAdminStatus('Spiel dupliziert!', 'success');
+    };
+
+    window.deleteGame = function(gameId) {
+      if (!confirm('Spiel wirklich löschen?')) return;
+      library = library.filter(g => g.id !== gameId);
+      saveLibrary();
+      renderAdminLibrary();
+      showAdminStatus('Spiel gelöscht.', 'danger');
+    };
+
+    window.exportGame = function(gameId) {
+      const g = getGame(gameId);
+      if (!g) return;
+      downloadJSON(g, (g.game.title || 'escape-room') + '.json');
+    };
+
+    function downloadJSON(obj, filename) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    window.importGameFile = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.game && data.rooms) {
+            data.id = 'game_' + Date.now();
+            library.push(data);
+            saveLibrary();
+            renderAdminLibrary();
+            showAdminStatus('Spiel importiert!', 'success');
+          } else {
+            showAdminStatus('Ungültiges Format.', 'danger');
+          }
+        } catch(err) {
+          showAdminStatus('JSON-Fehler: ' + err.message, 'danger');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    };
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Editor
+    // ══════════════════════════════════════════════════════
+    function renderEditor() {
+      document.getElementById('editor-title').textContent = editingGame.game.title || 'Spiel bearbeiten';
+      document.getElementById('ed-title').value = editingGame.game.title || '';
+      document.getElementById('ed-desc').value = editingGame.game.description || '';
+      document.getElementById('ed-timer').value = Math.floor((editingGame.game.totalTimer || 2400) / 60);
+      document.querySelectorAll('[name="ed-mode"]').forEach(r => r.checked = r.value === editingGame.game.mode);
+      renderRoomsList();
+
+      // Reset to first tab
+      switchEditorTab('tab-general', document.querySelector('.admin-tab'));
+    }
+
+    window.switchEditorTab = function(tabId, btn) {
+      document.querySelectorAll('.editor-tab').forEach(t => t.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+      document.querySelectorAll('#editor-tabs .admin-tab').forEach(t => t.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    };
+
+    window.saveCurrentGame = function() {
+      editingGame.game.title = document.getElementById('ed-title').value.trim() || 'Unbenannt';
+      editingGame.game.description = document.getElementById('ed-desc').value.trim();
+      editingGame.game.totalTimer = parseInt(document.getElementById('ed-timer').value) * 60 || 2400;
+      editingGame.game.mode = document.querySelector('[name="ed-mode"]:checked').value;
+
+      // Save rooms from DOM
+      syncRoomsFromDOM();
+
+      // Update library
+      const idx = library.findIndex(g => g.id === editingGameId);
+      if (idx >= 0) {
+        library[idx] = JSON.parse(JSON.stringify(editingGame));
+        library[idx].id = editingGameId;
+      }
+      saveLibrary();
+      document.getElementById('editor-title').textContent = editingGame.game.title;
+      showAdminStatus('Gespeichert!', 'success');
+    };
+
+    window.exportCurrentGame = function() {
+      saveCurrentGame();
+      exportGame(editingGameId);
+    };
+
+    window.resetGameScores = function() {
+      if (!confirm('Alle Spielstände für dieses Spiel löschen?')) return;
+      // Remove score and team keys
+      const prefix1 = 'escaperoom_scores_' + editingGameId;
+      const prefix2 = 'escaperoom_team_' + editingGameId;
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key === prefix1 || key.startsWith(prefix2)) keysToRemove.push(key);
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      showAdminStatus('Spielstände zurückgesetzt.', 'success');
+    };
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Room Editor
+    // ══════════════════════════════════════════════════════
+    function renderRoomsList() {
+      const list = document.getElementById('rooms-list');
+      list.innerHTML = '';
+
+      editingGame.rooms.forEach((room, rIdx) => {
+        const el = document.createElement('div');
+        el.className = 'room-editor';
+        el.dataset.roomIdx = rIdx;
+
+        el.innerHTML =
+          '<div class="room-editor-header" onclick="toggleRoomEditor(this)">' +
+            '<span class="room-title">🚪 ' + esc(room.name || 'Unbenannter Raum') + '</span>' +
+            '<span style="font-size:0.8rem;color:#999;">' + room.questions.length + ' Fragen</span>' +
+            '<div style="margin-left:auto;display:flex;gap:4px;">' +
+              (rIdx > 0 ? '<button class="admin-btn sm" onclick="event.stopPropagation();moveRoom(' + rIdx + ',-1)">↑</button>' : '') +
+              (rIdx < editingGame.rooms.length - 1 ? '<button class="admin-btn sm" onclick="event.stopPropagation();moveRoom(' + rIdx + ',1)">↓</button>' : '') +
+              '<button class="admin-btn sm" onclick="event.stopPropagation();duplicateRoom(' + rIdx + ')">📋</button>' +
+              '<button class="admin-btn sm danger" onclick="event.stopPropagation();deleteRoom(' + rIdx + ')">✗</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="room-editor-body collapsed" id="room-body-' + rIdx + '">' +
+            '<label class="admin-label">Raumname</label>' +
+            '<input type="text" class="admin-input room-field" data-field="name" value="' + escAttr(room.name) + '">' +
+            '<label class="admin-label">Fach / Bezeichnung</label>' +
+            '<input type="text" class="admin-input room-field" data-field="subject" value="' + escAttr(room.subject || '') + '">' +
+            '<label class="admin-label">Narrativer Text</label>' +
+            '<textarea class="admin-textarea room-field" data-field="description">' + esc(room.description || '') + '</textarea>' +
+            '<label class="admin-label">Hintergrundbild URL (optional)</label>' +
+            '<input type="text" class="admin-input room-field" data-field="backgroundImage" value="' + escAttr(room.backgroundImage || '') + '">' +
+            '<label class="admin-label">Unlock-Code (4-stellig)</label>' +
+            '<input type="text" class="admin-input room-field" data-field="unlockCode" value="' + escAttr(room.unlockCode || '') + '" maxlength="8" style="max-width:120px;">' +
+            '<div style="margin-top:16px;">' +
+              '<h4 style="margin-bottom:8px;">Fragen</h4>' +
+              '<div id="questions-list-' + rIdx + '"></div>' +
+              '<button class="admin-btn sm" style="margin-top:8px;" onclick="addQuestion(' + rIdx + ')">+ Frage hinzufügen</button>' +
+            '</div>' +
+          '</div>';
+
+        list.appendChild(el);
+
+        // Render questions for this room
+        renderQuestionsList(rIdx);
+      });
+    }
+
+    window.toggleRoomEditor = function(header) {
+      const body = header.nextElementSibling;
+      body.classList.toggle('collapsed');
+    };
+
+    window.addRoom = function() {
+      editingGame.rooms.push({
+        id: 'room_' + Date.now(),
+        name: 'Neuer Raum',
+        subject: '',
+        description: '',
+        backgroundImage: '',
+        unlockCode: String(Math.floor(1000 + Math.random() * 9000)),
+        questions: []
+      });
+      renderRoomsList();
+    };
+
+    window.deleteRoom = function(idx) {
+      if (!confirm('Raum "' + editingGame.rooms[idx].name + '" löschen?')) return;
+      editingGame.rooms.splice(idx, 1);
+      renderRoomsList();
+    };
+
+    window.duplicateRoom = function(idx) {
+      const dup = JSON.parse(JSON.stringify(editingGame.rooms[idx]));
+      dup.id = 'room_' + Date.now();
+      dup.name += ' (Kopie)';
+      editingGame.rooms.splice(idx + 1, 0, dup);
+      renderRoomsList();
+    };
+
+    window.moveRoom = function(idx, dir) {
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= editingGame.rooms.length) return;
+      syncRoomsFromDOM();
+      const temp = editingGame.rooms[idx];
+      editingGame.rooms[idx] = editingGame.rooms[newIdx];
+      editingGame.rooms[newIdx] = temp;
+      renderRoomsList();
+    };
+
+    function syncRoomsFromDOM() {
+      document.querySelectorAll('.room-editor').forEach(el => {
+        const rIdx = parseInt(el.dataset.roomIdx);
+        if (isNaN(rIdx) || !editingGame.rooms[rIdx]) return;
+        const room = editingGame.rooms[rIdx];
+
+        el.querySelectorAll('.room-field').forEach(field => {
+          const f = field.dataset.field;
+          if (f) room[f] = field.value;
+        });
+
+        // Sync questions
+        const qList = el.querySelectorAll('.question-editor');
+        qList.forEach((qEl, qIdx) => {
+          if (!room.questions[qIdx]) return;
+          const q = room.questions[qIdx];
+          q.type = qEl.querySelector('.q-type-select')?.value || q.type;
+          q.text = qEl.querySelector('.q-text')?.value || q.text;
+          q.codeDigit = qEl.querySelector('.q-digit')?.value || q.codeDigit;
+          q.hint = qEl.querySelector('.q-hint')?.value || q.hint;
+
+          if (q.type === 'multiple_choice') {
+            const opts = qEl.querySelectorAll('.q-option');
+            q.options = Array.from(opts).map(o => o.value);
+            const correct = qEl.querySelector('[name="q-correct-' + rIdx + '-' + qIdx + '"]:checked');
+            if (correct) q.correctAnswer = q.options[parseInt(correct.value)] || '';
+          } else if (q.type === 'text_input') {
+            q.correctAnswer = qEl.querySelector('.q-correct-text')?.value || '';
+            q.caseSensitive = qEl.querySelector('.q-case')?.checked || false;
+          } else if (q.type === 'number_code') {
+            q.correctAnswer = qEl.querySelector('.q-correct-number')?.value || '';
+          }
+        });
+      });
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Question Editor
+    // ══════════════════════════════════════════════════════
+    function renderQuestionsList(rIdx) {
+      const room = editingGame.rooms[rIdx];
+      const list = document.getElementById('questions-list-' + rIdx);
+      if (!list) return;
+      list.innerHTML = '';
+
+      room.questions.forEach((q, qIdx) => {
+        const el = document.createElement('div');
+        el.className = 'question-editor';
+
+        let html = '<div class="q-header">' +
+          '<select class="q-type-select" onchange="changeQuestionType(' + rIdx + ',' + qIdx + ',this.value)">' +
+            '<option value="multiple_choice"' + (q.type === 'multiple_choice' ? ' selected' : '') + '>Multiple Choice</option>' +
+            '<option value="text_input"' + (q.type === 'text_input' ? ' selected' : '') + '>Texteingabe</option>' +
+            '<option value="number_code"' + (q.type === 'number_code' ? ' selected' : '') + '>Zahlencode</option>' +
+          '</select>' +
+          '<span style="font-size:0.8rem;color:#999;">Frage ' + (qIdx + 1) + '</span>' +
+          '<div style="margin-left:auto;display:flex;gap:4px;">' +
+            (qIdx > 0 ? '<button class="admin-btn sm" onclick="moveQuestion(' + rIdx + ',' + qIdx + ',-1)">↑</button>' : '') +
+            (qIdx < room.questions.length - 1 ? '<button class="admin-btn sm" onclick="moveQuestion(' + rIdx + ',' + qIdx + ',1)">↓</button>' : '') +
+            '<button class="admin-btn sm danger" onclick="deleteQuestion(' + rIdx + ',' + qIdx + ')">✗</button>' +
+          '</div>' +
+        '</div>';
+
+        html += '<label class="admin-label" style="margin-top:0;">Fragetext</label>';
+        html += '<textarea class="admin-textarea q-text" rows="2">' + esc(q.text || '') + '</textarea>';
+
+        // Type-specific fields
+        if (q.type === 'multiple_choice') {
+          html += '<label class="admin-label">Antwortoptionen</label>';
+          const opts = q.options || ['', '', '', ''];
+          for (let i = 0; i < 4; i++) {
+            html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">' +
+              '<input type="radio" name="q-correct-' + rIdx + '-' + qIdx + '" value="' + i + '"' +
+                (q.correctAnswer === (opts[i] || '') ? ' checked' : '') + '>' +
+              '<input type="text" class="admin-input q-option" value="' + escAttr(opts[i] || '') + '" placeholder="Option ' + (i + 1) + '">' +
+            '</div>';
+          }
+        } else if (q.type === 'text_input') {
+          html += '<label class="admin-label">Richtige Antwort</label>';
+          html += '<input type="text" class="admin-input q-correct-text" value="' + escAttr(q.correctAnswer || '') + '">';
+          html += '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:0.85rem;color:#666;">' +
+            '<input type="checkbox" class="q-case"' + (q.caseSensitive ? ' checked' : '') + '> Groß-/Kleinschreibung beachten</label>';
+        } else if (q.type === 'number_code') {
+          html += '<label class="admin-label">Richtige Antwort (Zahl)</label>';
+          html += '<input type="text" class="admin-input q-correct-number" value="' + escAttr(q.correctAnswer || '') + '" style="max-width:200px;">';
+        }
+
+        html += '<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">' +
+          '<div><label class="admin-label">Hinweis (optional)</label>' +
+          '<input type="text" class="admin-input q-hint" value="' + escAttr(q.hint || '') + '" placeholder="Erscheint nach 2 Fehlversuchen"></div>' +
+          '<div><label class="admin-label">Code-Ziffer</label>' +
+          '<input type="text" class="admin-input q-digit" value="' + escAttr(q.codeDigit || '') + '" maxlength="1" style="width:50px;text-align:center;"></div>' +
+        '</div>';
+
+        el.innerHTML = html;
+        list.appendChild(el);
+      });
+    }
+
+    window.addQuestion = function(rIdx) {
+      syncRoomsFromDOM();
+      const room = editingGame.rooms[rIdx];
+      room.questions.push({
+        id: 'q' + (room.questions.length + 1),
+        type: 'multiple_choice',
+        text: '',
+        options: ['', '', '', ''],
+        correctAnswer: '',
+        hint: '',
+        codeDigit: String(room.questions.length + 1)
+      });
+      renderRoomsList();
+      // Open this room's editor
+      const body = document.getElementById('room-body-' + rIdx);
+      if (body) body.classList.remove('collapsed');
+    };
+
+    window.deleteQuestion = function(rIdx, qIdx) {
+      syncRoomsFromDOM();
+      editingGame.rooms[rIdx].questions.splice(qIdx, 1);
+      renderQuestionsList(rIdx);
+    };
+
+    window.moveQuestion = function(rIdx, qIdx, dir) {
+      syncRoomsFromDOM();
+      const qs = editingGame.rooms[rIdx].questions;
+      const newIdx = qIdx + dir;
+      if (newIdx < 0 || newIdx >= qs.length) return;
+      const temp = qs[qIdx];
+      qs[qIdx] = qs[newIdx];
+      qs[newIdx] = temp;
+      renderQuestionsList(rIdx);
+    };
+
+    window.changeQuestionType = function(rIdx, qIdx, newType) {
+      syncRoomsFromDOM();
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      q.type = newType;
+      if (newType === 'multiple_choice' && (!q.options || q.options.length < 4)) {
+        q.options = ['', '', '', ''];
+      }
+      renderQuestionsList(rIdx);
+    };
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Status Message
+    // ══════════════════════════════════════════════════════
+    function showAdminStatus(msg, type) {
+      const el = document.getElementById('admin-status');
+      el.textContent = msg;
+      el.style.display = 'block';
+      el.style.background = type === 'success' ? '#dcfce7' : type === 'danger' ? '#fee2e2' : '#e0e7ff';
+      el.style.color = type === 'success' ? '#166534' : type === 'danger' ? '#991b1b' : '#3730a3';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // DEMO GAME
+    // ══════════════════════════════════════════════════════
+    function createDemoGame() {
+      return {
+        id: 'game_demo_001',
+        game: {
+          title: 'Operation Zellkern',
+          description: 'Das Institut ist gesperrt. Löst die Rätsel — Raum für Raum.',
+          totalTimer: 2400,
+          mode: 'chain'
+        },
+        rooms: [
+          {
+            id: 'room_1',
+            name: 'Das Enzym-Labor',
+            subject: 'Biochemie',
+            description: 'Ihr betretet das verlassene Labor. Auf dem Arbeitstisch liegen Notizen über Enzyme. Löst die Rätsel, um den Code für die nächste Tür zu finden.',
+            backgroundImage: '',
+            unlockCode: '4823',
+            questions: [
+              {
+                id: 'q1', type: 'multiple_choice',
+                text: 'Welches Enzym spaltet Stärke in Maltose?',
+                options: ['Lipase', 'Amylase', 'Protease', 'Katalase'],
+                correctAnswer: 'Amylase',
+                hint: 'Das Enzym beginnt mit dem Substrat-Namen.',
+                codeDigit: '4'
+              },
+              {
+                id: 'q2', type: 'text_input',
+                text: 'Wie heißt der Bereich eines Enzyms, an den das Substrat bindet?',
+                correctAnswer: 'Aktives Zentrum',
+                caseSensitive: false,
+                hint: 'Es ist das „aktive" Herzstück des Enzyms.',
+                codeDigit: '8'
+              },
+              {
+                id: 'q3', type: 'number_code',
+                text: 'Bei welcher Temperatur (°C) arbeiten menschliche Enzyme optimal?',
+                correctAnswer: '37',
+                hint: 'Unsere normale Körpertemperatur.',
+                codeDigit: '2'
+              },
+              {
+                id: 'q4', type: 'multiple_choice',
+                text: 'Was passiert bei der Denaturierung eines Enzyms?',
+                options: [
+                  'Es wird schneller',
+                  'Die räumliche Struktur geht verloren',
+                  'Es wird zu DNA',
+                  'Es verdoppelt sich'
+                ],
+                correctAnswer: 'Die räumliche Struktur geht verloren',
+                hint: 'Denk an ein Ei in heißem Wasser.',
+                codeDigit: '3'
+              }
+            ]
+          },
+          {
+            id: 'room_2',
+            name: 'Die Genkammer',
+            subject: 'Biologie',
+            description: 'Die Tür öffnet sich zu einem Raum voller DNA-Modelle und Gensequenzen. Das Wissen über Genetik wird euch den Weg weisen.',
+            backgroundImage: '',
+            unlockCode: '6142',
+            questions: [
+              {
+                id: 'q5', type: 'multiple_choice',
+                text: 'Welche Base paart sich in der DNA mit Adenin?',
+                options: ['Cytosin', 'Guanin', 'Thymin', 'Uracil'],
+                correctAnswer: 'Thymin',
+                hint: 'A-T und G-C sind die klassischen Paarungen.',
+                codeDigit: '6'
+              },
+              {
+                id: 'q6', type: 'text_input',
+                text: 'Wie heißt der Vorgang, bei dem DNA in mRNA umgeschrieben wird?',
+                correctAnswer: 'Transkription',
+                caseSensitive: false,
+                hint: 'Das Wort bedeutet so viel wie „Abschrift".',
+                codeDigit: '1'
+              },
+              {
+                id: 'q7', type: 'number_code',
+                text: 'Wie viele Chromosomen hat ein menschlicher diploider Zellkern?',
+                correctAnswer: '46',
+                hint: '23 Paare ergeben…',
+                codeDigit: '4'
+              },
+              {
+                id: 'q8', type: 'multiple_choice',
+                text: 'Was ist ein Codon?',
+                options: [
+                  'Ein Abschnitt von 3 Basen, der für eine Aminosäure codiert',
+                  'Ein Enzym der Replikation',
+                  'Ein Typ von RNA',
+                  'Ein Chromosomenabschnitt'
+                ],
+                correctAnswer: 'Ein Abschnitt von 3 Basen, der für eine Aminosäure codiert',
+                hint: 'Drei Buchstaben → eine Aminosäure.',
+                codeDigit: '2'
+              }
+            ]
+          },
+          {
+            id: 'room_3',
+            name: 'Der Chemie-Tresor',
+            subject: 'Chemie',
+            description: 'Der letzte Raum: Ein schwerer Tresor mit dem Periodensystem an der Wand. Nur wer die Chemie beherrscht, knackt den finalen Code.',
+            backgroundImage: '',
+            unlockCode: '7935',
+            questions: [
+              {
+                id: 'q9', type: 'multiple_choice',
+                text: 'Welches Element hat das Symbol „Fe"?',
+                options: ['Fluor', 'Francium', 'Eisen', 'Fermium'],
+                correctAnswer: 'Eisen',
+                hint: 'Vom lateinischen „Ferrum".',
+                codeDigit: '7'
+              },
+              {
+                id: 'q10', type: 'text_input',
+                text: 'Wie lautet die chemische Formel von Wasser?',
+                correctAnswer: 'H2O',
+                caseSensitive: false,
+                hint: 'Zwei Wasserstoff, ein Sauerstoff.',
+                codeDigit: '9'
+              },
+              {
+                id: 'q11', type: 'number_code',
+                text: 'Welche Ordnungszahl hat Kohlenstoff im Periodensystem?',
+                correctAnswer: '6',
+                hint: 'Es steht in der zweiten Periode, Gruppe 14.',
+                codeDigit: '3'
+              },
+              {
+                id: 'q12', type: 'multiple_choice',
+                text: 'Was entsteht bei einer Neutralisationsreaktion von Säure und Base?',
+                options: [
+                  'Salz und Wasser',
+                  'Nur Wasser',
+                  'Ein Gas',
+                  'Ein Metall'
+                ],
+                correctAnswer: 'Salz und Wasser',
+                hint: 'Säure + Base → zwei Produkte.',
+                codeDigit: '5'
+              }
+            ]
+          }
+        ]
+      };
+    }
+
+    window.loadDemoGame = function() {
+      const demo = createDemoGame();
+      demo.id = 'game_' + Date.now();
+      // Check if demo already exists
+      const existing = library.find(g => g.game.title === 'Operation Zellkern');
+      if (existing) {
+        if (!confirm('\"Operation Zellkern\" existiert bereits. Trotzdem erneut laden?')) return;
+      }
+      library.push(demo);
+      saveLibrary();
+      if (isAdmin) renderAdminLibrary();
+      showAdminStatus('Demo-Spiel geladen!', 'success');
+    };
+
+    // ══════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════
+    function esc(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function escAttr(str) {
+      return esc(str).replace(/"/g, '&quot;');
+    }
+
+  })();
+  </script>
+</body>
+</html>
