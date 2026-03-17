@@ -61,14 +61,12 @@
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    html, body { height: 100%; }
+    html, body { min-height: 100%; }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg-body);
       color: var(--card-title-color);
-      display: flex;
-      flex-direction: column;
       transition: background 0.35s;
     }
 
@@ -76,11 +74,6 @@
     .page-wrap {
       width: 100%;
       padding: clamp(0.8rem, 2vw, 2rem) clamp(0.8rem, 2vw, 2rem) 0;
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      gap: clamp(0.5rem, 1vh, 1rem);
     }
 
     /* ── Header ── */
@@ -152,16 +145,10 @@
       border-radius: clamp(12px, 1.5vw, 20px);
       box-shadow: var(--container-shadow);
       padding: clamp(0.8rem, 2vw, 2rem);
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
     }
 
     body.dark .content-box {
-      padding: 0;
-      box-shadow: none;
-      background: transparent;
+      padding: 0; box-shadow: none; background: transparent;
     }
 
     /* ── Spiele-Grid ── */
@@ -169,8 +156,6 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: clamp(1rem, 2vw, 2rem);
-      flex: 1;
-      min-height: 0;
     }
 
     /* ── Spielkarte ── */
@@ -417,11 +402,8 @@
     @media (max-width: 600px) {
       .games-grid { grid-template-columns: 1fr; }
 
-      /* Mobile: natürliches Scrollen statt Viewport-Fitting */
-      html, body { height: auto; min-height: 100svh; }
-      .page-wrap { flex: 0 0 auto; padding-bottom: 0; }
-      .content-box { flex: 0 0 auto; height: auto; }
-      .games-grid { flex: none; height: auto; }
+      /* Mobile */
+      .page-wrap { padding-bottom: 0; }
 
       /* Karten-Banner kleiner */
       .card-banner { height: 110px; font-size: 3rem; }
