@@ -29,6 +29,16 @@ Spiele/
     data/
       pairs.json                ← Memory-Paare Datenbank
       images/                   ← Hochgeladene Bilder für Karten
+  quizpfad/
+    index.html                  ← QuizPfad Spiel (Setup + Board + Modals)
+    admin.html                  ← QuizPfad Fragenverwaltung (Editor + MD-Import)
+    js/
+      quizpfad.js               ← Spiellogik (Board, Teams, Runden, Bonus)
+      quizpfad-admin.js         ← Editor-Logik (Fragen CRUD, MD-Import)
+    css/
+      quizpfad.css              ← Styles (Brettspiel Classic, responsive)
+    data/
+      fragen.json               ← Fragedatenbank (Kategorien + Fragen)
   risiko-quiz/
     index.html                  ← Risiko-Quiz Spieloberfläche (Join-Screen + Board)
     admin.html                  ← Risiko-Quiz Admin (Spielwähler + Editor)
@@ -64,6 +74,8 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 |-------|----------|------------------------|
 | `index.html` | Light (SLF-Stil) | `body.dark` |
 | `stadt-land-fluss/index.html` | Light (SLF-Stil) | `body.dark` |
+| `quizpfad/index.html` | Light (Brettspiel) | `body.dark` |
+| `quizpfad/admin.html` | Light (Brettspiel) | `body.dark` |
 | `risiko-quiz/index.html` | Dark | `body.light` |
 | `risiko-quiz/admin.html` | Dark | `body.light` |
 
@@ -259,4 +271,47 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 ### Theme (Memory spezifisch)
 - Standard: Dark (`:root` in memory.css)
 - `body.light` überschreibt alle CSS-Variablen
+- Toggle-Script am Ende jeder HTML-Datei als IIFE
+
+---
+
+## QuizPfad
+
+### Architektur
+- Lineares Brettspiel: Teams rücken durch richtige Antworten auf einem Mäander-Pfad vor
+- 30 Felder in Schlangen-Layout (6 Spalten, 5 Zeilen, abwechselnd L→R / R→L)
+- Eigene Fragenbank: `quizpfad/data/fragen.json`
+- API-Endpunkt: `?f=quizpfad-fragen` (GET/POST)
+- Kein Multi-Game, kein SSE — reines Einzelspiel im Browser
+
+### Datenformat (`fragen.json`)
+```json
+{
+  "kategorien": [
+    { "id": "chemie", "name": "Chemie Grundlagen", "icon": "🧪", "farbe": "#3498db" }
+  ],
+  "fragen": [
+    {
+      "id": "q001", "kategorie": "chemie", "schwierigkeit": "leicht",
+      "frage": "...", "typ": "multiple_choice",
+      "antworten": ["A", "B", "C", "D"], "richtig": 0,
+      "erklaerung": "..."
+    }
+  ]
+}
+```
+Typen: `multiple_choice`, `wahr_falsch`, `offen` (Lehrer entscheidet)
+
+### Bonusfelder
+| Typ | Effekt |
+|-----|--------|
+| `advance` | +2 Felder vor |
+| `setback` | -2 Felder zurück |
+| `extra` | Sofort nochmal dran |
+| `joker` | Frage überspringen (1× pro Spiel) |
+| `duel` | Teamduell: gleiche Frage, schneller gewinnt |
+
+### Theme (QuizPfad spezifisch)
+- Standard: Light (Brettspiel Classic, warmes Beige)
+- `body.dark` überschreibt alle CSS-Variablen (warme Brauntöne)
 - Toggle-Script am Ende jeder HTML-Datei als IIFE

@@ -11,6 +11,7 @@ risiko-quiz/data/gamestate.json
 risiko-quiz/data/games/
 memory/data/pairs.json
 memory/data/images/
+quizpfad/data/fragen.json
 
 # Veraltete Duplikate
 SLF.html

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>QuizPfad</title>
+  <link rel="stylesheet" href="css/quizpfad.css">
+</head>
+<body>
+
+  <!-- ── Setup Screen ────────────────────────────────────── -->
+  <div class="screen active" id="setup-screen">
+    <div class="setup-card">
+      <div class="setup-header">
+        <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+        <div class="setup-header-btns">
+          <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+        </div>
+      </div>
+
+      <div class="setup-title">
+        <h1>🎲 QuizPfad</h1>
+        <p>Beantworte Fragen, rücke vor, erreiche das Ziel!</p>
+      </div>
+
+      <div class="setup-section">
+        <h3>Anzahl Teams</h3>
+        <div class="team-count-row" id="team-count-row"></div>
+      </div>
+
+      <div class="setup-section">
+        <h3>Teams konfigurieren</h3>
+        <div class="team-config-list" id="team-config-list"></div>
+      </div>
+
+      <div class="setup-error" id="setup-error"></div>
+
+      <div class="setup-actions">
+        <button class="btn-start-game" id="btn-start" onclick="startGame()">Spiel starten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ─────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="board-area">
+      <div class="board-header">
+        <button class="header-btn" onclick="confirmQuit()">&#8592; Beenden</button>
+        <h2>QuizPfad</h2>
+        <span class="round-info" id="round-info">Runde 1</span>
+        <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
+      </div>
+      <div class="active-team-banner" id="active-team-banner"></div>
+      <div class="board-grid" id="board-grid"></div>
+    </div>
+
+    <div class="sidebar">
+      <h3>Teams</h3>
+      <div class="team-list" id="team-list"></div>
+      <div class="sidebar-actions">
+        <button class="btn-answer" id="btn-answer" onclick="askQuestion()">Frage beantworten</button>
+        <button class="btn-use-joker" id="btn-joker" onclick="useJoker()" style="display:none;">🃏 Joker einsetzen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Question Modal ──────────────────────────────────── -->
+  <div class="modal-overlay" id="question-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-cat-icon" id="q-cat-icon"></span>
+        <span class="modal-cat-name" id="q-cat-name"></span>
+        <span class="modal-difficulty" id="q-difficulty"></span>
+      </div>
+      <div class="modal-question" id="q-text"></div>
+      <div class="modal-hint" id="q-hint" style="display:none;"></div>
+      <div class="answer-options" id="q-options"></div>
+      <div class="open-actions" id="q-open-actions" style="display:none;">
+        <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+        <button class="btn-wrong" onclick="resolveOpen(false)">✗ Falsch</button>
+      </div>
+      <div class="modal-result" id="q-result"></div>
+      <div class="modal-explanation" id="q-explanation">
+        <h4>Erklärung</h4>
+        <p id="q-explanation-text"></p>
+      </div>
+      <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── Bonus Modal ─────────────────────────────────────── -->
+  <div class="modal-overlay bonus-modal" id="bonus-modal">
+    <div class="modal-card">
+      <div class="bonus-icon" id="bonus-icon"></div>
+      <div class="bonus-title" id="bonus-title"></div>
+      <div class="bonus-desc" id="bonus-desc"></div>
+      <div class="duel-teams" id="duel-teams" style="display:none;"></div>
+      <button class="modal-continue visible" id="bonus-continue" onclick="continueAfterBonus()">Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── Winner Screen ───────────────────────────────────── -->
+  <div class="screen" id="winner-screen">
+    <div class="confetti-container" id="confetti-container"></div>
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-title">Gewonnen!</div>
+    <div class="winner-team-name" id="winner-team-name"></div>
+    <div class="winner-stats" id="winner-stats"></div>
+    <div class="winner-actions">
+      <button class="btn-new-game" onclick="resetToSetup()">Neues Spiel</button>
+      <a href="../spiele.html" class="btn-back">Zur Übersicht</a>
+    </div>
+  </div>
+
+  <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="js/quizpfad.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+      var el2 = document.getElementById('btn-theme-game');
+      if (el2) el2.textContent = dark ? '☀️' : '🌙';
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

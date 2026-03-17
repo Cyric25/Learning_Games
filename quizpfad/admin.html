@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizPfad – Fragenverwaltung</title>
+  <link rel="stylesheet" href="css/quizpfad.css">
+  <style>
+    body { overflow: auto; }
+    .admin-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: clamp(16px, 3vh, 40px) clamp(16px, 3vw, 40px);
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 10px;
+    }
+    .admin-header h1 { font-size: 1.5rem; color: var(--accent); }
+    .admin-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .admin-tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+    .admin-tab {
+      padding: 8px 18px; border: 2px solid var(--border); border-radius: 10px;
+      background: var(--bg-field); color: var(--text-primary); cursor: pointer;
+      font-weight: 600; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .admin-tab:hover { border-color: var(--accent); }
+    .admin-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Category list */
+    .cat-list { display: flex; flex-direction: column; gap: 16px; }
+    .cat-card {
+      background: var(--bg-sidebar); border: 2px solid var(--border); border-radius: 14px;
+      padding: 16px; box-shadow: var(--shadow);
+    }
+    .cat-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .cat-header input[type="text"] {
+      flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg-field); color: var(--text-primary); font-size: 0.95rem;
+    }
+    .cat-header input[type="color"] {
+      width: 36px; height: 32px; border: none; border-radius: 6px; cursor: pointer; background: transparent;
+    }
+    .cat-icon-input {
+      width: 40px; text-align: center; font-size: 1.2rem;
+      padding: 4px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg-field); color: var(--text-primary);
+    }
+
+    .question-list { display: flex; flex-direction: column; gap: 8px; }
+    .q-row {
+      display: flex; gap: 8px; align-items: flex-start; padding: 10px; border-radius: 10px;
+      background: var(--bg-field); border: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .q-row select, .q-row input, .q-row textarea {
+      padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-sidebar); color: var(--text-primary); font-size: 0.85rem;
+    }
+    .q-row textarea { resize: vertical; min-height: 40px; flex: 1; min-width: 200px; }
+    .q-row select { width: 110px; }
+    .q-type-select { width: 130px !important; }
+
+    .q-options-editor { width: 100%; margin-top: 6px; }
+    .q-options-editor input {
+      width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-sidebar); color: var(--text-primary); font-size: 0.85rem;
+      margin-top: 4px;
+    }
+    .q-options-editor label { font-size: 0.75rem; color: var(--text-light); }
+
+    .btn-sm {
+      padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg-field); color: var(--text-primary); cursor: pointer;
+      font-size: 0.8rem; transition: all 0.2s;
+    }
+    .btn-sm:hover { border-color: var(--accent); }
+    .btn-sm.danger { color: var(--danger); }
+    .btn-sm.danger:hover { background: var(--danger); color: #fff; }
+
+    .btn-primary {
+      padding: 10px 24px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-warm), var(--accent));
+      color: #fff; font-weight: 700; cursor: pointer; font-size: 0.95rem;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      padding: 10px 24px; border: 2px solid var(--border); border-radius: 12px;
+      background: var(--bg-sidebar); color: var(--text-primary); font-weight: 600;
+      cursor: pointer; font-size: 0.95rem;
+    }
+    .btn-secondary:hover { background: var(--bg-field); }
+
+    .save-bar {
+      position: sticky; bottom: 0; padding: 14px 0; display: flex; gap: 10px;
+      justify-content: center; background: var(--bg-body); border-top: 2px solid var(--border);
+      margin-top: 24px; flex-wrap: wrap;
+    }
+
+    .status-msg {
+      text-align: center; padding: 8px; font-size: 0.9rem; border-radius: 8px;
+      margin-bottom: 12px; display: none;
+    }
+    .status-msg.visible { display: block; }
+    .status-msg.success { background: rgba(42,157,143,0.15); color: var(--success); }
+    .status-msg.error { background: rgba(231,111,81,0.15); color: var(--danger); }
+
+    /* MD Import */
+    .import-area {
+      width: 100%; min-height: 200px; padding: 14px; border: 2px dashed var(--border);
+      border-radius: 12px; background: var(--bg-field); color: var(--text-primary);
+      font-family: 'Consolas', monospace; font-size: 0.85rem; resize: vertical;
+    }
+    .import-preview { margin-top: 16px; padding: 14px; background: var(--bg-field); border-radius: 12px; }
+    .import-preview h4 { margin-bottom: 8px; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <h1>🎲 QuizPfad – Fragenverwaltung</h1>
+      <div class="admin-header-btns">
+        <a href="index.html" class="header-btn">▶ Spielen</a>
+        <a href="../spiele.html" class="header-btn">← Übersicht</a>
+        <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+      </div>
+    </div>
+
+    <div class="status-msg" id="status-msg"></div>
+
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('tab-edit')">Fragen bearbeiten</button>
+      <button class="admin-tab" onclick="switchTab('tab-import')">MD-Import</button>
+      <button class="admin-tab" onclick="switchTab('tab-categories')">Kategorien</button>
+    </div>
+
+    <!-- Tab: Fragen bearbeiten -->
+    <div class="tab-content active" id="tab-edit">
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+
+    <!-- Tab: MD-Import -->
+    <div class="tab-content" id="tab-import">
+      <p style="margin-bottom:12px; color:var(--text-secondary); font-size:0.9rem;">
+        Fragen im Markdown-Format importieren. Format:<br>
+        <code>## Kategorie-ID</code><br>
+        <code>- typ | frage | antwort1 | antwort2 | ... | richtigIndex | erklaerung</code><br>
+        Typen: <code>mc</code>, <code>wf</code>, <code>offen</code>
+      </p>
+      <textarea class="import-area" id="import-area" placeholder="## chemie
+- mc | Wie lautet das Symbol für Gold? | Au | Ag | Fe | Cu | 0 | Au kommt vom lateinischen Aurum.
+- wf | Helium ist ein Edelgas. | Wahr | Falsch | 0 | Helium steht in der 8. Hauptgruppe.
+- offen | Erkläre die Ionenbindung. | | | -1 | Übertragung von Elektronen zwischen Metall und Nichtmetall."></textarea>
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <button class="btn-primary" onclick="importMD()">Importieren</button>
+        <button class="btn-secondary" onclick="previewMD()">Vorschau</button>
+      </div>
+      <div class="import-preview" id="import-preview" style="display:none;"></div>
+    </div>
+
+    <!-- Tab: Kategorien -->
+    <div class="tab-content" id="tab-categories">
+      <div id="categories-editor"></div>
+      <div style="margin-top:12px;">
+        <button class="btn-sm" onclick="addCategory()">+ Kategorie</button>
+      </div>
+    </div>
+
+    <div class="save-bar">
+      <button class="btn-primary" onclick="saveAll()">💾 Speichern</button>
+      <button class="btn-secondary" onclick="downloadJSON()">⬇ JSON herunterladen</button>
+    </div>
+  </div>
+
+  <script src="js/quizpfad-admin.js"></script>
+
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

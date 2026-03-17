@@ -70,6 +70,14 @@ Add-Folder $zip (Join-Path $mem "css")           "memory/css"
 Add-Folder $zip (Join-Path $mem "lib")           "memory/lib"
 # data/pairs.json wird NICHT mitgepackt (wie bei Risiko-Quiz)
 
+# QuizPfad
+$qp = Join-Path $source "quizpfad"
+Add-File   $zip (Join-Path $qp "index.html")    "quizpfad/index.html"
+Add-File   $zip (Join-Path $qp "admin.html")    "quizpfad/admin.html"
+Add-Folder $zip (Join-Path $qp "js")            "quizpfad/js"
+Add-Folder $zip (Join-Path $qp "css")           "quizpfad/css"
+# data/fragen.json wird NICHT mitgepackt (Spieldaten)
+
 # Stadt-Land-Fluss
 $slf = Join-Path $source "stadt-land-fluss"
 Add-File $zip (Join-Path $slf "index.html")      "stadt-land-fluss/index.html"
