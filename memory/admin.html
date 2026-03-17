@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory – Admin</title>
+  <link rel="stylesheet" href="css/memory.css">
+  <link rel="stylesheet" href="lib/katex/katex.min.css">
+  <style>
+    /* ── Admin-spezifische Styles ────────────────────────── */
+    .admin-wrap {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: clamp(12px, 3vw, 32px);
+      width: 100%;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: -2px;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Kategorien ──────────────────────────────────────── */
+    .cat-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .cat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cat-row:hover { background: var(--bg-card-hover); }
+    .cat-row.selected { border: 2px solid var(--accent); }
+    .cat-row .cat-name { flex: 1; font-weight: 500; }
+    .cat-row .cat-count { font-size: 0.8rem; color: var(--text-secondary); }
+
+    .cat-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    /* ── Pair Editor ─────────────────────────────────────── */
+    .pair-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .pair-card {
+      padding: 14px;
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .pair-sides {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .side-editor h4 {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .side-editor select,
+    .side-editor input,
+    .side-editor textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+    body.light .side-editor select,
+    body.light .side-editor input,
+    body.light .side-editor textarea {
+      background: #fff;
+      border-color: rgba(0,0,0,0.15);
+    }
+    .side-editor select { cursor: pointer; }
+    .side-preview {
+      min-height: 36px;
+      padding: 8px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+    body.light .side-preview { background: rgba(0,0,0,0.03); }
+
+    .pair-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .pair-footer select { width: auto; }
+    .pair-footer .btn-sm { padding: 4px 10px; }
+
+    /* ── Import ──────────────────────────────────────────── */
+    #import-textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+      font-family: 'Consolas', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      resize: vertical;
+      margin-bottom: 12px;
+    }
+    body.light #import-textarea {
+      background: #fff;
+      border-color: rgba(0,0,0,0.15);
+    }
+    .import-preview {
+      padding: 14px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .import-cat { margin-bottom: 12px; }
+    .import-cat h4 { margin-bottom: 6px; color: var(--accent); }
+    .import-pair {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      border-left: 3px solid var(--accent);
+      margin-bottom: 4px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; }
+
+    .save-status {
+      padding: 10px 16px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 500;
+      display: none;
+      margin-top: 12px;
+    }
+    .save-status.success { display: block; background: rgba(46,204,113,0.15); color: var(--success); }
+    .save-status.error { display: block; background: rgba(231,76,60,0.15); color: var(--danger); }
+
+    @media (max-width: 500px) {
+      .pair-sides { grid-template-columns: 1fr; }
+      .tabs { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-left">
+      <a href="../spiele.html" class="header-btn" title="Zurück zur Übersicht" style="text-decoration:none;">&#8592;</a>
+      <h1>Memory – Admin</h1>
+    </div>
+    <button class="header-btn" id="btn-theme" title="Design wechseln" onclick="toggleTheme()">☀️</button>
+  </div>
+
+  <div class="admin-wrap">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('categories')">Kategorien</button>
+      <button class="tab-btn" onclick="switchTab('pairs')">Paare</button>
+      <button class="tab-btn" onclick="switchTab('import')">MD-Import</button>
+    </div>
+
+    <!-- ── Tab: Kategorien ─────────────────────────────── -->
+    <div class="tab-content active" id="tab-categories">
+      <div class="cat-list" id="admin-cat-list"></div>
+      <div class="cat-actions">
+        <input type="text" id="new-cat-name" placeholder="Neue Kategorie…"
+               style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.06);color:var(--text-primary);font-size:0.9rem;">
+        <button class="btn btn-primary btn-sm" onclick="addCategory()">+ Hinzufügen</button>
+      </div>
+    </div>
+
+    <!-- ── Tab: Paare ──────────────────────────────────── -->
+    <div class="tab-content" id="tab-pairs">
+      <div style="margin-bottom:16px;">
+        <select id="pair-cat-select" onchange="selectPairCategory()"
+                style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font-size:0.95rem;">
+          <option value="">– Kategorie wählen –</option>
+        </select>
+      </div>
+      <div class="pair-list" id="pair-list"></div>
+      <button class="btn btn-primary" id="btn-add-pair" onclick="addPair()" style="display:none;">+ Neues Paar</button>
+      <button class="btn btn-primary" id="btn-save-pairs" onclick="savePairs()" style="display:none;margin-top:12px;">Speichern</button>
+      <div class="save-status" id="save-status"></div>
+    </div>
+
+    <!-- ── Tab: MD-Import ──────────────────────────────── -->
+    <div class="tab-content" id="tab-import">
+      <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;">
+        Format: <code>## Kategoriename</code> → <code>- typA | inhaltA | typB | inhaltB | schwierigkeit</code>
+      </p>
+      <textarea id="import-textarea" placeholder="## Chemie - Summenformeln
+- text | Schwefelsäure | formula | H_2SO_4
+- text | Wasser | formula | H_2O"></textarea>
+      <button class="btn btn-secondary" onclick="previewImport()">Vorschau</button>
+      <div class="import-preview" id="import-preview" style="display:none;"></div>
+      <button class="btn btn-primary" id="btn-confirm-import" onclick="confirmImport()" style="display:none;margin-top:8px;">Import bestätigen</button>
+      <div class="save-status" id="import-status"></div>
+    </div>
+  </div>
+
+  <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="lib/katex/katex.min.js"></script>
+  <script src="js/memory-shared.js"></script>
+  <script src="js/memory-admin.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(active) {
+      document.body.classList.toggle('light', active);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = active ? '🌙' : '☀️';
+    }
+    window.toggleTheme = function () {
+      var isLight = !document.body.classList.contains('light');
+      localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+      applyTheme(isLight);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'light');
+  })();
+  </script>
+
+</body>
+</html>

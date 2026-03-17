@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Memory</title>
+  <link rel="stylesheet" href="css/memory.css">
+  <link rel="stylesheet" href="lib/katex/katex.min.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <div class="header" id="game-header" style="display:none;">
+    <div class="header-left">
+      <button class="header-btn" onclick="backToSetup()" title="Zurück">&#8592;</button>
+      <h1>Memory</h1>
+    </div>
+    <div class="header-stats">
+      <span>Züge: <strong id="stat-moves">0</strong></span>
+      <span>⏱ <strong id="stat-time">0:00</strong></span>
+    </div>
+    <button class="header-btn" id="btn-theme" title="Design wechseln" onclick="toggleTheme()">☀️</button>
+  </div>
+
+  <!-- ── Setup Screen ────────────────────────────────────── -->
+  <div class="screen active" id="setup-screen">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border);">
+      <div class="header-left">
+        <a href="../spiele.html" class="header-btn" title="Zurück zur Übersicht" style="text-decoration:none;">&#8592;</a>
+        <h1 style="font-size:1.3rem;font-weight:700;">Memory</h1>
+      </div>
+      <button class="header-btn" id="btn-theme-setup" onclick="toggleTheme()">☀️ Lightmode</button>
+    </div>
+
+    <div style="padding:clamp(16px,4vw,40px);max-width:600px;margin:0 auto;width:100%;">
+      <div class="setup-section" id="cat-section">
+        <h2>Kategorien</h2>
+        <div class="category-list" id="category-list">
+          <!-- Dynamisch befüllt -->
+        </div>
+        <div class="no-categories" id="no-categories" style="display:none;">
+          Keine Kategorien vorhanden.<br>
+          <a href="admin.html">Paare im Admin anlegen</a>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <h2>Schwierigkeit</h2>
+        <div class="option-row" id="difficulty-row">
+          <button class="option-btn selected" data-val="all" onclick="selectDifficulty(this)">Alle</button>
+          <button class="option-btn" data-val="1" onclick="selectDifficulty(this)">Leicht</button>
+          <button class="option-btn" data-val="2" onclick="selectDifficulty(this)">Mittel</button>
+          <button class="option-btn" data-val="3" onclick="selectDifficulty(this)">Schwer</button>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <h2>Rastergröße</h2>
+        <div class="option-row" id="grid-row">
+          <button class="option-btn" data-cols="4" data-rows="3" data-pairs="6" onclick="selectGrid(this)">4×3 (6)</button>
+          <button class="option-btn selected" data-cols="4" data-rows="4" data-pairs="8" onclick="selectGrid(this)">4×4 (8)</button>
+          <button class="option-btn" data-cols="4" data-rows="5" data-pairs="10" onclick="selectGrid(this)">4×5 (10)</button>
+          <button class="option-btn" data-cols="6" data-rows="4" data-pairs="12" onclick="selectGrid(this)">6×4 (12)</button>
+        </div>
+      </div>
+
+      <div class="setup-info" id="setup-info">
+        Wähle mindestens eine Kategorie.
+      </div>
+
+      <button class="btn-start" id="btn-start" disabled onclick="startGame()">Spiel starten</button>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ─────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="memory-board" id="memory-board">
+      <!-- Karten werden dynamisch erzeugt -->
+    </div>
+  </div>
+
+  <!-- ── Result Screen ───────────────────────────────────── -->
+  <div class="screen" id="result-screen">
+    <div class="result-stars" id="result-stars"></div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-stats" id="result-stats"></div>
+    <div class="result-buttons">
+      <button class="result-btn primary" onclick="replay()">Nochmal spielen</button>
+      <button class="result-btn secondary" onclick="backToSetup()">Zurück</button>
+    </div>
+  </div>
+
+  <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="lib/katex/katex.min.js"></script>
+  <script src="js/memory-shared.js"></script>
+  <script src="js/memory.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(active) {
+      document.body.classList.toggle('light', active);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = active ? '🌙' : '☀️';
+      var el2 = document.getElementById('btn-theme-setup');
+      if (el2) el2.textContent = active ? '🌙 Darkmode' : '☀️ Lightmode';
+    }
+    window.toggleTheme = function () {
+      var isLight = !document.body.classList.contains('light');
+      localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+      applyTheme(isLight);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'light');
+  })();
+  </script>
+
+</body>
+</html>

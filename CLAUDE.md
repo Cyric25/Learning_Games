@@ -8,13 +8,27 @@ Interaktive Unterrichtsspiele für Klassenzimmer / digitale Tafel. Kein Build-Sy
 
 ```
 Spiele/
-  index.html                    ← Spielübersicht (Startseite) — Light/Dark Mode
+  spiele.html                   ← Spielübersicht (Startseite) — Light/Dark Mode
   api.php                       ← PHP-API für Webhosting (Multi-Game + SSE)
   .htaccess                     ← Apache-Routing, SSE-Buffering
   categories.json               ← Kategoriedaten (Stadt Land Fluss legacy)
   stadt-land-fluss/
     index.html                  ← Stadt Land Fluss Spiel — Light/Dark Mode
     categories.json
+  memory/
+    index.html                  ← Memory Spielseite (Setup + Board + Ergebnis)
+    admin.html                  ← Memory Admin (Paare verwalten, MD-Import)
+    js/
+      memory-shared.js          ← MemoryStorageManager + MemoryModel + MemoryMDParser
+      memory.js                 ← Spiellogik (Board, Flip, Match, Scoring)
+      memory-admin.js           ← Admin-Logik (Pair-Editor, Import)
+    css/
+      memory.css                ← Styles (Dark/Light, Card-Flip, responsive)
+    lib/
+      katex/                    ← KaTeX lokal (JS + CSS + Fonts)
+    data/
+      pairs.json                ← Memory-Paare Datenbank
+      images/                   ← Hochgeladene Bilder für Karten
   risiko-quiz/
     index.html                  ← Risiko-Quiz Spieloberfläche (Join-Screen + Board)
     admin.html                  ← Risiko-Quiz Admin (Spielwähler + Editor)
@@ -202,5 +216,47 @@ cellKey = `${categoryId}-${subcategoryId}-${difficulty}`
 
 ### Theme (Risiko-Quiz spezifisch)
 - Standard: Dark (`:root` in game.css / admin.css)
+- `body.light` überschreibt alle CSS-Variablen
+- Toggle-Script am Ende jeder HTML-Datei als IIFE
+
+---
+
+## Memory
+
+### Architektur
+- Singleplayer-Spiel: Paare finden (Text, Formeln, Bilder)
+- KaTeX lokal gebündelt in `memory/lib/katex/` für Formel-Rendering
+- `memory-shared.js` enthält `MemoryStorageManager` + `MemoryModel` + `MemoryMDParser`
+- API-Endpunkt: `?f=memory-pairs` (GET/POST)
+
+### Datenformat (`pairs.json`)
+```json
+{
+  "categories": [
+    {
+      "id": "cat-...",
+      "name": "Kategoriename",
+      "pairs": [
+        {
+          "id": "pair-...",
+          "sideA": { "type": "text|formula|image", "content": "..." },
+          "sideB": { "type": "text|formula|image", "content": "..." },
+          "difficulty": 1
+        }
+      ]
+    }
+  ]
+}
+```
+
+### MD-Import Format
+```markdown
+## Kategoriename
+- typA | inhaltA | typB | inhaltB | schwierigkeit
+```
+Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
+
+### Theme (Memory spezifisch)
+- Standard: Dark (`:root` in memory.css)
 - `body.light` überschreibt alle CSS-Variablen
 - Toggle-Script am Ende jeder HTML-Datei als IIFE

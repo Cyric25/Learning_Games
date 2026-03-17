@@ -9,6 +9,8 @@ backups/
 risiko-quiz/data/questions.json
 risiko-quiz/data/gamestate.json
 risiko-quiz/data/games/
+memory/data/pairs.json
+memory/data/images/
 
 # Veraltete Duplikate
 SLF.html

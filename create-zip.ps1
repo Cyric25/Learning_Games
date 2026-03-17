@@ -61,6 +61,15 @@ if (Test-Path $dataTemplates) {
     Add-Folder $zip $dataTemplates "risiko-quiz/data/templates"
 }
 
+# Memory
+$mem = Join-Path $source "memory"
+Add-File   $zip (Join-Path $mem "index.html")    "memory/index.html"
+Add-File   $zip (Join-Path $mem "admin.html")    "memory/admin.html"
+Add-Folder $zip (Join-Path $mem "js")            "memory/js"
+Add-Folder $zip (Join-Path $mem "css")           "memory/css"
+Add-Folder $zip (Join-Path $mem "lib")           "memory/lib"
+# data/pairs.json wird NICHT mitgepackt (wie bei Risiko-Quiz)
+
 # Stadt-Land-Fluss
 $slf = Join-Path $source "stadt-land-fluss"
 Add-File $zip (Join-Path $slf "index.html")      "stadt-land-fluss/index.html"
