@@ -3,7 +3,7 @@
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 30;
 const COLS = 6;
-const DEFAULT_COLORS = ['#e74c3c','#3498db','#2ecc71','#f4a261','#9b59b6','#1abc9c'];
+const DEFAULT_COLORS = ['#e74c3c','#3498db','#2ecc71','#f4a261','#9b59b6','#1abc9c','#e67e22','#2c3e50'];
 
 const BONUS_TYPES = [
   { id: 'advance',  icon: '⬆️', name: 'Vorziehen!',     color: '#2ecc71', desc: 'Das Team rückt 2 Felder vor!' },
@@ -203,7 +203,7 @@ function updateCatSelectInfo() {
 function renderTeamCountSelector(selected) {
   const row = document.getElementById('team-count-row');
   row.innerHTML = '';
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 8; i++) {
     const btn = document.createElement('button');
     btn.className = 'team-count-btn' + (i === selected ? ' selected' : '');
     btn.textContent = i;
