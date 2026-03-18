@@ -3,7 +3,8 @@
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 30;
 const COLS = 6;
-const DEFAULT_COLORS = ['#e74c3c','#3498db','#2ecc71','#f4a261','#9b59b6','#1abc9c','#e67e22','#2c3e50'];
+// Colorblind-safe team colors (distinguishable with deuteranopia/protanopia)
+const DEFAULT_COLORS = ['#0077bb','#ee7733','#cc3311','#009988','#aa3377','#ddaa33','#555555','#332288'];
 
 const BONUS_TYPES = [
   { id: 'advance',  icon: '⬆️', name: 'Vorziehen!',     color: '#2ecc71', desc: 'Das Team rückt 2 Felder vor!' },
@@ -70,7 +71,8 @@ async function loadFragen() {
 function convertRQtoQuizPfad(rqData) {
   const kategorien = [];
   const fragen = [];
-  const colors = ['#3498db','#2ecc71','#e74c3c','#9b59b6','#f39c12','#1abc9c','#e67e22','#2c3e50'];
+  // Colorblind-safe category colors (Tol's qualitative palette)
+  const colors = ['#332288','#88ccee','#44aa99','#117733','#999933','#ddcc77','#cc6677','#882255','#aa4499','#0077bb'];
   let colorIdx = 0;
 
   function collectLeafCategories(node, path, parentIcon) {
