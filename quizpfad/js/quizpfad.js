@@ -573,16 +573,14 @@ function askQuestion() {
 function pickQuestion(kategorieId) {
   if (!activeFragenBank || !activeFragenBank.fragen) return null;
 
-  // Filter by category, exclude already used
+  // Filter by category, exclude already used (no question appears twice in a game)
   let pool = activeFragenBank.fragen.filter(
     q => q.kategorie === kategorieId && !usedQuestionIds.has(q.id)
   );
 
-  // If pool empty, reset used for this category
+  // If category is exhausted, try any other category that still has questions
   if (pool.length === 0) {
-    const catIds = activeFragenBank.fragen.filter(q => q.kategorie === kategorieId).map(q => q.id);
-    catIds.forEach(id => usedQuestionIds.delete(id));
-    pool = activeFragenBank.fragen.filter(q => q.kategorie === kategorieId);
+    pool = activeFragenBank.fragen.filter(q => !usedQuestionIds.has(q.id));
   }
 
   if (pool.length === 0) return null;
