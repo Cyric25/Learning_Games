@@ -382,6 +382,16 @@ function renderBoard() {
         div.style.background = field.color;
       }
 
+      // Path connector to next field
+      if (fieldIdx < FIELD_COUNT - 1) {
+        const isEvenRow = row % 2 === 0;
+        if (isEvenRow) {
+          div.classList.add(col < COLS - 1 ? 'connect-right' : 'connect-down');
+        } else {
+          div.classList.add(col > 0 ? 'connect-left' : 'connect-down');
+        }
+      }
+
       // Highlight next field for active team
       const activeTeam = teams[currentTeamIdx];
       if (activeTeam && fieldIdx === activeTeam.position + 1 && !gameOver) {

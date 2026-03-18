@@ -409,8 +409,46 @@ body {
   box-shadow: var(--shadow);
   transition: transform 0.2s, box-shadow 0.2s;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   cursor: default;
+}
+
+/* ── Path Connectors ─────────────────────────────────────── */
+.board-field::after {
+  content: none;
+  position: absolute;
+  background: var(--text-secondary);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 2px;
+}
+
+.board-field.connect-right::after {
+  content: '';
+  right: 0;
+  top: 50%;
+  width: clamp(5px, 1vh, 10px);
+  height: 4px;
+  transform: translate(100%, -50%);
+}
+
+.board-field.connect-left::after {
+  content: '';
+  left: 0;
+  top: 50%;
+  width: clamp(5px, 1vh, 10px);
+  height: 4px;
+  transform: translate(-100%, -50%);
+}
+
+.board-field.connect-down::after {
+  content: '';
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  height: clamp(5px, 1vh, 10px);
+  transform: translate(-50%, 100%);
 }
 
 /* Category fields get solid background color */
