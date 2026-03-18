@@ -336,6 +336,23 @@ function generateBoard() {
     }
   }
 
+  // Ensure no consecutive setback fields (swap with a non-setback bonus)
+  for (let i = 1; i < FIELD_COUNT; i++) {
+    if (fields[i].bonus === 'setback' && fields[i - 1].bonus === 'setback') {
+      // Find a non-setback bonus field to swap with
+      for (let j = 3; j < FIELD_COUNT - 2; j++) {
+        if (j !== i && j !== i - 1 && fields[j].bonus && fields[j].bonus !== 'setback' &&
+            (!fields[j - 1] || fields[j - 1].bonus !== 'setback') &&
+            (!fields[j + 1] || fields[j + 1].bonus !== 'setback')) {
+          const tmp = fields[i].bonus;
+          fields[i].bonus = fields[j].bonus;
+          fields[j].bonus = tmp;
+          break;
+        }
+      }
+    }
+  }
+
   return fields;
 }
 
@@ -392,9 +409,11 @@ function renderBoard() {
         }
       }
 
-      // Highlight next field for active team
+      // Highlight next 2 fields for active team
       const activeTeam = teams[currentTeamIdx];
-      if (activeTeam && fieldIdx === activeTeam.position + 1 && !gameOver) {
+      if (activeTeam && !gameOver &&
+          (fieldIdx === activeTeam.position + 1 || fieldIdx === activeTeam.position + 2) &&
+          fieldIdx < FIELD_COUNT) {
         div.classList.add('next-field');
       }
 
@@ -693,7 +712,7 @@ function continueAfterQuestion() {
   const team = teams[currentTeamIdx];
 
   if (correct) {
-    const nextPos = Math.min(team.position + 1, FIELD_COUNT - 1);
+    const nextPos = Math.min(team.position + 2, FIELD_COUNT - 1);
     moveTeam(currentTeamIdx, nextPos);
   } else {
     // Wrong: team stays, next turn
