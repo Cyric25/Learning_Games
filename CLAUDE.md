@@ -9,6 +9,7 @@ Interaktive Unterrichtsspiele für Klassenzimmer / digitale Tafel. Kein Build-Sy
 ```
 Spiele/
   spiele.html                   ← Spielübersicht (Startseite) — Light/Dark Mode + Fragendatenbank-Button
+  admin.html                    ← Zentrale Fragendatenbank (Frageneditor, MD-Import, Export)
   api.php                       ← PHP-API für Webhosting (Multi-Game + SSE)
   .htaccess                     ← Apache-Routing, SSE-Buffering
   categories.json               ← Kategoriedaten (Stadt Land Fluss legacy)
@@ -200,7 +201,7 @@ Das Risiko-Quiz-Format ist das Master-Format. Spiele, die ein anderes internes F
 
 | Spiel | Konvertierung | Admin |
 |-------|--------------|-------|
-| Risiko-Quiz | Nativ (Master) | Eigener Admin (`risiko-quiz/admin.html`) |
+| Risiko-Quiz | Nativ (Master) | Zentrale `admin.html` (Root-Ebene) |
 | QuizPfad | `convertRQtoQuizPfad()` | Verweist auf Risiko-Quiz Admin |
 | Labyrinth-Quiz | `convertRQtoLabyrinth()` | Verweist auf Risiko-Quiz Admin |
 | Leiterspiel-Quiz | `convertRQtoLeiterspiel()` | Verweist auf Risiko-Quiz Admin |
@@ -243,9 +244,10 @@ Das Risiko-Quiz-Format ist das Master-Format. Spiele, die ein anderes internes F
 | Nested subcategories | Flat (Blatt-Ebenen, Pfad mit ` › `) |
 
 ### Zugriff auf die Fragendatenbank
-- **Im Lehrermodus**: Button "📋 Fragendatenbank" im Header von `spiele.html` → öffnet `risiko-quiz/admin.html`
-- **Einzelne Spiele**: Haben keinen eigenen "Fragen"-Button mehr in `spiele.html`; Admin-Seiten verweisen auf die zentrale DB
-- **Risiko-Quiz Admin** (`risiko-quiz/admin.html`) ist der **zentrale Frageneditor** für alle Quiz-Spiele
+- **Im Lehrermodus**: Button "📋 Fragendatenbank" im Header von `spiele.html` → öffnet `admin.html`
+- **Eigene Seite**: `admin.html` (Root-Ebene) — eigenständiger Frageneditor, unabhängig von einzelnen Spielen
+- **Einzelne Spiele**: Haben keinen eigenen "Fragen"-Button mehr in `spiele.html`; Admin-Seiten verweisen auf `admin.html`
+- Nutzt `risiko-quiz/js/shared.js` (StorageManager, GameModel, MDParser) und `risiko-quiz/css/admin.css` für Styling
 
 ### Laden der Fragendatenbank (Standard-Pattern)
 ```js
@@ -437,7 +439,7 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 - Lineares Brettspiel: Teams rücken durch richtige Antworten auf einem Mäander-Pfad vor
 - 30 Felder in Schlangen-Layout (6 Spalten, 5 Zeilen, abwechselnd L→R / R→L)
 - **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoQuizPfad()`) — siehe Abschnitt "Zentrale Fragendatenbank"
-- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
+- Admin verweist auf zentrale Fragendatenbank (`admin.html`)
 - Kein Multi-Game, kein SSE — reines Einzelspiel im Browser
 
 ### Bonusfelder
@@ -506,7 +508,7 @@ Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
 - **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoLabyrinth()`) — siehe Abschnitt "Zentrale Fragendatenbank"
 - `maze.js` generiert Labyrinth mit SeededRNG (Recursive Backtracker + Extra-Verbindungen)
 - `renderer.js` zeichnet das Labyrinth auf HTML5 Canvas
-- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
+- Admin verweist auf zentrale Fragendatenbank (`admin.html`)
 - Kein Multi-Game, kein SSE — reines Einzelspiel im Browser (Phase 1)
 
 ### Spielmechanik
@@ -536,7 +538,7 @@ Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
 ### Architektur
 - Klassisches Leiterspiel (Snakes & Ladders) mit 100 Feldern (10×10 Grid)
 - **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoLeiterspiel()`) — siehe Abschnitt "Zentrale Fragendatenbank"
-- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
+- Admin verweist auf zentrale Fragendatenbank (`admin.html`)
 - Einzel- und Mehrspielermodus
 
 ### Spielmechanik

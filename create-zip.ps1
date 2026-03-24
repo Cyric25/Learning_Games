@@ -44,6 +44,7 @@ function Add-Folder($zip, $folderPath, $zipPrefix) {
 
 # Root
 Add-File $zip (Join-Path $source "spiele.html") "spiele.html"
+Add-File $zip (Join-Path $source "admin.html") "admin.html"
 Add-File $zip (Join-Path $source "api.php")    "api.php"
 Add-File $zip (Join-Path $source ".htaccess")  ".htaccess"
 

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fragendatenbank – Verwaltung</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+  <link rel="stylesheet" href="risiko-quiz/css/admin.css">
+</head>
+<body>
+
+<header id="admin-header">
+  <h1>📋 Fragen<span>datenbank</span></h1>
+  <div style="display:flex;gap:0.8rem;align-items:center;">
+    <a href="spiele.html" class="btn btn-secondary">← Übersicht</a>
+    <button class="btn btn-secondary" id="btn-theme-admin" onclick="toggleTheme()" title="Design wechseln">☀️</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button class="tab-btn active" data-tab="tab-questions">❓ Fragen</button>
+  <button class="tab-btn" data-tab="tab-import">📥 MD-Import</button>
+  <button class="tab-btn" data-tab="tab-save">💾 Speichern</button>
+</nav>
+
+<main id="content">
+
+  <!-- ──── TAB: FRAGEN ──────────────────────────────────────── -->
+  <section id="tab-questions" class="tab-panel active">
+    <h2 class="section-title">Fragen & Kategorien</h2>
+    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">
+      Zentrale Fragendatenbank für alle Quiz-Spiele (Risiko-Quiz, QuizPfad, Leiterspiel, Labyrinth-Quiz).
+    </p>
+
+    <div class="btn-group" style="margin-bottom:1.2rem;">
+      <button class="btn btn-success" id="btn-add-cat">+ Kategorie hinzufügen</button>
+    </div>
+
+    <div id="questions-alert"></div>
+    <div id="category-blocks"></div>
+  </section>
+
+  <!-- ──── TAB: IMPORT ──────────────────────────────────────── -->
+  <section id="tab-import" class="tab-panel">
+    <h2 class="section-title">Fragen aus Markdown importieren</h2>
+
+    <div id="dropzone">
+      <p>📂 MD-Datei hier ablegen oder klicken</p>
+      <p style="font-size:0.85rem;">Unterstützt .md und .txt Dateien</p>
+      <input type="file" id="import-file" accept=".md,.txt" style="display:none;">
+    </div>
+
+    <div id="import-preview" style="display:none;">
+      <div class="card">
+        <h4 id="import-title-preview" style="margin-bottom:0.8rem;font-size:1.1rem;color:var(--text-secondary);"></h4>
+        <ul class="validation-list" id="import-validation-list"></ul>
+      </div>
+      <div id="import-content-preview" class="import-preview"></div>
+      <div class="btn-group">
+        <button class="btn btn-success btn-lg" id="btn-import-confirm">+ Importieren</button>
+        <button class="btn btn-secondary" id="btn-import-cancel">Abbrechen</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem;">
+      <h4 style="margin-bottom:0.8rem;">MD-Format Referenz</h4>
+      <pre style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;overflow-x:auto;">## Unterkategoriename
+
+### 100
+- type: open
+- q: Fragetext
+- a: Antwort
+- hint: Optionaler Hinweis
+
+### 200
+- type: mc
+- q: MC-Fragetext
+- o: Option A | Option B | Option C | Option D
+- a: Option B
+
+## Weitere Unterkategorie
+
+### 100
+...</pre>
+      <div style="margin-top:1rem;">
+        <a href="risiko-quiz/data/templates/vorlage.md" download class="btn btn-secondary btn-sm">📥 Vorlage herunterladen</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ──── TAB: SPEICHERN ───────────────────────────────────── -->
+  <section id="tab-save" class="tab-panel">
+    <h2 class="section-title">Speichern & Exportieren</h2>
+
+    <div id="save-alert" style="margin-bottom:1rem;"></div>
+
+    <div class="card">
+      <h3 style="margin-bottom:1rem;">Auf Server speichern</h3>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">
+        Die Fragendatenbank (questions.json) wird zentral gespeichert und ist für alle Spiele und Geräte im Netzwerk verfügbar.
+      </p>
+      <div class="btn-group">
+        <button class="btn btn-success" id="btn-save-questions">💾 Fragen speichern</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">Backup / Export</h3>
+      <div class="btn-group">
+        <button class="btn btn-success" id="btn-export-json">⬇ Fragen als JSON</button>
+        <button class="btn btn-warning" id="btn-export-md">⬇ Fragen als MD</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">Fragen aus JSON laden</h3>
+      <input type="file" id="load-json-file" accept=".json" style="display:none;">
+      <button class="btn btn-secondary" id="btn-load-json">📂 JSON-Datei öffnen</button>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">Statistik</h3>
+      <div id="stats-info" style="color:var(--text-secondary);font-size:0.9rem;"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ──── QUESTION MODAL ─────────────────────────────────────── -->
+<div id="q-modal">
+  <div id="q-modal-panel">
+    <h3 id="q-modal-title">Frage bearbeiten</h3>
+
+    <div class="form-row form-row-3" style="margin-bottom:0.5rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Hauptkategorie</label>
+        <select id="qm-cat"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>1. Unterkat</label>
+        <select id="qm-subcat"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>2. Unterkat</label>
+        <select id="qm-subsubcat">
+          <option value="">– Direkt –</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:1.2rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>3. Unterkat</label>
+        <select id="qm-l4cat">
+          <option value="">– Direkt –</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Schwierigkeit</label>
+        <select id="qm-diff">
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="300">300</option>
+          <option value="400">400</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Fragetyp</label>
+      <select id="qm-type">
+        <option value="open">Offene Frage</option>
+        <option value="mc">Multiple Choice</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Fragetext</label>
+      <textarea id="qm-question" rows="3" placeholder="Fragetext eingeben..."></textarea>
+    </div>
+
+    <div id="qm-open-section">
+      <div class="form-group">
+        <label>Korrekte Antwort</label>
+        <textarea id="qm-answer" rows="2" placeholder="Antwort..."></textarea>
+      </div>
+    </div>
+
+    <div id="qm-mc-section" style="display:none;">
+      <div class="form-group">
+        <label>Antwortoptionen <span style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <div class="mc-options-editor" id="qm-mc-options"></div>
+        <button class="btn btn-secondary btn-sm" id="btn-add-mc-option" style="margin-top:0.5rem;">+ Option hinzufügen</button>
+      </div>
+      <div class="form-group">
+        <label>Korrekte Antwort (für Anzeige)</label>
+        <input type="text" id="qm-mc-answer-text" placeholder="Wird automatisch gesetzt" readonly style="opacity:0.6;">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Hinweis <span style="color:var(--text-secondary);font-size:0.85rem;">(optional)</span></label>
+      <input type="text" id="qm-hint" placeholder="Lösungshinweis (optional)">
+    </div>
+
+    <div id="qm-alert" style="margin-bottom:0.8rem;"></div>
+
+    <div class="btn-group" style="justify-content:flex-end;margin-top:1rem;">
+      <button class="btn btn-secondary" id="btn-qm-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="btn-qm-save">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ──── NAME DIALOG ──────────────────────────────────────────── -->
+<div id="name-dialog" style="display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:14px; padding:1.8rem; min-width:320px; max-width:460px; width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <h3 id="nd-title" style="margin-bottom:1.2rem; font-size:1.2rem;">Name eingeben</h3>
+    <input type="text" id="nd-input" class="nd-input-field"
+      style="width:100%; padding:0.7rem 0.9rem; background:var(--input-bg);
+        border:1px solid var(--border); border-radius:8px; color:var(--text-primary);
+        font-size:1rem; font-family:inherit; outline:none; transition:border-color 0.2s;"
+      placeholder="">
+    <div style="display:flex; gap:0.8rem; justify-content:flex-end; margin-top:1.2rem;">
+      <button class="btn btn-secondary" id="nd-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="nd-confirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ──── CONFIRM DIALOG ───────────────────────────────────────── -->
+<div id="confirm-dialog" style="display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+  <div style="background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:14px; padding:1.8rem; min-width:300px; max-width:420px; width:90%;
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <p id="cd-message" style="font-size:1rem; margin-bottom:1.4rem; line-height:1.5;"></p>
+    <div style="display:flex; gap:0.8rem; justify-content:flex-end;">
+      <button class="btn btn-secondary" id="cd-cancel">Abbrechen</button>
+      <button class="btn btn-danger" id="cd-confirm">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<script src="risiko-quiz/js/shared.js"></script>
+<script>
+// ── Standalone Question Editor ───────────────────────────────────
+// Wiederverwendet StorageManager + GameModel + MDParser aus shared.js
+// Kein Spielwähler, keine Spieleinstellungen – nur Fragenverwaltung
+
+let questionBank = { categories: [] };
+let editingQuestionId = null;
+let editingCatId = null;
+let editingSubcatId = null;
+let editingSubsubcatId = null;
+let editingL4Id = null;
+let importParsed = null;
+const collapsedCats = new Map();
+const collapsedSubs = new Map();
+const collapsedSubsubs = new Map();
+
+// ── Init ─────────────────────────────────────────────────────────
+async function init() {
+  questionBank = await StorageManager.loadQuestions();
+  renderCategories();
+  updateStats();
+  bindEvents();
+}
+
+function updateStats() {
+  let totalCats = 0, totalSubs = 0, totalQs = 0;
+  function countNode(node, depth) {
+    if (depth === 0) totalCats++;
+    else totalSubs++;
+    (node.questions || []).forEach(() => totalQs++);
+    (node.subcategories || []).forEach(c => countNode(c, depth + 1));
+  }
+  (questionBank.categories || []).forEach(c => countNode(c, 0));
+  const el = document.getElementById('stats-info');
+  if (el) el.innerHTML = `<strong>${totalCats}</strong> Kategorien · <strong>${totalSubs}</strong> Unterkategorien · <strong>${totalQs}</strong> Fragen`;
+}
+
+// ── Save ─────────────────────────────────────────────────────────
+async function saveQuestionsToServer() {
+  return await StorageManager.saveQuestions(questionBank);
+}
+
+// ── Categories & Questions (identisch zu admin.js) ───────────────
+function renderQTable(container, questions, catId, subId, subsubId, l4Id) {
+  const uid = l4Id || subsubId || subId;
+  const tableWrap = document.createElement('div');
+  tableWrap.innerHTML = `
+    <table class="q-table">
+      <thead><tr><th>Stufe</th><th>Typ</th><th>Frage</th><th>Antwort</th><th></th></tr></thead>
+      <tbody id="q-tbody-${uid}"></tbody>
+    </table>`;
+  container.appendChild(tableWrap);
+  const tbody = tableWrap.querySelector(`#q-tbody-${uid}`);
+  const sorted = [...(questions || [])].sort((a, b) => a.difficulty - b.difficulty);
+  sorted.forEach(q => {
+    const tr = document.createElement('tr');
+    let editCall, removeCall;
+    if (l4Id) {
+      editCall = `openQuestionModal('${catId}','${subId}','${q.id}','${subsubId}','${l4Id}')`;
+      removeCall = `removeQuestion('${catId}','${subId}','${q.id}','${subsubId}','${l4Id}')`;
+    } else if (subsubId) {
+      editCall = `openQuestionModal('${catId}','${subId}','${q.id}','${subsubId}')`;
+      removeCall = `removeQuestion('${catId}','${subId}','${q.id}','${subsubId}')`;
+    } else {
+      editCall = `openQuestionModal('${catId}','${subId}','${q.id}')`;
+      removeCall = `removeQuestion('${catId}','${subId}','${q.id}')`;
+    }
+    tr.innerHTML = `
+      <td><span class="diff-badge diff-${q.difficulty}">${q.difficulty}</span></td>
+      <td><span class="type-badge type-${q.type}">${q.type === 'mc' ? 'MC' : 'Offen'}</span></td>
+      <td><span class="q-preview" title="${escHtml(q.question)}">${escHtml(q.question)}</span></td>
+      <td><span class="q-preview" title="${escHtml(q.answer)}">${escHtml(q.answer)}</span></td>
+      <td><div style="display:flex;gap:0.3rem;">
+        <button class="btn btn-secondary btn-sm" onclick="${editCall}">✎</button>
+        <button class="btn btn-danger btn-sm" onclick="${removeCall}">✕</button>
+      </div></td>`;
+    tbody.appendChild(tr);
+  });
+  if (sorted.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-secondary);text-align:center;padding:1rem;">Noch keine Fragen</td></tr>';
+  }
+}
+
+function isCollapsed(id, map) {
+  if (!map.has(id)) return true;
+  return map.get(id);
+}
+
+function renderCategories() {
+  const container = document.getElementById('category-blocks');
+  container.innerHTML = '';
+  if (questionBank.categories.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-secondary)">Noch keine Kategorien. Füge eine hinzu oder importiere Fragen per MD.</p>';
+    return;
+  }
+  questionBank.categories.forEach(cat => {
+    const subcats = cat.subcategories || [];
+    const catCollapsed = isCollapsed(cat.id, collapsedCats);
+    const block = document.createElement('div');
+    block.className = 'cat-block';
+    block.innerHTML = `
+      <div class="cat-header">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <button class="btn btn-secondary btn-sm cat-collapse-btn"
+            onclick="collapsedCats.set('${cat.id}', !collapsedCats.get('${cat.id}')); renderCategories();"
+            title="${catCollapsed ? 'Aufklappen' : 'Einklappen'}">${catCollapsed ? '▶' : '▼'}</button>
+          <input class="cat-name-edit" type="text" value="${escHtml(cat.name)}"
+            onchange="updateCatName('${cat.id}', this.value)"
+            oninput="updateCatName('${cat.id}', this.value)">
+        </div>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <span style="color:var(--text-secondary);font-size:0.85rem;">${subcats.length} Unterkat${subcats.length !== 1 ? 's' : ''}</span>
+          <button class="btn btn-success btn-sm" onclick="addSubcategory('${cat.id}')">+ 1.Unterkat</button>
+          <button class="btn btn-danger btn-sm" onclick="removeCat('${cat.id}')">✕</button>
+        </div>
+      </div>`;
+    const subcatContainer = document.createElement('div');
+    subcatContainer.style.paddingLeft = '1.5rem';
+    subcatContainer.style.display = catCollapsed ? 'none' : '';
+    if (subcats.length === 0) {
+      subcatContainer.innerHTML = '<p style="color:var(--text-secondary);padding:0.8rem;font-size:0.9rem;">Keine Unterkategorien.</p>';
+    } else {
+      subcats.forEach(sub => renderSubBlock(sub, cat, subcatContainer));
+    }
+    block.appendChild(subcatContainer);
+    container.appendChild(block);
+  });
+}
+
+function renderSubBlock(sub, cat, container) {
+  const subsubs = sub.subcategories || [];
+  const hasSubsubs = subsubs.length > 0;
+  const directQCount = (sub.questions || []).length;
+  const subCollapsed = isCollapsed(sub.id, collapsedSubs);
+  const missing = (!hasSubsubs && directQCount === 0) || hasSubsubs
+    ? [] : GameModel.DIFFICULTIES.filter(d => !(sub.questions || []).some(q => q.difficulty === d));
+  const subBlock = document.createElement('div');
+  subBlock.className = 'cat-block';
+  subBlock.style.marginTop = '0.5rem';
+  subBlock.style.marginBottom = '0.5rem';
+  subBlock.innerHTML = `
+    <div class="cat-header" style="background:rgba(255,255,255,0.05);">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <button class="btn btn-secondary btn-sm cat-collapse-btn"
+          onclick="collapsedSubs.set('${sub.id}', !collapsedSubs.get('${sub.id}')); renderCategories();"
+          title="${subCollapsed ? 'Aufklappen' : 'Einklappen'}">${subCollapsed ? '▶' : '▼'}</button>
+        <input class="cat-name-edit" type="text" value="${escHtml(sub.name)}"
+          style="font-size:1rem;font-weight:600;"
+          onchange="updateSubcatName('${cat.id}', '${sub.id}', this.value)"
+          oninput="updateSubcatName('${cat.id}', '${sub.id}', this.value)">
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        ${!hasSubsubs && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasSubsubs && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
+        <button class="btn btn-success btn-sm" onclick="addSubSubcategory('${cat.id}', '${sub.id}')">+ 2.UK</button>
+        <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}')">+ Frage</button>
+        <button class="btn btn-danger btn-sm" onclick="removeSubcategory('${cat.id}', '${sub.id}')">✕</button>
+      </div>
+    </div>`;
+  const subBody = document.createElement('div');
+  subBody.style.display = subCollapsed ? 'none' : '';
+  if (!hasSubsubs || directQCount > 0) renderQTable(subBody, sub.questions, cat.id, sub.id, null);
+  if (hasSubsubs) {
+    const subsubContainer = document.createElement('div');
+    subsubContainer.style.paddingLeft = '1.5rem';
+    subsubs.forEach(subsub => renderSubSubBlock(subsub, sub, cat, subsubContainer));
+    subBody.appendChild(subsubContainer);
+  }
+  subBlock.appendChild(subBody);
+  container.appendChild(subBlock);
+}
+
+function renderSubSubBlock(subsub, sub, cat, container) {
+  const l4s = subsub.subcategories || [];
+  const hasL4 = l4s.length > 0;
+  const directQCount = (subsub.questions || []).length;
+  const subsubCollapsed = isCollapsed(subsub.id, collapsedSubsubs);
+  const missing = hasL4 ? [] : GameModel.DIFFICULTIES.filter(d => !(subsub.questions || []).some(q => q.difficulty === d));
+  const subsubBlock = document.createElement('div');
+  subsubBlock.className = 'cat-block';
+  subsubBlock.style.marginTop = '0.5rem';
+  subsubBlock.style.marginBottom = '0.5rem';
+  subsubBlock.innerHTML = `
+    <div class="cat-header" style="background:rgba(255,255,255,0.03);">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <button class="btn btn-secondary btn-sm cat-collapse-btn"
+          onclick="collapsedSubsubs.set('${subsub.id}', !collapsedSubsubs.get('${subsub.id}')); renderCategories();"
+          title="${subsubCollapsed ? 'Aufklappen' : 'Einklappen'}">${subsubCollapsed ? '▶' : '▼'}</button>
+        <input class="cat-name-edit" type="text" value="${escHtml(subsub.name)}"
+          style="font-size:0.95rem;font-weight:600;"
+          onchange="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)"
+          oninput="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)">
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        ${!hasL4 && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasL4 && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
+        <button class="btn btn-success btn-sm" onclick="addLevel4('${cat.id}', '${sub.id}', '${subsub.id}')">+ 3.UK</button>
+        <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}', null, '${subsub.id}')">+ Frage</button>
+        <button class="btn btn-danger btn-sm" onclick="removeSubSubcategory('${cat.id}', '${sub.id}', '${subsub.id}')">✕</button>
+      </div>
+    </div>`;
+  const subsubBody = document.createElement('div');
+  subsubBody.style.display = subsubCollapsed ? 'none' : '';
+  if (!hasL4 || directQCount > 0) renderQTable(subsubBody, subsub.questions, cat.id, sub.id, subsub.id);
+  if (hasL4) {
+    const l4Container = document.createElement('div');
+    l4Container.style.paddingLeft = '1.5rem';
+    l4s.forEach(l4 => {
+      const l4Missing = GameModel.DIFFICULTIES.filter(d => !(l4.questions || []).some(q => q.difficulty === d));
+      const l4Block = document.createElement('div');
+      l4Block.className = 'cat-block';
+      l4Block.style.marginTop = '0.5rem';
+      l4Block.style.marginBottom = '0.5rem';
+      l4Block.innerHTML = `
+        <div class="cat-header" style="background:rgba(255,255,255,0.02);">
+          <input class="cat-name-edit" type="text" value="${escHtml(l4.name)}"
+            style="font-size:0.9rem;font-weight:600;"
+            onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)"
+            oninput="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            ${l4Missing.length ? `<span class="warning-badge">⚠ ${l4Missing.join(', ')} fehlt</span>` : '<span style="color:var(--success);font-size:0.85rem;">✓</span>'}
+            <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}','${sub.id}',null,'${subsub.id}','${l4.id}')">+ Frage</button>
+            <button class="btn btn-danger btn-sm" onclick="removeLevel4('${cat.id}','${sub.id}','${subsub.id}','${l4.id}')">✕</button>
+          </div>
+        </div>`;
+      renderQTable(l4Block, l4.questions, cat.id, sub.id, subsub.id, l4.id);
+      l4Container.appendChild(l4Block);
+    });
+    subsubBody.appendChild(l4Container);
+  }
+  subsubBlock.appendChild(subsubBody);
+  container.appendChild(subsubBlock);
+}
+
+// ── Category CRUD ────────────────────────────────────────────────
+async function addCategory() {
+  const name = await showNameDialog('Kategoriename', 'z.B. Chemie');
+  if (!name) return;
+  questionBank.categories.push(GameModel.createCategory(name));
+  await saveQuestionsToServer();
+  renderCategories(); updateStats();
+  showAlert('questions-alert', 'success', `Kategorie "${name}" hinzugefügt.`);
+}
+async function removeCat(catId) {
+  if (!await showConfirmDialog('Kategorie und alle Unterkategorien/Fragen löschen?')) return;
+  questionBank.categories = questionBank.categories.filter(c => c.id !== catId);
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function updateCatName(catId, val) {
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (cat) { cat.name = val; await saveQuestionsToServer(); }
+}
+async function addSubcategory(catId) {
+  const name = await showNameDialog('Unterkategoriename', 'z.B. Atombau');
+  if (!name) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  if (!cat.subcategories) cat.subcategories = [];
+  cat.subcategories.push(GameModel.createSubcategory(name));
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function removeSubcategory(catId, subcatId) {
+  if (!await showConfirmDialog('Unterkategorie und alle Fragen löschen?')) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  cat.subcategories = (cat.subcategories || []).filter(s => s.id !== subcatId);
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function updateSubcatName(catId, subcatId, val) {
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  if (sub) { sub.name = val; await saveQuestionsToServer(); }
+}
+async function addSubSubcategory(catId, subId) {
+  const name = await showNameDialog('2. Unterkategoriename', 'z.B. Elektronen');
+  if (!name) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  if (!sub.subcategories) sub.subcategories = [];
+  sub.subcategories.push(GameModel.createSubSubcategory(name));
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function removeSubSubcategory(catId, subId, subsubId) {
+  if (!await showConfirmDialog('2. Unterkategorie und alle Fragen löschen?')) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  sub.subcategories = (sub.subcategories || []).filter(ss => ss.id !== subsubId);
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function updateSubSubcatName(catId, subId, subsubId, val) {
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
+  if (ss) { ss.name = val; await saveQuestionsToServer(); }
+}
+async function addLevel4(catId, subId, subsubId) {
+  const name = await showNameDialog('3. Unterkategoriename', 'z.B. Schalen');
+  if (!name) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
+  if (!ss) return;
+  if (!ss.subcategories) ss.subcategories = [];
+  ss.subcategories.push(GameModel.createLevel4(name));
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function removeLevel4(catId, subId, subsubId, l4Id) {
+  if (!await showConfirmDialog('3. Unterkategorie und alle Fragen löschen?')) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
+  if (!ss) return;
+  ss.subcategories = (ss.subcategories || []).filter(n => n.id !== l4Id);
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+async function updateLevel4Name(catId, subId, subsubId, l4Id, val) {
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subId);
+  if (!sub) return;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
+  if (!ss) return;
+  const l4 = (ss.subcategories || []).find(n => n.id === l4Id);
+  if (l4) { l4.name = val; await saveQuestionsToServer(); }
+}
+async function removeQuestion(catId, subcatId, qId, subsubcatId, l4catId) {
+  if (!await showConfirmDialog('Diese Frage löschen?')) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  if (!sub) return;
+  let targetNode = sub;
+  if (subsubcatId) {
+    const ss = (sub.subcategories || []).find(ss => ss.id === subsubcatId);
+    if (ss) { targetNode = ss; if (l4catId) { const l4 = (ss.subcategories || []).find(n => n.id === l4catId); if (l4) targetNode = l4; } }
+  }
+  targetNode.questions = (targetNode.questions || []).filter(q => q.id !== qId);
+  await saveQuestionsToServer(); renderCategories(); updateStats();
+}
+
+// ── Question Modal ───────────────────────────────────────────────
+function openQuestionModal(catId, subcatId, questionId, subsubcatId, l4catId) {
+  editingCatId = catId; editingSubcatId = subcatId || null;
+  editingSubsubcatId = subsubcatId || null; editingL4Id = l4catId || null;
+  editingQuestionId = questionId || null;
+  const catSel = document.getElementById('qm-cat');
+  catSel.innerHTML = '';
+  questionBank.categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name;
+    if (c.id === catId) opt.selected = true;
+    catSel.appendChild(opt);
+  });
+  populateSubcatDropdown(catId, subcatId);
+  populateSubSubcatDropdown(catId, subcatId, subsubcatId);
+  populateL4Dropdown(catId, subcatId, subsubcatId, l4catId);
+  if (questionId) {
+    const foundQ = GameModel.findQuestion({ categories: questionBank.categories }, questionId);
+    if (foundQ) {
+      document.getElementById('q-modal-title').textContent = 'Frage bearbeiten';
+      document.getElementById('qm-diff').value = foundQ.difficulty;
+      document.getElementById('qm-type').value = foundQ.type;
+      document.getElementById('qm-question').value = foundQ.question;
+      document.getElementById('qm-answer').value = foundQ.answer;
+      document.getElementById('qm-hint').value = foundQ.hint || '';
+      renderMcOptions(foundQ.options, foundQ.correctIndex);
+      updateQModalType(foundQ.type);
+    }
+  } else {
+    document.getElementById('q-modal-title').textContent = 'Neue Frage';
+    document.getElementById('qm-diff').value = '100';
+    document.getElementById('qm-type').value = 'open';
+    document.getElementById('qm-question').value = '';
+    document.getElementById('qm-answer').value = '';
+    document.getElementById('qm-hint').value = '';
+    renderMcOptions(['', ''], null);
+    updateQModalType('open');
+  }
+  showAlert('qm-alert', '', '');
+  document.getElementById('q-modal').classList.add('open');
+}
+function populateSubcatDropdown(catId, selectedSubcatId) {
+  const sel = document.getElementById('qm-subcat'); sel.innerHTML = '';
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat || !cat.subcategories || cat.subcategories.length === 0) {
+    sel.innerHTML = '<option value="">– Keine Unterkategorien –</option>';
+    populateSubSubcatDropdown(catId, null, null); return;
+  }
+  cat.subcategories.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = s.name;
+    if (s.id === selectedSubcatId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function populateSubSubcatDropdown(catId, subcatId, selectedSubsubId) {
+  const sel = document.getElementById('qm-subsubcat');
+  sel.innerHTML = '<option value="">– Direkt –</option>';
+  if (!subcatId) { populateL4Dropdown(catId, subcatId, null, null); return; }
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  if (!sub || !sub.subcategories || sub.subcategories.length === 0) { populateL4Dropdown(catId, subcatId, null, null); return; }
+  sub.subcategories.forEach(ss => {
+    const opt = document.createElement('option');
+    opt.value = ss.id; opt.textContent = ss.name;
+    if (ss.id === selectedSubsubId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function populateL4Dropdown(catId, subcatId, subsubId, selectedL4Id) {
+  const sel = document.getElementById('qm-l4cat');
+  sel.innerHTML = '<option value="">– Direkt –</option>';
+  if (!subsubId) return;
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) return;
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  if (!sub) return;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
+  if (!ss || !ss.subcategories || ss.subcategories.length === 0) return;
+  ss.subcategories.forEach(l4 => {
+    const opt = document.createElement('option');
+    opt.value = l4.id; opt.textContent = l4.name;
+    if (l4.id === selectedL4Id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function closeQuestionModal() {
+  document.getElementById('q-modal').classList.remove('open');
+  editingCatId = editingSubcatId = editingSubsubcatId = editingL4Id = editingQuestionId = null;
+}
+function updateQModalType(type) {
+  document.getElementById('qm-open-section').style.display = type === 'open' ? '' : 'none';
+  document.getElementById('qm-mc-section').style.display = type === 'mc' ? '' : 'none';
+}
+function renderMcOptions(options, correctIndex) {
+  const container = document.getElementById('qm-mc-options'); container.innerHTML = '';
+  options.forEach((opt, i) => {
+    const row = document.createElement('div'); row.className = 'mc-option-row';
+    row.innerHTML = `<input type="radio" name="mc-correct" value="${i}" ${correctIndex === i ? 'checked' : ''}>
+      <input type="text" class="mc-opt-input" value="${escHtml(opt)}" placeholder="Option ${i + 1}" oninput="updateMcAnswerText()">
+      <button class="btn btn-danger btn-sm" onclick="removeMcOption(${i})" ${options.length <= 2 ? 'disabled' : ''}>✕</button>`;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('input[type="radio"]').forEach(r => r.addEventListener('change', updateMcAnswerText));
+  updateMcAnswerText();
+}
+function addMcOption() { const opts = getMcOptions(); opts.push(''); renderMcOptions(opts, getCorrectMcIndex()); }
+function removeMcOption(idx) {
+  const opts = getMcOptions(); if (opts.length <= 2) return;
+  const wasCorrect = getCorrectMcIndex() === idx; opts.splice(idx, 1);
+  renderMcOptions(opts, wasCorrect ? 0 : getCorrectMcIndex());
+}
+function getMcOptions() { return [...document.querySelectorAll('#qm-mc-options .mc-opt-input')].map(i => i.value); }
+function getCorrectMcIndex() { const c = document.querySelector('#qm-mc-options input[type="radio"]:checked'); return c ? parseInt(c.value) : 0; }
+function updateMcAnswerText() { const opts = getMcOptions(); document.getElementById('qm-mc-answer-text').value = opts[getCorrectMcIndex()] || ''; }
+
+function findNodeForSave(catId, subcatId, subsubcatId, l4catId) {
+  const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return null;
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId); if (!sub) return null;
+  if (!subsubcatId) return sub;
+  const ss = (sub.subcategories || []).find(ss => ss.id === subsubcatId); if (!ss) return null;
+  if (!l4catId) return ss;
+  return (ss.subcategories || []).find(n => n.id === l4catId) || null;
+}
+function findNodeWithQuestion(node, qId) {
+  if ((node.questions || []).some(q => q.id === qId)) return node;
+  for (const child of (node.subcategories || [])) { const f = findNodeWithQuestion(child, qId); if (f) return f; }
+  return null;
+}
+
+async function saveQuestion() {
+  const catId = document.getElementById('qm-cat').value;
+  const subcatId = document.getElementById('qm-subcat').value;
+  const subsubcatId = document.getElementById('qm-subsubcat').value;
+  const l4catId = document.getElementById('qm-l4cat').value;
+  const type = document.getElementById('qm-type').value;
+  const diff = parseInt(document.getElementById('qm-diff').value);
+  const qText = document.getElementById('qm-question').value.trim();
+  const hint = document.getElementById('qm-hint').value.trim();
+  let answer = '', options = [], correctIndex = null;
+  if (!qText) { showAlert('qm-alert', 'danger', 'Bitte Fragetext eingeben.'); return; }
+  if (!subcatId) { showAlert('qm-alert', 'danger', 'Bitte Unterkategorie wählen.'); return; }
+  if (type === 'open') {
+    answer = document.getElementById('qm-answer').value.trim();
+    if (!answer) { showAlert('qm-alert', 'danger', 'Bitte Antwort eingeben.'); return; }
+  } else {
+    options = getMcOptions(); correctIndex = getCorrectMcIndex(); answer = options[correctIndex] || '';
+    if (options.length < 2) { showAlert('qm-alert', 'danger', 'Mindestens 2 Optionen erforderlich.'); return; }
+    if (!answer) { showAlert('qm-alert', 'danger', 'Bitte korrekte Antwort markieren und Text eingeben.'); return; }
+  }
+  const targetNode = findNodeForSave(catId, subcatId, subsubcatId || null, l4catId || null);
+  if (!targetNode) { showAlert('qm-alert', 'danger', 'Zielknoten nicht gefunden.'); return; }
+  if (editingQuestionId) {
+    let oldNode = null;
+    outer: for (const c of questionBank.categories) {
+      for (const s of (c.subcategories || [])) { const f = findNodeWithQuestion(s, editingQuestionId); if (f) { oldNode = f; break outer; } }
+    }
+    if (oldNode) {
+      const q = (oldNode.questions || []).find(q => q.id === editingQuestionId);
+      if (oldNode !== targetNode) {
+        oldNode.questions = (oldNode.questions || []).filter(q => q.id !== editingQuestionId);
+        if (q) { q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint; if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(q); }
+        else { if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint })); }
+      } else { if (q) { q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint; } }
+    }
+  } else {
+    if (!targetNode.questions) targetNode.questions = [];
+    targetNode.questions.push(GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint }));
+  }
+  await saveQuestionsToServer(); renderCategories(); updateStats(); closeQuestionModal();
+}
+
+// ── MD Import ────────────────────────────────────────────────────
+function handleImportFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try { importParsed = MDParser.parse(e.target.result); showImportPreview(); }
+    catch (err) { showAlert('questions-alert', 'danger', 'Fehler beim Parsen: ' + err.message); switchTab('tab-questions'); }
+  };
+  reader.readAsText(file);
+}
+function showImportPreview() {
+  const validation = MDParser.validate(importParsed);
+  const totalQ = importParsed.categories.reduce((s, c) => s + c.questions.length, 0);
+  document.getElementById('import-title-preview').textContent = `${importParsed.categories.length} Abschnitt${importParsed.categories.length !== 1 ? 'e' : ''}, ${totalQ} Fragen erkannt`;
+  const listEl = document.getElementById('import-validation-list'); listEl.innerHTML = '';
+  validation.errors.forEach(e => { const li = document.createElement('li'); li.className = 'error'; li.textContent = '✕ ' + e; listEl.appendChild(li); });
+  validation.warnings.forEach(w => { const li = document.createElement('li'); li.className = 'warn'; li.textContent = '⚠ ' + w; listEl.appendChild(li); });
+  if (validation.errors.length === 0 && validation.warnings.length === 0) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = '✓ Keine Probleme gefunden'; listEl.appendChild(li); }
+  const catOpts = questionBank.categories.map(c => `<option value="${escHtml(c.id)}">${escHtml(c.name)}</option>`).join('');
+  const ss = 'padding:0.35rem 0.6rem;background:var(--input-bg,rgba(255,255,255,0.08));border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:inherit;font-size:0.85rem;';
+  let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+  importParsed.categories.forEach((sub, idx) => {
+    const diffs = sub.questions.map(q => `<span class="diff-badge diff-${q.difficulty}" style="margin:0 1px;">${q.difficulty}</span>`).join('');
+    html += `<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:0.8rem;padding:0.7rem 1rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">`;
+    html += `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;min-width:0;"><strong>${escHtml(sub.name || '(unbenannt)')}</strong><span>${diffs || '<em style="opacity:.5">leer</em>'}</span></div>`;
+    html += `<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end;">`;
+    html += `<span style="color:var(--text-secondary);font-size:0.85rem;">→ Hauptkat:</span>`;
+    html += `<select id="import-cat-map-${idx}" style="${ss}" onchange="updateImportSubcatDropdown(${idx}, this.value)"><option value="">+ Neu</option>${catOpts}</select>`;
+    html += `<span style="color:var(--text-secondary);font-size:0.85rem;">1.Unterkat:</span>`;
+    html += `<select id="import-subcat-map-${idx}" style="${ss}"><option value="">– Als 1.Unterkat –</option></select>`;
+    html += `</div></div>`;
+  });
+  html += '</div>';
+  document.getElementById('import-content-preview').innerHTML = html;
+  document.getElementById('btn-import-confirm').disabled = validation.errors.length > 0;
+  document.getElementById('import-preview').style.display = 'block';
+}
+function updateImportSubcatDropdown(idx, catId) {
+  const sel = document.getElementById(`import-subcat-map-${idx}`); if (!sel) return;
+  sel.innerHTML = '<option value="">– Als 1.Unterkat –</option>';
+  if (!catId) return;
+  const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return;
+  (cat.subcategories || []).forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt); });
+}
+async function doImport() {
+  if (!importParsed) return;
+  let newCats = 0, newSubs = 0, newSubsubs = 0, newQs = 0;
+  for (let i = 0; i < importParsed.categories.length; i++) {
+    const importSub = importParsed.categories[i];
+    const catSel = document.getElementById(`import-cat-map-${i}`);
+    const subcatSel = document.getElementById(`import-subcat-map-${i}`);
+    const targetCatId = catSel ? catSel.value : '';
+    const targetSubcatId = subcatSel ? subcatSel.value : '';
+    let targetCat;
+    if (!targetCatId) { targetCat = GameModel.createCategory(importSub.name || 'Importierte Kategorie'); questionBank.categories.push(targetCat); newCats++; }
+    else { targetCat = questionBank.categories.find(c => c.id === targetCatId); if (!targetCat) continue; }
+    if (!targetCat.subcategories) targetCat.subcategories = [];
+    if (targetSubcatId) {
+      const targetSub = targetCat.subcategories.find(s => s.id === targetSubcatId); if (!targetSub) continue;
+      if (!targetSub.subcategories) targetSub.subcategories = [];
+      let subsub = targetSub.subcategories.find(ss => ss.name.toLowerCase() === (importSub.name || '').toLowerCase());
+      if (!subsub) { subsub = GameModel.createSubSubcategory(importSub.name || 'Standard'); targetSub.subcategories.push(subsub); newSubsubs++; }
+      (importSub.questions || []).forEach(q => { subsub.questions.push(Object.assign({}, q, { id: 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) })); newQs++; });
+    } else {
+      let sub = targetCat.subcategories.find(s => s.name.toLowerCase() === (importSub.name || '').toLowerCase());
+      if (!sub) { sub = GameModel.createSubcategory(importSub.name || 'Standard'); targetCat.subcategories.push(sub); newSubs++; }
+      (importSub.questions || []).forEach(q => { sub.questions.push(Object.assign({}, q, { id: 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) })); newQs++; });
+    }
+  }
+  await saveQuestionsToServer(); renderCategories(); updateStats(); cancelImport();
+  const parts = [];
+  if (newCats > 0) parts.push(`${newCats} neue Hauptkategorie${newCats !== 1 ? 'n' : ''}`);
+  if (newSubs > 0) parts.push(`${newSubs} 1.Unterkategorie${newSubs !== 1 ? 'n' : ''}`);
+  if (newSubsubs > 0) parts.push(`${newSubsubs} 2.Unterkategorie${newSubsubs !== 1 ? 'n' : ''}`);
+  parts.push(`${newQs} Frage${newQs !== 1 ? 'n' : ''}`);
+  showAlert('questions-alert', 'success', `Import erfolgreich! ${parts.join(', ')} hinzugefügt.`);
+  switchTab('tab-questions');
+}
+function cancelImport() { importParsed = null; document.getElementById('import-preview').style.display = 'none'; document.getElementById('import-file').value = ''; }
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId)?.classList.add('active');
+  document.querySelector(`[data-tab="${tabId}"]`)?.classList.add('active');
+}
+
+// ── Dialogs ──────────────────────────────────────────────────────
+function showNameDialog(title, placeholder) {
+  return new Promise(resolve => {
+    const dialog = document.getElementById('name-dialog'), input = document.getElementById('nd-input');
+    document.getElementById('nd-title').textContent = title;
+    input.value = ''; input.placeholder = placeholder || '';
+    dialog.style.display = 'flex';
+    setTimeout(() => input.focus(), 50);
+    function cleanup() { dialog.style.display = 'none'; document.getElementById('nd-cancel').removeEventListener('click', onCancel); document.getElementById('nd-confirm').removeEventListener('click', onConfirm); input.removeEventListener('keydown', onKey); }
+    function onConfirm() { const v = input.value.trim(); cleanup(); resolve(v || null); }
+    function onCancel() { cleanup(); resolve(null); }
+    function onKey(e) { if (e.key === 'Enter') onConfirm(); if (e.key === 'Escape') onCancel(); }
+    document.getElementById('nd-cancel').addEventListener('click', onCancel);
+    document.getElementById('nd-confirm').addEventListener('click', onConfirm);
+    input.addEventListener('keydown', onKey);
+  });
+}
+function showConfirmDialog(message) {
+  return new Promise(resolve => {
+    const dialog = document.getElementById('confirm-dialog');
+    document.getElementById('cd-message').textContent = message;
+    dialog.style.display = 'flex';
+    function cleanup() { dialog.style.display = 'none'; document.getElementById('cd-cancel').removeEventListener('click', onCancel); document.getElementById('cd-confirm').removeEventListener('click', onConfirm); }
+    function onConfirm() { cleanup(); resolve(true); }
+    function onCancel() { cleanup(); resolve(false); }
+    document.getElementById('cd-cancel').addEventListener('click', onCancel);
+    document.getElementById('cd-confirm').addEventListener('click', onConfirm);
+  });
+}
+
+// ── Utilities ────────────────────────────────────────────────────
+function showAlert(containerId, type, msg) {
+  const el = document.getElementById(containerId); if (!el) return;
+  if (!msg) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="alert alert-${type}">${escHtml(msg)}</div>`;
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Event Binding ────────────────────────────────────────────────
+function bindEvents() {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+  document.getElementById('btn-add-cat').addEventListener('click', addCategory);
+  document.getElementById('btn-qm-cancel').addEventListener('click', closeQuestionModal);
+  document.getElementById('btn-qm-save').addEventListener('click', saveQuestion);
+  document.getElementById('btn-add-mc-option').addEventListener('click', addMcOption);
+  document.getElementById('qm-type').addEventListener('change', function () { updateQModalType(this.value); });
+  document.getElementById('qm-cat').addEventListener('change', function () { populateSubcatDropdown(this.value, null); populateSubSubcatDropdown(this.value, null, null); populateL4Dropdown(this.value, null, null, null); });
+  document.getElementById('qm-subcat').addEventListener('change', function () { const c = document.getElementById('qm-cat').value; populateSubSubcatDropdown(c, this.value, null); populateL4Dropdown(c, this.value, null, null); });
+  document.getElementById('qm-subsubcat').addEventListener('change', function () { populateL4Dropdown(document.getElementById('qm-cat').value, document.getElementById('qm-subcat').value, this.value, null); });
+  document.getElementById('q-modal').addEventListener('click', function (e) { if (e.target === this) closeQuestionModal(); });
+  // Import
+  const dropzone = document.getElementById('dropzone');
+  dropzone.addEventListener('click', () => document.getElementById('import-file').click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', (e) => { e.preventDefault(); dropzone.classList.remove('drag-over'); handleImportFile(e.dataTransfer.files[0]); });
+  document.getElementById('import-file').addEventListener('change', function () { handleImportFile(this.files[0]); });
+  document.getElementById('btn-import-confirm').addEventListener('click', doImport);
+  document.getElementById('btn-import-cancel').addEventListener('click', cancelImport);
+  // Save
+  document.getElementById('btn-save-questions').addEventListener('click', async () => {
+    const ok = await saveQuestionsToServer();
+    if (ok) showAlert('save-alert', 'success', 'Fragen gespeichert (lokal + Server).');
+    else if (!StorageManager._hasServer()) showAlert('save-alert', 'success', 'Fragen gespeichert (Dateimodus – nur auf diesem Gerät).');
+    else showAlert('save-alert', 'warning', 'Fragen lokal gespeichert, aber Server-Speichern fehlgeschlagen.');
+  });
+  document.getElementById('btn-export-json').addEventListener('click', () => StorageManager.exportToFile(questionBank, 'fragendatenbank.json'));
+  document.getElementById('btn-export-md').addEventListener('click', () => {
+    const md = MDParser.toMarkdown(questionBank);
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = 'fragendatenbank.md'; a.click(); URL.revokeObjectURL(url);
+  });
+  document.getElementById('btn-load-json').addEventListener('click', () => document.getElementById('load-json-file').click());
+  document.getElementById('load-json-file').addEventListener('change', async function () {
+    try {
+      const data = await StorageManager.importFromFile(this.files[0]);
+      if (!data.categories) { showAlert('save-alert', 'danger', 'Ungültige Fragen-Datei (kein "categories"-Feld).'); return; }
+      questionBank = data;
+      const ok = await saveQuestionsToServer(); renderCategories(); updateStats();
+      if (ok) showAlert('save-alert', 'success', `Fragen geladen: ${data.categories.length} Kategorien.`);
+      else showAlert('save-alert', 'warning', `Fragen geladen – Server-Speichern fehlgeschlagen.`);
+      switchTab('tab-questions');
+    } catch (e) { showAlert('save-alert', 'danger', 'Fehler: ' + e.message); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeQuestionModal(); });
+}
+
+// ── Start ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+<script>
+(function () {
+  const KEY = 'spiele_theme';
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    var el = document.getElementById('btn-theme-admin');
+    if (el) el.textContent = light ? '🌙' : '☀️';
+  }
+  window.toggleTheme = function () {
+    var isLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, isLight ? 'light' : 'dark');
+    applyTheme(isLight);
+  };
+  applyTheme(localStorage.getItem(KEY) === 'light');
+})();
+</script>
+</body>
+</html>
