@@ -11,8 +11,14 @@
     .q-table tr[data-qid] { cursor: pointer; transition: background 0.15s; }
     .q-table tr[data-qid]:hover td { background: rgba(233,69,96,0.08) !important; }
     body.light .q-table tr[data-qid]:hover td { background: rgba(227,79,32,0.08) !important; }
-    /* Tabelle scrollbar auf kleinen Bildschirmen */
-    .q-table-wrap { overflow-x: auto; }
+    /* Textumbruch in Tabellenzellen */
+    .q-table .q-preview {
+      max-width: none !important;
+      white-space: normal !important;
+      word-break: break-word;
+      overflow: visible !important;
+      text-overflow: unset !important;
+    }
   </style>
 </head>
 <body>
@@ -303,7 +309,7 @@ function renderQTable(container, questions, catId, subId, subsubId, l4Id) {
   tableWrap.className = 'q-table-wrap';
   tableWrap.innerHTML = `
     <table class="q-table">
-      <thead><tr><th>Stufe</th><th>Typ</th><th>Frage</th><th>Antwort</th><th style="width:70px;"></th></tr></thead>
+      <thead><tr><th style="width:70px;"></th><th>Stufe</th><th>Typ</th><th>Frage</th><th>Antwort</th></tr></thead>
       <tbody id="q-tbody-${uid}"></tbody>
     </table>`;
   container.appendChild(tableWrap);
@@ -320,14 +326,14 @@ function renderQTable(container, questions, catId, subId, subsubId, l4Id) {
     });
     tr.title = 'Klicken zum Bearbeiten';
     tr.innerHTML = `
-      <td><span class="diff-badge diff-${q.difficulty}">${q.difficulty}</span></td>
-      <td><span class="type-badge type-${q.type}">${q.type === 'mc' ? 'MC' : 'Offen'}</span></td>
-      <td><span class="q-preview" title="${escHtml(q.question)}">${escHtml(q.question)}</span></td>
-      <td><span class="q-preview" title="${escHtml(q.answer)}">${escHtml(q.answer)}</span></td>
       <td><div style="display:flex;gap:0.3rem;flex-shrink:0;">
         <button class="btn btn-secondary btn-sm" title="Bearbeiten">✎</button>
         <button class="btn btn-danger btn-sm" title="Löschen">✕</button>
-      </div></td>`;
+      </div></td>
+      <td><span class="diff-badge diff-${q.difficulty}">${q.difficulty}</span></td>
+      <td><span class="type-badge type-${q.type}">${q.type === 'mc' ? 'MC' : 'Offen'}</span></td>
+      <td><span class="q-preview">${escHtml(q.question)}</span></td>
+      <td><span class="q-preview">${escHtml(q.answer)}</span></td>`;
     // Button-Events per JS binden (kein inline onclick)
     const btns = tr.querySelectorAll('button');
     btns[0].addEventListener('click', (e) => { e.stopPropagation(); openQuestionModal(...editArgs); });
