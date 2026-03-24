@@ -58,7 +58,7 @@
       background-size: 256px 256px;
     }
 
-    body.player-mode > div { position: relative; z-index: 1; }
+    body.player-mode > .view { position: relative; z-index: 1; }
 
     /* ── Player Typography ── */
     body.player-mode h1, body.player-mode h2, body.player-mode h3 {
@@ -365,6 +365,247 @@
     .room-editor-body.collapsed { display: none; }
 
     /* ══════════════════════════════════════════════════════
+       ROOM EXPLORER
+       ══════════════════════════════════════════════════════ */
+    .room-explorer {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      border-radius: var(--radius-lg); overflow: hidden;
+      background: var(--bg-card); border: 1px solid var(--border);
+    }
+    .room-explorer img.explorer-bg {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .room-explorer-fallback {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--bg-card), var(--bg-deep));
+      font-family: 'Cinzel', serif; font-size: 1.3rem; color: var(--text-muted);
+    }
+
+    /* Hotspots */
+    .hotspot {
+      position: absolute; width: 52px; height: 52px;
+      transform: translate(-50%, -50%);
+      cursor: pointer; z-index: 10;
+    }
+    .hotspot-inner {
+      width: 100%; height: 100%; border-radius: 50%;
+      background: rgba(212,168,83,0.2); border: 2px solid var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; transition: all 0.3s; position: relative;
+    }
+    .hotspot-inner::after {
+      content: ''; position: absolute; inset: -6px; border-radius: 50%;
+      border: 2px solid var(--gold-glow);
+      animation: hotspotPulse 2s ease infinite;
+    }
+    .hotspot:hover .hotspot-inner {
+      background: rgba(212,168,83,0.4); transform: scale(1.12);
+      box-shadow: 0 0 20px var(--gold-glow);
+    }
+    .hotspot.solved .hotspot-inner {
+      background: rgba(46,204,113,0.2); border-color: var(--success);
+    }
+    .hotspot.solved .hotspot-inner::after { border-color: rgba(46,204,113,0.3); }
+    .hotspot.exit .hotspot-inner {
+      background: rgba(231,76,60,0.15); border-color: var(--danger); font-size: 1.5rem;
+    }
+    .hotspot.exit.unlocked .hotspot-inner {
+      background: rgba(46,204,113,0.15); border-color: var(--success);
+    }
+    .hotspot.exit.locked { cursor: not-allowed; }
+    .hotspot-label {
+      position: absolute; bottom: -26px; left: 50%;
+      transform: translateX(-50%); white-space: nowrap;
+      font-size: 0.75rem; color: var(--gold);
+      background: rgba(10,10,26,0.85); padding: 2px 10px;
+      border-radius: 8px; pointer-events: none;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .hotspot:hover .hotspot-label { opacity: 1; }
+    @keyframes hotspotPulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.4); opacity: 0; }
+    }
+
+    /* ── Puzzle Card ── */
+    .puzzle-card-btn {
+      position: fixed; bottom: 20px; left: 20px; z-index: 100;
+      padding: 10px 18px; background: var(--bg-card);
+      border: 2px solid var(--gold); border-radius: var(--radius);
+      color: var(--gold); font-family: 'Cinzel', serif;
+      font-size: 0.9rem; cursor: pointer; transition: all 0.3s;
+      display: none;
+    }
+    .puzzle-card-btn:hover { background: var(--gold); color: var(--bg-deep); }
+    .puzzle-card-btn.has-update { animation: glowPulse 1.5s ease 3; }
+
+    .puzzle-card-overlay {
+      position: fixed; inset: 0; z-index: 150;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .puzzle-card-box {
+      background: var(--bg-card); border: 2px solid var(--gold);
+      border-radius: var(--radius-lg); padding: 28px;
+      max-width: 600px; width: 90%; max-height: 80vh;
+      overflow-y: auto; position: relative;
+    }
+    .puzzle-card-box h3 {
+      font-family: 'Cinzel', serif; color: var(--gold);
+      margin-bottom: 16px; text-align: center;
+    }
+    .puzzle-card-box img { width: 100%; border-radius: var(--radius); margin-bottom: 16px; }
+    .puzzle-card-text {
+      color: var(--text-primary); font-size: 1.05rem;
+      line-height: 1.8; white-space: pre-line; margin-bottom: 16px;
+    }
+    .puzzle-card-close {
+      position: absolute; top: 10px; right: 14px;
+      background: none; border: none;
+      color: var(--text-muted); font-size: 1.5rem; cursor: pointer;
+    }
+    .puzzle-card-close:hover { color: var(--gold); }
+
+    /* ── Padlock (Zahlenschloss) ── */
+    .padlock { display: flex; flex-direction: column; align-items: center; margin: 24px auto; }
+    .padlock-shackle {
+      width: 100px; height: 55px;
+      border: 6px solid #888; border-bottom: none;
+      border-radius: 50px 50px 0 0;
+      transition: all 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+    .padlock.unlocked .padlock-shackle {
+      transform: translateY(-24px);
+      border-color: var(--success);
+    }
+    .padlock-body {
+      background: linear-gradient(180deg, #555, #333);
+      border-radius: 12px; padding: 16px 20px;
+      border: 2px solid #666;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .padlock-wheels { display: flex; gap: 4px; }
+    .padlock-wheel {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      user-select: none;
+    }
+    .padlock-arrow {
+      width: 44px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #999; font-size: 1rem;
+      border-radius: 4px; transition: all 0.2s;
+    }
+    .padlock-arrow:hover { color: var(--gold); background: rgba(255,255,255,0.1); }
+    .padlock-arrow:active { transform: scale(0.9); }
+    .padlock-digit {
+      width: 44px; height: 56px;
+      display: flex; align-items: center; justify-content: center;
+      background: #1a1a1a; border: 2px solid #555; border-radius: 6px;
+      font-family: 'Cinzel', serif; font-size: 1.8rem; font-weight: 700;
+      color: var(--gold); transition: border-color 0.3s;
+    }
+    .padlock.wrong .padlock-body { animation: shake 0.4s ease; border-color: var(--danger); }
+    .padlock.unlocked .padlock-body { border-color: var(--success); }
+
+    /* ── Digital Lock (Digitales Eingabefeld) ── */
+    .digital-lock { display: flex; flex-direction: column; align-items: center; margin: 24px auto; max-width: 280px; }
+    .digital-lock-screen {
+      background: #111; border: 2px solid #444; border-radius: 12px;
+      padding: 20px; width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .digital-lock-display {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;
+      padding: 12px; background: #0a0a0a; border-radius: 8px; border: 1px solid #333;
+    }
+    .digital-lock-char {
+      width: 40px; height: 52px;
+      display: flex; align-items: center; justify-content: center;
+      background: #0d1117; border: 2px solid #30363d; border-radius: 6px;
+      font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: 700;
+      color: #58a6ff; transition: all 0.2s;
+    }
+    .digital-lock-char.active { border-color: #58a6ff; box-shadow: 0 0 8px rgba(88,166,255,0.3); }
+    .digital-lock-char.filled { color: var(--gold); border-color: var(--gold); }
+    .digital-lock-keypad {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .digital-lock-key {
+      padding: 14px 0; border: none; border-radius: 8px;
+      background: #21262d; color: #e6edf3; font-size: 1.3rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; font-family: 'Cinzel', serif;
+    }
+    .digital-lock-key:hover { background: #30363d; }
+    .digital-lock-key:active { transform: scale(0.95); background: #444; }
+    .digital-lock-key.key-delete { background: #3d1f1f; color: #f85149; font-size: 1rem; }
+    .digital-lock-key.key-delete:hover { background: #4d2525; }
+    .digital-lock.wrong .digital-lock-screen { animation: shake 0.4s ease; border-color: var(--danger); }
+    .digital-lock.unlocked .digital-lock-screen { border-color: var(--success); }
+    .digital-lock.unlocked .digital-lock-char { color: var(--success); border-color: var(--success); }
+
+    /* ── Enhanced Door ── */
+    .door-half .door-panel {
+      position: absolute; top: 15%; bottom: 15%; width: 55%;
+      border: 2px solid var(--gold-dim); border-radius: 4px; opacity: 0.3;
+    }
+    .door-half.left .door-panel { right: 18%; }
+    .door-half.right .door-panel { left: 18%; }
+    .door-keyhole {
+      position: absolute; top: 52%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 14px; height: 14px;
+      background: var(--gold-dim); border-radius: 50%;
+    }
+    .door-keyhole::after {
+      content: ''; position: absolute; top: 10px; left: 3px;
+      width: 8px; height: 16px;
+      background: var(--gold-dim); border-radius: 0 0 4px 4px;
+    }
+
+    /* ── Hotspot Question Modal ── */
+    .hotspot-modal {
+      position: fixed; inset: 0; z-index: 160;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .hotspot-modal-content {
+      background: var(--bg-card); border: 2px solid var(--border);
+      border-radius: var(--radius-lg); padding: 28px;
+      max-width: 600px; width: 90%; position: relative;
+    }
+
+    /* ── Admin: Hotspot Editor ── */
+    .hotspot-preview {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      background: #f0f0f0; border: 1px solid #d0d0d0;
+      border-radius: 8px; overflow: hidden; margin: 8px 0; cursor: crosshair;
+    }
+    .hotspot-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .hotspot-preview-empty {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      color: #999; font-size: 0.9rem;
+    }
+    .hotspot-marker {
+      position: absolute; width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(59,130,246,0.3); border: 2px solid #3b82f6;
+      transform: translate(-50%,-50%);
+      cursor: grab; display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; color: #3b82f6;
+    }
+    .hotspot-marker:active { cursor: grabbing; }
+    .hotspot-marker.exit-marker {
+      background: rgba(231,76,60,0.3); border-color: #e74c3c; color: #e74c3c;
+    }
+    .hs-config {
+      background: #f8f8f8; border: 1px solid #e0e0e0;
+      border-radius: 8px; padding: 10px; margin-bottom: 8px;
+    }
+
+    /* ══════════════════════════════════════════════════════
        ANIMATIONS
        ══════════════════════════════════════════════════════ */
     @keyframes shimmer {
@@ -476,6 +717,14 @@
       .code-input-field { width: 48px; height: 60px; font-size: 1.5rem; }
       .option-btn { padding: 12px 16px; font-size: 1rem; }
       .game-tile { padding: 16px; }
+      .padlock-digit { width: 38px; height: 48px; font-size: 1.4rem; }
+      .padlock-arrow { width: 38px; }
+      .digital-lock-char { width: 34px; height: 44px; font-size: 1.4rem; }
+      .digital-lock-key { padding: 12px 0; font-size: 1.1rem; }
+      .hotspot { width: 44px; height: 44px; }
+      .hotspot-inner { font-size: 1.1rem; }
+      .puzzle-card-box { padding: 20px; }
+      .room-explorer { aspect-ratio: 4/3; }
     }
 
     /* ══════════════════════════════════════════════════════
@@ -514,7 +763,7 @@
   <!-- View: Player Home -->
   <div id="view-player-home" class="view">
     <div class="player-container">
-      <button class="back-link" onclick="showView('game-select')">← Zurück zur Spielauswahl</button>
+      <button class="back-link" onclick="showView('view-game-select')">← Zurück zur Spielauswahl</button>
       <div class="room-intro-card">
         <h1 id="ph-title"></h1>
         <p class="room-description" id="ph-desc"></p>
@@ -534,7 +783,7 @@
   <!-- View: Room Select (mode=single) -->
   <div id="view-room-select" class="view">
     <div class="player-container">
-      <button class="back-link" onclick="showView('player-home')">← Zurück</button>
+      <button class="back-link" onclick="showView('view-player-home')">← Zurück</button>
       <h2 class="text-center mb-16">Wähle einen Raum</h2>
       <div class="room-grid" id="room-grid"></div>
     </div>
@@ -547,7 +796,7 @@
     </div>
   </div>
 
-  <!-- View: Room Questions -->
+  <!-- View: Room Questions (linear mode) -->
   <div id="view-room-questions" class="view">
     <div class="player-container">
       <div id="timer-el" class="timer-display"></div>
@@ -558,7 +807,19 @@
     </div>
   </div>
 
-  <!-- View: Code Reveal -->
+  <!-- View: Room Explorer (hotspot mode) -->
+  <div id="view-room-explorer" class="view">
+    <div class="player-container" style="max-width:1000px;">
+      <div id="timer-el-explorer" class="timer-display"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span id="explorer-room-name" style="color:var(--gold);font-family:'Cinzel',serif;font-size:1.1rem;"></span>
+        <span id="explorer-progress" style="color:var(--text-muted);font-size:0.85rem;"></span>
+      </div>
+      <div class="room-explorer" id="room-explorer-container"></div>
+    </div>
+  </div>
+
+  <!-- View: Code Reveal (linear mode) -->
   <div id="view-code-reveal" class="view">
     <div class="player-container text-center">
       <h2 style="margin-bottom:8px;">Alle Rätsel gelöst!</h2>
@@ -570,18 +831,60 @@
     </div>
   </div>
 
-  <!-- View: Room Unlock -->
+  <!-- View: Room Unlock / Padlock or Digital -->
   <div id="view-room-unlock" class="view">
     <div class="player-container text-center">
-      <h2 style="margin-bottom:8px;" id="unlock-title">Code eingeben</h2>
-      <p style="color:var(--text-secondary);margin-bottom:24px;">Gib den Code ein, um den Raum zu verlassen.</p>
-      <div class="code-input-group" id="unlock-inputs"></div>
-      <div class="mt-16">
-        <button class="btn-gold" onclick="checkUnlockCode()">Überprüfen</button>
+      <h2 style="margin-bottom:8px;" id="unlock-title">Schloss öffnen</h2>
+      <p id="unlock-hint-text" style="color:var(--text-secondary);margin-bottom:8px;">Gib den Code ein, um die Tür zu öffnen.</p>
+
+      <!-- Padlock (Zahlenschloss) -->
+      <div class="padlock" id="padlock">
+        <div class="padlock-shackle"></div>
+        <div class="padlock-body">
+          <div class="padlock-wheels" id="padlock-wheels"></div>
+        </div>
+        <button class="btn-gold" style="margin-top:16px;" onclick="checkPadlockCode()">🔓 Schloss öffnen</button>
       </div>
+
+      <!-- Digital Lock (Eingabefeld) -->
+      <div class="digital-lock hidden" id="digital-lock">
+        <div class="digital-lock-screen">
+          <div class="digital-lock-display" id="digital-lock-display"></div>
+          <div class="digital-lock-keypad">
+            <button class="digital-lock-key" onclick="digitalKeyPress('1')">1</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('2')">2</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('3')">3</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('4')">4</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('5')">5</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('6')">6</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('7')">7</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('8')">8</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('9')">9</button>
+            <button class="digital-lock-key key-delete" onclick="digitalKeyPress('del')">⌫</button>
+            <button class="digital-lock-key" onclick="digitalKeyPress('0')">0</button>
+            <button class="digital-lock-key" style="background:#1a3a1a;color:var(--success);" onclick="checkPadlockCode()">OK</button>
+          </div>
+        </div>
+      </div>
+
       <p id="unlock-error" class="hidden" style="color:var(--danger);margin-top:12px;"></p>
+      <div class="mt-16" id="unlock-back-btns">
+        <button class="btn-ghost" onclick="showView('view-code-reveal')">← Zurück zum Code</button>
+      </div>
     </div>
   </div>
+
+  <!-- Hotspot Question Modal -->
+  <div id="hotspot-modal" class="hotspot-modal hidden">
+    <div class="hotspot-modal-content">
+      <button class="puzzle-card-close" onclick="closeHotspotModal()">✕</button>
+      <div id="hotspot-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Puzzle Card Button + Overlay -->
+  <button class="puzzle-card-btn" id="puzzle-card-btn" onclick="showPuzzleCard()">🗺 Rätselkarte</button>
+  <div id="puzzle-card-overlay" class="hidden"></div>
 
   <!-- View: Game Complete -->
   <div id="view-game-complete" class="view">
@@ -591,7 +894,7 @@
       <p id="complete-time" style="color:var(--gold);font-family:'Cinzel',serif;font-size:1.6rem;margin-top:8px;"></p>
       <div class="scoreboard" id="scoreboard"></div>
       <div class="mt-24 flex justify-center gap-8 flex-wrap">
-        <button class="btn-gold" onclick="showView('game-select');currentGame=null;currentTeam=null;">Neues Spiel</button>
+        <button class="btn-gold" onclick="showView('view-game-select');currentGame=null;currentTeam=null;">Neues Spiel</button>
         <a href="../spiele.html" class="btn-ghost">← Übersicht</a>
       </div>
     </div>
@@ -608,8 +911,8 @@
 
   <!-- Door Animation Overlay -->
   <div id="door-overlay" class="door-overlay hidden">
-    <div class="door-half left"><div class="door-handle"></div></div>
-    <div class="door-half right"><div class="door-handle"></div></div>
+    <div class="door-half left"><div class="door-panel"></div><div class="door-handle"></div><div class="door-keyhole"></div></div>
+    <div class="door-half right"><div class="door-panel"></div><div class="door-handle"></div></div>
   </div>
 
   <!-- Confetti Container -->
@@ -631,8 +934,10 @@
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
         <button class="admin-btn primary" onclick="createNewGame()">+ Neues Spiel</button>
-        <button class="admin-btn" onclick="document.getElementById('import-file').click()">📥 Spiel importieren</button>
+        <button class="admin-btn" onclick="document.getElementById('import-file').click()">📥 JSON importieren</button>
         <input type="file" id="import-file" accept=".json" style="display:none" onchange="importGameFile(event)">
+        <button class="admin-btn" onclick="document.getElementById('import-md-file').click()">📝 MD importieren</button>
+        <input type="file" id="import-md-file" accept=".md,.txt,.markdown" style="display:none" onchange="importMDFile(event)">
         <button class="admin-btn" onclick="loadDemoGame()">📋 Demo-Spiel laden</button>
       </div>
       <div class="admin-card">
@@ -730,19 +1035,9 @@
     let editingGameId = null;
     let editingGame = null;   // Deep copy for editing
     let timeUpShown = false;
-
-    // ══════════════════════════════════════════════════════
-    // INIT
-    // ══════════════════════════════════════════════════════
-    loadLibrary();
-
-    if (isAdmin) {
-      document.body.classList.add('admin-mode');
-      showAdminView('admin-library');
-    } else {
-      document.body.classList.add('player-mode');
-      showView('game-select');
-    }
+    let explorerMode = false; // true when room has hotspots + backgroundImage
+    let currentHotspot = null; // hotspot being solved
+    let padlockDigits = [];   // current padlock wheel values
 
     // ══════════════════════════════════════════════════════
     // LIBRARY (localStorage)
@@ -775,7 +1070,7 @@
       const el = document.getElementById(viewId);
       if (el) el.classList.add('active');
 
-      if (viewId === 'game-select') renderGameSelect();
+      if (viewId === 'view-game-select') renderGameSelect();
       if (viewId === 'view-game-complete') launchConfetti();
     };
 
@@ -916,8 +1211,24 @@
       currentTeam.currentRoom = roomIdx;
       saveTeamState();
 
-      renderRoomIntro(room);
-      playDoorAnimation(() => showView('view-room-intro'));
+      // Check for explorer mode (has hotspots — background image optional)
+      explorerMode = !!(room.hotspots && room.hotspots.length > 0);
+
+      if (explorerMode) {
+        playDoorAnimation(() => {
+          if (!currentTeam.startTime) {
+            currentTeam.startTime = Date.now();
+            saveTeamState();
+          }
+          startTimer();
+          renderRoomExplorer(room);
+          showView('view-room-explorer');
+          document.getElementById('puzzle-card-btn').style.display = room.puzzleCard ? 'block' : 'none';
+        });
+      } else {
+        renderRoomIntro(room);
+        playDoorAnimation(() => showView('view-room-intro'));
+      }
     }
 
     function renderRoomIntro(room) {
@@ -973,8 +1284,14 @@
       digitsEl.innerHTML = '';
       room.questions.forEach((q, i) => {
         const d = document.createElement('div');
-        d.className = 'code-digit' + (progress.solvedQuestions.includes(q.id) ? ' revealed' : '');
-        d.textContent = progress.solvedQuestions.includes(q.id) ? q.codeDigit : '?';
+        const isSolved = progress.solvedQuestions.includes(q.id);
+        d.className = 'code-digit' + (isSolved ? ' revealed' : '');
+        d.textContent = isSolved ? q.codeDigit : '?';
+        if (isSolved) {
+          d.style.cursor = 'pointer';
+          d.title = 'Klicke für Details';
+          d.onclick = function() { showSolvedQuestionInfo(q); };
+        }
         digitsEl.appendChild(d);
       });
 
@@ -1103,9 +1420,10 @@
       progress.solvedQuestions.push(q.id);
       saveTeamState();
 
-      setTimeout(() => {
-        renderRoomQuestions();
-      }, 1200);
+      // In explorer mode, this is handled by hotspot-specific answer checkers
+      if (!explorerMode) {
+        setTimeout(() => { renderRoomQuestions(); }, 1200);
+      }
     }
 
     function onWrongAnswer(q) {
@@ -1115,11 +1433,286 @@
       progress.failCounts[q.id]++;
       saveTeamState();
 
-      // Re-render after delay to show hint if needed
+      if (!explorerMode) {
+        setTimeout(() => { renderRoomQuestions(); }, 1500);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Room Explorer (hotspot mode)
+    // ══════════════════════════════════════════════════════
+    function renderRoomExplorer(room) {
+      const container = document.getElementById('room-explorer-container');
+      const progress = currentTeam.roomProgress[room.id];
+      const puzzleHotspots = (room.hotspots || []).filter(h => h.type === 'puzzle');
+      const solvedHs = puzzleHotspots.filter(h => isHotspotSolved(h, progress));
+      const allPuzzlesSolved = solvedHs.length >= puzzleHotspots.length && puzzleHotspots.length > 0;
+
+      document.getElementById('explorer-room-name').textContent = room.name;
+      document.getElementById('explorer-progress').textContent =
+        solvedHs.length + ' / ' + puzzleHotspots.length + ' Rätsel gelöst';
+
+      let html = '';
+      if (room.backgroundImage) {
+        html += '<img class="explorer-bg" src="' + esc(room.backgroundImage) + '" alt="" draggable="false">';
+      } else {
+        html += '<div class="room-explorer-fallback">' + esc(room.name) + '</div>';
+      }
+
+      (room.hotspots || []).forEach((hs, i) => {
+        const isSolved = hs.type === 'puzzle' && isHotspotSolved(hs, progress);
+        const isExit = hs.type === 'exit';
+        const unlocked = isExit && allPuzzlesSolved;
+        const classes = 'hotspot'
+          + (isSolved ? ' solved' : '')
+          + (isExit ? ' exit' : '')
+          + (unlocked ? ' unlocked' : '')
+          + (isExit && !unlocked ? ' locked' : '');
+
+        const icon = isExit ? '🚪' : (isSolved ? '✅' : (hs.icon || '🔍'));
+        html += '<div class="' + classes + '" style="left:' + hs.x + '%;top:' + hs.y + '%;" onclick="onHotspotClick(' + i + ')">' +
+          '<div class="hotspot-inner">' + icon + '</div>' +
+          '<div class="hotspot-label">' + esc(hs.label || '') + '</div>' +
+        '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function isHotspotSolved(hs, progress) {
+      if (!hs.questionIds || hs.questionIds.length === 0) return false;
+      return hs.questionIds.every(qid => progress.solvedQuestions.includes(qid));
+    }
+
+    window.onHotspotClick = function(hsIdx) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const hs = room.hotspots[hsIdx];
+      const progress = currentTeam.roomProgress[room.id];
+
+      if (hs.type === 'exit') {
+        const puzzleHotspots = room.hotspots.filter(h => h.type === 'puzzle');
+        const allSolved = puzzleHotspots.every(h => isHotspotSolved(h, progress));
+        if (!allSolved) {
+          // Show message
+          const modal = document.getElementById('hotspot-modal');
+          document.getElementById('hotspot-modal-body').innerHTML =
+            '<h3 style="color:var(--danger);font-family:\'Cinzel\',serif;">🔒 Tür verschlossen</h3>' +
+            '<p style="color:var(--text-secondary);margin-top:12px;">Löse zuerst alle Rätsel, bevor du die Tür öffnen kannst.</p>';
+          modal.classList.remove('hidden');
+          return;
+        }
+        // All solved → go to padlock
+        document.getElementById('puzzle-card-btn').style.display = 'none';
+        goToPadlock();
+        return;
+      }
+
+      // Puzzle hotspot
+      if (isHotspotSolved(hs, progress)) {
+        // Already solved — show summary with answers to help decode puzzle card
+        const room = currentGame.rooms[currentRoomIdx];
+        const modal = document.getElementById('hotspot-modal');
+        let solvedHtml = '<h3 style="color:var(--success);font-family:\'Cinzel\',serif;">✅ ' + esc(hs.label || 'Rätsel') + '</h3>';
+        // Show answers of solved questions
+        const qSummaries = (hs.questionIds || []).map(qid => {
+          const q = room.questions.find(qq => qq.id === qid);
+          if (!q) return null;
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
+            '<span style="color:var(--text-secondary);font-size:0.85rem;">' + esc(q.text) + '</span><br>' +
+            '<span style="color:var(--gold);font-weight:600;">→ ' + esc(q.correctAnswer) + '</span></div>';
+        }).filter(Boolean);
+        if (qSummaries.length > 0) {
+          solvedHtml += '<div style="margin-top:12px;text-align:left;">' + qSummaries.join('') + '</div>';
+        }
+        solvedHtml += (hs.codeDigit ? '<p style="color:var(--text-secondary);margin-top:12px;">Code-Ziffer: <strong style="color:var(--gold);font-size:1.3rem;">' + esc(hs.codeDigit) + '</strong></p>' : '');
+        solvedHtml += '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
+        document.getElementById('hotspot-modal-body').innerHTML = solvedHtml;
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      currentHotspot = hs;
+      renderHotspotQuestion(hs, progress);
+    };
+
+    function renderHotspotQuestion(hs, progress) {
+      const room = currentGame.rooms[currentRoomIdx];
+      // Find first unsolved question in this hotspot
+      let qToShow = null;
+      let qIdx = -1;
+      for (const qid of hs.questionIds) {
+        if (!progress.solvedQuestions.includes(qid)) {
+          qIdx = room.questions.findIndex(q => q.id === qid);
+          if (qIdx >= 0) { qToShow = room.questions[qIdx]; break; }
+        }
+      }
+      if (!qToShow) { closeHotspotModal(); renderRoomExplorer(room); return; }
+
+      currentQuestionIdx = qIdx;
+      const fails = progress.failCounts[qToShow.id] || 0;
+      const modal = document.getElementById('hotspot-modal');
+      let html = '<h3 style="font-family:\'Cinzel\',serif;color:var(--gold);margin-bottom:4px;">' + esc(hs.label || 'Rätsel') + '</h3>';
+      html += '<p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">' +
+        'Frage ' + (hs.questionIds.indexOf(qToShow.id) + 1) + ' von ' + hs.questionIds.length + '</p>';
+      html += '<div style="margin-bottom:16px;">';
+      html += '<p style="font-size:1.1rem;font-weight:600;margin-bottom:14px;color:var(--text-primary);">' + esc(qToShow.text) + '</p>';
+
+      if (qToShow.type === 'multiple_choice') {
+        (qToShow.options || []).forEach((opt, i) => {
+          html += '<button class="option-btn" onclick="checkHotspotMC(this,' + i + ')">' + esc(opt) + '</button>';
+        });
+      } else if (qToShow.type === 'text_input') {
+        html += '<div style="display:flex;gap:8px;">' +
+          '<input type="text" class="player-input" id="hs-text-answer" placeholder="Antwort eingeben..." style="flex:1;">' +
+          '<button class="btn-gold" onclick="checkHotspotText()">Prüfen</button></div>';
+      } else if (qToShow.type === 'number_code') {
+        html += '<div style="display:flex;gap:8px;">' +
+          '<input type="text" inputmode="numeric" class="player-input" id="hs-number-answer" placeholder="Zahl eingeben..." style="flex:1;max-width:200px;">' +
+          '<button class="btn-gold" onclick="checkHotspotNumber()">Prüfen</button></div>';
+      }
+
+      if (fails >= 2 && qToShow.hint) {
+        html += '<div class="hint-box">💡 ' + esc(qToShow.hint) + '</div>';
+      }
+      html += '</div>';
+      html += '<div class="text-center"><button class="btn-ghost" onclick="closeHotspotModal()">← Zurück zum Raum</button></div>';
+
+      document.getElementById('hotspot-modal-body').innerHTML = html;
+      modal.classList.remove('hidden');
+    }
+
+    window.closeHotspotModal = function() {
+      document.getElementById('hotspot-modal').classList.add('hidden');
+      currentHotspot = null;
+    };
+
+    function onHotspotCorrect(q) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      progress.solvedQuestions.push(q.id);
+      saveTeamState();
+
       setTimeout(() => {
-        renderRoomQuestions();
+        if (currentHotspot && isHotspotSolved(currentHotspot, progress)) {
+          // Show code digit reveal
+          const modal = document.getElementById('hotspot-modal');
+          let html = '<div class="text-center">' +
+            '<h3 style="color:var(--success);font-family:\'Cinzel\',serif;">Rätsel gelöst!</h3>';
+          if (currentHotspot.codeDigit) {
+            html += '<p style="color:var(--text-secondary);margin:12px 0;">Die Code-Ziffer lautet:</p>' +
+              '<div class="code-digit revealed" style="margin:16px auto;animation:glowPulse 2s ease infinite;">' + esc(currentHotspot.codeDigit) + '</div>' +
+              '<p style="color:var(--text-muted);font-size:0.85rem;">Merke dir diese Ziffer!</p>';
+          }
+          html += '<div class="mt-16"><button class="btn-gold" onclick="closeHotspotModal();renderRoomExplorer(currentGame.rooms[currentRoomIdx]);">Weiter</button></div></div>';
+          document.getElementById('hotspot-modal-body').innerHTML = html;
+
+          // Pulse the puzzle card button
+          const pcBtn = document.getElementById('puzzle-card-btn');
+          pcBtn.classList.add('has-update');
+          setTimeout(() => pcBtn.classList.remove('has-update'), 4500);
+        } else {
+          renderHotspotQuestion(currentHotspot, progress);
+        }
+      }, 1200);
+    }
+
+    function onHotspotWrong(q) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      if (!progress.failCounts[q.id]) progress.failCounts[q.id] = 0;
+      progress.failCounts[q.id]++;
+      saveTeamState();
+
+      setTimeout(() => {
+        if (currentHotspot) renderHotspotQuestion(currentHotspot, progress);
       }, 1500);
     }
+
+    window.checkHotspotMC = function(btn, idx) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const selected = q.options[idx];
+      const isCorrect = selected === q.correctAnswer;
+      document.querySelectorAll('#hotspot-modal .option-btn').forEach(b => b.classList.add('disabled'));
+      if (isCorrect) {
+        btn.classList.add('correct');
+        onHotspotCorrect(q);
+      } else {
+        btn.classList.add('wrong');
+        document.querySelectorAll('#hotspot-modal .option-btn').forEach(b => {
+          if (b.textContent === q.correctAnswer) b.classList.add('correct');
+        });
+        onHotspotWrong(q);
+      }
+    };
+
+    window.checkHotspotText = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const input = document.getElementById('hs-text-answer');
+      const answer = input.value.trim();
+      if (!answer) return;
+      const correct = q.caseSensitive ? q.correctAnswer.trim() : q.correctAnswer.trim().toLowerCase();
+      const given = q.caseSensitive ? answer : answer.toLowerCase();
+      if (given === correct) { input.style.borderColor = 'var(--success)'; onHotspotCorrect(q); }
+      else { input.style.borderColor = 'var(--danger)'; input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); onHotspotWrong(q); }
+    };
+
+    window.checkHotspotNumber = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const input = document.getElementById('hs-number-answer');
+      const answer = input.value.trim();
+      if (!answer) return;
+      if (answer === String(q.correctAnswer)) { input.style.borderColor = 'var(--success)'; onHotspotCorrect(q); }
+      else { input.style.borderColor = 'var(--danger)'; input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); onHotspotWrong(q); }
+    };
+
+    // ══════════════════════════════════════════════════════
+    // PLAYER: Puzzle Card
+    // ══════════════════════════════════════════════════════
+    window.showPuzzleCard = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      const pc = room.puzzleCard || {};
+      const puzzleHotspots = (room.hotspots || []).filter(h => h.type === 'puzzle');
+
+      let html = '<div class="puzzle-card-overlay" onclick="hidePuzzleCard()">' +
+        '<div class="puzzle-card-box" onclick="event.stopPropagation()">' +
+        '<button class="puzzle-card-close" onclick="hidePuzzleCard()">✕</button>' +
+        '<h3>🗺 Rätselkarte</h3>';
+
+      if (pc.type === 'image' && pc.content) {
+        html += '<img src="' + esc(pc.content) + '" alt="Rätselkarte">';
+      } else if (pc.type === 'text' && pc.content) {
+        html += '<div class="puzzle-card-text">' + esc(pc.content) + '</div>';
+      }
+
+      // Code digits — shuffled so the order doesn't reveal the code
+      var shuffledHs = puzzleHotspots.slice();
+      for (var si = shuffledHs.length - 1; si > 0; si--) {
+        var sj = Math.floor(Math.random() * (si + 1));
+        var tmp = shuffledHs[si]; shuffledHs[si] = shuffledHs[sj]; shuffledHs[sj] = tmp;
+      }
+      html += '<div style="margin-top:16px;"><p style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-bottom:8px;">Gesammelte Code-Ziffern (unsortiert):</p>';
+      html += '<div class="code-digits">';
+      shuffledHs.forEach(hs => {
+        const solved = isHotspotSolved(hs, progress);
+        html += '<div class="code-digit' + (solved ? ' revealed' : '') + '">' +
+          (solved ? esc(hs.codeDigit || '?') : '?') + '</div>';
+      });
+      html += '</div></div>';
+
+      html += '</div></div>';
+
+      const overlay = document.getElementById('puzzle-card-overlay');
+      overlay.innerHTML = html;
+      overlay.classList.remove('hidden');
+    };
+
+    window.hidePuzzleCard = function() {
+      document.getElementById('puzzle-card-overlay').classList.add('hidden');
+    };
 
     // ══════════════════════════════════════════════════════
     // PLAYER: Code Reveal & Unlock
@@ -1137,6 +1730,9 @@
         const d = document.createElement('div');
         d.className = 'code-digit';
         d.textContent = q.codeDigit;
+        d.style.cursor = 'pointer';
+        d.title = 'Klicke für Details';
+        d.onclick = function() { showSolvedQuestionInfo(q); };
         digitsEl.appendChild(d);
         setTimeout(() => {
           d.classList.add('revealed');
@@ -1147,67 +1743,173 @@
       showView('view-code-reveal');
     }
 
-    window.goToUnlock = function() {
+    function showSolvedQuestionInfo(q) {
+      const modal = document.getElementById('hotspot-modal');
+      document.getElementById('hotspot-modal-body').innerHTML =
+        '<h3 style="color:var(--success);font-family:\'Cinzel\',serif;margin-bottom:12px;">✅ Gelöste Frage</h3>' +
+        '<div style="text-align:left;">' +
+          '<p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:8px;">' + esc(q.text) + '</p>' +
+          '<p style="color:var(--gold);font-weight:600;font-size:1.05rem;">→ ' + esc(q.correctAnswer) + '</p>' +
+        '</div>' +
+        (q.codeDigit ? '<p style="color:var(--text-secondary);margin-top:12px;">Code-Ziffer: <strong style="color:var(--gold);font-size:1.3rem;">' + esc(q.codeDigit) + '</strong></p>' : '') +
+        '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
+      modal.classList.remove('hidden');
+    }
+
+    // ── Padlock / Digital Lock ──
+    let currentLockType = 'padlock'; // 'padlock' or 'digital'
+
+    function goToPadlock() {
       const room = currentGame.rooms[currentRoomIdx];
-      document.getElementById('unlock-title').textContent = 'Code für: ' + room.name;
-      const inputsEl = document.getElementById('unlock-inputs');
-      inputsEl.innerHTML = '';
-      const codeLen = room.unlockCode.length;
-      for (let i = 0; i < codeLen; i++) {
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.maxLength = 1;
-        inp.className = 'code-input-field';
-        inp.inputMode = 'numeric';
-        inp.dataset.idx = i;
-        inp.oninput = function() {
-          if (this.value && i < codeLen - 1) {
-            this.nextElementSibling && this.nextElementSibling.focus();
-          }
-        };
-        inp.onkeydown = function(e) {
-          if (e.key === 'Backspace' && !this.value && i > 0) {
-            this.previousElementSibling && this.previousElementSibling.focus();
-          }
-        };
-        inputsEl.appendChild(inp);
+      document.getElementById('unlock-title').textContent = room.name;
+      // Auto-detect lock type: 5+ digits → digital, otherwise padlock (can be overridden by room.lockType)
+      if (room.lockType) {
+        currentLockType = room.lockType;
+      } else {
+        currentLockType = (room.unlockCode && room.unlockCode.length >= 5) ? 'digital' : 'padlock';
       }
-      inputsEl.children[0].focus();
+
+      // Determine if this is explorer mode (no code shown) or linear mode
+      const backBtns = document.getElementById('unlock-back-btns');
+      if (explorerMode) {
+        document.getElementById('unlock-hint-text').textContent = 'Stelle den Code ein, den du auf der Rätselkarte gesammelt hast.';
+        backBtns.innerHTML = '<button class="btn-ghost" onclick="showView(\'view-room-explorer\');document.getElementById(\'puzzle-card-btn\').style.display=\'block\';">← Zurück zum Raum</button>';
+      } else {
+        document.getElementById('unlock-hint-text').textContent = 'Gib den Code ein, um die Tür zu öffnen.';
+        backBtns.innerHTML = '<button class="btn-ghost" onclick="showView(\'view-code-reveal\')">← Zurück zum Code</button>';
+      }
+
+      const codeLen = room.unlockCode.length;
+      padlockDigits = new Array(codeLen).fill(0);
+
+      const padlockEl = document.getElementById('padlock');
+      const digitalEl = document.getElementById('digital-lock');
+
+      if (currentLockType === 'digital') {
+        // Digital lock mode
+        padlockEl.classList.add('hidden');
+        digitalEl.classList.remove('hidden');
+        digitalEl.classList.remove('unlocked', 'wrong');
+        const display = document.getElementById('digital-lock-display');
+        display.innerHTML = '';
+        for (let i = 0; i < codeLen; i++) {
+          display.innerHTML += '<div class="digital-lock-char" id="digi-char-' + i + '">_</div>';
+        }
+        digitalDigitPos = 0;
+        padlockDigits = new Array(codeLen).fill(-1);
+      } else {
+        // Padlock mode
+        digitalEl.classList.add('hidden');
+        padlockEl.classList.remove('hidden');
+        padlockEl.classList.remove('unlocked', 'wrong');
+        const wheelsEl = document.getElementById('padlock-wheels');
+        wheelsEl.innerHTML = '';
+        for (let i = 0; i < codeLen; i++) {
+          const wheel = document.createElement('div');
+          wheel.className = 'padlock-wheel';
+          wheel.innerHTML =
+            '<div class="padlock-arrow" onclick="padlockSpin(' + i + ',1)">▲</div>' +
+            '<div class="padlock-digit" id="pad-digit-' + i + '">0</div>' +
+            '<div class="padlock-arrow" onclick="padlockSpin(' + i + ',-1)">▼</div>';
+          wheelsEl.appendChild(wheel);
+        }
+      }
+
       document.getElementById('unlock-error').classList.add('hidden');
       showView('view-room-unlock');
+    }
+
+    window.goToUnlock = function() {
+      goToPadlock();
     };
 
-    window.checkUnlockCode = function() {
+    // Padlock wheel spin
+    window.padlockSpin = function(idx, dir) {
+      padlockDigits[idx] = (padlockDigits[idx] + dir + 10) % 10;
+      document.getElementById('pad-digit-' + idx).textContent = padlockDigits[idx];
+      document.getElementById('padlock').classList.remove('wrong');
+    };
+
+    // Digital lock keypad
+    let digitalDigitPos = 0;
+    window.digitalKeyPress = function(key) {
       const room = currentGame.rooms[currentRoomIdx];
-      const inputs = document.getElementById('unlock-inputs').querySelectorAll('input');
-      let code = '';
-      inputs.forEach(inp => code += inp.value);
+      const codeLen = room.unlockCode.length;
+      const lockEl = document.getElementById('digital-lock');
+      lockEl.classList.remove('wrong');
+
+      if (key === 'del') {
+        if (digitalDigitPos > 0) {
+          digitalDigitPos--;
+          padlockDigits[digitalDigitPos] = -1;
+          const ch = document.getElementById('digi-char-' + digitalDigitPos);
+          ch.textContent = '_';
+          ch.classList.remove('filled');
+          ch.classList.add('active');
+          // Remove active from next
+          if (digitalDigitPos + 1 < codeLen) {
+            document.getElementById('digi-char-' + (digitalDigitPos + 1)).classList.remove('active');
+          }
+        }
+      } else if (digitalDigitPos < codeLen) {
+        padlockDigits[digitalDigitPos] = parseInt(key);
+        const ch = document.getElementById('digi-char-' + digitalDigitPos);
+        ch.textContent = key;
+        ch.classList.remove('active');
+        ch.classList.add('filled');
+        digitalDigitPos++;
+        if (digitalDigitPos < codeLen) {
+          document.getElementById('digi-char-' + digitalDigitPos).classList.add('active');
+        }
+      }
+    };
+
+    // Check code (works for both lock types)
+    window.checkPadlockCode = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const code = padlockDigits.join('');
+      const isDigital = currentLockType === 'digital';
+      const lockEl = document.getElementById(isDigital ? 'digital-lock' : 'padlock');
 
       if (code === room.unlockCode) {
+        lockEl.classList.add('unlocked');
+        document.getElementById('puzzle-card-btn').style.display = 'none';
+
         // Mark room completed
         if (!currentTeam.completedRooms.includes(currentRoomIdx)) {
           currentTeam.completedRooms.push(currentRoomIdx);
         }
         saveTeamState();
 
-        // Next room or game complete
-        const nextIdx = currentRoomIdx + 1;
-        if (nextIdx >= currentGame.rooms.length) {
-          stopTimer();
-          showGameComplete();
-        } else if (currentGame.game.mode === 'single') {
-          renderRoomSelect();
-          showView('view-room-select');
-        } else {
-          enterRoom(nextIdx);
-        }
+        setTimeout(() => {
+          // Next room or game complete
+          const nextIdx = currentRoomIdx + 1;
+          if (nextIdx >= currentGame.rooms.length) {
+            stopTimer();
+            showGameComplete();
+          } else if (currentGame.game.mode === 'single') {
+            renderRoomSelect();
+            showView('view-room-select');
+          } else {
+            enterRoom(nextIdx);
+          }
+        }, 1200);
       } else {
-        // Wrong code
+        lockEl.classList.add('wrong');
         const errEl = document.getElementById('unlock-error');
         errEl.textContent = 'Falscher Code! Versuche es erneut.';
         errEl.classList.remove('hidden');
-        document.getElementById('unlock-inputs').classList.add('shake');
-        setTimeout(() => document.getElementById('unlock-inputs').classList.remove('shake'), 400);
+        setTimeout(() => lockEl.classList.remove('wrong'), 500);
+        // Reset digital lock
+        if (isDigital) {
+          digitalDigitPos = 0;
+          padlockDigits = new Array(room.unlockCode.length).fill(-1);
+          for (let i = 0; i < room.unlockCode.length; i++) {
+            const ch = document.getElementById('digi-char-' + i);
+            ch.textContent = '_'; ch.classList.remove('filled', 'active');
+          }
+          document.getElementById('digi-char-0').classList.add('active');
+        }
       }
     };
 
@@ -1331,13 +2033,13 @@
     // ══════════════════════════════════════════════════════
     function playDoorAnimation(callback) {
       const overlay = document.getElementById('door-overlay');
-      overlay.classList.remove('hidden', 'open');
-      overlay.style.display = 'flex';
-
+      // Remove hidden and open, then force repaint before adding open
+      overlay.classList.remove('hidden');
+      overlay.classList.remove('open');
+      overlay.offsetHeight; // force repaint
       setTimeout(() => {
         overlay.classList.add('open');
         setTimeout(() => {
-          overlay.style.display = 'none';
           overlay.classList.add('hidden');
           overlay.classList.remove('open');
           if (callback) callback();
@@ -1479,6 +2181,244 @@
       event.target.value = '';
     };
 
+    // ── MD Import ──
+    window.importMDFile = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const game = parseEscapeRoomMD(e.target.result);
+          game.id = 'game_' + Date.now();
+          library.push(game);
+          saveLibrary();
+          renderAdminLibrary();
+          showAdminStatus('MD importiert: ' + game.game.title + ' (' + game.rooms.length + ' Räume)', 'success');
+        } catch(err) {
+          showAdminStatus('MD-Fehler: ' + err.message, 'danger');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    };
+
+    function parseEscapeRoomMD(md) {
+      const lines = md.split('\n');
+      const game = {
+        id: '', game: { title: 'Import', description: '', totalTimer: 2400, mode: 'chain' },
+        rooms: []
+      };
+      let currentRoom = null;
+      let currentQuestion = null;
+      let section = 'game'; // 'game' | 'room' | 'hotspots' | 'fragen'
+      let questionCounter = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // H1: Game title
+        if (trimmed.startsWith('# ') && !trimmed.startsWith('## ')) {
+          game.game.title = trimmed.substring(2).trim();
+          section = 'game';
+          continue;
+        }
+
+        // H2: Room
+        if (trimmed.startsWith('## ') && !trimmed.startsWith('### ')) {
+          finishQuestion();
+          currentRoom = {
+            id: 'room_' + Date.now() + '_' + game.rooms.length,
+            name: trimmed.substring(3).trim(),
+            subject: '', description: '', backgroundImage: '',
+            unlockCode: '', lockType: 'padlock', puzzleCard: { type: 'text', content: '' },
+            hotspots: [], questions: []
+          };
+          game.rooms.push(currentRoom);
+          section = 'room';
+          questionCounter = 0;
+          continue;
+        }
+
+        // H3: Section headers
+        if (trimmed.startsWith('### ')) {
+          finishQuestion();
+          const h3 = trimmed.substring(4).trim().toLowerCase();
+          if (h3 === 'hotspots') { section = 'hotspots'; continue; }
+          if (h3 === 'fragen' || h3 === 'questions') { section = 'fragen'; continue; }
+
+          // H3 as question header: ### F1, ### F1: mc, ### Frage 1, etc.
+          if (currentRoom && (section === 'fragen' || section === 'room' || section === 'hotspots')) {
+            section = 'fragen';
+            const qMatch = h3.match(/^f(?:rage)?\s*(\d+)\s*(?::\s*(.+))?$/i) || h3.match(/^q(?:uestion)?\s*(\d+)\s*(?::\s*(.+))?$/i);
+            questionCounter++;
+            currentQuestion = {
+              id: 'q' + questionCounter,
+              type: 'multiple_choice',
+              text: '', options: [], correctAnswer: '',
+              caseSensitive: false, hint: '', codeDigit: ''
+            };
+            if (qMatch && qMatch[2]) {
+              const typeHint = qMatch[2].trim().toLowerCase();
+              if (typeHint === 'mc' || typeHint === 'multiple_choice') currentQuestion.type = 'multiple_choice';
+              else if (typeHint === 'text' || typeHint === 'text_input' || typeHint === 'offen') currentQuestion.type = 'text_input';
+              else if (typeHint === 'zahl' || typeHint === 'number' || typeHint === 'number_code') currentQuestion.type = 'number_code';
+            }
+            currentRoom.questions.push(currentQuestion);
+            continue;
+          }
+          continue;
+        }
+
+        // Key-value lines (- key: value)
+        const kvMatch = trimmed.match(/^-\s+(.+?):\s+(.+)$/);
+        if (kvMatch) {
+          const key = kvMatch[1].trim().toLowerCase();
+          const val = kvMatch[2].trim();
+
+          // Game-level properties
+          if (section === 'game' && !currentRoom) {
+            if (key === 'timer') game.game.totalTimer = parseInt(val) * 60 || 2400;
+            else if (key === 'modus' || key === 'mode') game.game.mode = (val === 'einzeln' || val === 'single') ? 'single' : 'chain';
+            else if (key === 'beschreibung' || key === 'description') game.game.description = val;
+            continue;
+          }
+
+          // Room-level properties
+          if (section === 'room' && currentRoom && !currentQuestion) {
+            if (key === 'fach' || key === 'subject') currentRoom.subject = val;
+            else if (key === 'beschreibung' || key === 'description') currentRoom.description = val;
+            else if (key === 'code' || key === 'unlock' || key === 'unlockcode') currentRoom.unlockCode = val;
+            else if (key === 'schloss' || key === 'locktype' || key === 'lock') {
+              var lt = val.toLowerCase();
+              currentRoom.lockType = (lt === 'digital' || lt === 'eingabe' || lt === 'keypad' || lt === 'pin') ? 'digital' : 'padlock';
+            }
+            else if (key === 'bild' || key === 'hintergrundbild' || key === 'backgroundimage' || key === 'image') currentRoom.backgroundImage = val;
+            else if (key === 'rätselkarte' || key === 'puzzlecard' || key === 'rätselkarte-text') {
+              currentRoom.puzzleCard = { type: 'text', content: val };
+            }
+            else if (key === 'rätselkarte-bild' || key === 'puzzlecard-image') {
+              currentRoom.puzzleCard = { type: 'image', content: val };
+            }
+            continue;
+          }
+
+          // Question-level properties
+          if (currentQuestion) {
+            if (key === 'typ' || key === 'type') {
+              const t = val.toLowerCase();
+              if (t === 'mc' || t === 'multiple_choice') currentQuestion.type = 'multiple_choice';
+              else if (t === 'text' || t === 'text_input' || t === 'offen' || t === 'open') currentQuestion.type = 'text_input';
+              else if (t === 'zahl' || t === 'number' || t === 'number_code') currentQuestion.type = 'number_code';
+            }
+            else if (key === 'frage' || key === 'q' || key === 'question' || key === 'text') currentQuestion.text = val;
+            else if (key === 'antwort' || key === 'a' || key === 'answer' || key === 'correct') currentQuestion.correctAnswer = val;
+            else if (key === 'optionen' || key === 'o' || key === 'options') {
+              currentQuestion.options = val.split('|').map(s => s.trim());
+              currentQuestion.type = 'multiple_choice';
+            }
+            else if (key === 'hinweis' || key === 'hint') currentQuestion.hint = val;
+            else if (key === 'ziffer' || key === 'digit' || key === 'code' || key === 'codedigit') currentQuestion.codeDigit = val;
+            else if (key === 'case' || key === 'casesensitive') currentQuestion.caseSensitive = val === 'true' || val === 'ja';
+            continue;
+          }
+        }
+
+        // Hotspot lines: - icon | label | x | y | codeDigit | questionIds  OR  - icon | label | x | y (exit)
+        if (section === 'hotspots' && currentRoom && trimmed.startsWith('-')) {
+          const parts = trimmed.substring(1).trim().split('|').map(s => s.trim());
+          if (parts.length >= 4) {
+            const icon = parts[0] || '🔍';
+            const label = parts[1] || '';
+            const x = parseFloat(parts[2]) || 50;
+            const y = parseFloat(parts[3]) || 50;
+            const isExit = icon === '🚪' || label.toLowerCase() === 'ausgang' || label.toLowerCase() === 'exit' || label.toLowerCase() === 'tür';
+
+            const hs = {
+              id: 'hs_' + Date.now() + '_' + currentRoom.hotspots.length,
+              x: x, y: y, icon: icon, label: label,
+              type: isExit ? 'exit' : 'puzzle',
+              codeDigit: '', questionIds: []
+            };
+            if (!isExit && parts.length >= 5) hs.codeDigit = parts[4];
+            if (!isExit && parts.length >= 6) {
+              hs.questionIds = parts[5].split(',').map(s => 'q' + s.trim());
+            }
+            currentRoom.hotspots.push(hs);
+          }
+          continue;
+        }
+
+        // Inline question format: - typ | frage | optionen/antwort | antwort | hinweis | ziffer
+        if (section === 'fragen' && currentRoom && trimmed.startsWith('-') && trimmed.includes('|') && !currentQuestion) {
+          finishQuestion();
+          const parts = trimmed.substring(1).trim().split('|').map(s => s.trim());
+          if (parts.length >= 3) {
+            questionCounter++;
+            const typ = parts[0].toLowerCase();
+            const q = { id: 'q' + questionCounter, text: parts[1], options: [], correctAnswer: '',
+              caseSensitive: false, hint: '', codeDigit: '' };
+
+            if (typ === 'mc' || typ === 'multiple_choice') {
+              q.type = 'multiple_choice';
+              // mc | frage | opt1 | opt2 | opt3 | opt4 | antwort | hinweis | ziffer
+              if (parts.length >= 7) {
+                q.options = parts.slice(2, 6);
+                q.correctAnswer = parts[6];
+                if (parts[7]) q.hint = parts[7];
+                if (parts[8]) q.codeDigit = parts[8];
+              }
+            } else if (typ === 'text' || typ === 'offen' || typ === 'open' || typ === 'text_input') {
+              q.type = 'text_input';
+              q.correctAnswer = parts[2] || '';
+              if (parts[3]) q.hint = parts[3];
+              if (parts[4]) q.codeDigit = parts[4];
+            } else if (typ === 'zahl' || typ === 'number' || typ === 'number_code') {
+              q.type = 'number_code';
+              q.correctAnswer = parts[2] || '';
+              if (parts[3]) q.hint = parts[3];
+              if (parts[4]) q.codeDigit = parts[4];
+            }
+            currentRoom.questions.push(q);
+          }
+          continue;
+        }
+
+        // Question text line (no key prefix, inside a question block)
+        if (currentQuestion && !currentQuestion.text && !trimmed.startsWith('-')) {
+          currentQuestion.text = trimmed;
+        }
+      }
+
+      finishQuestion();
+
+      // Auto-generate unlock codes if missing
+      game.rooms.forEach(room => {
+        if (!room.unlockCode) {
+          // Priority: hotspot digits > question digits > random
+          const puzzleHs = (room.hotspots || []).filter(h => h.type === 'puzzle' && h.codeDigit);
+          if (puzzleHs.length > 0) {
+            room.unlockCode = puzzleHs.map(h => h.codeDigit).join('');
+          } else {
+            const digits = room.questions.map(q => q.codeDigit).filter(d => d);
+            room.unlockCode = digits.length > 0 ? digits.join('') : String(Math.floor(1000 + Math.random() * 9000));
+          }
+        }
+        // Ensure question options exist for MC
+        room.questions.forEach(q => {
+          if (q.type === 'multiple_choice' && q.options.length === 0) {
+            q.options = ['', '', '', ''];
+          }
+        });
+      });
+
+      if (game.rooms.length === 0) throw new Error('Keine Räume gefunden. Verwende ## für Raum-Überschriften.');
+      return game;
+
+      function finishQuestion() { currentQuestion = null; }
+    }
+
     // ══════════════════════════════════════════════════════
     // ADMIN: Editor
     // ══════════════════════════════════════════════════════
@@ -1548,14 +2488,20 @@
       list.innerHTML = '';
 
       editingGame.rooms.forEach((room, rIdx) => {
+        if (!room.hotspots) room.hotspots = [];
+        if (!room.puzzleCard) room.puzzleCard = { type: 'text', content: '' };
+
         const el = document.createElement('div');
         el.className = 'room-editor';
         el.dataset.roomIdx = rIdx;
 
+        const hsCount = room.hotspots.length;
+        const hasExplorer = !!(room.backgroundImage && hsCount > 0);
+
         el.innerHTML =
           '<div class="room-editor-header" onclick="toggleRoomEditor(this)">' +
             '<span class="room-title">🚪 ' + esc(room.name || 'Unbenannter Raum') + '</span>' +
-            '<span style="font-size:0.8rem;color:#999;">' + room.questions.length + ' Fragen</span>' +
+            '<span style="font-size:0.8rem;color:#999;">' + room.questions.length + ' Fragen' + (hasExplorer ? ' · ' + hsCount + ' Hotspots' : '') + '</span>' +
             '<div style="margin-left:auto;display:flex;gap:4px;">' +
               (rIdx > 0 ? '<button class="admin-btn sm" onclick="event.stopPropagation();moveRoom(' + rIdx + ',-1)">↑</button>' : '') +
               (rIdx < editingGame.rooms.length - 1 ? '<button class="admin-btn sm" onclick="event.stopPropagation();moveRoom(' + rIdx + ',1)">↓</button>' : '') +
@@ -1570,10 +2516,62 @@
             '<input type="text" class="admin-input room-field" data-field="subject" value="' + escAttr(room.subject || '') + '">' +
             '<label class="admin-label">Narrativer Text</label>' +
             '<textarea class="admin-textarea room-field" data-field="description">' + esc(room.description || '') + '</textarea>' +
-            '<label class="admin-label">Hintergrundbild URL (optional)</label>' +
-            '<input type="text" class="admin-input room-field" data-field="backgroundImage" value="' + escAttr(room.backgroundImage || '') + '">' +
-            '<label class="admin-label">Unlock-Code (4-stellig)</label>' +
-            '<input type="text" class="admin-input room-field" data-field="unlockCode" value="' + escAttr(room.unlockCode || '') + '" maxlength="8" style="max-width:120px;">' +
+
+            // Background image
+            '<label class="admin-label">Hintergrundbild (URL oder Datei)</label>' +
+            '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+              '<input type="text" class="admin-input room-field" data-field="backgroundImage" value="' + escAttr(room.backgroundImage || '') + '" placeholder="URL oder Bild hochladen" style="flex:1;min-width:200px;" onchange="updateHotspotPreview(' + rIdx + ')">' +
+              '<label class="admin-btn sm" style="cursor:pointer;">📷 Datei<input type="file" accept="image/*" style="display:none" onchange="handleRoomImgUpload(event,' + rIdx + ')"></label>' +
+            '</div>' +
+
+            // Unlock code + lock type
+            '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">' +
+              '<div>' +
+                '<label class="admin-label">Unlock-Code</label>' +
+                '<input type="text" class="admin-input room-field" data-field="unlockCode" value="' + escAttr(room.unlockCode || '') + '" maxlength="8" style="max-width:120px;">' +
+              '</div>' +
+              '<div>' +
+                '<label class="admin-label">Schloss-Typ</label>' +
+                '<select class="admin-input room-field" data-field="lockType" style="max-width:180px;">' +
+                  '<option value="padlock"' + ((room.lockType || 'padlock') === 'padlock' ? ' selected' : '') + '>🔒 Zahlenschloss</option>' +
+                  '<option value="digital"' + (room.lockType === 'digital' ? ' selected' : '') + '>🔢 Digitales Eingabefeld</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+
+            // Puzzle Card
+            '<div style="margin-top:16px;padding:12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:8px;">' +
+              '<h4 style="margin-bottom:8px;">🗺 Rätselkarte <span style="font-size:0.75rem;color:#999;font-weight:normal;">(optional — wird nur im Explorer-Modus angezeigt)</span></h4>' +
+              '<label class="admin-label" style="margin-top:0;">Typ</label>' +
+              '<select class="admin-input pc-type" data-ridx="' + rIdx + '" style="max-width:200px;" onchange="updatePuzzleCardEditor(' + rIdx + ')">' +
+                '<option value="text"' + (room.puzzleCard.type === 'text' ? ' selected' : '') + '>Text</option>' +
+                '<option value="image"' + (room.puzzleCard.type === 'image' ? ' selected' : '') + '>Bild (URL)</option>' +
+              '</select>' +
+              '<div id="pc-content-' + rIdx + '">' +
+                (room.puzzleCard.type === 'image'
+                  ? '<label class="admin-label">Bild-URL</label><input type="text" class="admin-input pc-content" value="' + escAttr(room.puzzleCard.content || '') + '" placeholder="URL der Rätselkarte">'
+                  : '<label class="admin-label">Text</label><textarea class="admin-textarea pc-content" rows="3" placeholder="Beschreibung, Hinweise zur Reihenfolge...">' + esc(room.puzzleCard.content || '') + '</textarea>'
+                ) +
+              '</div>' +
+            '</div>' +
+
+            // Hotspot Editor
+            '<div style="margin-top:16px;padding:12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:8px;">' +
+              '<h4 style="margin-bottom:8px;">📍 Hotspots <span style="font-size:0.75rem;color:#999;font-weight:normal;">(Klick auf Vorschau zum Platzieren)</span></h4>' +
+              '<div class="hotspot-preview" id="hs-preview-' + rIdx + '" onclick="placeHotspot(event,' + rIdx + ')">' +
+                (room.backgroundImage
+                  ? '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false">'
+                  : '<div class="hotspot-preview-empty">Kein Hintergrundbild — bitte zuerst eines setzen</div>'
+                ) +
+              '</div>' +
+              '<div id="hs-list-' + rIdx + '"></div>' +
+              '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' +
+                '<button class="admin-btn sm" onclick="addHotspotManual(' + rIdx + ',\'puzzle\')">+ Rätsel-Hotspot</button>' +
+                '<button class="admin-btn sm" onclick="addHotspotManual(' + rIdx + ',\'exit\')">+ Ausgang-Hotspot</button>' +
+              '</div>' +
+            '</div>' +
+
+            // Questions
             '<div style="margin-top:16px;">' +
               '<h4 style="margin-bottom:8px;">Fragen</h4>' +
               '<div id="questions-list-' + rIdx + '"></div>' +
@@ -1582,9 +2580,9 @@
           '</div>';
 
         list.appendChild(el);
-
-        // Render questions for this room
         renderQuestionsList(rIdx);
+        renderHotspotList(rIdx);
+        renderHotspotMarkers(rIdx);
       });
     }
 
@@ -1601,6 +2599,9 @@
         description: '',
         backgroundImage: '',
         unlockCode: String(Math.floor(1000 + Math.random() * 9000)),
+        lockType: 'padlock',
+        puzzleCard: { type: 'text', content: '' },
+        hotspots: [],
         questions: []
       });
       renderRoomsList();
@@ -1639,6 +2640,29 @@
         el.querySelectorAll('.room-field').forEach(field => {
           const f = field.dataset.field;
           if (f) room[f] = field.value;
+        });
+
+        // Sync puzzle card
+        const pcType = el.querySelector('.pc-type');
+        const pcContent = el.querySelector('.pc-content');
+        if (pcType && pcContent) {
+          if (!room.puzzleCard) room.puzzleCard = { type: 'text', content: '' };
+          room.puzzleCard.type = pcType.value;
+          room.puzzleCard.content = pcContent.value;
+        }
+
+        // Sync hotspot config fields
+        el.querySelectorAll('.hs-config').forEach((hsEl, hsIdx) => {
+          if (!room.hotspots || !room.hotspots[hsIdx]) return;
+          const hs = room.hotspots[hsIdx];
+          const labelInp = hsEl.querySelector('.hs-label');
+          const iconInp = hsEl.querySelector('.hs-icon');
+          const digitInp = hsEl.querySelector('.hs-digit');
+          const qidsEl = hsEl.querySelectorAll('.hs-qid:checked');
+          if (labelInp) hs.label = labelInp.value;
+          if (iconInp) hs.icon = iconInp.value;
+          if (digitInp) hs.codeDigit = digitInp.value;
+          hs.questionIds = Array.from(qidsEl).map(c => c.value);
         });
 
         // Sync questions
@@ -1772,6 +2796,205 @@
         q.options = ['', '', '', ''];
       }
       renderQuestionsList(rIdx);
+    };
+
+    // ══════════════════════════════════════════════════════
+    // ADMIN: Hotspot Editor
+    // ══════════════════════════════════════════════════════
+    function renderHotspotList(rIdx) {
+      const room = editingGame.rooms[rIdx];
+      const listEl = document.getElementById('hs-list-' + rIdx);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      (room.hotspots || []).forEach((hs, hsIdx) => {
+        const isExit = hs.type === 'exit';
+        const div = document.createElement('div');
+        div.className = 'hs-config';
+        let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+          '<strong style="font-size:0.85rem;">' + (isExit ? '🚪 Ausgang' : '🔍 Rätsel ' + (hsIdx + 1)) + '</strong>' +
+          '<span style="font-size:0.75rem;color:#999;">(' + Math.round(hs.x) + '%, ' + Math.round(hs.y) + '%)</span>' +
+          '<div style="margin-left:auto;">' +
+            '<button class="admin-btn sm danger" onclick="deleteHotspot(' + rIdx + ',' + hsIdx + ')">✗</button>' +
+          '</div></div>';
+
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">';
+        html += '<div><label class="admin-label" style="margin-top:0;">Label</label>' +
+          '<input type="text" class="admin-input hs-label" value="' + escAttr(hs.label || '') + '" placeholder="z.B. Notizen" style="width:150px;"></div>';
+
+        if (!isExit) {
+          html += '<div><label class="admin-label" style="margin-top:0;">Icon</label>' +
+            '<select class="admin-input hs-icon" style="width:80px;">' +
+              '<option value="🔍"' + (hs.icon === '🔍' ? ' selected' : '') + '>🔍</option>' +
+              '<option value="📖"' + (hs.icon === '📖' ? ' selected' : '') + '>📖</option>' +
+              '<option value="🔑"' + (hs.icon === '🔑' ? ' selected' : '') + '>🔑</option>' +
+              '<option value="🧪"' + (hs.icon === '🧪' ? ' selected' : '') + '>🧪</option>' +
+              '<option value="🧩"' + (hs.icon === '🧩' ? ' selected' : '') + '>🧩</option>' +
+              '<option value="💡"' + (hs.icon === '💡' ? ' selected' : '') + '>💡</option>' +
+            '</select></div>';
+          html += '<div><label class="admin-label" style="margin-top:0;">Code-Ziffer</label>' +
+            '<input type="text" class="admin-input hs-digit" value="' + escAttr(hs.codeDigit || '') + '" maxlength="1" style="width:45px;text-align:center;"></div>';
+        }
+        html += '</div>';
+
+        // Question assignment (only for puzzle hotspots)
+        if (!isExit && room.questions.length > 0) {
+          html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Zugeordnete Fragen</label>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+          room.questions.forEach((q, qi) => {
+            const checked = (hs.questionIds || []).includes(q.id) ? ' checked' : '';
+            html += '<label style="display:flex;align-items:center;gap:3px;font-size:0.8rem;cursor:pointer;">' +
+              '<input type="checkbox" class="hs-qid" value="' + escAttr(q.id) + '"' + checked + '>' +
+              'F' + (qi + 1) + (q.text ? ' (' + esc(q.text.substring(0, 20)) + '…)' : '') +
+            '</label>';
+          });
+          html += '</div></div>';
+        }
+
+        div.innerHTML = html;
+        listEl.appendChild(div);
+      });
+    }
+
+    function renderHotspotMarkers(rIdx) {
+      const room = editingGame.rooms[rIdx];
+      const preview = document.getElementById('hs-preview-' + rIdx);
+      if (!preview) return;
+      // Remove existing markers
+      preview.querySelectorAll('.hotspot-marker').forEach(m => m.remove());
+
+      (room.hotspots || []).forEach((hs, hsIdx) => {
+        const marker = document.createElement('div');
+        marker.className = 'hotspot-marker' + (hs.type === 'exit' ? ' exit-marker' : '');
+        marker.style.left = hs.x + '%';
+        marker.style.top = hs.y + '%';
+        marker.textContent = hs.type === 'exit' ? '🚪' : (hsIdx + 1);
+        marker.title = hs.label || (hs.type === 'exit' ? 'Ausgang' : 'Rätsel ' + (hsIdx + 1));
+
+        // Drag support
+        marker.onmousedown = function(e) {
+          e.stopPropagation();
+          e.preventDefault();
+          const rect = preview.getBoundingClientRect();
+          function onMove(ev) {
+            const x = Math.max(0, Math.min(100, (ev.clientX - rect.left) / rect.width * 100));
+            const y = Math.max(0, Math.min(100, (ev.clientY - rect.top) / rect.height * 100));
+            marker.style.left = x + '%';
+            marker.style.top = y + '%';
+            hs.x = Math.round(x * 10) / 10;
+            hs.y = Math.round(y * 10) / 10;
+          }
+          function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            renderHotspotList(rIdx);
+          }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        };
+
+        preview.appendChild(marker);
+      });
+    }
+
+    window.placeHotspot = function(event, rIdx) {
+      // Only place if clicking directly on image/preview (not on a marker)
+      if (event.target.classList.contains('hotspot-marker')) return;
+      const preview = document.getElementById('hs-preview-' + rIdx);
+      const rect = preview.getBoundingClientRect();
+      const x = Math.round((event.clientX - rect.left) / rect.width * 1000) / 10;
+      const y = Math.round((event.clientY - rect.top) / rect.height * 1000) / 10;
+
+      syncRoomsFromDOM();
+      const room = editingGame.rooms[rIdx];
+      if (!room.hotspots) room.hotspots = [];
+      room.hotspots.push({
+        id: 'hs_' + Date.now(),
+        x: x, y: y,
+        icon: '🔍',
+        label: '',
+        questionIds: [],
+        codeDigit: '',
+        type: 'puzzle'
+      });
+      renderHotspotList(rIdx);
+      renderHotspotMarkers(rIdx);
+    };
+
+    window.addHotspotManual = function(rIdx, type) {
+      syncRoomsFromDOM();
+      const room = editingGame.rooms[rIdx];
+      if (!room.hotspots) room.hotspots = [];
+      room.hotspots.push({
+        id: 'hs_' + Date.now(),
+        x: 50, y: 50,
+        icon: type === 'exit' ? '🚪' : '🔍',
+        label: type === 'exit' ? 'Ausgang' : '',
+        questionIds: [],
+        codeDigit: '',
+        type: type
+      });
+      renderHotspotList(rIdx);
+      renderHotspotMarkers(rIdx);
+    };
+
+    window.deleteHotspot = function(rIdx, hsIdx) {
+      syncRoomsFromDOM();
+      editingGame.rooms[rIdx].hotspots.splice(hsIdx, 1);
+      renderHotspotList(rIdx);
+      renderHotspotMarkers(rIdx);
+    };
+
+    window.updateHotspotPreview = function(rIdx) {
+      const room = editingGame.rooms[rIdx];
+      const imgField = document.querySelector('#room-body-' + rIdx + ' [data-field="backgroundImage"]');
+      if (imgField) room.backgroundImage = imgField.value;
+      const preview = document.getElementById('hs-preview-' + rIdx);
+      if (!preview) return;
+      if (room.backgroundImage) {
+        preview.innerHTML = '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false">';
+      } else {
+        preview.innerHTML = '<div class="hotspot-preview-empty">Kein Hintergrundbild</div>';
+      }
+      renderHotspotMarkers(rIdx);
+    };
+
+    window.handleRoomImgUpload = function(event, rIdx) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        // Resize to max 1200px to save localStorage space
+        const img = new Image();
+        img.onload = function() {
+          const maxW = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          const field = document.querySelector('#room-body-' + rIdx + ' [data-field="backgroundImage"]');
+          if (field) field.value = dataUrl;
+          editingGame.rooms[rIdx].backgroundImage = dataUrl;
+          updateHotspotPreview(rIdx);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.updatePuzzleCardEditor = function(rIdx) {
+      const room = editingGame.rooms[rIdx];
+      const typeSelect = document.querySelector('#room-body-' + rIdx + ' .pc-type');
+      const contentDiv = document.getElementById('pc-content-' + rIdx);
+      if (!typeSelect || !contentDiv) return;
+      const type = typeSelect.value;
+      if (type === 'image') {
+        contentDiv.innerHTML = '<label class="admin-label">Bild-URL</label><input type="text" class="admin-input pc-content" value="' + escAttr(room.puzzleCard?.content || '') + '" placeholder="URL der Rätselkarte">';
+      } else {
+        contentDiv.innerHTML = '<label class="admin-label">Text</label><textarea class="admin-textarea pc-content" rows="3" placeholder="Beschreibung, Hinweise zur Reihenfolge...">' + esc(room.puzzleCard?.content || '') + '</textarea>';
+      }
     };
 
     // ══════════════════════════════════════════════════════
@@ -1967,6 +3190,19 @@
 
     function escAttr(str) {
       return esc(str).replace(/"/g, '&quot;');
+    }
+
+    // ══════════════════════════════════════════════════════
+    // INIT
+    // ══════════════════════════════════════════════════════
+    loadLibrary();
+
+    if (isAdmin) {
+      document.body.classList.add('admin-mode');
+      showAdminView('admin-library');
+    } else {
+      document.body.classList.add('player-mode');
+      showView('view-game-select');
     }
 
   })();

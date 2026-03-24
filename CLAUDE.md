@@ -8,10 +8,12 @@ Interaktive Unterrichtsspiele für Klassenzimmer / digitale Tafel. Kein Build-Sy
 
 ```
 Spiele/
-  spiele.html                   ← Spielübersicht (Startseite) — Light/Dark Mode
+  spiele.html                   ← Spielübersicht (Startseite) — Light/Dark Mode + Fragendatenbank-Button
   api.php                       ← PHP-API für Webhosting (Multi-Game + SSE)
   .htaccess                     ← Apache-Routing, SSE-Buffering
   categories.json               ← Kategoriedaten (Stadt Land Fluss legacy)
+  data/
+    questions.json              ← ZENTRALE Fragendatenbank (alle Quiz-Spiele)
   stadt-land-fluss/
     index.html                  ← Stadt Land Fluss Spiel — Light/Dark Mode
     categories.json
@@ -52,11 +54,26 @@ Spiele/
       game.css                  ← Spieloberfläche CSS (mit Light Mode vars)
       admin.css                 ← Admin CSS (mit Light Mode vars)
     data/
-      questions.json            ← Fragenbank (zentral, alle Spiele)
       gamestate.json            ← Legacy-Spielstand (vor Multi-Game)
       games/
         index.json              ← Registry aller Spiele {CODE: {title,status,...}}
         XXXX.json               ← Spielstand pro Spiel (CODE = 4-stellig)
+  Leiterspiel-quiz/
+    index.html                  ← Leiterspiel (Setup + 10×10 Board + Modals)
+    admin.html                  ← Verweis auf Risiko-Quiz Admin
+    js/
+      leiterspiel.js            ← Spiellogik (Board, Leitern, Schlangen, Fragen)
+    css/
+      leiterspiel.css           ← Styles (Light default, body.dark)
+  Labyrint-Quiz/
+    index.html                  ← Labyrinth-Quiz (Setup + Canvas-Board + Modals)
+    admin.html                  ← Verweis auf Risiko-Quiz Admin
+    js/
+      maze.js                   ← SeededRNG + MazeGenerator (16×16, Recursive Backtracker)
+      renderer.js               ← Canvas-Renderer (Labyrinth, Figuren, Animationen)
+      labyrinth.js              ← Spiellogik (Setup, Turns, Fragen, Scoring)
+    css/
+      labyrinth.css             ← Styles (Light default, body.dark)
 ```
 
 ---
@@ -79,6 +96,8 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 | `escape-room/index.html` | Dark (Mystery) / Hell (Admin) | `body.player-mode` / `body.admin-mode` |
 | `risiko-quiz/index.html` | Dark | `body.light` |
 | `risiko-quiz/admin.html` | Dark | `body.light` |
+| `Labyrint-Quiz/index.html` | Light (Mystisch-Lila) | `body.dark` |
+| `Labyrint-Quiz/admin.html` | Light (Mystisch-Lila) | `body.dark` |
 
 **JS-Muster (immer gleich, nur `'dark'`/`'light'` und Klassenname tauschen):**
 
@@ -169,6 +188,140 @@ Für Seiten mit Light-als-Standard (SLF, index):
 
 ---
 
+## Zentrale Fragendatenbank
+
+### Prinzip
+Alle fragenbasierten Spiele nutzen eine **gemeinsame Fragendatenbank**: `data/questions.json`.
+Das Risiko-Quiz-Format ist das Master-Format. Spiele, die ein anderes internes Format benötigen, konvertieren beim Laden automatisch.
+
+**Bei der Implementierung eines neuen Spiels MUSS nachgefragt werden**, ob die zentrale Fragendatenbank verwendet werden soll. Standardmäßig ja — Ausnahmen nur, wenn die Spielmechanik ein grundlegend anderes Datenformat erfordert (z.B. Paare statt Fragen).
+
+### Nutzer der zentralen DB
+
+| Spiel | Konvertierung | Admin |
+|-------|--------------|-------|
+| Risiko-Quiz | Nativ (Master) | Eigener Admin (`risiko-quiz/admin.html`) |
+| QuizPfad | `convertRQtoQuizPfad()` | Verweist auf Risiko-Quiz Admin |
+| Labyrinth-Quiz | `convertRQtoLabyrinth()` | Verweist auf Risiko-Quiz Admin |
+| Leiterspiel-Quiz | `convertRQtoLeiterspiel()` | Verweist auf Risiko-Quiz Admin |
+
+### Spiele mit eigener Datenbank (spielmechanikbedingt)
+
+| Spiel | Eigene DB | Grund |
+|-------|-----------|-------|
+| Memory | `memory/data/pairs.json` | Paare (sideA/sideB) statt Fragen |
+| Stadt Land Fluss | `categories.json` | Kategorienamen statt Fragen |
+| Escape Room | localStorage | Raumgebundene Fragen mit Codes/Hotspots |
+
+### Master-Format (`questions.json`)
+```json
+{
+  "categories": [{
+    "id": "cat-...", "name": "Kategoriename",
+    "subcategories": [{
+      "id": "subcat-...", "name": "Unterkategorie",
+      "questions": [{
+        "id": "q-...", "question": "Fragetext",
+        "type": "mc|open",
+        "difficulty": 100|200|300|400|500,
+        "options": ["A","B","C","D"], "correctIndex": 0,
+        "answer": "...", "hint": "..."
+      }]
+    }]
+  }]
+}
+```
+
+### Standard-Konvertierung (für neue Spiele übernehmen)
+| Master-Feld | Konvertiert |
+|-------------|------------|
+| `difficulty: 100-200` | `"leicht"` |
+| `difficulty: 300` | `"mittel"` |
+| `difficulty: 400-500` | `"schwer"` |
+| `type: "mc"` | `"multiple_choice"` |
+| `type: "open"` | `"offen"` |
+| Nested subcategories | Flat (Blatt-Ebenen, Pfad mit ` › `) |
+
+### Zugriff auf die Fragendatenbank
+- **Im Lehrermodus**: Button "📋 Fragendatenbank" im Header von `spiele.html` → öffnet `risiko-quiz/admin.html`
+- **Einzelne Spiele**: Haben keinen eigenen "Fragen"-Button mehr in `spiele.html`; Admin-Seiten verweisen auf die zentrale DB
+- **Risiko-Quiz Admin** (`risiko-quiz/admin.html`) ist der **zentrale Frageneditor** für alle Quiz-Spiele
+
+### Laden der Fragendatenbank (Standard-Pattern)
+```js
+async function loadQuestions() {
+  // 1. Versuch: API (Webhosting)
+  try {
+    const r = await fetch('../api.php?f=questions');
+    if (r.ok) return await r.json();
+  } catch(e) {}
+  // 2. Versuch: Direkt (file:// oder statisch)
+  try {
+    const r = await fetch('../data/questions.json');
+    if (r.ok) return await r.json();
+  } catch(e) {}
+  // 3. Fallback: localStorage
+  const cached = localStorage.getItem('rq_questions');
+  return cached ? JSON.parse(cached) : { categories: [] };
+}
+```
+
+### Kategorieauswahl im Setup (Standard-Pattern)
+Jedes Spiel, das die zentrale DB nutzt, bietet im Setup-Screen eine **Kategorieauswahl** an:
+- Alle Kategorien (Blatt-Ebenen) werden als Toggle-Buttons angezeigt
+- "Alle auswählen" / "Keine" Buttons verfügbar
+- Nur Fragen aus gewählten Kategorien werden im Spiel verwendet
+- Kategorien erhalten automatisch Icons und Farben aus einer festen Palette
+
+---
+
+## Multi-Game Architektur (Paralleles Spielen)
+
+### Prinzip
+Wenn ein Spiel **paralleles Spielen** mit mehreren Klassen/Gruppen unterstützen soll, wird das Multi-Game-Muster des Risiko-Quiz verwendet. Bei der Implementierung eines neuen Spiels **nachfragen**, ob Multi-Game sinnvoll ist (z.B. wenn mehrere Klassen gleichzeitig spielen könnten).
+
+### Ablauf
+1. **Spiel erstellen**: Lehrkraft erstellt ein neues Spiel im Admin → generiert einen **4-stelligen Zugangscode** (z.B. `A3K7`)
+2. **Beitreten**: Spieler geben den Code ein → URL-Parameter `?code=XXXX`
+3. **Spielstand pro Spiel**: Jedes Spiel hat eine eigene JSON-Datei (`games/XXXX.json`)
+4. **Registry**: `games/index.json` enthält alle aktiven Spiele mit Metadaten (Titel, Status, Zeitstempel)
+5. **Echtzeit-Sync**: SSE-Endpunkt (`?f=sse&code=XXXX`) liefert Live-Updates an alle Clients
+6. **Auto-Cleanup**: Spiele werden **nach 24 Stunden automatisch gelöscht** (serverseitig in `api.php`)
+
+### Technische Umsetzung
+```
+api.php Endpunkte:
+  GET  ?f=games            → Registry aller Spiele laden
+  POST ?f=games            → Registry speichern
+  GET  ?f=game&code=XXXX   → Spielstand laden
+  POST ?f=game&code=XXXX   → Spielstand speichern + Registry updaten
+  DELETE ?f=game&code=XXXX → Spiel löschen
+  GET  ?f=sse&code=XXXX   → Server-Sent Events Stream
+
+Dateistruktur:
+  risiko-quiz/data/games/
+    index.json              ← Registry: { "A3K7": { title, status, createdAt, updatedAt } }
+    A3K7.json               ← Spielstand für Spiel A3K7
+```
+
+### Cleanup-Logik (`cleanupExpiredGames`)
+- Wird bei jedem Registry-Abruf (`GET ?f=games`) ausgeführt
+- Löscht Spiele, deren `updatedAt`/`createdAt` > 24 Stunden alt ist
+- Entfernt sowohl die Spieldatei als auch den Registry-Eintrag
+- File-Locking (`LOCK_EX`) für konkurrierende Zugriffe
+
+### Spiele mit Multi-Game
+| Spiel | Multi-Game | Grund |
+|-------|-----------|-------|
+| Risiko-Quiz | Ja | Mehrere Klassen parallel, SSE-Live-Updates |
+| QuizPfad | Nein | Einzelspiel im Browser |
+| Labyrinth-Quiz | Nein | Einzelspiel im Browser |
+| Leiterspiel-Quiz | Nein | Einzelspiel im Browser |
+| Memory | Nein | Singleplayer |
+| Escape Room | Nein | localStorage-basiert, eigenes Multi-Team-System |
+
+---
+
 ## Stadt Land Fluss (`stadt-land-fluss/index.html`)
 
 Single-file SPA, alle Styles und JS inline.
@@ -193,10 +346,12 @@ Single-file SPA, alle Styles und JS inline.
 ## Risiko-Quiz
 
 ### Architektur
+- Verwaltet die **zentrale Fragendatenbank** (`data/questions.json`) — siehe Abschnitt "Zentrale Fragendatenbank"
 - Läuft auf PHP-Webhosting; `api.php` + `.htaccess` übernehmen die API-Routen
 - Zwei JSON-Dateien: `questions.json` (Fragenbank) + `gamestate.json` (Spielstand)
 - `shared.js` enthält `StorageManager` (fetch-API) + `GameModel`
 - `admin.js` und `game.js` laden Daten asynchron beim Start
+- Der Risiko-Quiz Admin ist der **zentrale Frageneditor** für alle Quiz-Spiele
 
 ### StorageManager-Endpunkte
 | Methode | Endpoint | Zweck |
@@ -281,21 +436,9 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 ### Architektur
 - Lineares Brettspiel: Teams rücken durch richtige Antworten auf einem Mäander-Pfad vor
 - 30 Felder in Schlangen-Layout (6 Spalten, 5 Zeilen, abwechselnd L→R / R→L)
-- **Gemeinsame Fragendatenbank**: Nutzt `risiko-quiz/data/questions.json` (Risiko-Quiz-Format)
-- `quizpfad.js` konvertiert beim Laden automatisch: Kategorien → flat, Difficulty → leicht/mittel/schwer
+- **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoQuizPfad()`) — siehe Abschnitt "Zentrale Fragendatenbank"
 - Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
 - Kein Multi-Game, kein SSE — reines Einzelspiel im Browser
-
-### Fragen-Konvertierung (Risiko-Quiz → QuizPfad)
-| Risiko-Quiz | QuizPfad |
-|-------------|----------|
-| `difficulty: 100-200` | `schwierigkeit: "leicht"` |
-| `difficulty: 300` | `schwierigkeit: "mittel"` |
-| `difficulty: 400-500` | `schwierigkeit: "schwer"` |
-| `type: "mc"` | `typ: "multiple_choice"` |
-| `type: "open"` | `typ: "offen"` |
-| `options` / `correctIndex` | `antworten` / `richtig` |
-| Nested subcategories | Flat `kategorien` (Blatt-Ebenen) |
 
 ### Bonusfelder
 | Typ | Effekt |
@@ -353,3 +496,51 @@ Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
 - Spieler-Modus: Dark/Mystery (`body.player-mode`) — Tiefes Dunkelblau, Gold-Akzente, Noise-Overlay
 - Admin-Modus: Light/Clean (`body.admin-mode`) — Weißes Interface, Blau-Akzente
 - Kein Shared-Theme-Toggle (eigenes System, nicht `spiele_theme`)
+
+---
+
+## Labyrinth-Quiz
+
+### Architektur
+- Canvas-basiertes Labyrinth-Spiel: Teams navigieren ein 16×16 Labyrinth
+- **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoLabyrinth()`) — siehe Abschnitt "Zentrale Fragendatenbank"
+- `maze.js` generiert Labyrinth mit SeededRNG (Recursive Backtracker + Extra-Verbindungen)
+- `renderer.js` zeichnet das Labyrinth auf HTML5 Canvas
+- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
+- Kein Multi-Game, kein SSE — reines Einzelspiel im Browser (Phase 1)
+
+### Spielmechanik
+- 2–6 Gruppen mit SVG-Figuren (🛡️🐉🦉🦊🧙🤖)
+- Symbole (6–18) im Labyrinth verteilt, anteilig auf gewählte Kategorien
+- Türen (geschlossen) blockieren Wege → Frage beantworten zum Öffnen
+- Symbole einsammeln → Frage beantworten → +10 Punkte
+- Ziel erreichen mit allen Symbolen → +50 Bonus → Sieg
+
+### Punkte-System
+| Aktion | Punkte |
+|--------|--------|
+| Symbol eingesammelt (richtig) | +10 |
+| Tür geöffnet (richtig) | 0 |
+| Ziel + alle Symbole | +50 Bonus |
+| Falsche Antwort | 0 |
+
+### Theme (Labyrinth-Quiz spezifisch)
+- Standard: Light (Mystisch-Lila Akzentfarbe `#7c3aed`)
+- `body.dark` überschreibt alle CSS-Variablen (dunkles Lila/Indigo)
+- Toggle-Script am Ende jeder HTML-Datei als IIFE
+
+---
+
+## Leiterspiel-Quiz
+
+### Architektur
+- Klassisches Leiterspiel (Snakes & Ladders) mit 100 Feldern (10×10 Grid)
+- **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoLeiterspiel()`) — siehe Abschnitt "Zentrale Fragendatenbank"
+- Admin verweist auf Risiko-Quiz Admin (`risiko-quiz/admin.html`)
+- Einzel- und Mehrspielermodus
+
+### Spielmechanik
+- 5 Leitern: 4→14, 9→31, 21→42, 28→84, 51→67
+- 5 Schlangen: 16→6, 47→26, 62→19, 93→73, 98→87
+- Zeitlimits: leicht=30s, mittel=45s, schwer=60s
+- Punkte: leicht=10, mittel=20, schwer=30

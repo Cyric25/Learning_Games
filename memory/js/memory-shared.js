@@ -180,6 +180,7 @@ const MemoryMDParser = {
     if (t === 'text' || t === 'formula' || t === 'image') return t;
     if (t === 'formel') return 'formula';
     if (t === 'bild') return 'image';
+    if (t === 'name' || t === 'bezeichnung' || t === 'begriff') return 'text';
     return null;
   }
 };

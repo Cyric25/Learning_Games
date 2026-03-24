@@ -47,6 +47,8 @@ Add-File $zip (Join-Path $source "spiele.html") "spiele.html"
 Add-File $zip (Join-Path $source "api.php")    "api.php"
 Add-File $zip (Join-Path $source ".htaccess")  ".htaccess"
 
+# Zentrale Fragendatenbank (data/ Ordner wird NICHT mitgepackt – nur Spieldaten)
+
 # Risiko-Quiz
 $rq = Join-Path $source "risiko-quiz"
 Add-File   $zip (Join-Path $rq "index.html")    "risiko-quiz/index.html"
@@ -76,7 +78,21 @@ Add-File   $zip (Join-Path $qp "index.html")    "quizpfad/index.html"
 Add-File   $zip (Join-Path $qp "admin.html")    "quizpfad/admin.html"
 Add-Folder $zip (Join-Path $qp "js")            "quizpfad/js"
 Add-Folder $zip (Join-Path $qp "css")           "quizpfad/css"
-# QuizPfad nutzt die gemeinsame questions.json (Risiko-Quiz)
+# QuizPfad nutzt die zentrale Fragendatenbank (data/questions.json)
+
+# Leiterspiel-Quiz
+$ls = Join-Path $source "Leiterspiel-quiz"
+Add-File   $zip (Join-Path $ls "index.html")    "Leiterspiel-quiz/index.html"
+Add-File   $zip (Join-Path $ls "admin.html")    "Leiterspiel-quiz/admin.html"
+Add-Folder $zip (Join-Path $ls "js")            "Leiterspiel-quiz/js"
+Add-Folder $zip (Join-Path $ls "css")           "Leiterspiel-quiz/css"
+
+# Labyrinth-Quiz
+$lq = Join-Path $source "Labyrint-Quiz"
+Add-File   $zip (Join-Path $lq "index.html")    "Labyrint-Quiz/index.html"
+Add-File   $zip (Join-Path $lq "admin.html")    "Labyrint-Quiz/admin.html"
+Add-Folder $zip (Join-Path $lq "js")            "Labyrint-Quiz/js"
+Add-Folder $zip (Join-Path $lq "css")           "Labyrint-Quiz/css"
 
 # Escape Room
 $er = Join-Path $source "escape-room"

@@ -46,7 +46,7 @@ async function loadFragen() {
       } catch (e) { /* fallback */ }
     }
     if (!rqData) {
-      const r = await fetch('../risiko-quiz/data/questions.json');
+      const r = await fetch('../data/questions.json');
       if (r.ok) rqData = await r.json();
     }
   } catch (e) { /* ignore */ }
@@ -64,7 +64,7 @@ async function loadFragen() {
   }
 
   document.getElementById('setup-error').textContent =
-    'Keine Fragen geladen. Bitte Fragen im Risiko-Quiz Admin anlegen.';
+    'Keine Fragen geladen. Bitte Fragen in der zentralen Fragendatenbank anlegen.';
 }
 
 // Convert Risiko-Quiz format → QuizPfad format

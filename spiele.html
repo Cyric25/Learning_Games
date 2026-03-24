@@ -167,6 +167,7 @@
       flex-direction: column;
       transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
       min-height: 0;
+      position: relative;
     }
 
     .game-card:hover {
@@ -275,21 +276,45 @@
       display: inline-flex;
     }
 
-    /* Coming Soon: im Lehrermodus aktiviert */
-    .coming-soon {
+    /* Deaktivierte Spiele: für Schüler ausgeblendet */
+    .game-card.game-disabled {
       opacity: 0.5; pointer-events: none; position: relative;
     }
-    body.teacher .coming-soon {
-      opacity: 1; pointer-events: auto;
+    body.teacher .game-card.game-disabled {
+      opacity: 0.7; pointer-events: auto;
     }
-    .coming-soon-badge {
+    .disabled-badge {
       position: absolute; top: 16px; right: 16px;
       padding: 4px 12px; border-radius: 8px;
       font-size: 0.8rem; font-weight: 700; z-index: 2;
+      background: #6c757d; color: #fff;
     }
-    body.teacher .coming-soon-badge {
+    body.teacher .disabled-badge {
       display: none;
     }
+
+    /* Sichtbarkeits-Toggle im Lehrermodus */
+    .game-toggle {
+      display: none;
+      position: absolute; top: 12px; left: 12px;
+      z-index: 3;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid rgba(255,255,255,0.4);
+      color: #fff;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      align-items: center;
+      justify-content: center;
+    }
+    .game-toggle:hover { background: rgba(0,0,0,0.8); transform: scale(1.1); }
+    .game-card.game-disabled .game-toggle {
+      background: rgba(220,53,69,0.7);
+      border-color: rgba(220,53,69,0.9);
+    }
+    body.teacher .game-toggle { display: flex; }
 
     /* ── Footer ── */
     footer {
@@ -468,7 +493,11 @@
       <button class="header-btn" id="footer-lp-link" onclick="openPasswordModal()">
         🔒 Lehrermodus
       </button>
-      <!-- Lehrermodus aktiv: Anzeige + Abmelden -->
+      <!-- Lehrermodus aktiv: Fragendatenbank + Abmelden -->
+      <a class="header-btn teacher-only" id="btn-questions-db" href="risiko-quiz/admin.html"
+         style="background:rgba(233,69,96,0.25);border-color:rgba(233,69,96,0.5);color:#fff;text-decoration:none;">
+        📋 Fragendatenbank
+      </a>
       <button class="header-btn" id="btn-teacher-mode" onclick="exitTeacherMode()">
         ✓ Lehrermodus &nbsp;·&nbsp; Beenden
       </button>
@@ -486,7 +515,8 @@
     <div class="games-grid">
 
       <!-- Stadt Land Fluss -->
-      <div class="game-card">
+      <div class="game-card" data-game="slf">
+        <button class="game-toggle" onclick="toggleGameVisibility('slf')" title="Sichtbarkeit umschalten"></button>
         <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
           <span class="card-emoji">🗺️</span>
         </div>
@@ -509,7 +539,8 @@
       </div>
 
       <!-- Risiko-Quiz -->
-      <div class="game-card">
+      <div class="game-card" data-game="risiko">
+        <button class="game-toggle" onclick="toggleGameVisibility('risiko')" title="Sichtbarkeit umschalten"></button>
         <div class="card-banner" style="background: linear-gradient(135deg, #e94560, #0f3460);">
           <span class="card-emoji">🎯</span>
         </div>
@@ -529,13 +560,13 @@
           <div class="card-actions" style="flex-wrap:wrap;">
             <a href="risiko-quiz/index.html"    class="btn btn-play">🎮 Spielen</a>
             <a href="risiko-quiz/practice.html" class="btn btn-play" style="background:linear-gradient(135deg,#2ecc71,#27ae60);">📚 Üben</a>
-            <a href="risiko-quiz/admin.html"    class="btn btn-admin teacher-only">⚙ Fragen</a>
           </div>
         </div>
       </div>
 
-      <!-- QuizPfad (Coming Soon / Lehrermodus aktiv) -->
-      <div class="game-card coming-soon">
+      <!-- QuizPfad -->
+      <div class="game-card" data-game="quizpfad">
+        <button class="game-toggle" onclick="toggleGameVisibility('quizpfad')" title="Sichtbarkeit umschalten"></button>
         <div class="card-banner" style="background: linear-gradient(135deg, #f4a261, #e76f51);">
           <span class="card-emoji">🎲</span>
         </div>
@@ -553,14 +584,13 @@
           </div>
           <div class="card-actions">
             <a href="quizpfad/index.html" class="btn btn-play">▶ Spielen</a>
-            <a href="quizpfad/admin.html" class="btn btn-admin teacher-only">⚙ Fragen</a>
           </div>
         </div>
-        <div class="coming-soon-badge" style="background:#e76f51;color:#fff;">Coming Soon</div>
       </div>
 
-      <!-- Memory (Coming Soon / Lehrermodus aktiv) -->
-      <div class="game-card coming-soon">
+      <!-- Memory -->
+      <div class="game-card" data-game="memory">
+        <button class="game-toggle" onclick="toggleGameVisibility('memory')" title="Sichtbarkeit umschalten"></button>
         <div class="card-banner" style="background: linear-gradient(135deg, #9b59b6, #3498db);">
           <span class="card-emoji">🧠</span>
         </div>
@@ -581,11 +611,11 @@
             <a href="memory/admin.html" class="btn btn-admin teacher-only">⚙ Paare</a>
           </div>
         </div>
-        <div class="coming-soon-badge" style="background:#e94560;color:#fff;">Coming Soon</div>
       </div>
 
-      <!-- Escape Room (Coming Soon / Lehrermodus aktiv) -->
-      <div class="game-card coming-soon">
+      <!-- Escape Room -->
+      <div class="game-card" data-game="escape">
+        <button class="game-toggle" onclick="toggleGameVisibility('escape')" title="Sichtbarkeit umschalten"></button>
         <div class="card-banner" style="background: linear-gradient(135deg, #0a0a2e, #1a1a3e);">
           <span class="card-emoji">🔐</span>
         </div>
@@ -606,7 +636,54 @@
             <a href="escape-room/index.html?admin=true" class="btn btn-admin teacher-only">⚙ Admin</a>
           </div>
         </div>
-        <div class="coming-soon-badge" style="background:#d4a853;color:#0a0a1a;">Coming Soon</div>
+      </div>
+
+      <!-- Schlangen & Leitern -->
+      <div class="game-card" data-game="leiterspiel">
+        <button class="game-toggle" onclick="toggleGameVisibility('leiterspiel')" title="Sichtbarkeit umschalten"></button>
+        <div class="card-banner" style="background: linear-gradient(135deg, #66bb6a, #ef5350);">
+          <span class="card-emoji">🐍</span>
+        </div>
+        <div class="card-body">
+          <div class="card-title">Schlangen &amp; Leitern</div>
+          <div class="card-desc">
+            Klassisches Brettspiel mit Wissensfragen: Würfeln, Fragen beantworten,
+            Leitern hochklettern und Schlangen ausweichen. Bis zu 10 Gruppen mit Tierfiguren.
+          </div>
+          <div class="card-tags">
+            <span class="tag">Brettspiel</span>
+            <span class="tag">Quiz</span>
+            <span class="tag">Gruppen</span>
+            <span class="tag">Timer</span>
+          </div>
+          <div class="card-actions">
+            <a href="Leiterspiel-quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Labyrinth-Quiz -->
+      <div class="game-card" data-game="labyrinth">
+        <button class="game-toggle" onclick="toggleGameVisibility('labyrinth')" title="Sichtbarkeit umschalten"></button>
+        <div class="card-banner" style="background: linear-gradient(135deg, #7c3aed, #1e1b4b);">
+          <span class="card-emoji">🏰</span>
+        </div>
+        <div class="card-body">
+          <div class="card-title">Labyrinth-Quiz</div>
+          <div class="card-desc">
+            Navigiere mit deiner Gruppe durch ein zufällig generiertes Labyrinth,
+            sammle Symbole durch richtige Antworten und erreiche als Erste das Ziel!
+          </div>
+          <div class="card-tags">
+            <span class="tag">Brettspiel</span>
+            <span class="tag">Teams</span>
+            <span class="tag">Labyrinth</span>
+            <span class="tag">Quiz</span>
+          </div>
+          <div class="card-actions">
+            <a href="Labyrint-Quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -621,7 +698,11 @@
 <script>
   const STORAGE_KEY   = 'spiele_theme';
   const SESSION_KEY   = 'spiele_lp_mode';
+  const GAMES_KEY     = 'spiele_enabled_games';
   const LP_PASSWORD   = 'LP@FOS';
+
+  // Standard: diese Spiele sind aktiv, Rest deaktiviert
+  const DEFAULT_ENABLED = ['slf', 'risiko'];
 
   // ── Theme ────────────────────────────────────────────────
   function applyTheme(dark) {
@@ -634,6 +715,50 @@
     const isDark = !document.body.classList.contains('dark');
     localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
     applyTheme(isDark);
+  }
+
+  // ── Spiele-Sichtbarkeit ────────────────────────────────
+  function getEnabledGames() {
+    const stored = localStorage.getItem(GAMES_KEY);
+    return stored ? JSON.parse(stored) : DEFAULT_ENABLED;
+  }
+
+  function saveEnabledGames(list) {
+    localStorage.setItem(GAMES_KEY, JSON.stringify(list));
+  }
+
+  function applyGameVisibility() {
+    const enabled = getEnabledGames();
+    document.querySelectorAll('.game-card[data-game]').forEach(function(card) {
+      var id = card.getAttribute('data-game');
+      var isEnabled = enabled.indexOf(id) !== -1;
+      card.classList.toggle('game-disabled', !isEnabled);
+      // Toggle-Button Emoji aktualisieren
+      var btn = card.querySelector('.game-toggle');
+      if (btn) btn.textContent = isEnabled ? '👁️' : '🚫';
+      // Badge für deaktivierte Spiele
+      var badge = card.querySelector('.disabled-badge');
+      if (!isEnabled && !badge) {
+        badge = document.createElement('div');
+        badge.className = 'disabled-badge';
+        badge.textContent = 'Deaktiviert';
+        card.appendChild(badge);
+      } else if (isEnabled && badge) {
+        badge.remove();
+      }
+    });
+  }
+
+  function toggleGameVisibility(gameId) {
+    var enabled = getEnabledGames();
+    var idx = enabled.indexOf(gameId);
+    if (idx !== -1) {
+      enabled.splice(idx, 1);
+    } else {
+      enabled.push(gameId);
+    }
+    saveEnabledGames(enabled);
+    applyGameVisibility();
   }
 
   // ── Lehrermodus ──────────────────────────────────────────
@@ -675,6 +800,7 @@
   // ── Init ─────────────────────────────────────────────────
   applyTheme(localStorage.getItem(STORAGE_KEY) === 'dark');
   applyMode(sessionStorage.getItem(SESSION_KEY) === '1');
+  applyGameVisibility();
 </script>
 
 </body>

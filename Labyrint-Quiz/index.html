@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Labyrinth-Quiz</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+  <link rel="stylesheet" href="css/labyrinth.css">
+</head>
+<body>
+
+  <!-- ── Setup Screen ────────────────────────────────────────── -->
+  <div class="screen active" id="setup-screen">
+    <div class="setup-card">
+      <div class="setup-header">
+        <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+        <div class="setup-header-btns">
+          <a href="admin.html" class="header-btn" id="btn-admin">Fragen</a>
+          <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+        </div>
+      </div>
+
+      <div class="setup-title">
+        <h1>🏰 Labyrinth-Quiz</h1>
+        <p>Navigiere durch das Labyrinth, sammle Symbole und erreiche das Ziel!</p>
+      </div>
+
+      <!-- Kategorien -->
+      <div class="setup-section" id="category-section" style="display:none;">
+        <h3>Kategorien auswählen</h3>
+        <div class="cat-select-actions">
+          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle auswählen</button>
+          <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+        </div>
+        <div class="cat-select-list" id="cat-select-list"></div>
+        <div class="cat-select-info" id="cat-select-info"></div>
+      </div>
+
+      <!-- Gruppen-Anzahl -->
+      <div class="setup-section">
+        <h3>Anzahl Gruppen</h3>
+        <div class="param-row" id="team-count-row"></div>
+      </div>
+
+      <!-- Gruppen konfigurieren -->
+      <div class="setup-section">
+        <h3>Gruppen konfigurieren</h3>
+        <div class="team-config-list" id="team-config-list"></div>
+      </div>
+
+      <!-- Symbole -->
+      <div class="setup-section">
+        <h3>Anzahl Symbole</h3>
+        <div class="param-row" id="symbol-row"></div>
+      </div>
+
+      <!-- Timer -->
+      <div class="setup-section">
+        <h3>Zeitlimit pro Frage</h3>
+        <div class="param-row" id="timer-row"></div>
+      </div>
+
+      <div class="setup-error" id="setup-error"></div>
+
+      <div class="setup-actions">
+        <button class="btn-start-game" id="btn-start" onclick="startGame()">Spiel starten</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ─────────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="board-area">
+      <div class="board-header">
+        <button class="header-btn" onclick="confirmQuit()">&#8592; Beenden</button>
+        <h2>🏰 Labyrinth-Quiz</h2>
+        <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
+      </div>
+      <div class="active-team-banner" id="active-team-banner"></div>
+      <div class="canvas-wrap">
+        <canvas id="maze-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="controls-hint">
+        <p>Steuerung</p>
+        <div class="keys">⬆⬇⬅➡</div>
+        <p>oder Klick auf Nachbarfeld</p>
+      </div>
+
+      <h3>Gruppen</h3>
+      <div class="team-list" id="team-list"></div>
+
+      <div class="sidebar-legend">
+        <h3>Legende</h3>
+        <div class="legend-list">
+          <div class="legend-item"><span class="legend-icon">🔒</span><span>Tür (geschlossen)</span></div>
+          <div class="legend-item"><span class="legend-icon">✓</span><span>Tür (offen)</span></div>
+          <div class="legend-item"><span class="legend-icon">⭐</span><span>Symbol (einsammeln)</span></div>
+          <div class="legend-item"><span class="legend-icon">🏁</span><span>Ziel</span></div>
+          <div class="legend-item"><span class="legend-icon">S</span><span>Start</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Question Modal ──────────────────────────────────────── -->
+  <div class="modal-overlay" id="question-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-cat-name" id="q-cat-name"></span>
+        <span class="modal-difficulty" id="q-difficulty"></span>
+      </div>
+      <div class="modal-trigger" id="q-trigger-type"></div>
+      <div class="timer-bar-wrap"><div class="timer-bar" id="q-timer-bar"></div></div>
+      <div class="timer-text" id="q-timer-text"></div>
+      <div class="modal-question" id="q-text"></div>
+
+      <!-- MC answers -->
+      <div class="answer-options" id="q-options"></div>
+
+      <!-- Open question -->
+      <div class="open-answer-section" id="q-open-section" style="display:none;">
+        <button class="btn-show-answer" id="q-show-answer" onclick="showOpenAnswer()">Lösung anzeigen</button>
+        <div class="open-answer-text" id="q-open-answer"></div>
+        <div class="open-actions" id="q-open-actions">
+          <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+          <button class="btn-wrong" onclick="resolveOpen(false)">✗ Falsch</button>
+        </div>
+      </div>
+
+      <div class="modal-result" id="q-result"></div>
+      <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── Result Screen ───────────────────────────────────────── -->
+  <div class="screen" id="result-screen">
+    <div class="result-card">
+      <div class="result-trophy">🏆</div>
+      <h2>Spiel beendet!</h2>
+      <div class="result-winner" id="result-winner"></div>
+      <table class="result-ranking">
+        <thead>
+          <tr>
+            <th>Platz</th>
+            <th>Gruppe</th>
+            <th>Punkte</th>
+            <th>Symbole</th>
+          </tr>
+        </thead>
+        <tbody id="result-ranking-body"></tbody>
+      </table>
+      <div class="result-actions">
+        <button class="btn-result btn-result-primary" onclick="playAgain()">Neues Spiel</button>
+        <a href="../spiele.html" class="btn-result btn-result-secondary">Zur Übersicht</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/maze.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/labyrinth.js"></script>
+
+</body>
+</html>

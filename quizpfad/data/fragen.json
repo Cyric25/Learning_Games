@@ -1,0 +1,213 @@
+{
+  "kategorien": [
+    { "id": "chemie",     "name": "Chemie Grundlagen", "icon": "🧪", "farbe": "#3498db" },
+    { "id": "biochemie",  "name": "Biochemie",         "icon": "🧬", "farbe": "#2ecc71" },
+    { "id": "reaktionen", "name": "Reaktionen",        "icon": "⚗️", "farbe": "#e74c3c" },
+    { "id": "analytik",   "name": "Analytik",          "icon": "🔬", "farbe": "#9b59b6" },
+    { "id": "allgemein",  "name": "Allgemeinwissen NaWi", "icon": "🌍", "farbe": "#f39c12" }
+  ],
+  "fragen": [
+    {
+      "id": "q001", "kategorie": "chemie", "schwierigkeit": "leicht",
+      "frage": "Wie lautet das chemische Symbol für Sauerstoff?",
+      "typ": "multiple_choice",
+      "antworten": ["O", "Os", "Ox", "S"], "richtig": 0,
+      "erklaerung": "Sauerstoff hat das Symbol O (vom lat. Oxygenium)."
+    },
+    {
+      "id": "q002", "kategorie": "chemie", "schwierigkeit": "leicht",
+      "frage": "Wie viele Elektronen hat ein neutrales Kohlenstoffatom?",
+      "typ": "multiple_choice",
+      "antworten": ["6", "8", "12", "4"], "richtig": 0,
+      "erklaerung": "Kohlenstoff hat die Ordnungszahl 6, also 6 Elektronen."
+    },
+    {
+      "id": "q003", "kategorie": "chemie", "schwierigkeit": "mittel",
+      "frage": "Was beschreibt die Elektronegativität?",
+      "typ": "multiple_choice",
+      "antworten": ["Anziehungskraft eines Atoms auf Bindungselektronen", "Anzahl der Valenzelektronen", "Masse des Atomkerns", "Größe des Atoms"],
+      "richtig": 0,
+      "erklaerung": "Die Elektronegativität gibt an, wie stark ein Atom Bindungselektronen anzieht (Pauling-Skala)."
+    },
+    {
+      "id": "q004", "kategorie": "chemie", "schwierigkeit": "mittel",
+      "frage": "Welche Bindungsart liegt in NaCl vor?",
+      "typ": "multiple_choice",
+      "antworten": ["Ionenbindung", "Kovalente Bindung", "Metallbindung", "Van-der-Waals-Bindung"],
+      "richtig": 0,
+      "erklaerung": "NaCl besteht aus Na⁺ und Cl⁻ – eine typische Ionenverbindung."
+    },
+    {
+      "id": "q005", "kategorie": "chemie", "schwierigkeit": "schwer",
+      "frage": "Was ist ein Mol?",
+      "typ": "multiple_choice",
+      "antworten": ["6,022 × 10²³ Teilchen", "1 Gramm eines Stoffes", "1 Liter Gas", "Die Masse eines Atoms"],
+      "richtig": 0,
+      "erklaerung": "Ein Mol enthält 6,022 × 10²³ Teilchen (Avogadro-Konstante)."
+    },
+    {
+      "id": "q006", "kategorie": "biochemie", "schwierigkeit": "leicht",
+      "frage": "Was ist die Funktion von ATP in der Zelle?",
+      "typ": "multiple_choice",
+      "antworten": ["Universeller Energieträger", "Strukturprotein", "Enzym", "Speicherlipid"],
+      "richtig": 0,
+      "erklaerung": "ATP (Adenosintriphosphat) ist der universelle Energieträger der Zelle."
+    },
+    {
+      "id": "q007", "kategorie": "biochemie", "schwierigkeit": "leicht",
+      "frage": "Glucose ist ein Monosaccharid.",
+      "typ": "wahr_falsch",
+      "antworten": ["Wahr", "Falsch"], "richtig": 0,
+      "erklaerung": "Korrekt! Glucose (Traubenzucker) ist ein Einfachzucker mit der Formel C₆H₁₂O₆."
+    },
+    {
+      "id": "q008", "kategorie": "biochemie", "schwierigkeit": "mittel",
+      "frage": "Welches Molekül ist der Träger der genetischen Information?",
+      "typ": "multiple_choice",
+      "antworten": ["DNA", "RNA", "Protein", "Lipid"], "richtig": 0,
+      "erklaerung": "Die DNA (Desoxyribonukleinsäure) speichert die genetische Information."
+    },
+    {
+      "id": "q009", "kategorie": "biochemie", "schwierigkeit": "mittel",
+      "frage": "Enzyme sind meistens aus welcher Stoffklasse aufgebaut?",
+      "typ": "multiple_choice",
+      "antworten": ["Proteine", "Lipide", "Kohlenhydrate", "Nukleinsäuren"], "richtig": 0,
+      "erklaerung": "Die meisten Enzyme sind Proteine, die biochemische Reaktionen katalysieren."
+    },
+    {
+      "id": "q010", "kategorie": "biochemie", "schwierigkeit": "schwer",
+      "frage": "In welchem Zellkompartiment findet der Citratzyklus statt?",
+      "typ": "multiple_choice",
+      "antworten": ["Mitochondrien-Matrix", "Zytoplasma", "Zellkern", "Endoplasmatisches Retikulum"],
+      "richtig": 0,
+      "erklaerung": "Der Citratzyklus läuft in der Matrix der Mitochondrien ab."
+    },
+    {
+      "id": "q011", "kategorie": "reaktionen", "schwierigkeit": "leicht",
+      "frage": "Was entsteht bei der Reaktion von Säure und Base?",
+      "typ": "multiple_choice",
+      "antworten": ["Salz und Wasser", "Gas und Salz", "Nur Wasser", "Nur ein Salz"],
+      "richtig": 0,
+      "erklaerung": "Neutralisation: Säure + Base → Salz + Wasser."
+    },
+    {
+      "id": "q012", "kategorie": "reaktionen", "schwierigkeit": "leicht",
+      "frage": "Verbrennung ist eine Reaktion mit Sauerstoff.",
+      "typ": "wahr_falsch",
+      "antworten": ["Wahr", "Falsch"], "richtig": 0,
+      "erklaerung": "Korrekt! Verbrennung ist eine exotherme Oxidation mit Sauerstoff."
+    },
+    {
+      "id": "q013", "kategorie": "reaktionen", "schwierigkeit": "mittel",
+      "frage": "Was ist eine exotherme Reaktion?",
+      "typ": "multiple_choice",
+      "antworten": ["Gibt Wärme ab", "Nimmt Wärme auf", "Benötigt Licht", "Erzeugt Strom"],
+      "richtig": 0,
+      "erklaerung": "Exotherm = Energie (Wärme) wird an die Umgebung abgegeben (ΔH < 0)."
+    },
+    {
+      "id": "q014", "kategorie": "reaktionen", "schwierigkeit": "mittel",
+      "frage": "Was passiert bei einer Oxidation?",
+      "typ": "multiple_choice",
+      "antworten": ["Elektronenabgabe", "Elektronenaufnahme", "Protonenabgabe", "Protonenaufnahme"],
+      "richtig": 0,
+      "erklaerung": "Oxidation = Elektronenabgabe. Merkhilfe: OIL RIG (Oxidation Is Loss)."
+    },
+    {
+      "id": "q015", "kategorie": "reaktionen", "schwierigkeit": "schwer",
+      "frage": "Welcher Katalysator wird bei der Haber-Bosch-Synthese verwendet?",
+      "typ": "multiple_choice",
+      "antworten": ["Eisen", "Platin", "Palladium", "Nickel"], "richtig": 0,
+      "erklaerung": "Die Haber-Bosch-Synthese nutzt Eisen als Katalysator: N₂ + 3H₂ → 2NH₃."
+    },
+    {
+      "id": "q016", "kategorie": "analytik", "schwierigkeit": "leicht",
+      "frage": "Was misst ein pH-Meter?",
+      "typ": "multiple_choice",
+      "antworten": ["Säure-/Basenstärke einer Lösung", "Temperatur", "Leitfähigkeit", "Dichte"],
+      "richtig": 0,
+      "erklaerung": "Der pH-Wert gibt die H⁺-Konzentration an: sauer (<7), neutral (7), basisch (>7)."
+    },
+    {
+      "id": "q017", "kategorie": "analytik", "schwierigkeit": "mittel",
+      "frage": "Welche Methode trennt Stoffgemische nach Siedepunkt?",
+      "typ": "multiple_choice",
+      "antworten": ["Destillation", "Filtration", "Chromatographie", "Zentrifugation"],
+      "richtig": 0,
+      "erklaerung": "Destillation nutzt unterschiedliche Siedepunkte zur Trennung von Flüssigkeitsgemischen."
+    },
+    {
+      "id": "q018", "kategorie": "analytik", "schwierigkeit": "mittel",
+      "frage": "Was ist Chromatographie?",
+      "typ": "multiple_choice",
+      "antworten": ["Trennverfahren nach Adsorption", "Messung von Farben", "Elektrolyse", "Spektralanalyse"],
+      "richtig": 0,
+      "erklaerung": "Chromatographie trennt Stoffgemische anhand unterschiedlicher Verteilung zwischen mobiler und stationärer Phase."
+    },
+    {
+      "id": "q019", "kategorie": "analytik", "schwierigkeit": "schwer",
+      "frage": "Was misst man bei der Photometrie?",
+      "typ": "multiple_choice",
+      "antworten": ["Lichtabsorption einer Probe", "Masse einer Probe", "Brechungsindex", "Schmelzpunkt"],
+      "richtig": 0,
+      "erklaerung": "Photometrie misst Lichtabsorption (Beer-Lambert-Gesetz: A = ε · c · d)."
+    },
+    {
+      "id": "q020", "kategorie": "allgemein", "schwierigkeit": "leicht",
+      "frage": "Wasser hat die chemische Formel H₂O.",
+      "typ": "wahr_falsch",
+      "antworten": ["Wahr", "Falsch"], "richtig": 0,
+      "erklaerung": "Korrekt! Wasser besteht aus 2 Wasserstoff- und 1 Sauerstoffatom."
+    },
+    {
+      "id": "q021", "kategorie": "allgemein", "schwierigkeit": "leicht",
+      "frage": "Die Erde ist der größte Planet im Sonnensystem.",
+      "typ": "wahr_falsch",
+      "antworten": ["Wahr", "Falsch"], "richtig": 1,
+      "erklaerung": "Falsch! Jupiter ist der größte Planet im Sonnensystem."
+    },
+    {
+      "id": "q022", "kategorie": "allgemein", "schwierigkeit": "mittel",
+      "frage": "Welches Gas macht den größten Anteil der Erdatmosphäre aus?",
+      "typ": "multiple_choice",
+      "antworten": ["Stickstoff", "Sauerstoff", "CO₂", "Argon"], "richtig": 0,
+      "erklaerung": "Stickstoff (N₂) macht ca. 78% der Erdatmosphäre aus."
+    },
+    {
+      "id": "q023", "kategorie": "allgemein", "schwierigkeit": "mittel",
+      "frage": "Wer entwickelte das Periodensystem der Elemente?",
+      "typ": "multiple_choice",
+      "antworten": ["Dmitri Mendelejew", "Albert Einstein", "Marie Curie", "Isaac Newton"],
+      "richtig": 0,
+      "erklaerung": "Dmitri Mendelejew ordnete 1869 die Elemente nach Atommasse und sagte fehlende Elemente voraus."
+    },
+    {
+      "id": "q024", "kategorie": "chemie", "schwierigkeit": "schwer",
+      "frage": "Erkläre den Unterschied zwischen einer kovalenten und einer ionischen Bindung.",
+      "typ": "offen",
+      "antworten": [], "richtig": -1,
+      "erklaerung": "Kovalent: Elektronenpaare werden geteilt (z.B. H₂). Ionisch: Elektronen werden übertragen, es entstehen Ionen (z.B. NaCl)."
+    },
+    {
+      "id": "q025", "kategorie": "biochemie", "schwierigkeit": "schwer",
+      "frage": "Beschreibe die Funktion der Mitochondrien.",
+      "typ": "offen",
+      "antworten": [], "richtig": -1,
+      "erklaerung": "Mitochondrien sind die „Kraftwerke der Zelle". Sie erzeugen ATP durch oxidative Phosphorylierung (Atmungskette)."
+    },
+    {
+      "id": "q026", "kategorie": "analytik", "schwierigkeit": "schwer",
+      "frage": "Nenne ein Verfahren zur Identifikation von Ionen in Lösungen.",
+      "typ": "offen",
+      "antworten": [], "richtig": -1,
+      "erklaerung": "Z.B. Flammfärbung (Alkali-/Erdalkalimetalle), Fällungsreaktionen oder Nachweisreagenzien."
+    },
+    {
+      "id": "q027", "kategorie": "allgemein", "schwierigkeit": "schwer",
+      "frage": "Warum ist der Treibhauseffekt für das Leben auf der Erde wichtig?",
+      "typ": "offen",
+      "antworten": [], "richtig": -1,
+      "erklaerung": "Der natürliche Treibhauseffekt hält die Erde warm genug für flüssiges Wasser (~+15°C statt −18°C ohne)."
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Schlangen &amp; Leitern</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+  <link rel="stylesheet" href="css/leiterspiel.css">
+</head>
+<body>
+
+  <!-- ── Setup Screen ────────────────────────────────────── -->
+  <div class="screen active" id="setup-screen">
+    <div class="setup-card">
+      <div class="setup-header">
+        <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+        <div class="setup-header-btns">
+          <a href="admin.html" class="header-btn" id="btn-admin">Fragen</a>
+          <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+        </div>
+      </div>
+
+      <div class="setup-title">
+        <h1>🐍 Schlangen &amp; Leitern</h1>
+        <p>Würfeln, Fragen beantworten, Leitern hochklettern!</p>
+      </div>
+
+      <div class="setup-section">
+        <h3>Spielmodus</h3>
+        <div class="mode-row" id="mode-row"></div>
+      </div>
+
+      <div class="setup-section" id="team-count-section">
+        <h3>Anzahl Gruppen</h3>
+        <div class="team-count-row" id="team-count-row"></div>
+      </div>
+
+      <div class="setup-section" id="team-config-section">
+        <h3>Gruppen konfigurieren</h3>
+        <div class="team-config-list" id="team-config-list"></div>
+      </div>
+
+      <div class="setup-section" id="category-section" style="display:none;">
+        <h3>Kategorien auswählen</h3>
+        <div class="cat-select-actions">
+          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle auswählen</button>
+          <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+        </div>
+        <div class="cat-select-list" id="cat-select-list"></div>
+        <div class="cat-select-info" id="cat-select-info"></div>
+      </div>
+
+      <div class="setup-error" id="setup-error"></div>
+
+      <div class="setup-actions">
+        <button class="btn-start-game" id="btn-start" onclick="proceedToGame()">Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dice Order Screen ───────────────────────────────── -->
+  <div class="screen" id="dice-order-screen">
+    <div class="dice-order-card">
+      <h2>🎲 Startreihenfolge</h2>
+      <p>Jede Gruppe würfelt einmal. Wer am höchsten würfelt, beginnt!</p>
+      <div class="dice-order-list" id="dice-order-list"></div>
+      <button class="btn-dice-roll" id="btn-dice-order" onclick="rollForOrder()">Würfeln</button>
+    </div>
+  </div>
+
+  <!-- ── Game Screen ─────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="board-area">
+      <div class="board-header">
+        <button class="header-btn" onclick="confirmQuit()">&#8592; Beenden</button>
+        <h2>Schlangen &amp; Leitern</h2>
+        <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
+      </div>
+      <div class="active-team-banner" id="active-team-banner"></div>
+      <div class="board-container">
+        <div class="board-grid" id="board-grid"></div>
+        <svg class="svg-overlay" id="svg-overlay"></svg>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="dice-area">
+        <div class="dice-display" id="dice-display">🎲</div>
+        <button class="btn-roll" id="btn-roll" onclick="rollDice()">Würfeln</button>
+      </div>
+      <h3>Gruppen</h3>
+      <div class="team-list" id="team-list"></div>
+      <div class="sidebar-legend">
+        <h3>Legende</h3>
+        <div class="legend-list">
+          <div class="legend-item"><div class="legend-color" style="background:var(--field-easy);"></div><span>Leicht (30s)</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--field-medium);"></div><span>Mittel (45s)</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--field-hard);"></div><span>Schwer (60s)</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--ladder-color);"></div><span>Leiter (hoch)</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--snake-color);"></div><span>Schlange (runter)</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--bonus-roll);"></div><span>Nochmals würfeln</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--bonus-free);"></div><span>Frei bewegen</span></div>
+          <div class="legend-item"><div class="legend-color" style="background:var(--bonus-swap);"></div><span>Tauschen</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Question Modal ──────────────────────────────────── -->
+  <div class="modal-overlay" id="question-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-cat-name" id="q-cat-name"></span>
+        <span class="modal-difficulty" id="q-difficulty"></span>
+      </div>
+      <div class="timer-bar-wrap"><div class="timer-bar" id="q-timer-bar"></div></div>
+      <div class="timer-text" id="q-timer-text"></div>
+      <div class="modal-question" id="q-text"></div>
+
+      <!-- MC answers -->
+      <div class="answer-options" id="q-options"></div>
+
+      <!-- Open question -->
+      <div class="open-answer-section" id="q-open-section" style="display:none;">
+        <button class="btn-show-answer" id="q-show-answer" onclick="showOpenAnswer()">Lösung anzeigen</button>
+        <div class="open-answer-text" id="q-open-answer"></div>
+        <div class="open-actions" id="q-open-actions" style="display:none;">
+          <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+          <button class="btn-wrong" onclick="resolveOpen(false)">✗ Falsch</button>
+        </div>
+      </div>
+
+      <div class="modal-result" id="q-result"></div>
+      <div class="modal-explanation" id="q-explanation">
+        <h4>Erklärung</h4>
+        <p id="q-explanation-text"></p>
+      </div>
+      <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── Bonus Modal ─────────────────────────────────────── -->
+  <div class="modal-overlay bonus-modal" id="bonus-modal">
+    <div class="modal-card">
+      <div class="bonus-icon" id="bonus-icon"></div>
+      <div class="bonus-title" id="bonus-title"></div>
+      <div class="bonus-desc" id="bonus-desc"></div>
+      <div class="swap-teams" id="swap-teams" style="display:none;"></div>
+      <button class="modal-continue visible" id="bonus-continue" onclick="continueAfterBonus()">Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── Winner Screen ───────────────────────────────────── -->
+  <div class="screen" id="winner-screen">
+    <div class="confetti-container" id="confetti-container"></div>
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-title">Gewonnen!</div>
+    <div class="winner-team-name" id="winner-team-name"></div>
+    <div class="winner-stats" id="winner-stats"></div>
+    <div class="winner-actions">
+      <button class="btn-new-game" onclick="resetToSetup()">Neues Spiel</button>
+      <a href="../spiele.html" class="btn-back">Zur Übersicht</a>
+    </div>
+  </div>
+
+  <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="js/leiterspiel.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+      var el2 = document.getElementById('btn-theme-game');
+      if (el2) el2.textContent = dark ? '☀️' : '🌙';
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

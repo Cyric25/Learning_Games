@@ -68,7 +68,7 @@ $gamesDir = __DIR__ . '/risiko-quiz/data/games';
 
 // Statische Dateien (Legacy + Questions)
 $files = [
-    'questions'    => __DIR__ . '/risiko-quiz/data/questions.json',
+    'questions'    => __DIR__ . '/data/questions.json',
     'gamestate'    => __DIR__ . '/risiko-quiz/data/gamestate.json',
     'memory-pairs'     => __DIR__ . '/memory/data/pairs.json',
 ];

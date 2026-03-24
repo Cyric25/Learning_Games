@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leiterspiel – Fragenverwaltung</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+  <link rel="stylesheet" href="css/leiterspiel.css">
+  <style>
+    .admin-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    .admin-card {
+      background: var(--bg-sidebar);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      padding: 48px;
+      max-width: 480px;
+      width: 100%;
+      border: 2px solid var(--border);
+    }
+    .admin-card h1 { font-size: 1.8rem; color: var(--accent); margin-bottom: 12px; }
+    .admin-card p { color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; }
+    .admin-link {
+      display: inline-block;
+      padding: 14px 32px;
+      background: linear-gradient(135deg, var(--accent), #388e3c);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+    }
+    .admin-link:hover { opacity: 0.9; }
+    .back-link {
+      display: inline-block;
+      margin-top: 16px;
+      color: var(--text-light);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .back-link:hover { color: var(--text-primary); }
+  </style>
+</head>
+<body>
+  <div class="admin-page">
+    <div class="admin-card">
+      <h1>🐍 Fragenverwaltung</h1>
+      <p>
+        Das Leiterspiel nutzt die zentrale Fragendatenbank.
+        Fragen kannst du über die Spielübersicht im Lehrermodus verwalten.
+      </p>
+      <a href="../risiko-quiz/admin.html" class="admin-link">Fragendatenbank öffnen</a>
+      <br>
+      <a href="index.html" class="back-link">&larr; Zurück zum Spiel</a>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+    }
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+</body>
+</html>

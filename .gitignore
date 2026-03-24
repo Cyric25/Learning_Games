@@ -6,7 +6,7 @@ backups/
 .zip-version
 
 # Spieldaten (sollen nicht ins Repo)
-risiko-quiz/data/questions.json
+data/questions.json
 risiko-quiz/data/gamestate.json
 risiko-quiz/data/games/
 memory/data/pairs.json
