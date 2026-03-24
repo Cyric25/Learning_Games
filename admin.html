@@ -346,7 +346,7 @@ function renderQTable(container, questions, catId, subId, subsubId, l4Id) {
 }
 
 function isCollapsed(id, map) {
-  if (!map.has(id)) return true;
+  if (!map.has(id)) { map.set(id, true); return true; }
   return map.get(id);
 }
 
