@@ -66,18 +66,20 @@ async function loadFragen() {
     if (window.location.protocol !== 'file:') {
       try {
         const r = await fetch('../api.php?f=questions');
-        if (r.ok) rqData = await r.json();
+        if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
       } catch (e) { /* fallback */ }
     }
     if (!rqData) {
-      const r = await fetch('../data/questions.json');
-      if (r.ok) rqData = await r.json();
+      try {
+        const r = await fetch('../data/questions.json');
+        if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
+      } catch (e) { /* ignore */ }
     }
   } catch (e) { /* ignore */ }
 
   if (!rqData) {
     const ls = localStorage.getItem('rq_questions');
-    if (ls) try { rqData = JSON.parse(ls); } catch (e) {}
+    if (ls) try { const d = JSON.parse(ls); if (d.categories && d.categories.length) rqData = d; } catch (e) {}
   }
 
   if (rqData && rqData.categories && rqData.categories.length > 0) {

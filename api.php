@@ -73,6 +73,17 @@ $files = [
     'memory-pairs'     => __DIR__ . '/memory/data/pairs.json',
 ];
 
+// Auto-Migration: alte questions.json → neuer Pfad
+$newQ = $files['questions'];
+$oldQ = __DIR__ . '/risiko-quiz/data/questions.json';
+if (!file_exists($newQ) || filesize($newQ) < 30) {
+    if (file_exists($oldQ) && filesize($oldQ) > 30) {
+        $dir = dirname($newQ);
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        copy($oldQ, $newQ);
+    }
+}
+
 // ── Cleanup: Spiele älter als 24h löschen ───────────────────────────
 function cleanupExpiredGames($gamesDir) {
     $registryPath = $gamesDir . '/index.json';
