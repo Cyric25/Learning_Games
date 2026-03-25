@@ -498,6 +498,11 @@
          style="background:rgba(233,69,96,0.25);border-color:rgba(233,69,96,0.5);color:#fff;text-decoration:none;">
         📋 Fragendatenbank
       </a>
+      <button class="header-btn teacher-only" id="btn-publish-global" onclick="publishGlobal()"
+        style="background:rgba(52,152,219,0.25);border-color:rgba(52,152,219,0.5);color:#fff;"
+        title="Aktuelle Spiele-Sichtbarkeit für alle Geräte veröffentlichen">
+        🌐 Global veröffentlichen
+      </button>
       <button class="header-btn" id="btn-teacher-mode" onclick="exitTeacherMode()">
         ✓ Lehrermodus &nbsp;·&nbsp; Beenden
       </button>
@@ -718,6 +723,8 @@
   }
 
   // ── Spiele-Sichtbarkeit ────────────────────────────────
+  let globalEnabledGames = null; // vom Server geladene globale Einstellungen
+
   function getEnabledGames() {
     const stored = localStorage.getItem(GAMES_KEY);
     return stored ? JSON.parse(stored) : DEFAULT_ENABLED;
@@ -727,8 +734,20 @@
     localStorage.setItem(GAMES_KEY, JSON.stringify(list));
   }
 
+  function getEffectiveEnabledGames() {
+    // Lehrer: immer lokale Einstellungen (damit sie konfigurieren können)
+    if (document.body.classList.contains('teacher')) {
+      return getEnabledGames();
+    }
+    // Schüler: globale Einstellungen bevorzugen, Fallback lokal
+    if (globalEnabledGames !== null) {
+      return globalEnabledGames;
+    }
+    return getEnabledGames();
+  }
+
   function applyGameVisibility() {
-    const enabled = getEnabledGames();
+    const enabled = getEffectiveEnabledGames();
     document.querySelectorAll('.game-card[data-game]').forEach(function(card) {
       var id = card.getAttribute('data-game');
       var isEnabled = enabled.indexOf(id) !== -1;
@@ -759,6 +778,50 @@
     }
     saveEnabledGames(enabled);
     applyGameVisibility();
+  }
+
+  // ── Globale Sichtbarkeit (Server) ─────────────────────
+  async function loadGlobalSettings() {
+    if (window.location.protocol === 'file:') return;
+    try {
+      const r = await fetch('api.php?f=settings');
+      if (r.ok) {
+        const d = await r.json();
+        if (d.enabledGames && Array.isArray(d.enabledGames)) {
+          globalEnabledGames = d.enabledGames;
+          applyGameVisibility();
+        }
+      }
+    } catch (e) { /* kein Server verfügbar */ }
+  }
+
+  async function publishGlobal() {
+    const btn = document.getElementById('btn-publish-global');
+    const enabled = getEnabledGames();
+    try {
+      const r = await fetch('api.php?f=settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabledGames: enabled })
+      });
+      if (r.ok) {
+        globalEnabledGames = enabled;
+        btn.textContent = '✓ Veröffentlicht!';
+        btn.style.background = 'rgba(46,204,113,0.35)';
+        btn.style.borderColor = 'rgba(46,204,113,0.6)';
+        setTimeout(() => {
+          btn.textContent = '🌐 Global veröffentlichen';
+          btn.style.background = 'rgba(52,152,219,0.25)';
+          btn.style.borderColor = 'rgba(52,152,219,0.5)';
+        }, 2000);
+      } else {
+        btn.textContent = '❌ Fehler!';
+        setTimeout(() => { btn.textContent = '🌐 Global veröffentlichen'; }, 2000);
+      }
+    } catch (e) {
+      btn.textContent = '❌ Kein Server';
+      setTimeout(() => { btn.textContent = '🌐 Global veröffentlichen'; }, 2000);
+    }
   }
 
   // ── Lehrermodus ──────────────────────────────────────────
@@ -801,6 +864,7 @@
   applyTheme(localStorage.getItem(STORAGE_KEY) === 'dark');
   applyMode(sessionStorage.getItem(SESSION_KEY) === '1');
   applyGameVisibility();
+  loadGlobalSettings();
 </script>
 
 </body>

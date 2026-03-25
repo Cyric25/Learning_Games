@@ -71,6 +71,7 @@ $files = [
     'questions'    => __DIR__ . '/data/questions.json',
     'gamestate'    => __DIR__ . '/risiko-quiz/data/gamestate.json',
     'memory-pairs'     => __DIR__ . '/memory/data/pairs.json',
+    'settings'     => __DIR__ . '/data/settings.json',
 ];
 
 // Auto-Migration: alte questions.json → neuer Pfad
