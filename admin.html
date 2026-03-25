@@ -145,29 +145,33 @@
   <div id="q-modal-panel">
     <h3 id="q-modal-title">Frage bearbeiten</h3>
 
-    <div class="form-row form-row-3" style="margin-bottom:0.5rem;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Hauptkategorie</label>
-        <select id="qm-cat"></select>
+    <div id="qm-cat-rows" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.2rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Kategorie</label>
+          <select id="qm-cat"></select>
+        </div>
+        <div class="form-group" id="qm-subcat-group" style="margin-bottom:0;display:none;">
+          <label>1. Unterkat</label>
+          <select id="qm-subcat"></select>
+        </div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>1. Unterkat</label>
-        <select id="qm-subcat"></select>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>2. Unterkat</label>
-        <select id="qm-subsubcat">
-          <option value="">– Direkt –</option>
-        </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+        <div class="form-group" id="qm-subsubcat-group" style="margin-bottom:0;display:none;">
+          <label>2. Unterkat</label>
+          <select id="qm-subsubcat">
+            <option value="">– Direkt –</option>
+          </select>
+        </div>
+        <div class="form-group" id="qm-l4cat-group" style="margin-bottom:0;display:none;">
+          <label>3. Unterkat</label>
+          <select id="qm-l4cat">
+            <option value="">– Direkt –</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="form-row" style="grid-template-columns:1fr 1fr;margin-bottom:1.2rem;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label>3. Unterkat</label>
-        <select id="qm-l4cat">
-          <option value="">– Direkt –</option>
-        </select>
-      </div>
       <div class="form-group" style="margin-bottom:0;">
         <label>Schwierigkeit</label>
         <select id="qm-diff">
@@ -663,12 +667,15 @@ function openQuestionModal(catId, subcatId, questionId, subsubcatId, l4catId) {
 }
 function populateSubcatDropdown(catId, selectedSubcatId) {
   const sel = document.getElementById('qm-subcat'); sel.innerHTML = '';
+  const group = document.getElementById('qm-subcat-group');
   const cat = questionBank.categories.find(c => c.id === catId);
-  if (!cat || !cat.subcategories || cat.subcategories.length === 0) {
-    sel.innerHTML = '<option value="">– Keine Unterkategorien –</option>';
+  const subs = (cat && cat.subcategories) ? cat.subcategories : [];
+  if (subs.length === 0) {
+    group.style.display = 'none';
     populateSubSubcatDropdown(catId, null, null); return;
   }
-  cat.subcategories.forEach(s => {
+  group.style.display = '';
+  subs.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id; opt.textContent = s.name;
     if (s.id === selectedSubcatId) opt.selected = true;
@@ -677,13 +684,16 @@ function populateSubcatDropdown(catId, selectedSubcatId) {
 }
 function populateSubSubcatDropdown(catId, subcatId, selectedSubsubId) {
   const sel = document.getElementById('qm-subsubcat');
+  const group = document.getElementById('qm-subsubcat-group');
   sel.innerHTML = '<option value="">– Direkt –</option>';
-  if (!subcatId) { populateL4Dropdown(catId, subcatId, null, null); return; }
+  if (!subcatId) { group.style.display = 'none'; populateL4Dropdown(catId, subcatId, null, null); return; }
   const cat = questionBank.categories.find(c => c.id === catId);
-  if (!cat) return;
+  if (!cat) { group.style.display = 'none'; return; }
   const sub = (cat.subcategories || []).find(s => s.id === subcatId);
-  if (!sub || !sub.subcategories || sub.subcategories.length === 0) { populateL4Dropdown(catId, subcatId, null, null); return; }
-  sub.subcategories.forEach(ss => {
+  const subsubs = (sub && sub.subcategories) ? sub.subcategories : [];
+  if (subsubs.length === 0) { group.style.display = 'none'; populateL4Dropdown(catId, subcatId, null, null); return; }
+  group.style.display = '';
+  subsubs.forEach(ss => {
     const opt = document.createElement('option');
     opt.value = ss.id; opt.textContent = ss.name;
     if (ss.id === selectedSubsubId) opt.selected = true;
@@ -692,15 +702,18 @@ function populateSubSubcatDropdown(catId, subcatId, selectedSubsubId) {
 }
 function populateL4Dropdown(catId, subcatId, subsubId, selectedL4Id) {
   const sel = document.getElementById('qm-l4cat');
+  const group = document.getElementById('qm-l4cat-group');
   sel.innerHTML = '<option value="">– Direkt –</option>';
-  if (!subsubId) return;
+  if (!subsubId) { group.style.display = 'none'; return; }
   const cat = questionBank.categories.find(c => c.id === catId);
-  if (!cat) return;
+  if (!cat) { group.style.display = 'none'; return; }
   const sub = (cat.subcategories || []).find(s => s.id === subcatId);
-  if (!sub) return;
+  if (!sub) { group.style.display = 'none'; return; }
   const ss = (sub.subcategories || []).find(ss => ss.id === subsubId);
-  if (!ss || !ss.subcategories || ss.subcategories.length === 0) return;
-  ss.subcategories.forEach(l4 => {
+  const l4s = (ss && ss.subcategories) ? ss.subcategories : [];
+  if (l4s.length === 0) { group.style.display = 'none'; return; }
+  group.style.display = '';
+  l4s.forEach(l4 => {
     const opt = document.createElement('option');
     opt.value = l4.id; opt.textContent = l4.name;
     if (l4.id === selectedL4Id) opt.selected = true;
