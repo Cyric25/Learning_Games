@@ -261,6 +261,15 @@
 
 <script src="risiko-quiz/js/shared.js"></script>
 <script>
+// admin.html liegt im Root → API-Pfad korrigieren (shared.js nutzt ../api.php für Unterordner)
+StorageManager._apiUrl = function(resource, params) {
+  let url = './api.php?f=' + resource;
+  if (params) Object.entries(params).forEach(function(e) { url += '&' + e[0] + '=' + encodeURIComponent(e[1]); });
+  try { return new URL(url, window.location.href).href; }
+  catch(ex) { return '/api.php?f=' + resource; }
+};
+</script>
+<script>
 // ── Standalone Question Editor ───────────────────────────────────
 // Wiederverwendet StorageManager + GameModel + MDParser aus shared.js
 // Kein Spielwähler, keine Spieleinstellungen – nur Fragenverwaltung

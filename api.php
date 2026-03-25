@@ -75,15 +75,16 @@ $files = [
 ];
 
 // Auto-Migration: alte questions.json → neuer Pfad
-$newQ = $files['questions'];
-$oldQ = __DIR__ . '/risiko-quiz/data/questions.json';
-if (!file_exists($newQ) || filesize($newQ) < 30) {
-    if (file_exists($oldQ) && filesize($oldQ) > 30) {
+try {
+    $newQ = $files['questions'];
+    $oldQ = __DIR__ . '/risiko-quiz/data/questions.json';
+    $needsMigration = !file_exists($newQ) || @filesize($newQ) < 30;
+    if ($needsMigration && file_exists($oldQ) && @filesize($oldQ) > 30) {
         $dir = dirname($newQ);
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-        copy($oldQ, $newQ);
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        @copy($oldQ, $newQ);
     }
-}
+} catch (Exception $e) { /* Migration fehlgeschlagen – ignorieren */ }
 
 // ── Cleanup: Spiele älter als 24h löschen ───────────────────────────
 function cleanupExpiredGames($gamesDir) {
