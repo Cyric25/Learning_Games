@@ -829,13 +829,17 @@ function showImportPreview() {
   let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
   importParsed.categories.forEach((sub, idx) => {
     const diffs = sub.questions.map(q => `<span class="diff-badge diff-${q.difficulty}" style="margin:0 1px;">${q.difficulty}</span>`).join('');
-    html += `<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:0.8rem;padding:0.7rem 1rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">`;
-    html += `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;min-width:0;"><strong>${escHtml(sub.name || '(unbenannt)')}</strong><span>${diffs || '<em style="opacity:.5">leer</em>'}</span></div>`;
-    html += `<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end;">`;
-    html += `<span style="color:var(--text-secondary);font-size:0.85rem;">→ Hauptkat:</span>`;
-    html += `<select id="import-cat-map-${idx}" style="${ss}" onchange="updateImportSubcatDropdown(${idx}, this.value)"><option value="">+ Neu</option>${catOpts}</select>`;
-    html += `<span style="color:var(--text-secondary);font-size:0.85rem;">1.Unterkat:</span>`;
-    html += `<select id="import-subcat-map-${idx}" style="${ss}"><option value="">– Als 1.Unterkat –</option></select>`;
+    html += `<div style="padding:0.7rem 1rem;background:var(--bg-card);border-radius:8px;border:1px solid var(--border);">`;
+    html += `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;min-width:0;margin-bottom:0.5rem;"><strong>${escHtml(sub.name || '(unbenannt)')}</strong><span>${diffs || '<em style="opacity:.5">leer</em>'}</span></div>`;
+    html += `<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">`;
+    html += `<span style="color:var(--text-secondary);font-size:0.85rem;">Hauptkat:</span>`;
+    html += `<select id="import-cat-map-${idx}" style="${ss}" onchange="updateImportHierarchy(${idx}, 0)"><option value="">+ Neu</option>${catOpts}</select>`;
+    html += `<span id="import-subcat-label-${idx}" style="color:var(--text-secondary);font-size:0.85rem;display:none;">1.Unterkat:</span>`;
+    html += `<select id="import-subcat-map-${idx}" style="${ss};display:none;" onchange="updateImportHierarchy(${idx}, 1)"><option value="">– Neu –</option></select>`;
+    html += `<span id="import-subsubcat-label-${idx}" style="color:var(--text-secondary);font-size:0.85rem;display:none;">2.Unterkat:</span>`;
+    html += `<select id="import-subsubcat-map-${idx}" style="${ss};display:none;" onchange="updateImportHierarchy(${idx}, 2)"><option value="">– Neu –</option></select>`;
+    html += `<span id="import-l4cat-label-${idx}" style="color:var(--text-secondary);font-size:0.85rem;display:none;">3.Unterkat:</span>`;
+    html += `<select id="import-l4cat-map-${idx}" style="${ss};display:none;"><option value="">– Neu –</option></select>`;
     html += `</div></div>`;
   });
   html += '</div>';
@@ -843,43 +847,125 @@ function showImportPreview() {
   document.getElementById('btn-import-confirm').disabled = validation.errors.length > 0;
   document.getElementById('import-preview').style.display = 'block';
 }
-function updateImportSubcatDropdown(idx, catId) {
-  const sel = document.getElementById(`import-subcat-map-${idx}`); if (!sel) return;
-  sel.innerHTML = '<option value="">– Als 1.Unterkat –</option>';
-  if (!catId) return;
-  const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return;
-  (cat.subcategories || []).forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt); });
+function updateImportHierarchy(idx, changedLevel) {
+  // Level 0=Hauptkat changed, 1=Subcat changed, 2=Subsubcat changed
+  const catSel = document.getElementById(`import-cat-map-${idx}`);
+  const subcatSel = document.getElementById(`import-subcat-map-${idx}`);
+  const subcatLabel = document.getElementById(`import-subcat-label-${idx}`);
+  const subsubSel = document.getElementById(`import-subsubcat-map-${idx}`);
+  const subsubLabel = document.getElementById(`import-subsubcat-label-${idx}`);
+  const l4Sel = document.getElementById(`import-l4cat-map-${idx}`);
+  const l4Label = document.getElementById(`import-l4cat-label-${idx}`);
+
+  function hideFrom(level) {
+    if (level <= 1) { subcatSel.style.display = subcatLabel.style.display = 'none'; subcatSel.innerHTML = '<option value="">– Neu –</option>'; }
+    if (level <= 2) { subsubSel.style.display = subsubLabel.style.display = 'none'; subsubSel.innerHTML = '<option value="">– Neu –</option>'; }
+    l4Sel.style.display = l4Label.style.display = 'none'; l4Sel.innerHTML = '<option value="">– Neu –</option>';
+  }
+
+  if (changedLevel <= 0) {
+    hideFrom(1);
+    const catId = catSel.value; if (!catId) return;
+    const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return;
+    const subs = cat.subcategories || [];
+    if (subs.length === 0) return;
+    subcatSel.innerHTML = '<option value="">– Neu –</option>';
+    subs.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; subcatSel.appendChild(o); });
+    subcatSel.style.display = subcatLabel.style.display = '';
+  }
+
+  if (changedLevel <= 1) {
+    hideFrom(2);
+    const catId = catSel.value; if (!catId) return;
+    const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return;
+    const subcatId = subcatSel.value; if (!subcatId) return;
+    const sub = (cat.subcategories || []).find(s => s.id === subcatId); if (!sub) return;
+    const subsubs = sub.subcategories || [];
+    if (subsubs.length === 0) return;
+    subsubSel.innerHTML = '<option value="">– Neu –</option>';
+    subsubs.forEach(ss => { const o = document.createElement('option'); o.value = ss.id; o.textContent = ss.name; subsubSel.appendChild(o); });
+    subsubSel.style.display = subsubLabel.style.display = '';
+  }
+
+  if (changedLevel <= 2) {
+    l4Sel.style.display = l4Label.style.display = 'none'; l4Sel.innerHTML = '<option value="">– Neu –</option>';
+    const catId = catSel.value; if (!catId) return;
+    const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return;
+    const subcatId = subcatSel.value; if (!subcatId) return;
+    const sub = (cat.subcategories || []).find(s => s.id === subcatId); if (!sub) return;
+    const subsubId = subsubSel.value; if (!subsubId) return;
+    const ss = (sub.subcategories || []).find(x => x.id === subsubId); if (!ss) return;
+    const l4s = ss.subcategories || [];
+    if (l4s.length === 0) return;
+    l4Sel.innerHTML = '<option value="">– Neu –</option>';
+    l4s.forEach(l4 => { const o = document.createElement('option'); o.value = l4.id; o.textContent = l4.name; l4Sel.appendChild(o); });
+    l4Sel.style.display = l4Label.style.display = '';
+  }
 }
 async function doImport() {
   if (!importParsed) return;
-  let newCats = 0, newSubs = 0, newSubsubs = 0, newQs = 0;
+  let newCats = 0, newSubs = 0, newSubsubs = 0, newL4s = 0, newQs = 0;
   for (let i = 0; i < importParsed.categories.length; i++) {
     const importSub = importParsed.categories[i];
-    const catSel = document.getElementById(`import-cat-map-${i}`);
-    const subcatSel = document.getElementById(`import-subcat-map-${i}`);
-    const targetCatId = catSel ? catSel.value : '';
-    const targetSubcatId = subcatSel ? subcatSel.value : '';
+    const catId = (document.getElementById(`import-cat-map-${i}`) || {}).value || '';
+    const subcatId = (document.getElementById(`import-subcat-map-${i}`) || {}).value || '';
+    const subsubId = (document.getElementById(`import-subsubcat-map-${i}`) || {}).value || '';
+    const l4Id = (document.getElementById(`import-l4cat-map-${i}`) || {}).value || '';
+    const importName = importSub.name || 'Importiert';
+    const makeId = () => 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+
+    // Hauptkategorie finden/erstellen
     let targetCat;
-    if (!targetCatId) { targetCat = GameModel.createCategory(importSub.name || 'Importierte Kategorie'); questionBank.categories.push(targetCat); newCats++; }
-    else { targetCat = questionBank.categories.find(c => c.id === targetCatId); if (!targetCat) continue; }
+    if (!catId) { targetCat = GameModel.createCategory(importName); questionBank.categories.push(targetCat); newCats++; }
+    else { targetCat = questionBank.categories.find(c => c.id === catId); if (!targetCat) continue; }
     if (!targetCat.subcategories) targetCat.subcategories = [];
-    if (targetSubcatId) {
-      const targetSub = targetCat.subcategories.find(s => s.id === targetSubcatId); if (!targetSub) continue;
-      if (!targetSub.subcategories) targetSub.subcategories = [];
-      let subsub = targetSub.subcategories.find(ss => ss.name.toLowerCase() === (importSub.name || '').toLowerCase());
-      if (!subsub) { subsub = GameModel.createSubSubcategory(importSub.name || 'Standard'); targetSub.subcategories.push(subsub); newSubsubs++; }
-      (importSub.questions || []).forEach(q => { subsub.questions.push(Object.assign({}, q, { id: 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) })); newQs++; });
+
+    // Zielknoten bestimmen — je nach gewählter Tiefe
+    let targetNode = targetCat;
+    if (subcatId) {
+      const sub = targetCat.subcategories.find(s => s.id === subcatId);
+      if (sub) {
+        targetNode = sub;
+        if (!sub.subcategories) sub.subcategories = [];
+        if (subsubId) {
+          const ss = sub.subcategories.find(x => x.id === subsubId);
+          if (ss) {
+            targetNode = ss;
+            if (!ss.subcategories) ss.subcategories = [];
+            if (l4Id) {
+              const l4 = ss.subcategories.find(x => x.id === l4Id);
+              if (l4) { targetNode = l4; }
+            } else {
+              // Neue L4 als Kind von subsubcat
+              let l4 = ss.subcategories.find(x => x.name.toLowerCase() === importName.toLowerCase());
+              if (!l4) { l4 = GameModel.createLevel4 ? GameModel.createLevel4(importName) : { id: 'l4-' + Date.now(), name: importName, questions: [], subcategories: [] }; ss.subcategories.push(l4); newL4s++; }
+              targetNode = l4;
+            }
+          }
+        } else {
+          // Neue SubSubcat als Kind von subcat
+          let ss = sub.subcategories.find(x => x.name.toLowerCase() === importName.toLowerCase());
+          if (!ss) { ss = GameModel.createSubSubcategory ? GameModel.createSubSubcategory(importName) : { id: 'subsubcat-' + Date.now(), name: importName, questions: [], subcategories: [] }; sub.subcategories.push(ss); newSubsubs++; }
+          targetNode = ss;
+        }
+      }
     } else {
-      let sub = targetCat.subcategories.find(s => s.name.toLowerCase() === (importSub.name || '').toLowerCase());
-      if (!sub) { sub = GameModel.createSubcategory(importSub.name || 'Standard'); targetCat.subcategories.push(sub); newSubs++; }
-      (importSub.questions || []).forEach(q => { sub.questions.push(Object.assign({}, q, { id: 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5) })); newQs++; });
+      // Neue Subcat als Kind von Hauptkat
+      let sub = targetCat.subcategories.find(s => s.name.toLowerCase() === importName.toLowerCase());
+      if (!sub) { sub = GameModel.createSubcategory(importName); targetCat.subcategories.push(sub); newSubs++; }
+      targetNode = sub;
     }
+
+    // Fragen einfügen
+    if (!targetNode.questions) targetNode.questions = [];
+    (importSub.questions || []).forEach(q => { targetNode.questions.push(Object.assign({}, q, { id: makeId() })); newQs++; });
   }
   await saveQuestionsToServer(); renderCategories(); updateStats(); cancelImport();
   const parts = [];
-  if (newCats > 0) parts.push(`${newCats} neue Hauptkategorie${newCats !== 1 ? 'n' : ''}`);
-  if (newSubs > 0) parts.push(`${newSubs} 1.Unterkategorie${newSubs !== 1 ? 'n' : ''}`);
-  if (newSubsubs > 0) parts.push(`${newSubsubs} 2.Unterkategorie${newSubsubs !== 1 ? 'n' : ''}`);
+  if (newCats > 0) parts.push(`${newCats} Hauptkat.`);
+  if (newSubs > 0) parts.push(`${newSubs} 1.Unterkat.`);
+  if (newSubsubs > 0) parts.push(`${newSubsubs} 2.Unterkat.`);
+  if (newL4s > 0) parts.push(`${newL4s} 3.Unterkat.`);
   parts.push(`${newQs} Frage${newQs !== 1 ? 'n' : ''}`);
   showAlert('questions-alert', 'success', `Import erfolgreich! ${parts.join(', ')} hinzugefügt.`);
   switchTab('tab-questions');
