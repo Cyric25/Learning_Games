@@ -288,6 +288,7 @@ let importParsed = null;
 const collapsedCats = new Map();
 const collapsedSubs = new Map();
 const collapsedSubsubs = new Map();
+const collapsedL4s = new Map();
 
 // ── Init ─────────────────────────────────────────────────────────
 async function init() {
@@ -482,23 +483,32 @@ function renderSubSubBlock(subsub, sub, cat, container) {
     l4Container.style.paddingLeft = '1.5rem';
     l4s.forEach(l4 => {
       const l4Missing = GameModel.DIFFICULTIES.filter(d => !(l4.questions || []).some(q => q.difficulty === d));
+      const l4Collapsed = isCollapsed(l4.id, collapsedL4s);
       const l4Block = document.createElement('div');
       l4Block.className = 'cat-block';
       l4Block.style.marginTop = '0.5rem';
       l4Block.style.marginBottom = '0.5rem';
       l4Block.innerHTML = `
         <div class="cat-header" style="background:rgba(255,255,255,0.02);">
-          <input class="cat-name-edit" type="text" value="${escHtml(l4.name)}"
-            style="font-size:0.9rem;font-weight:600;"
-            onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)"
-            oninput="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <button class="btn btn-secondary btn-sm cat-collapse-btn"
+              onclick="collapsedL4s.set('${l4.id}', !collapsedL4s.get('${l4.id}')); renderCategories();"
+              title="${l4Collapsed ? 'Aufklappen' : 'Einklappen'}">${l4Collapsed ? '▶' : '▼'}</button>
+            <input class="cat-name-edit" type="text" value="${escHtml(l4.name)}"
+              style="font-size:0.9rem;font-weight:600;"
+              onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)"
+              oninput="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
+          </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
             ${l4Missing.length ? `<span class="warning-badge">⚠ ${l4Missing.join(', ')} fehlt</span>` : '<span style="color:var(--success);font-size:0.85rem;">✓</span>'}
             <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}','${sub.id}',null,'${subsub.id}','${l4.id}')">+ Frage</button>
             <button class="btn btn-danger btn-sm" onclick="removeLevel4('${cat.id}','${sub.id}','${subsub.id}','${l4.id}')">✕</button>
           </div>
         </div>`;
-      renderQTable(l4Block, l4.questions, cat.id, sub.id, subsub.id, l4.id);
+      const l4Body = document.createElement('div');
+      l4Body.style.display = l4Collapsed ? 'none' : '';
+      renderQTable(l4Body, l4.questions, cat.id, sub.id, subsub.id, l4.id);
+      l4Block.appendChild(l4Body);
       l4Container.appendChild(l4Block);
     });
     subsubBody.appendChild(l4Container);
