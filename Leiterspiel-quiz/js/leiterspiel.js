@@ -154,13 +154,7 @@ function convertRQtoLeiterspiel(rqData) {
   const icons = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯'];
   (rqData.categories || []).forEach((cat, i) => {
     const icon = icons[i % icons.length];
-    if ((!cat.subcategories || cat.subcategories.length === 0) && cat.questions && cat.questions.length > 0) {
-      collectLeafCategories(cat, [cat.name], icon);
-    } else {
-      (cat.subcategories || []).forEach(sub => {
-        collectLeafCategories(sub, [cat.name, sub.name], icon);
-      });
-    }
+    collectLeafCategories(cat, [cat.name], icon);
   });
 
   return { kategorien, fragen };
@@ -681,6 +675,7 @@ function renderBoard() {
     div.style.gridColumn = pos.gridCol;
 
     // Difficulty class
+    const diffClassMap = { leicht: 'easy', mittel: 'medium', schwer: 'hard' };
     if (f === 1) {
       div.classList.add('field-start');
     } else if (f === 100) {
@@ -692,7 +687,7 @@ function renderBoard() {
     } else if (field.bonusType === 'swap') {
       div.classList.add('bonus-swap');
     } else {
-      div.classList.add('field-' + field.difficulty);
+      div.classList.add('field-' + (diffClassMap[field.difficulty] || field.difficulty));
     }
 
     // Ladder/Snake markers
@@ -788,12 +783,17 @@ function updatePieces() {
 // ── SVG Ladders & Snakes ─────────────────────────────────────
 function drawLaddersAndSnakes() {
   const svg = document.getElementById('svg-overlay');
-  if (!svg) return;
-  const container = svg.parentElement;
-  const rect = container.getBoundingClientRect();
-  svg.setAttribute('width', rect.width);
-  svg.setAttribute('height', rect.height);
-  svg.setAttribute('viewBox', '0 0 ' + rect.width + ' ' + rect.height);
+  const grid = document.getElementById('board-grid');
+  if (!svg || !grid) return;
+
+  const gridRect = grid.getBoundingClientRect();
+  const containerRect = svg.parentElement.getBoundingClientRect();
+
+  svg.style.left = (gridRect.left - containerRect.left) + 'px';
+  svg.style.top  = (gridRect.top  - containerRect.top)  + 'px';
+  svg.setAttribute('width',   gridRect.width);
+  svg.setAttribute('height',  gridRect.height);
+  svg.setAttribute('viewBox', '0 0 ' + gridRect.width + ' ' + gridRect.height);
   svg.innerHTML = '';
 
   function getFieldCenter(fieldNum) {
@@ -801,94 +801,122 @@ function drawLaddersAndSnakes() {
     if (!el) return null;
     const fr = el.getBoundingClientRect();
     return {
-      x: fr.left - rect.left + fr.width / 2,
-      y: fr.top - rect.top + fr.height / 2
+      x: fr.left - gridRect.left + fr.width  / 2,
+      y: fr.top  - gridRect.top  + fr.height / 2
     };
   }
 
-  // Draw ladders
+  function el(tag, attrs) {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  }
+
+  // ── Leitern ──────────────────────────────────────────────
   Object.entries(LADDERS).forEach(([from, to]) => {
     const a = getFieldCenter(Number(from));
     const b = getFieldCenter(Number(to));
     if (!a || !b) return;
 
-    // Ladder: two parallel lines with rungs
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const nx = -dy / len * 4; // normal offset
-    const ny = dx / len * 4;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const W = 5.5;
+    const nx = -dy / len * W, ny = dx / len * W;
 
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', a.x + nx); line.setAttribute('y1', a.y + ny);
-    line.setAttribute('x2', b.x + nx); line.setAttribute('y2', b.y + ny);
-    line.setAttribute('stroke', '#2e7d32'); line.setAttribute('stroke-width', '2.5');
-    line.setAttribute('opacity', '0.7'); line.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(line);
+    // Schatten
+    svg.appendChild(el('line', { x1: a.x+nx+2, y1: a.y+ny+2.5, x2: b.x+nx+2, y2: b.y+ny+2.5, stroke:'#000','stroke-width':'5',opacity:'0.1','stroke-linecap':'round' }));
+    svg.appendChild(el('line', { x1: a.x-nx+2, y1: a.y-ny+2.5, x2: b.x-nx+2, y2: b.y-ny+2.5, stroke:'#000','stroke-width':'5',opacity:'0.1','stroke-linecap':'round' }));
 
-    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line2.setAttribute('x1', a.x - nx); line2.setAttribute('y1', a.y - ny);
-    line2.setAttribute('x2', b.x - nx); line2.setAttribute('y2', b.y - ny);
-    line2.setAttribute('stroke', '#2e7d32'); line2.setAttribute('stroke-width', '2.5');
-    line2.setAttribute('opacity', '0.7'); line2.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(line2);
+    // Holme (dunkelbraun)
+    svg.appendChild(el('line', { x1: a.x+nx, y1: a.y+ny, x2: b.x+nx, y2: b.y+ny, stroke:'#5D2E0C','stroke-width':'4',opacity:'1','stroke-linecap':'round' }));
+    svg.appendChild(el('line', { x1: a.x-nx, y1: a.y-ny, x2: b.x-nx, y2: b.y-ny, stroke:'#5D2E0C','stroke-width':'4',opacity:'1','stroke-linecap':'round' }));
+    // Holme Highlight
+    svg.appendChild(el('line', { x1: a.x+nx*0.3, y1: a.y+ny*0.3, x2: b.x+nx*0.3, y2: b.y+ny*0.3, stroke:'#A0622D','stroke-width':'1.5',opacity:'0.5','stroke-linecap':'round' }));
+    svg.appendChild(el('line', { x1: a.x-nx*0.3, y1: a.y-ny*0.3, x2: b.x-nx*0.3, y2: b.y-ny*0.3, stroke:'#A0622D','stroke-width':'1.5',opacity:'0.5','stroke-linecap':'round' }));
 
-    // Rungs
-    const rungCount = Math.max(2, Math.floor(len / 20));
+    // Sprossen
+    const rungCount = Math.max(3, Math.floor(len / 14));
     for (let i = 1; i < rungCount; i++) {
       const t = i / rungCount;
-      const rx = a.x + dx * t;
-      const ry = a.y + dy * t;
-      const rung = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      rung.setAttribute('x1', rx + nx); rung.setAttribute('y1', ry + ny);
-      rung.setAttribute('x2', rx - nx); rung.setAttribute('y2', ry - ny);
-      rung.setAttribute('stroke', '#2e7d32'); rung.setAttribute('stroke-width', '2');
-      rung.setAttribute('opacity', '0.5');
-      svg.appendChild(rung);
+      const rx = a.x + dx*t, ry = a.y + dy*t;
+      svg.appendChild(el('line', { x1: rx+nx, y1: ry+ny, x2: rx-nx, y2: ry-ny, stroke:'#8B4513','stroke-width':'3',opacity:'0.95','stroke-linecap':'round' }));
+      svg.appendChild(el('line', { x1: rx+nx*0.3, y1: ry+ny*0.3, x2: rx-nx*0.3, y2: ry-ny*0.3, stroke:'#C47A3A','stroke-width':'1.2',opacity:'0.5','stroke-linecap':'round' }));
     }
+
+    // Kreise an Fuß (grün) und Kopf (dunkelgrün)
+    svg.appendChild(el('circle', { cx: a.x, cy: a.y, r:'6',   fill:'#43A047', opacity:'0.95' }));
+    svg.appendChild(el('circle', { cx: a.x, cy: a.y, r:'3.5', fill:'#fff',    opacity:'0.5'  }));
+    svg.appendChild(el('circle', { cx: b.x, cy: b.y, r:'6',   fill:'#1B5E20', opacity:'0.95' }));
+    svg.appendChild(el('circle', { cx: b.x, cy: b.y, r:'3.5', fill:'#fff',    opacity:'0.4'  }));
+
+    // Pfeil nach oben an der Spitze
+    const ah = 8, udx = dx/len, udy = dy/len;
+    const ap = 'M '+(b.x-udx*ah-nx*0.7)+' '+(b.y-udy*ah-ny*0.7)+
+               ' L '+b.x+' '+b.y+
+               ' L '+(b.x-udx*ah+nx*0.7)+' '+(b.y-udy*ah+ny*0.7);
+    svg.appendChild(el('path', { d:ap, fill:'none', stroke:'#1B5E20','stroke-width':'3','stroke-linecap':'round','stroke-linejoin':'round',opacity:'0.95' }));
   });
 
-  // Draw snakes
+  // ── Schlangen ─────────────────────────────────────────────
+  const snakeColors = ['#C62828','#E65100','#6A1B9A','#1565C0','#2E7D32'];
+  let snakeIdx = 0;
+
   Object.entries(SNAKES).forEach(([from, to]) => {
-    const a = getFieldCenter(Number(from));
-    const b = getFieldCenter(Number(to));
+    const a = getFieldCenter(Number(from)); // Kopf (oben)
+    const b = getFieldCenter(Number(to));   // Schwanz (unten)
     if (!a || !b) return;
 
-    // Snake: wavy path
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const waves = Math.max(2, Math.floor(len / 30));
-    const amplitude = Math.min(15, len * 0.08);
-    const nx = -dy / len;
-    const ny = dx / len;
+    const color = snakeColors[snakeIdx++ % snakeColors.length];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const waves = Math.max(3, Math.floor(len / 20));
+    const amplitude = Math.min(20, len * 0.09);
+    const nx = -dy / len, ny = dx / len;
 
-    let d = 'M ' + a.x + ' ' + a.y;
-    for (let i = 1; i <= waves * 2; i++) {
-      const t = i / (waves * 2);
-      const px = a.x + dx * t;
-      const py = a.y + dy * t;
-      const side = i % 2 === 0 ? 1 : -1;
-      const cpx = a.x + dx * (t - 0.5 / (waves * 2)) + nx * amplitude * side;
-      const cpy = a.y + dy * (t - 0.5 / (waves * 2)) + ny * amplitude * side;
-      d += ' Q ' + cpx + ' ' + cpy + ' ' + px + ' ' + py;
+    // Wellenpath generieren
+    function buildPath(ox, oy) {
+      let d = 'M '+(a.x+ox)+' '+(a.y+oy);
+      for (let i = 1; i <= waves * 2; i++) {
+        const t = i / (waves * 2);
+        const px = a.x + dx*t + ox, py = a.y + dy*t + oy;
+        const side = i % 2 === 0 ? 1 : -1;
+        const cpx = a.x + dx*(t - 0.5/(waves*2)) + nx*amplitude*side + ox;
+        const cpy = a.y + dy*(t - 0.5/(waves*2)) + ny*amplitude*side + oy;
+        d += ' Q '+cpx+' '+cpy+' '+px+' '+py;
+      }
+      return d;
     }
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', '#c62828');
-    path.setAttribute('stroke-width', '3');
-    path.setAttribute('opacity', '0.6');
-    path.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(path);
+    // Schatten
+    svg.appendChild(el('path', { d: buildPath(2,3), fill:'none', stroke:'#000','stroke-width':'8', opacity:'0.1','stroke-linecap':'round' }));
+    // Körper (dicker Außen)
+    svg.appendChild(el('path', { d: buildPath(0,0), fill:'none', stroke:'#000','stroke-width':'8', opacity:'0.15','stroke-linecap':'round' }));
+    // Körper (Farbe)
+    svg.appendChild(el('path', { d: buildPath(0,0), fill:'none', stroke:color,'stroke-width':'6', opacity:'0.92','stroke-linecap':'round' }));
+    // Schuppenmuster (heller Streifen)
+    svg.appendChild(el('path', { d: buildPath(0,0), fill:'none', stroke:'#fff','stroke-width':'1.5',opacity:'0.25','stroke-linecap':'round','stroke-dasharray':'8 12' }));
 
-    // Snake head (circle at start)
-    const head = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    head.setAttribute('cx', a.x); head.setAttribute('cy', a.y);
-    head.setAttribute('r', '4'); head.setAttribute('fill', '#c62828');
-    head.setAttribute('opacity', '0.7');
-    svg.appendChild(head);
+    // Kopf (großer Kreis)
+    svg.appendChild(el('circle', { cx: a.x, cy: a.y, r:'8',   fill:color, opacity:'0.97' }));
+    svg.appendChild(el('circle', { cx: a.x, cy: a.y, r:'5.5', fill:'#000',opacity:'0.12' }));
+
+    // Augen
+    const enx = nx*2.8, eny = ny*2.8;
+    const ebx = dx/len*2, eby = dy/len*2;
+    svg.appendChild(el('circle', { cx: a.x+enx-ebx, cy: a.y+eny-eby, r:'2.2', fill:'#fff', opacity:'1' }));
+    svg.appendChild(el('circle', { cx: a.x-enx-ebx, cy: a.y-eny-eby, r:'2.2', fill:'#fff', opacity:'1' }));
+    svg.appendChild(el('circle', { cx: a.x+enx-ebx, cy: a.y+eny-eby, r:'1.1', fill:'#000', opacity:'0.9' }));
+    svg.appendChild(el('circle', { cx: a.x-enx-ebx, cy: a.y-eny-eby, r:'1.1', fill:'#000', opacity:'0.9' }));
+
+    // Zunge
+    const tx = a.x - dx/len*10, ty = a.y - dy/len*10;
+    const tongue = 'M '+a.x+' '+a.y+' L '+tx+' '+ty+
+                   ' M '+(tx)+' '+ty+' L '+(tx-nx*4-dx/len*3)+' '+(ty-ny*4-dy/len*3)+
+                   ' M '+(tx)+' '+ty+' L '+(tx+nx*4-dx/len*3)+' '+(ty+ny*4-dy/len*3);
+    svg.appendChild(el('path', { d:tongue, fill:'none', stroke:'#FF1744','stroke-width':'1.5','stroke-linecap':'round',opacity:'0.9' }));
+
+    // Schwanzspitze
+    svg.appendChild(el('circle', { cx: b.x, cy: b.y, r:'3', fill:color, opacity:'0.7' }));
   });
 }
 
@@ -907,9 +935,8 @@ function renderTeamList() {
       '<span class="team-emoji">' + team.emoji + '</span>' +
       '<div class="team-info">' +
         '<div class="team-name">' + team.name + '</div>' +
-        '<div class="team-pos">Feld ' + team.position + '</div>' +
-      '</div>' +
-      '<span class="team-score">' + team.score + '</span>';
+        '<div class="team-pos">Feld <strong>' + team.position + '</strong></div>' +
+      '</div>';
     list.appendChild(card);
   });
 }
@@ -919,8 +946,7 @@ function updateTeamList() {
     const team = gameState.teams[teamIdx];
     const card = document.getElementById('team-card-' + teamIdx);
     if (!card) return;
-    card.querySelector('.team-pos').textContent = 'Feld ' + team.position;
-    card.querySelector('.team-score').textContent = team.score;
+    card.querySelector('.team-pos').innerHTML = 'Feld <strong>' + team.position + '</strong>';
   });
   // Highlight active
   document.querySelectorAll('.team-card').forEach(c => c.classList.remove('active-turn'));
@@ -1010,8 +1036,10 @@ function askQuestion() {
   document.getElementById('q-cat-name').textContent = kat ? kat.icon + ' ' + kat.name : '';
 
   const diffEl = document.getElementById('q-difficulty');
-  diffEl.textContent = difficulty === 'leicht' ? 'Leicht' : difficulty === 'mittel' ? 'Mittel' : 'Schwer';
-  diffEl.className = 'modal-difficulty diff-' + difficulty;
+  const diffLabelMap = { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' };
+  const diffCssMap   = { leicht: 'easy',   mittel: 'medium', schwer: 'hard'   };
+  diffEl.textContent = diffLabelMap[difficulty] || difficulty;
+  diffEl.className = 'modal-difficulty diff-' + (diffCssMap[difficulty] || difficulty);
 
   document.getElementById('q-text').textContent = question.frage;
 
@@ -1121,7 +1149,7 @@ function resolveQuestion(correct) {
 
   const resultEl = document.getElementById('q-result');
   if (correct) {
-    resultEl.textContent = '✓ Richtig! +' + POINTS[field.difficulty] + ' Punkte';
+    resultEl.textContent = '✓ Richtig!';
     resultEl.className = 'modal-result visible correct-result';
     team.score += POINTS[field.difficulty];
     team.correctCount++;
@@ -1380,7 +1408,6 @@ function showWinner() {
   const statsEl = document.getElementById('winner-stats');
   statsEl.innerHTML = '';
   const stats = [
-    { label: 'Punkte', value: team.score },
     { label: 'Richtig', value: team.correctCount },
     { label: 'Falsch', value: team.wrongCount },
     { label: 'Endfeld', value: team.position }
