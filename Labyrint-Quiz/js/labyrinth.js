@@ -291,6 +291,7 @@ function renderBoard() {
     teams: gameState.teams,
     currentTeamIdx: gameState.currentTeamIdx,
     allSymbols: gameState.symbols || [],
+    doors: gameState.doors || [],
     _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
   };
   renderer.render(rs);
