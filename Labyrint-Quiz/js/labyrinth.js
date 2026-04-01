@@ -1,968 +1,733 @@
-/* labyrinth.js – Labyrinth-Quiz Spiellogik */
+/* labyrinth.js – Spiellogik v2 (Würfel + Teamspezifische Symbole) */
 
-// ── Constants ────────────────────────────────────────────────────
-const FIGURES = [
-  { id: 'knight', emoji: '🛡️', name: 'Ritter' },
-  { id: 'dragon', emoji: '🐉', name: 'Drache' },
-  { id: 'owl',    emoji: '🦉', name: 'Eule' },
-  { id: 'fox',    emoji: '🦊', name: 'Fuchs' },
-  { id: 'wizard', emoji: '🧙', name: 'Zauberer' },
-  { id: 'robot',  emoji: '🤖', name: 'Roboter' }
-];
-
-const TEAM_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#ec4899'];
-
-const TIMER_OPTIONS = [
-  { value: 15, label: '15s' },
-  { value: 20, label: '20s' },
-  { value: 30, label: '30s' },
-  { value: 0,  label: 'Kein Limit' }
-];
-
-const SYMBOL_OPTIONS = [6, 9, 12, 15, 18];
-const MAZE_SIZE = 16;
+// ── Konstanten ───────────────────────────────────────────────────
+const TEAM_SYMBOL_ICONS = ['👑', '⚔️', '💎', '🔮', '🗝️', '📜'];
+const TEAM_COLORS = ['#1a3a8f', '#8f1a1a', '#1a6b1a', '#6b1a6b', '#8f5a1a', '#1a6b6b'];
+const TEAM_EMOJIS = ['🛡️', '🐉', '🦉', '🦊', '🧙', '🤖'];
+const DICE_CHARS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const DEFAULT_NAMES = ['Ritter', 'Drachen', 'Eulen', 'Füchse', 'Magier', 'Roboter'];
 
 // ── State ────────────────────────────────────────────────────────
-let fragenBank = null;          // { kategorien: [], fragen: [] }
-let selectedCategoryIds = new Set();
+let allQuestions = [];
+let activeCategories = new Set();
+let usedQuestionIds = new Set();
 
 let gameState = {
-  maze: null,
-  seed: 0,
+  phase: 'setup', // setup | rolling | moving | question | finished
   teams: [],
   currentTeamIdx: 0,
-  phase: 'setup',               // setup | playing | finished
-  symbols: [],
-  doors: [],
-  usedQuestionIds: new Set(),
-  config: {
-    symbolCount: 12,
-    timerSeconds: 20,
-    teamCount: 4
-  }
+  maze: null,
+  allSymbols: [],
+  diceValue: 0,
+  stepsRemaining: 0,
+  config: { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, kategorien: [] },
+  _validFree: new Set(),
+  _validDoor: new Set(),
+  _validSym: new Set(),
 };
 
 let renderer = null;
+let questionContext = null;
 let timerInterval = null;
 let timerRemaining = 0;
-let currentQuestion = null;
-let questionResolved = false;
-let pendingTrigger = null;      // { type: 'door'|'symbol', index, targetX, targetY }
-let animating = false;
+let diceAnimInterval = null;
 
 // ── Init ─────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  renderTeamCountSelector();
-  renderTimerSelector();
-  renderSymbolSelector();
-  renderTeamConfig();
-  loadFragen();
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadQuestions();
+  buildSetupUI();
+
+  document.getElementById('maze-canvas').addEventListener('click', e => {
+    if (gameState.phase !== 'moving' || !renderer) return;
+    const cell = renderer.getCellFromClick(e.clientX, e.clientY);
+    if (cell) attemptMove(cell.x, cell.y);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (gameState.phase !== 'moving') return;
+    const dirs = { ArrowUp:{dx:0,dy:-1}, ArrowDown:{dx:0,dy:1}, ArrowLeft:{dx:-1,dy:0}, ArrowRight:{dx:1,dy:0} };
+    const d = dirs[e.key];
+    if (!d) return;
+    e.preventDefault();
+    const t = currentTeam();
+    attemptMove(t.x + d.dx, t.y + d.dy);
+  });
 });
 
-// ── Question Loading (shared pattern) ────────────────────────────
-async function loadFragen() {
-  let rqData = null;
-  try {
-    if (window.location.protocol !== 'file:') {
-      try {
-        const r = await fetch('../api.php?f=questions');
-        if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
-      } catch (e) { /* fallback */ }
-    }
-    if (!rqData) {
-      try {
-        const r = await fetch('../data/questions.json');
-        if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
-      } catch (e) { /* ignore */ }
-    }
-  } catch (e) { /* ignore */ }
+// ── Fragen laden ─────────────────────────────────────────────────
+async function loadQuestions() {
+  let data = null;
+  try { const r = await fetch('../api.php?f=questions'); if (r.ok) data = await r.json(); } catch(e) {}
+  if (!data) { try { const r = await fetch('../data/questions.json'); if (r.ok) data = await r.json(); } catch(e) {} }
+  if (!data) { const c = localStorage.getItem('rq_questions'); if (c) data = JSON.parse(c); }
+  if (!data) data = { categories: [] };
 
-  if (!rqData) {
-    const ls = localStorage.getItem('rq_questions');
-    if (ls) try { const d = JSON.parse(ls); if (d.categories && d.categories.length) rqData = d; } catch (e) {}
-  }
-
-  if (rqData && rqData.categories && rqData.categories.length > 0) {
-    fragenBank = convertRQtoLabyrinth(rqData);
-    renderCategorySelector();
-    return;
-  }
-
-  document.getElementById('setup-error').textContent =
-    'Keine Fragen geladen. Bitte Fragen in der zentralen Fragendatenbank anlegen.';
-  document.getElementById('btn-start').disabled = true;
+  const { fragen, kategorien } = convertRQtoLabyrinth(data);
+  allQuestions = fragen;
 }
 
 function convertRQtoLabyrinth(rqData) {
-  const kategorien = [];
-  const fragen = [];
-  const icons = ['🧪', '🧬', '⚗️', '🔬', '🌍', '📐', '💡', '🎯', '📖', '🧮'];
-  const colors = ['#332288', '#88ccee', '#44aa99', '#117733', '#999933',
-                  '#ddcc77', '#cc6677', '#882255', '#aa4499', '#0077bb'];
-  let colorIdx = 0;
-
-  function collectLeafCategories(node, path, parentIcon) {
-    const subs = node.subcategories || [];
-    const hasQuestions = node.questions && node.questions.length > 0;
-
-    if (hasQuestions) {
-      const katId = node.id;
-      const katName = path.join(' \u203a ');
-      if (!kategorien.find(k => k.id === katId)) {
-        kategorien.push({
-          id: katId,
-          name: katName,
-          icon: parentIcon || '📚',
-          farbe: colors[colorIdx++ % colors.length]
-        });
-      }
-
-      node.questions.forEach(q => {
-        const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
-        let typ, antworten, richtig;
-
-        if (q.type === 'mc' && q.options && q.options.length > 0) {
-          typ = 'multiple_choice';
-          antworten = q.options.slice();
-          richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
-        } else {
-          typ = 'offen';
-          antworten = [];
-          richtig = -1;
-        }
-
-        fragen.push({
-          id: q.id,
-          kategorie: katId,
-          schwierigkeit,
-          frage: q.question || '',
-          typ,
-          antworten,
-          richtig,
-          erklaerung: q.answer || q.hint || ''
-        });
-      });
-    }
-
-    subs.forEach(sub => collectLeafCategories(sub, [...path, sub.name], parentIcon));
-  }
-
-  (rqData.categories || []).forEach((cat, i) => {
-    const icon = icons[i % icons.length];
-    if ((!cat.subcategories || cat.subcategories.length === 0) && cat.questions && cat.questions.length > 0) {
-      collectLeafCategories(cat, [cat.name], icon);
+  const fragen = [], kategorien = [];
+  function walk(cat, path) {
+    if (cat.subcategories?.length) {
+      cat.subcategories.forEach(s => walk(s, path ? `${path} › ${cat.name}` : cat.name));
     } else {
-      (cat.subcategories || []).forEach(sub => {
-        collectLeafCategories(sub, [cat.name, sub.name], icon);
+      const full = path ? `${path} › ${cat.name}` : cat.name;
+      kategorien.push({ id: cat.id, name: full });
+      (cat.questions || []).forEach(q => {
+        let diff = q.difficulty <= 200 ? 'leicht' : q.difficulty >= 400 ? 'schwer' : 'mittel';
+        fragen.push({ ...q, kategorieId: cat.id, kategorieName: full, schwierigkeit: diff,
+          type: q.type === 'mc' ? 'multiple_choice' : 'offen' });
       });
     }
-  });
-
-  return { kategorien, fragen };
+  }
+  (rqData.categories || []).forEach(c => walk(c, ''));
+  return { fragen, kategorien };
 }
 
-// ── Setup UI Renderers ───────────────────────────────────────────
-function renderTeamCountSelector() {
+// ── Setup UI ─────────────────────────────────────────────────────
+function buildSetupUI() {
+  buildCategoryUI();
+  buildTeamCountUI();
+  buildTeamConfigUI();
+  buildSymbolsPerTeamUI();
+  buildTimerUI();
+}
+
+function buildCategoryUI() {
+  const catMap = new Map();
+  allQuestions.forEach(q => {
+    if (!catMap.has(q.kategorieId)) catMap.set(q.kategorieId, { id: q.kategorieId, name: q.kategorieName });
+    activeCategories.add(q.kategorieId);
+  });
+  const cats = [...catMap.values()];
+  const section = document.getElementById('category-section');
+  const list = document.getElementById('cat-select-list');
+  if (!cats.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  list.innerHTML = '';
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-toggle-btn active';
+    btn.dataset.catId = cat.id;
+    btn.textContent = cat.name.split(' › ').pop();
+    btn.title = cat.name;
+    btn.onclick = () => {
+      if (activeCategories.has(cat.id)) { activeCategories.delete(cat.id); btn.classList.remove('active'); }
+      else { activeCategories.add(cat.id); btn.classList.add('active'); }
+      updateCategoryInfo();
+    };
+    list.appendChild(btn);
+  });
+  updateCategoryInfo();
+}
+
+function toggleAllCategories(on) {
+  document.querySelectorAll('#cat-select-list .cat-toggle-btn').forEach(btn => {
+    on ? activeCategories.add(btn.dataset.catId) : activeCategories.delete(btn.dataset.catId);
+    btn.classList.toggle('active', on);
+  });
+  updateCategoryInfo();
+}
+
+function updateCategoryInfo() {
+  const el = document.getElementById('cat-select-info');
+  if (!el) return;
+  const n = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  el.textContent = `${n} Fragen aus ${activeCategories.size} Kategorien verfügbar`;
+}
+
+function buildTeamCountUI() {
   const row = document.getElementById('team-count-row');
   row.innerHTML = '';
-  for (let n = 2; n <= 6; n++) {
+  [2, 3, 4, 5, 6].forEach(n => {
     const btn = document.createElement('button');
     btn.className = 'param-btn' + (n === gameState.config.teamCount ? ' active' : '');
-    btn.textContent = n + ' Gruppen';
+    btn.textContent = n;
     btn.onclick = () => {
       gameState.config.teamCount = n;
       row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderTeamConfig();
-    };
-    row.appendChild(btn);
-  }
-}
-
-function renderTimerSelector() {
-  const row = document.getElementById('timer-row');
-  row.innerHTML = '';
-  TIMER_OPTIONS.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.className = 'param-btn' + (opt.value === gameState.config.timerSeconds ? ' active' : '');
-    btn.textContent = opt.label;
-    btn.onclick = () => {
-      gameState.config.timerSeconds = opt.value;
-      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      buildTeamConfigUI();
     };
     row.appendChild(btn);
   });
 }
 
-function renderSymbolSelector() {
-  const row = document.getElementById('symbol-row');
-  row.innerHTML = '';
-  SYMBOL_OPTIONS.forEach(n => {
-    const btn = document.createElement('button');
-    btn.className = 'param-btn' + (n === gameState.config.symbolCount ? ' active' : '');
-    btn.textContent = n + ' Symbole';
-    btn.onclick = () => {
-      gameState.config.symbolCount = n;
-      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      updateCatSelectInfo();
-    };
-    row.appendChild(btn);
-  });
-}
-
-function renderTeamConfig() {
+function buildTeamConfigUI() {
   const list = document.getElementById('team-config-list');
   list.innerHTML = '';
-
-  // Preserve existing team data
-  const oldTeams = gameState.teams || [];
-  const usedFigures = new Set();
-  gameState.teams = [];
-
   for (let i = 0; i < gameState.config.teamCount; i++) {
-    const old = oldTeams[i] || {};
-    const team = {
-      id: i,
-      name: old.name || 'Gruppe ' + (i + 1),
-      emoji: old.emoji || FIGURES[i % FIGURES.length].emoji,
-      figureId: old.figureId || FIGURES[i % FIGURES.length].id,
-      color: TEAM_COLORS[i % TEAM_COLORS.length],
-      x: 0, y: 0,
-      score: 0,
-      symbolsCollected: 0
+    const row = document.createElement('div');
+    row.className = 'team-config-row';
+    const em = document.createElement('span');
+    em.className = 'team-config-emoji';
+    em.textContent = TEAM_EMOJIS[i];
+    em.style.color = TEAM_COLORS[i];
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'team-name-input';
+    inp.value = DEFAULT_NAMES[i]; inp.maxLength = 20;
+    inp.dataset.teamIdx = i;
+    row.appendChild(em); row.appendChild(inp);
+    list.appendChild(row);
+  }
+}
+
+function buildSymbolsPerTeamUI() {
+  const row = document.getElementById('symbols-per-team-row');
+  if (!row) return;
+  row.innerHTML = '';
+  [6, 7, 8].forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (n === gameState.config.symbolsPerTeam ? ' active' : '');
+    btn.textContent = n;
+    btn.onclick = () => {
+      gameState.config.symbolsPerTeam = n;
+      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     };
-    usedFigures.add(team.figureId);
-    gameState.teams.push(team);
-
-    const item = document.createElement('div');
-    item.className = 'team-config-item';
-
-    const dot = document.createElement('div');
-    dot.className = 'team-color-dot';
-    dot.style.background = team.color;
-
-    const nameInput = document.createElement('input');
-    nameInput.className = 'team-name-input';
-    nameInput.type = 'text';
-    nameInput.value = team.name;
-    nameInput.maxLength = 20;
-    nameInput.oninput = () => { team.name = nameInput.value || 'Gruppe ' + (i + 1); };
-
-    const figureSelect = document.createElement('div');
-    figureSelect.className = 'team-figure-select';
-
-    FIGURES.forEach(fig => {
-      const btn = document.createElement('button');
-      btn.className = 'figure-btn';
-      if (team.figureId === fig.id) btn.classList.add('active');
-      btn.textContent = fig.emoji;
-      btn.title = fig.name;
-      btn.onclick = () => {
-        // Check if already taken by another team
-        const takenBy = gameState.teams.find(t => t.id !== team.id && t.figureId === fig.id);
-        if (takenBy) return;
-
-        team.figureId = fig.id;
-        team.emoji = fig.emoji;
-        renderTeamConfig(); // re-render to update taken states
-      };
-      figureSelect.appendChild(btn);
-    });
-
-    item.append(dot, nameInput, figureSelect);
-    list.appendChild(item);
-  }
-
-  // Update taken state
-  updateFigureTakenState();
-}
-
-function updateFigureTakenState() {
-  const takenFigures = new Set(gameState.teams.map(t => t.figureId));
-  document.querySelectorAll('.team-config-item').forEach((item, teamIdx) => {
-    item.querySelectorAll('.figure-btn').forEach((btn, figIdx) => {
-      const fig = FIGURES[figIdx];
-      btn.classList.toggle('taken',
-        takenFigures.has(fig.id) && gameState.teams[teamIdx].figureId !== fig.id
-      );
-      btn.classList.toggle('active', gameState.teams[teamIdx].figureId === fig.id);
-    });
+    row.appendChild(btn);
   });
 }
 
-// ── Category Selector ────────────────────────────────────────────
-function renderCategorySelector() {
-  if (!fragenBank || !fragenBank.kategorien.length) return;
-
-  document.getElementById('category-section').style.display = '';
-  const list = document.getElementById('cat-select-list');
-  list.innerHTML = '';
-
-  selectedCategoryIds.clear();
-  fragenBank.kategorien.forEach(k => selectedCategoryIds.add(k.id));
-
-  fragenBank.kategorien.forEach(kat => {
-    const qCount = fragenBank.fragen.filter(q => q.kategorie === kat.id).length;
-    const item = document.createElement('div');
-    item.className = 'cat-select-item selected';
-    item.dataset.catId = kat.id;
-    item.innerHTML =
-      '<span class="cat-select-icon">' + kat.icon + '</span>' +
-      '<span class="cat-select-name">' + kat.name + '</span>' +
-      '<span class="cat-select-count">' + qCount + ' Fragen</span>' +
-      '<div class="cat-select-check">\u2713</div>';
-    item.onclick = () => {
-      if (selectedCategoryIds.has(kat.id)) {
-        selectedCategoryIds.delete(kat.id);
-        item.classList.remove('selected');
-      } else {
-        selectedCategoryIds.add(kat.id);
-        item.classList.add('selected');
-      }
-      updateCatSelectInfo();
+function buildTimerUI() {
+  const row = document.getElementById('timer-row');
+  row.innerHTML = '';
+  [{ label: '15s', v: 15 }, { label: '20s', v: 20 }, { label: '30s', v: 30 }, { label: 'Kein', v: 0 }].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (opt.v === gameState.config.timerSeconds ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => {
+      gameState.config.timerSeconds = opt.v;
+      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     };
-    list.appendChild(item);
+    row.appendChild(btn);
   });
-
-  updateCatSelectInfo();
 }
 
-function toggleAllCategories(selectAll) {
-  const items = document.querySelectorAll('.cat-select-item');
-  selectedCategoryIds.clear();
-  if (selectAll) {
-    fragenBank.kategorien.forEach(k => selectedCategoryIds.add(k.id));
-  }
-  items.forEach(item => {
-    item.classList.toggle('selected', selectAll);
-  });
-  updateCatSelectInfo();
-}
-
-function updateCatSelectInfo() {
-  const info = document.getElementById('cat-select-info');
-  const total = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length;
-  const needed = gameState.config.symbolCount;
-
-  if (selectedCategoryIds.size === 0) {
-    info.textContent = 'Mindestens 1 Kategorie auswählen';
-    info.className = 'cat-select-info warning';
-  } else if (total < needed) {
-    info.textContent = `Nur ${total} Fragen verfügbar, ${needed} benötigt. Weniger Symbole wählen oder mehr Kategorien aktivieren.`;
-    info.className = 'cat-select-info warning';
-  } else {
-    info.textContent = `${total} Fragen verfügbar aus ${selectedCategoryIds.size} Kategorien`;
-    info.className = 'cat-select-info';
-  }
-}
-
-// ── Start Game ───────────────────────────────────────────────────
+// ── Spiel starten ─────────────────────────────────────────────────
 function startGame() {
-  const errorEl = document.getElementById('setup-error');
-  errorEl.textContent = '';
+  const errEl = document.getElementById('setup-error');
+  errEl.textContent = '';
 
-  if (selectedCategoryIds.size === 0) {
-    errorEl.textContent = 'Mindestens 1 Kategorie auswählen!';
-    return;
+  if (activeCategories.size === 0) { errEl.textContent = 'Bitte mindestens eine Kategorie auswählen.'; return; }
+
+  const avail = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  const needed = gameState.config.teamCount * gameState.config.symbolsPerTeam;
+  if (avail < needed) { errEl.textContent = `Zu wenig Fragen. Benötigt: ${needed}, Verfügbar: ${avail}`; return; }
+
+  const inputs = document.querySelectorAll('.team-name-input');
+  gameState.teams = [];
+  for (let i = 0; i < gameState.config.teamCount; i++) {
+    gameState.teams.push({
+      id: i, name: inputs[i]?.value.trim() || DEFAULT_NAMES[i],
+      emoji: TEAM_EMOJIS[i], symbolIcon: TEAM_SYMBOL_ICONS[i], color: TEAM_COLORS[i],
+      x: 0, y: 0, score: 0, symbolsFound: 0,
+    });
   }
 
-  const availableFragen = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
-  if (availableFragen.length < gameState.config.symbolCount) {
-    errorEl.textContent = 'Zu wenige Fragen für die gewählte Symbolanzahl!';
-    return;
-  }
+  gameState.config.kategorien = [...activeCategories];
 
-  // Generate maze
-  gameState.seed = Date.now();
-  const gen = new MazeGenerator(MAZE_SIZE, MAZE_SIZE, gameState.seed);
-  const maze = gen.generate({
-    doorCount: Math.max(4, Math.floor(gameState.config.symbolCount * 0.5)),
-    symbolCount: gameState.config.symbolCount
-  });
-  gameState.maze = maze;
-
-  // Assign categories to symbols (proportional distribution)
-  assignSymbolCategories(maze.symbols);
-
-  // Set doors and symbols in game state
-  gameState.doors = maze.doors;
-  gameState.symbols = maze.symbols;
-
-  // Reset teams to start position
-  gameState.teams.forEach(t => {
-    t.x = maze.start.x;
-    t.y = maze.start.y;
-    t.score = 0;
-    t.symbolsCollected = 0;
-  });
-
+  const seed = Date.now() & 0xffffffff;
+  const gen = new MazeGenerator(16, 16, seed);
+  const result = gen.generate({ doorCount: 14, teamCount: gameState.config.teamCount });
+  gameState.maze = result;
   gameState.currentTeamIdx = 0;
-  gameState.usedQuestionIds = new Set();
-  gameState.phase = 'playing';
-  gameState.config.kategorien = [...selectedCategoryIds];
+  gameState.phase = 'rolling';
+  gameState.diceValue = 0;
+  gameState.stepsRemaining = 0;
+  usedQuestionIds.clear();
 
-  // Switch screens
-  showScreen('game-screen');
+  result.startPositions.forEach((pos, i) => {
+    if (gameState.teams[i]) { gameState.teams[i].x = pos.x; gameState.teams[i].y = pos.y; }
+  });
 
-  // Initialize renderer
+  gameState.allSymbols = placeTeamSymbols(result.grid, gameState.teams, gameState.config.symbolsPerTeam);
+
   const canvas = document.getElementById('maze-canvas');
   renderer = new MazeRenderer(canvas);
-  renderer.setMaze(maze);
-
-  // Enrich symbols with category data for rendering
-  gameState.symbols.forEach(sym => {
-    sym._category = fragenBank.kategorien.find(k => k.id === sym.categoryId);
-  });
-
+  renderer.setMaze(result);
   renderer.render(gameState);
-  renderer.startPulseLoop();
 
-  updateSidebar();
-  updateActiveTeamBanner();
-
-  // Keyboard controls
-  document.addEventListener('keydown', handleKeyDown);
-
-  // Canvas click
-  canvas.addEventListener('click', handleCanvasClick);
-
-  // Resize handler
-  window.addEventListener('resize', handleResize);
-  handleResize();
+  showScreen('game-screen');
+  updateGameUI();
 }
 
-function assignSymbolCategories(symbols) {
-  const catIds = [...selectedCategoryIds];
-  const catCounts = {};
-  catIds.forEach(id => {
-    catCounts[id] = fragenBank.fragen.filter(q => q.kategorie === id).length;
+// ── Symbole platzieren ────────────────────────────────────────────
+function placeTeamSymbols(grid, teams, perTeam) {
+  const W = 16, H = 16;
+  const symbols = [];
+
+  const excluded = new Set();
+  teams.forEach(t => {
+    for (let dy = -4; dy <= 4; dy++)
+      for (let dx = -4; dx <= 4; dx++) {
+        const nx = t.x + dx, ny = t.y + dy;
+        if (nx >= 0 && nx < W && ny >= 0 && ny < H) excluded.add(`${nx},${ny}`);
+      }
   });
 
-  const totalFragen = Object.values(catCounts).reduce((s, c) => s + c, 0);
+  const allCells = [];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (excluded.has(`${x},${y}`)) continue;
+      if (grid[y][x].type === 'door') continue;
+      allCells.push({ x, y });
+    }
 
-  // Proportional assignment
-  let assigned = 0;
-  const assignments = [];
-  catIds.forEach(id => {
-    const proportion = catCounts[id] / totalFragen;
-    let count = Math.max(1, Math.round(proportion * symbols.length));
-    assignments.push({ id, count });
-    assigned += count;
-  });
+  const rng = new SeededRNG((Date.now() * 7 + 13) & 0xffffffff);
+  rng.shuffle(allCells);
 
-  // Adjust to match exact count
-  while (assigned > symbols.length) {
-    const maxEntry = assignments.reduce((a, b) => a.count > b.count ? a : b);
-    maxEntry.count--;
-    assigned--;
-  }
-  while (assigned < symbols.length) {
-    const minEntry = assignments.reduce((a, b) => a.count < b.count ? a : b);
-    minEntry.count++;
-    assigned++;
-  }
-
-  // Create pool and shuffle
-  const pool = [];
-  assignments.forEach(a => {
-    for (let i = 0; i < a.count; i++) pool.push(a.id);
-  });
-
-  // Fisher-Yates shuffle
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  symbols.forEach((sym, i) => {
-    sym.categoryId = pool[i];
-  });
-}
-
-// ── Screen Management ────────────────────────────────────────────
-function showScreen(screenId) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
-}
-
-// ── Game Controls ────────────────────────────────────────────────
-function handleKeyDown(e) {
-  if (gameState.phase !== 'playing' || animating) return;
-  if (document.querySelector('.modal-overlay.visible')) return;
-
-  const team = gameState.teams[gameState.currentTeamIdx];
-  let dx = 0, dy = 0;
-
-  switch (e.key) {
-    case 'ArrowUp':    case 'w': case 'W': dy = -1; break;
-    case 'ArrowDown':  case 's': case 'S': dy = 1;  break;
-    case 'ArrowLeft':  case 'a': case 'A': dx = -1; break;
-    case 'ArrowRight': case 'd': case 'D': dx = 1;  break;
-    default: return;
-  }
-
-  e.preventDefault();
-  attemptMove(team.x + dx, team.y + dy);
-}
-
-function handleCanvasClick(e) {
-  if (gameState.phase !== 'playing' || animating) return;
-  if (document.querySelector('.modal-overlay.visible')) return;
-
-  const cell = renderer.getCellFromClick(e.clientX, e.clientY);
-  if (!cell) return;
-
-  const team = gameState.teams[gameState.currentTeamIdx];
-  const dx = cell.x - team.x;
-  const dy = cell.y - team.y;
-
-  // Only allow moves to adjacent cells
-  if (Math.abs(dx) + Math.abs(dy) !== 1) return;
-
-  attemptMove(cell.x, cell.y);
-}
-
-function attemptMove(targetX, targetY) {
-  const team = gameState.teams[gameState.currentTeamIdx];
-  const grid = gameState.maze.grid;
-
-  // Bounds check
-  if (targetX < 0 || targetX >= MAZE_SIZE || targetY < 0 || targetY >= MAZE_SIZE) return;
-
-  // Wall check: is there a wall between current pos and target?
-  const dx = targetX - team.x;
-  const dy = targetY - team.y;
-  let wallBit;
-  if (dy === -1) wallBit = 1;      // N
-  else if (dx === 1) wallBit = 2;  // E
-  else if (dy === 1) wallBit = 4;  // S
-  else if (dx === -1) wallBit = 8; // W
-  else return;
-
-  if (grid[team.y][team.x].walls & wallBit) {
-    // Wall blocks movement
-    return;
-  }
-
-  // Check for closed door at target
-  const doorIdx = gameState.doors.findIndex(d => d.x === targetX && d.y === targetY && !d.open);
-  if (doorIdx >= 0) {
-    // Door! Need to answer a question to open it
-    pendingTrigger = { type: 'door', index: doorIdx, targetX, targetY };
-    showQuestion('door');
-    return;
-  }
-
-  // Check for uncollected symbol at target
-  const symIdx = gameState.symbols.findIndex(s => s.x === targetX && s.y === targetY && !s.found);
-  if (symIdx >= 0) {
-    // Symbol! Need to answer a question to collect it
-    pendingTrigger = { type: 'symbol', index: symIdx, targetX, targetY };
-    showQuestion('symbol', gameState.symbols[symIdx].categoryId);
-    return;
-  }
-
-  // Normal move
-  executeMove(targetX, targetY, () => {
-    checkGoal(targetX, targetY);
-  });
-}
-
-function executeMove(targetX, targetY, callback) {
-  const team = gameState.teams[gameState.currentTeamIdx];
-  const fromX = team.x;
-  const fromY = team.y;
-  animating = true;
-
-  renderer.animateMove(gameState.currentTeamIdx, fromX, fromY, targetX, targetY, () => {
-    team.x = targetX;
-    team.y = targetY;
-    animating = false;
-    renderer.render(gameState);
-    updateSidebar();
-    if (callback) callback();
-  });
-}
-
-function checkGoal(x, y) {
-  const goal = gameState.maze.goal;
-  if (x !== goal.x || y !== goal.y) {
-    advanceTurn();
-    return;
-  }
-
-  const team = gameState.teams[gameState.currentTeamIdx];
-  const totalSymbols = gameState.symbols.length;
-  const teamSymbols = team.symbolsCollected;
-
-  if (teamSymbols >= totalSymbols) {
-    // WIN!
-    team.score += 50;
-    gameState.phase = 'finished';
-    renderer.stopPulseLoop();
-    document.removeEventListener('keydown', handleKeyDown);
-    showResultScreen();
-  } else {
-    // Not enough symbols
-    const remaining = totalSymbols - teamSymbols;
-    showToast(`Noch ${remaining} Symbol${remaining > 1 ? 'e' : ''} sammeln!`);
-    advanceTurn();
-  }
-}
-
-function advanceTurn() {
-  gameState.currentTeamIdx = (gameState.currentTeamIdx + 1) % gameState.teams.length;
-  updateActiveTeamBanner();
-  updateSidebar();
-  renderer.render(gameState);
-}
-
-// ── Question System ──────────────────────────────────────────────
-function showQuestion(triggerType, preferredCategoryId) {
-  const fragen = fragenBank.fragen.filter(q => {
-    if (!selectedCategoryIds.has(q.kategorie)) return false;
-    if (gameState.usedQuestionIds.has(q.id)) return false;
-    return true;
-  });
-
-  // Prefer questions from the symbol's category
-  let question = null;
-  if (preferredCategoryId) {
-    const catFragen = fragen.filter(q => q.kategorie === preferredCategoryId);
-    if (catFragen.length > 0) {
-      question = catFragen[Math.floor(Math.random() * catFragen.length)];
+  for (let ti = 0; ti < teams.length; ti++) {
+    let placed = 0;
+    for (const cell of allCells) {
+      if (placed >= perTeam) break;
+      if (symbols.some(s => s.x === cell.x && s.y === cell.y)) continue;
+      let tooClose = false;
+      for (const s of symbols) {
+        if (s.teamId === ti && Math.abs(s.x - cell.x) + Math.abs(s.y - cell.y) < 3) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
+      symbols.push({ id: `sym-${ti}-${placed}`, teamId: ti, x: cell.x, y: cell.y, found: false, foundBy: null });
+      grid[cell.y][cell.x].type = 'symbol';
+      grid[cell.y][cell.x].symTeamId = ti;
+      placed++;
     }
   }
-  if (!question && fragen.length > 0) {
-    question = fragen[Math.floor(Math.random() * fragen.length)];
-  }
+  return symbols;
+}
 
-  if (!question) {
-    // No questions left – reset pool
-    gameState.usedQuestionIds.clear();
-    showToast('Fragenpool zurückgesetzt');
-    return showQuestion(triggerType, preferredCategoryId);
-  }
+// ── UI aktualisieren ──────────────────────────────────────────────
+function updateGameUI() {
+  const team = currentTeam();
 
-  gameState.usedQuestionIds.add(question.id);
-  currentQuestion = question;
-  questionResolved = false;
+  const banner = document.getElementById('active-team-banner');
+  if (banner) { banner.textContent = `${team.emoji} ${team.name} ist dran`; banner.style.background = team.color; }
 
-  const modal = document.getElementById('question-modal');
-  const catName = fragenBank.kategorien.find(k => k.id === question.kategorie);
+  updateThemeBtnText();
+  updateDiceUI();
+  renderTeamList();
+  renderer?.render(gameState);
+}
 
-  document.getElementById('q-cat-name').textContent = catName ? catName.name : '';
-  const diffEl = document.getElementById('q-difficulty');
-  diffEl.textContent = question.schwierigkeit.charAt(0).toUpperCase() + question.schwierigkeit.slice(1);
-  diffEl.className = 'modal-difficulty ' + question.schwierigkeit;
+function renderTeamList() {
+  const list = document.getElementById('team-list');
+  if (!list) return;
+  list.innerHTML = '';
+  gameState.teams.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'team-item' + (i === gameState.currentTeamIdx ? ' active' : '');
+    div.style.borderColor = t.color;
 
-  document.getElementById('q-trigger-type').textContent =
-    triggerType === 'door' ? '🔒 Tür öffnen' : '⭐ Symbol einsammeln';
+    const fig = document.createElement('span');
+    fig.className = 'team-figure';
+    fig.textContent = t.emoji;
 
-  document.getElementById('q-text').textContent = question.frage;
+    const info = document.createElement('div');
+    info.className = 'team-info';
+    info.innerHTML = `<div class="team-name">${t.name}</div><div class="team-score">${t.score} Pkt</div>`;
 
-  // Timer
-  const timerWrap = document.querySelector('.timer-bar-wrap');
-  const timerBar = document.getElementById('q-timer-bar');
-  const timerText = document.getElementById('q-timer-text');
+    // Symbol progress bar
+    const bar = document.createElement('div');
+    bar.className = 'team-sym-bar';
+    const teamSyms = gameState.allSymbols.filter(s => s.teamId === t.id);
+    teamSyms.forEach(s => {
+      const dot = document.createElement('span');
+      dot.className = 'team-sym-dot' + (s.found ? ' found' : '');
+      dot.style.background = s.found ? t.color : 'rgba(245,230,200,0.25)';
+      dot.title = s.found ? `${t.symbolIcon} gefunden` : '○';
+      bar.appendChild(dot);
+    });
+    info.appendChild(bar);
 
-  if (gameState.config.timerSeconds > 0) {
-    timerWrap.style.display = '';
-    timerText.style.display = '';
-    timerRemaining = gameState.config.timerSeconds;
-    timerBar.style.width = '100%';
-    timerBar.className = 'timer-bar';
-    timerText.textContent = timerRemaining + 's';
+    div.appendChild(fig);
+    div.appendChild(info);
+    list.appendChild(div);
+  });
+}
 
-    timerInterval = setInterval(() => {
-      timerRemaining--;
-      const pct = (timerRemaining / gameState.config.timerSeconds) * 100;
-      timerBar.style.width = pct + '%';
-      timerText.textContent = timerRemaining + 's';
+function updateDiceUI() {
+  const diceArea = document.getElementById('dice-area');
+  const stepsArea = document.getElementById('steps-area');
+  if (!diceArea || !stepsArea) return;
 
-      if (pct <= 20) timerBar.className = 'timer-bar danger';
-      else if (pct <= 50) timerBar.className = 'timer-bar warning';
+  const df = document.getElementById('dice-face');
+  const sc = document.getElementById('steps-count'); // .steps-number span
 
-      if (timerRemaining <= 0) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        resolveQuestion(false);
-      }
-    }, 1000);
+  if (gameState.phase === 'rolling') {
+    diceArea.style.display = 'flex';
+    stepsArea.style.display = 'none';
+    if (df) df.textContent = gameState.diceValue > 0 ? DICE_CHARS[gameState.diceValue - 1] : '🎲';
+    const btnRoll = document.getElementById('btn-roll');
+    if (btnRoll) btnRoll.disabled = false;
+  } else if (gameState.phase === 'moving') {
+    diceArea.style.display = 'none';
+    stepsArea.style.display = 'flex';
+    if (sc) sc.textContent = gameState.stepsRemaining;
   } else {
-    timerWrap.style.display = 'none';
-    timerText.style.display = 'none';
+    diceArea.style.display = 'none';
+    stepsArea.style.display = 'none';
+  }
+}
+
+// ── Würfeln ───────────────────────────────────────────────────────
+function rollDice() {
+  if (gameState.phase !== 'rolling') return;
+  if (diceAnimInterval) return;
+
+  const diceface = document.getElementById('dice-face');
+  const btnRoll = document.getElementById('btn-roll');
+  if (btnRoll) btnRoll.disabled = true;
+  if (diceface) diceface.classList.add('rolling');
+
+  let frames = 0;
+  diceAnimInterval = setInterval(() => {
+    frames++;
+    if (diceface) diceface.textContent = DICE_CHARS[Math.floor(Math.random() * 6)];
+
+    if (frames >= 20) {
+      clearInterval(diceAnimInterval);
+      diceAnimInterval = null;
+      const result = Math.floor(Math.random() * 6) + 1;
+      gameState.diceValue = result;
+      gameState.stepsRemaining = result;
+      gameState.phase = 'moving';
+      if (diceface) { diceface.textContent = DICE_CHARS[result - 1]; diceface.classList.remove('rolling'); }
+      updateValidMoves();
+      updateGameUI();
+    }
+  }, 70);
+}
+
+// ── Gültige Züge ─────────────────────────────────────────────────
+function updateValidMoves() {
+  gameState._validFree = new Set();
+  gameState._validDoor = new Set();
+  gameState._validSym = new Set();
+  if (gameState.phase !== 'moving') return;
+
+  const team = currentTeam();
+  const grid = gameState.maze.grid;
+  const WALLMAP = [{ dx:0, dy:-1, wall:1 }, { dx:1, dy:0, wall:2 }, { dx:0, dy:1, wall:4 }, { dx:-1, dy:0, wall:8 }];
+
+  WALLMAP.forEach(d => {
+    const nx = team.x + d.dx, ny = team.y + d.dy;
+    if (nx < 0 || nx >= 16 || ny < 0 || ny >= 16) return;
+    if (grid[team.y][team.x].walls & d.wall) return;
+
+    const key = `${nx},${ny}`;
+    const closedDoor = gameState.maze.doors.find(dr => dr.x === nx && dr.y === ny && !dr.open);
+    if (closedDoor) { gameState._validDoor.add(key); return; }
+
+    const cell = grid[ny][nx];
+    if (cell.type === 'symbol' && cell.symTeamId === gameState.currentTeamIdx) {
+      const sym = gameState.allSymbols.find(s => s.x === nx && s.y === ny && !s.found);
+      if (sym) { gameState._validSym.add(key); return; }
+    }
+    gameState._validFree.add(key);
+  });
+}
+
+// ── Bewegung ──────────────────────────────────────────────────────
+function attemptMove(tx, ty) {
+  if (gameState.phase !== 'moving') return;
+  const key = `${tx},${ty}`;
+
+  if (gameState._validDoor.has(key)) {
+    const door = gameState.maze.doors.find(d => d.x === tx && d.y === ty && !d.open);
+    if (door) { questionContext = { type: 'door', target: { x: tx, y: ty }, door }; showQuestion(); }
+    return;
+  }
+  if (gameState._validSym.has(key)) {
+    const sym = gameState.allSymbols.find(s => s.x === tx && s.y === ty && !s.found && s.teamId === gameState.currentTeamIdx);
+    if (sym) { questionContext = { type: 'symbol', target: { x: tx, y: ty }, sym }; showQuestion(); }
+    return;
+  }
+  if (gameState._validFree.has(key)) {
+    executeMove(tx, ty);
+  }
+}
+
+function executeMove(tx, ty) {
+  const team = currentTeam();
+  team.x = tx;
+  team.y = ty;
+  gameState.stepsRemaining--;
+
+  if (gameState.stepsRemaining <= 0) {
+    endTurn();
+  } else {
+    updateValidMoves();
+    updateGameUI();
+  }
+}
+
+function endTurn() {
+  gameState.phase = 'rolling';
+  gameState.diceValue = 0;
+  gameState.stepsRemaining = 0;
+  gameState._validFree = new Set();
+  gameState._validDoor = new Set();
+  gameState._validSym = new Set();
+  gameState.currentTeamIdx = (gameState.currentTeamIdx + 1) % gameState.teams.length;
+  updateGameUI();
+}
+
+function skipRemainingSteps() {
+  endTurn();
+}
+
+// ── Frage ─────────────────────────────────────────────────────────
+function showQuestion() {
+  gameState.phase = 'question';
+  updateDiceUI();
+
+  const q = pickQuestion();
+  if (!q) { continueAfterQuestion(); return; }
+
+  questionContext.question = q;
+  usedQuestionIds.add(q.id);
+
+  document.getElementById('q-cat-name').textContent = q.kategorieName?.split(' › ').pop() || '';
+  const diffEl = document.getElementById('q-difficulty');
+  diffEl.textContent = q.schwierigkeit || '';
+  diffEl.className = 'modal-difficulty diff-' + (q.schwierigkeit || '');
+
+  const trigger = document.getElementById('q-trigger-type');
+  if (questionContext.type === 'door') {
+    trigger.textContent = '🔒 Tür öffnen'; trigger.className = 'modal-trigger trigger-door';
+  } else {
+    const t = currentTeam();
+    trigger.textContent = `${t.symbolIcon} Symbol einsammeln`; trigger.className = 'modal-trigger trigger-symbol';
   }
 
-  // Answer area
-  const optionsEl = document.getElementById('q-options');
-  const openSection = document.getElementById('q-open-section');
-  optionsEl.innerHTML = '';
-  openSection.style.display = 'none';
-
-  document.getElementById('q-result').className = 'modal-result';
+  document.getElementById('q-text').textContent = q.question;
   document.getElementById('q-result').textContent = '';
-  document.getElementById('q-continue').className = 'modal-continue';
+  document.getElementById('q-result').className = 'modal-result';
+  document.getElementById('q-continue').style.display = 'none';
 
-  if (question.typ === 'multiple_choice') {
+  const optionsEl = document.getElementById('q-options');
+  const openSec = document.getElementById('q-open-section');
+
+  if (q.type === 'multiple_choice' && q.options?.length) {
     optionsEl.style.display = '';
-    question.antworten.forEach((ans, idx) => {
+    openSec.style.display = 'none';
+    optionsEl.innerHTML = '';
+    q.options.forEach((opt, i) => {
       const btn = document.createElement('button');
       btn.className = 'answer-btn';
-      btn.textContent = String.fromCharCode(65 + idx) + ') ' + ans;
-      btn.onclick = () => {
-        if (questionResolved) return;
-        resolveQuestion(idx === question.richtig, btn, idx);
-      };
+      btn.textContent = opt;
+      btn.onclick = () => resolveChoice(i);
       optionsEl.appendChild(btn);
     });
   } else {
     optionsEl.style.display = 'none';
-    openSection.style.display = '';
+    openSec.style.display = '';
+    document.getElementById('q-open-answer').textContent = q.answer || '';
+    document.getElementById('q-open-answer').style.display = 'none';
     document.getElementById('q-show-answer').style.display = '';
-    document.getElementById('q-open-answer').className = 'open-answer-text';
-    document.getElementById('q-open-answer').textContent = question.erklaerung;
-    document.getElementById('q-open-actions').className = 'open-actions';
+    document.getElementById('q-open-actions').style.display = 'none';
   }
 
-  modal.classList.add('visible');
+  startTimer(gameState.config.timerSeconds);
+  document.getElementById('question-modal').classList.add('active');
+}
+
+function pickQuestion() {
+  const cats = gameState.config.kategorien.length > 0 ? gameState.config.kategorien : [...activeCategories];
+  let pool = allQuestions.filter(q => cats.includes(q.kategorieId) && !usedQuestionIds.has(q.id));
+  if (!pool.length) {
+    usedQuestionIds.clear();
+    pool = allQuestions.filter(q => cats.includes(q.kategorieId));
+  }
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+}
+
+function startTimer(seconds) {
+  clearTimer();
+  const bar = document.getElementById('q-timer-bar');
+  const txt = document.getElementById('q-timer-text');
+  if (!seconds || seconds <= 0) { if (bar) bar.style.width = '0%'; return; }
+  timerRemaining = seconds;
+  if (bar) bar.style.width = '100%';
+  if (txt) txt.textContent = seconds + 's';
+  timerInterval = setInterval(() => {
+    timerRemaining--;
+    if (bar) bar.style.width = Math.max(0, timerRemaining / seconds * 100) + '%';
+    if (txt) txt.textContent = timerRemaining > 0 ? timerRemaining + 's' : '';
+    if (timerRemaining <= 0) { clearTimer(); resolveQuestion(false, true); }
+  }, 1000);
+}
+
+function clearTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const bar = document.getElementById('q-timer-bar');
+  if (bar) bar.style.width = '0%';
+}
+
+function resolveChoice(idx) {
+  clearTimer();
+  const q = questionContext.question;
+  const correct = idx === q.correctIndex;
+  document.querySelectorAll('.answer-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.correctIndex) btn.classList.add('correct');
+    else if (i === idx && !correct) btn.classList.add('wrong');
+  });
+  resolveQuestion(correct, false);
 }
 
 function showOpenAnswer() {
+  document.getElementById('q-open-answer').style.display = '';
   document.getElementById('q-show-answer').style.display = 'none';
-  document.getElementById('q-open-answer').classList.add('visible');
-  document.getElementById('q-open-actions').classList.add('visible');
+  document.getElementById('q-open-actions').style.display = 'flex';
 }
 
-function resolveOpen(correct) {
-  resolveQuestion(correct);
-}
+function resolveOpen(correct) { clearTimer(); resolveQuestion(correct, false); }
 
-function resolveQuestion(correct, clickedBtn, clickedIdx) {
-  if (questionResolved) return;
-  questionResolved = true;
-
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-
-  // Highlight MC answers
-  if (currentQuestion.typ === 'multiple_choice') {
-    const buttons = document.querySelectorAll('#q-options .answer-btn');
-    buttons.forEach((btn, idx) => {
-      btn.classList.add('locked');
-      if (idx === currentQuestion.richtig) btn.classList.add('correct');
-      else if (btn === clickedBtn && !correct) btn.classList.add('wrong');
-    });
-  }
-
-  // Hide open answer buttons
-  if (currentQuestion.typ === 'offen') {
-    document.getElementById('q-open-actions').classList.remove('visible');
-  }
-
-  // Show result
+function resolveQuestion(correct, timedOut) {
+  const ctx = questionContext;
+  const team = currentTeam();
   const resultEl = document.getElementById('q-result');
-  const team = gameState.teams[gameState.currentTeamIdx];
 
-  if (correct) {
-    if (pendingTrigger.type === 'symbol') {
-      resultEl.textContent = `✓ Richtig! ${team.name} sammelt das Symbol ein. (+10 Punkte)`;
+  document.querySelectorAll('.answer-btn').forEach(b => b.disabled = true);
+  document.getElementById('q-open-actions').style.display = 'none';
+
+  if (timedOut) {
+    resultEl.textContent = '⏱️ Zeit abgelaufen!';
+    resultEl.className = 'modal-result result-wrong';
+  } else if (correct) {
+    resultEl.className = 'modal-result result-correct';
+    if (ctx.type === 'door') {
+      resultEl.textContent = '✓ Richtig! Die Tür öffnet sich!';
+      ctx.door.open = true;
+      ctx.door.openedBy = team.id;
+      gameState.maze.grid[ctx.target.y][ctx.target.x].type = 'path';
     } else {
-      resultEl.textContent = '✓ Richtig! Die Tür öffnet sich.';
+      resultEl.textContent = `✓ Richtig! ${team.symbolIcon} Symbol eingesammelt! +10 Punkte`;
+      team.score += 10;
+      ctx.sym.found = true;
+      ctx.sym.foundBy = team.id;
+      team.symbolsFound++;
+      gameState.maze.grid[ctx.target.y][ctx.target.x].type = 'path';
+      gameState.maze.grid[ctx.target.y][ctx.target.x].symTeamId = undefined;
     }
-    resultEl.className = 'modal-result visible correct';
   } else {
-    if (pendingTrigger.type === 'door') {
-      resultEl.textContent = `✗ Falsch! Die Tür bleibt verschlossen.`;
-    } else {
-      resultEl.textContent = `✗ Falsch! Das Symbol bleibt liegen.`;
-    }
-    resultEl.className = 'modal-result visible wrong';
+    resultEl.textContent = '✗ Leider falsch.';
+    resultEl.className = 'modal-result result-wrong';
   }
 
-  // Show correct answer for open questions
-  if (currentQuestion.typ === 'offen') {
-    document.getElementById('q-open-answer').classList.add('visible');
-  }
-
-  // Show continue button
-  document.getElementById('q-continue').classList.add('visible');
-  document.getElementById('q-continue').dataset.correct = correct ? '1' : '0';
+  document.getElementById('q-continue').style.display = '';
+  renderer?.render(gameState);
 }
 
 function continueAfterQuestion() {
-  const modal = document.getElementById('question-modal');
-  modal.classList.remove('visible');
+  clearTimer();
+  document.getElementById('question-modal').classList.remove('active');
 
-  const correct = document.getElementById('q-continue').dataset.correct === '1';
-  const team = gameState.teams[gameState.currentTeamIdx];
+  const ctx = questionContext;
+  const wasCorrect = document.getElementById('q-result').classList.contains('result-correct');
+  questionContext = null;
 
-  if (correct) {
-    if (pendingTrigger.type === 'door') {
-      // Open door for everyone
-      gameState.doors[pendingTrigger.index].open = true;
-      gameState.doors[pendingTrigger.index].openedBy = team.id;
-
-      // Move through the door
-      executeMove(pendingTrigger.targetX, pendingTrigger.targetY, () => {
-        checkGoal(pendingTrigger.targetX, pendingTrigger.targetY);
-        pendingTrigger = null;
-      });
-    } else if (pendingTrigger.type === 'symbol') {
-      // Collect symbol
-      const sym = gameState.symbols[pendingTrigger.index];
-      sym.found = true;
-      sym.foundBy = team.id;
-      team.score += 10;
-      team.symbolsCollected++;
-
-      // Move to symbol position
-      executeMove(pendingTrigger.targetX, pendingTrigger.targetY, () => {
-        checkGoal(pendingTrigger.targetX, pendingTrigger.targetY);
-        pendingTrigger = null;
-      });
-    }
-  } else {
-    // Wrong answer: stay in place, next turn
-    pendingTrigger = null;
-    advanceTurn();
+  if (ctx?.type === 'door' && ctx.door?.open) {
+    gameState.phase = 'moving';
+    executeMove(ctx.target.x, ctx.target.y);
+    // Check for win after move (executeMove may have called endTurn already if steps ran out)
+    return;
   }
 
-  currentQuestion = null;
-}
+  if (ctx?.type === 'symbol' && wasCorrect && ctx.sym?.found) {
+    gameState.phase = 'moving';
+    // Move to symbol cell
+    const team = currentTeam();
+    team.x = ctx.target.x;
+    team.y = ctx.target.y;
+    gameState.stepsRemaining--;
 
-// ── Sidebar Updates ──────────────────────────────────────────────
-function updateSidebar() {
-  const list = document.getElementById('team-list');
-  list.innerHTML = '';
-
-  gameState.teams.forEach((team, idx) => {
-    const item = document.createElement('div');
-    item.className = 'team-item' + (idx === gameState.currentTeamIdx ? ' active' : '');
-
-    const figure = document.createElement('div');
-    figure.className = 'team-figure';
-    figure.textContent = team.emoji;
-
-    const info = document.createElement('div');
-    info.className = 'team-info';
-
-    const name = document.createElement('div');
-    name.className = 'team-name';
-    name.textContent = team.name;
-    name.style.color = team.color;
-
-    const score = document.createElement('div');
-    score.className = 'team-score';
-    score.textContent = team.score + ' Punkte · ' + team.symbolsCollected + '/' + gameState.symbols.length + ' Symbole';
-
-    const symRow = document.createElement('div');
-    symRow.className = 'team-symbols-row';
-    for (let i = 0; i < team.symbolsCollected; i++) {
-      const dot = document.createElement('div');
-      dot.className = 'team-sym-dot';
-      symRow.appendChild(dot);
+    // Check win
+    if (team.symbolsFound >= gameState.config.symbolsPerTeam) {
+      team.score += 50;
+      showResult();
+      return;
     }
 
-    info.append(name, score, symRow);
-    item.append(figure, info);
-    list.appendChild(item);
-  });
+    if (gameState.stepsRemaining <= 0) {
+      endTurn();
+    } else {
+      updateValidMoves();
+      updateGameUI();
+    }
+    return;
+  }
+
+  // Wrong answer for door or symbol: don't move, keep steps
+  gameState.phase = 'moving';
+  updateValidMoves();
+  updateGameUI();
 }
 
-function updateActiveTeamBanner() {
-  const banner = document.getElementById('active-team-banner');
-  const team = gameState.teams[gameState.currentTeamIdx];
-  banner.textContent = team.emoji + ' ' + team.name + ' ist dran';
-  banner.style.background = team.color + '22';
-  banner.style.color = team.color;
-  banner.style.border = '2px solid ' + team.color;
-}
+// ── Spielende ─────────────────────────────────────────────────────
+function showResult() {
+  gameState.phase = 'finished';
+  const sorted = [...gameState.teams].sort((a, b) => b.symbolsFound - a.symbolsFound || b.score - a.score);
+  const winner = sorted[0];
 
-// ── Result Screen ────────────────────────────────────────────────
-function showResultScreen() {
-  showScreen('result-screen');
-
-  const sorted = [...gameState.teams].sort((a, b) => b.score - a.score);
-
-  document.getElementById('result-winner').textContent =
-    sorted[0].emoji + ' ' + sorted[0].name + ' gewinnt!';
+  document.getElementById('result-winner').innerHTML =
+    `${winner.emoji} <strong>${winner.name}</strong> hat gewonnen mit ${winner.symbolsFound} von ${gameState.config.symbolsPerTeam} Symbolen!`;
 
   const tbody = document.getElementById('result-ranking-body');
   tbody.innerHTML = '';
-  sorted.forEach((team, idx) => {
+  sorted.forEach((t, i) => {
     const tr = document.createElement('tr');
-    if (idx === 0) tr.className = 'rank-1';
-    tr.innerHTML =
-      '<td>' + (idx + 1) + '.</td>' +
-      '<td>' + team.emoji + ' ' + team.name + '</td>' +
-      '<td>' + team.score + '</td>' +
-      '<td>' + team.symbolsCollected + '/' + gameState.symbols.length + '</td>';
+    if (i === 0) tr.className = 'winner-row';
+    tr.innerHTML = `<td>${i + 1}.</td><td>${t.emoji} ${t.name}</td><td>${t.symbolsFound} / ${gameState.config.symbolsPerTeam}</td>`;
     tbody.appendChild(tr);
   });
+
+  showScreen('result-screen');
+}
+
+// ── Helper ────────────────────────────────────────────────────────
+function currentTeam() { return gameState.teams[gameState.currentTeamIdx]; }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+
+function confirmQuit() {
+  if (confirm('Spiel wirklich beenden?')) { showScreen('setup-screen'); gameState.phase = 'setup'; }
 }
 
 function playAgain() {
   showScreen('setup-screen');
   gameState.phase = 'setup';
-  if (renderer) renderer.stopPulseLoop();
-  document.removeEventListener('keydown', handleKeyDown);
+  gameState.teams = [];
+  gameState.allSymbols = [];
 }
 
-function confirmQuit() {
-  if (confirm('Spiel wirklich beenden?')) {
-    playAgain();
-  }
+function updateThemeBtnText() {
+  const dark = document.body.classList.contains('dark');
+  ['btn-theme', 'btn-theme-game'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+  });
 }
 
-// ── Toast notification ───────────────────────────────────────────
-function showToast(message) {
-  let toast = document.getElementById('toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'toast';
-    toast.style.cssText =
-      'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
-      'padding:0.7rem 1.5rem;border-radius:10px;font-weight:700;font-size:0.95rem;' +
-      'z-index:200;transition:opacity 0.3s;pointer-events:none;' +
-      'background:var(--accent);color:#fff;box-shadow:var(--shadow-lg);';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.style.opacity = '1';
-  setTimeout(() => { toast.style.opacity = '0'; }, 2500);
-}
-
-// ── Resize handler ───────────────────────────────────────────────
-function handleResize() {
-  if (renderer && gameState.maze) {
-    renderer.resize();
-    renderer.render(gameState);
-  }
-}
-
-// ── Theme Toggle ─────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────
 (function () {
   const KEY = 'spiele_theme';
-  function applyTheme(dark) {
+  function apply(dark) {
     document.body.classList.toggle('dark', dark);
-    document.querySelectorAll('[id^="btn-theme"]').forEach(el => {
-      el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
-    });
-    // Force renderer to re-read colors
-    if (renderer) {
-      renderer._colors = null;
-      if (gameState.maze) renderer.render(gameState);
-    }
+    updateThemeBtnText();
+    renderer?.invalidateColors();
+    renderer?.render(gameState);
   }
   window.toggleTheme = function () {
-    var isDark = !document.body.classList.contains('dark');
-    localStorage.setItem(KEY, isDark ? 'dark' : 'light');
-    applyTheme(isDark);
+    const d = !document.body.classList.contains('dark');
+    localStorage.setItem(KEY, d ? 'dark' : 'light');
+    apply(d);
   };
-  applyTheme(localStorage.getItem(KEY) === 'dark');
+  apply(localStorage.getItem(KEY) === 'dark');
 })();

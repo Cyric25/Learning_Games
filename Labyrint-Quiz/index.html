@@ -22,7 +22,7 @@
 
       <div class="setup-title">
         <h1>🏰 Labyrinth-Quiz</h1>
-        <p>Navigiere durch das Labyrinth, sammle Symbole und erreiche das Ziel!</p>
+        <p>Würfle, navigiere durch das Labyrinth und sammle als Erste alle deine Symbole ein!</p>
       </div>
 
       <!-- Kategorien -->
@@ -48,10 +48,10 @@
         <div class="team-config-list" id="team-config-list"></div>
       </div>
 
-      <!-- Symbole -->
+      <!-- Symbole pro Gruppe -->
       <div class="setup-section">
-        <h3>Anzahl Symbole</h3>
-        <div class="param-row" id="symbol-row"></div>
+        <h3>Symbole pro Gruppe</h3>
+        <div class="param-row" id="symbols-per-team-row"></div>
       </div>
 
       <!-- Timer -->
@@ -77,6 +77,22 @@
         <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
       </div>
       <div class="active-team-banner" id="active-team-banner"></div>
+
+      <!-- Würfel-Leiste -->
+      <div class="game-info-bar">
+        <div id="dice-area" class="dice-area" style="display:none;">
+          <div class="dice-face" id="dice-face">🎲</div>
+          <button class="btn-roll" id="btn-roll" onclick="rollDice()">Würfeln</button>
+        </div>
+        <div id="steps-area" class="steps-area" style="display:none;">
+          <div class="steps-counter">
+            <span class="steps-number" id="steps-count">0</span>
+            <span class="steps-label">Schritte</span>
+          </div>
+          <button class="btn-end-turn" onclick="skipRemainingSteps()">Zug beenden</button>
+        </div>
+      </div>
+
       <div class="canvas-wrap">
         <canvas id="maze-canvas"></canvas>
       </div>
@@ -84,9 +100,8 @@
 
     <div class="sidebar">
       <div class="controls-hint">
-        <p>Steuerung</p>
-        <div class="keys">⬆⬇⬅➡</div>
-        <p>oder Klick auf Nachbarfeld</p>
+        <p>Würfeln → Richtung wählen</p>
+        <div class="keys">⬆⬇⬅➡ oder Klick</div>
       </div>
 
       <h3>Gruppen</h3>
@@ -96,10 +111,9 @@
         <h3>Legende</h3>
         <div class="legend-list">
           <div class="legend-item"><span class="legend-icon">🔒</span><span>Tür (geschlossen)</span></div>
-          <div class="legend-item"><span class="legend-icon">✓</span><span>Tür (offen)</span></div>
-          <div class="legend-item"><span class="legend-icon">⭐</span><span>Symbol (einsammeln)</span></div>
-          <div class="legend-item"><span class="legend-icon">🏁</span><span>Ziel</span></div>
-          <div class="legend-item"><span class="legend-icon">S</span><span>Start</span></div>
+          <div class="legend-item"><span class="legend-icon">🔓</span><span>Tür (offen)</span></div>
+          <div class="legend-item"><span class="legend-icon">👑⚔️💎</span><span>Euer Symbol</span></div>
+          <div class="legend-item"><span class="legend-icon">🏠</span><span>Startposition</span></div>
         </div>
       </div>
     </div>
@@ -146,7 +160,6 @@
           <tr>
             <th>Platz</th>
             <th>Gruppe</th>
-            <th>Punkte</th>
             <th>Symbole</th>
           </tr>
         </thead>
