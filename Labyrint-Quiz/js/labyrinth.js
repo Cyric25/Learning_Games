@@ -89,6 +89,26 @@ function convertRQtoLabyrinth(rqData) {
   return fragen;
 }
 
+// ── Join Screen ───────────────────────────────────────────────────
+function showSetup() {
+  showScreen('setup-screen');
+  buildSetupUI();
+}
+
+async function joinWithCode() {
+  const input = document.getElementById('join-code');
+  const code = (input?.value || '').trim().toUpperCase();
+  const errEl = document.getElementById('join-error');
+  errEl.textContent = '';
+
+  if (!code || code.length < 4) { errEl.textContent = 'Bitte einen 4-stelligen Code eingeben.'; return; }
+
+  const state = await GameSync.load(code);
+  if (!state?.meta) { errEl.textContent = `Spiel "${code}" nicht gefunden.`; return; }
+
+  window.location.href = 'play.html?code=' + code;
+}
+
 // ── Setup UI ──────────────────────────────────────────────────────
 function buildSetupUI() {
   buildCategoryUI(); buildTeamCountUI(); buildTeamConfigUI(); buildSymbolsUI(); buildTimerUI();
@@ -366,7 +386,7 @@ function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.cl
 function confirmQuit() { if (confirm('Spiel wirklich beenden?')) { GameSync.unsubscribe(); showScreen('setup-screen'); } }
 function updateThemeBtnText() {
   const d = document.body.classList.contains('dark');
-  ['btn-theme','btn-theme-game'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d ? '☀️ Lightmode' : '🌙 Darkmode'; });
+  ['btn-theme','btn-theme-game','btn-theme-join'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d ? '☀️ Lightmode' : '🌙 Darkmode'; });
 }
 
 // ── Theme ─────────────────────────────────────────────────────────

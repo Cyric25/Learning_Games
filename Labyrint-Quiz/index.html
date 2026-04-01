@@ -9,11 +9,44 @@
 </head>
 <body>
 
-  <!-- ── Setup Screen ────────────────────────────────────────── -->
-  <div class="screen active" id="setup-screen">
-    <div class="setup-card">
+  <!-- ── Join Screen ────────────────────────────────────────── -->
+  <div class="screen active" id="join-screen">
+    <div class="setup-card join-card">
       <div class="setup-header">
         <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+        <button class="header-btn" id="btn-theme-join" onclick="toggleTheme()">🌙 Darkmode</button>
+      </div>
+      <div class="setup-title">
+        <h1>🏰 Labyrinth-Quiz</h1>
+        <p>Spiel beitreten oder neues Spiel erstellen</p>
+      </div>
+
+      <div class="join-section">
+        <h3>Mit Code beitreten</h3>
+        <p class="join-hint">Gib den Code deiner Lehrkraft ein</p>
+        <input class="join-code-input" id="join-code" type="text" maxlength="6"
+          placeholder="CODE" autocomplete="off" autocapitalize="characters"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+          onkeydown="if(event.key==='Enter') joinWithCode()">
+        <div class="join-error" id="join-error"></div>
+        <button class="btn-join-code" onclick="joinWithCode()">Beitreten ▶</button>
+      </div>
+
+      <div class="join-divider"><span>oder</span></div>
+
+      <div class="join-section">
+        <h3>Als Spielleiter</h3>
+        <p class="join-hint">Neues Spiel einrichten und Spielcode generieren</p>
+        <button class="btn-new-game" onclick="showSetup()">+ Neues Spiel erstellen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Setup Screen ────────────────────────────────────────── -->
+  <div class="screen" id="setup-screen">
+    <div class="setup-card">
+      <div class="setup-header">
+        <button class="header-btn" onclick="showScreen('join-screen')">&#8592; Zurück</button>
         <div class="setup-header-btns">
           <a href="admin.html" class="header-btn">Fragen</a>
           <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
