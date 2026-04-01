@@ -48,6 +48,7 @@ const GameSync = {
 
 // ── State ─────────────────────────────────────────────────────────
 let allQuestions = [];
+let rawCategories = [];  // original hierarchical structure
 let activeCategories = new Set();
 let gameCode = null;
 let localGrid = null;   // regeneriert aus seed
@@ -63,10 +64,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 // ── Fragen laden ──────────────────────────────────────────────────
 async function loadQuestions() {
   let data = null;
-  try { const r = await fetch('../api.php?f=questions'); if (r.ok) data = await r.json(); } catch {}
-  if (!data) { try { const r = await fetch('../data/questions.json'); if (r.ok) data = await r.json(); } catch {} }
+  // Skip fetch on file:// to avoid CORS errors; use localStorage directly
+  if (location.protocol !== 'file:') {
+    try { const r = await fetch('../api.php?f=questions'); if (r.ok) data = await r.json(); } catch {}
+    if (!data) { try { const r = await fetch('../data/questions.json'); if (r.ok) data = await r.json(); } catch {} }
+  }
   if (!data) { const c = localStorage.getItem('rq_questions'); if (c) try { data = JSON.parse(c); } catch {} }
   if (!data) data = { categories: [] };
+  rawCategories = data.categories || [];
   allQuestions = convertRQtoLabyrinth(data);
 }
 
@@ -77,7 +82,6 @@ function convertRQtoLabyrinth(rqData) {
       cat.subcategories.forEach(s => walk(s, path ? `${path} › ${cat.name}` : cat.name));
     } else {
       const full = path ? `${path} › ${cat.name}` : cat.name;
-      activeCategories.add(cat.id);
       (cat.questions || []).forEach(q => {
         const diff = q.difficulty <= 200 ? 'leicht' : q.difficulty >= 400 ? 'schwer' : 'mittel';
         fragen.push({ ...q, kategorieId: cat.id, kategorieName: full, schwierigkeit: diff,
@@ -114,29 +118,114 @@ function buildSetupUI() {
   buildCategoryUI(); buildTeamCountUI(); buildTeamConfigUI(); buildSymbolsUI(); buildTimerUI();
 }
 
+const CAT_ICONS = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯','📚','🏛️','🎨','⚡'];
+
 function buildCategoryUI() {
-  const catMap = new Map();
-  allQuestions.forEach(q => { if (!catMap.has(q.kategorieId)) catMap.set(q.kategorieId, q.kategorieName); });
   const sec = document.getElementById('category-section');
   const list = document.getElementById('cat-select-list');
-  if (!catMap.size) { if (sec) sec.style.display = 'none'; return; }
+  if (!rawCategories.length) { if (sec) sec.style.display = 'none'; return; }
   if (sec) sec.style.display = '';
   list.innerHTML = '';
-  catMap.forEach((name, id) => {
-    const btn = document.createElement('button');
-    btn.className = 'cat-toggle-btn active'; btn.dataset.catId = id;
-    btn.textContent = name.split(' › ').pop(); btn.title = name;
-    btn.onclick = () => { activeCategories.has(id) ? activeCategories.delete(id) : activeCategories.add(id); btn.classList.toggle('active'); updateCategoryInfo(); };
-    list.appendChild(btn);
-  });
+
+  // Initialize all leaf categories as active
+  activeCategories.clear();
+  function collectLeaves(cat) {
+    if (cat.subcategories?.length) { cat.subcategories.forEach(collectLeaves); }
+    else { activeCategories.add(cat.id); }
+  }
+  rawCategories.forEach(collectLeaves);
+
+  rawCategories.forEach((cat, ci) => _buildCatNode(list, cat, CAT_ICONS[ci % CAT_ICONS.length], 0));
   updateCategoryInfo();
 }
 
-function toggleAllCategories(on) {
-  document.querySelectorAll('#cat-select-list .cat-toggle-btn').forEach(btn => {
-    on ? activeCategories.add(btn.dataset.catId) : activeCategories.delete(btn.dataset.catId);
-    btn.classList.toggle('active', on);
+function _buildCatNode(container, cat, icon, depth) {
+  const subs = cat.subcategories || [];
+  if (!subs.length) {
+    // Leaf category — checkable item
+    const qCount = allQuestions.filter(q => q.kategorieId === cat.id).length;
+    const item = document.createElement('div');
+    item.className = 'cat-select-item selected';
+    item.dataset.catId = cat.id;
+    if (depth > 0) item.style.marginLeft = (depth * 1.2) + 'rem';
+    item.innerHTML =
+      '<span class="cat-select-icon">' + icon + '</span>' +
+      '<span class="cat-select-name">' + cat.name + '</span>' +
+      '<span class="cat-select-count">' + qCount + '</span>' +
+      '<div class="cat-select-check">✓</div>';
+    item.onclick = () => {
+      if (activeCategories.has(cat.id)) { activeCategories.delete(cat.id); item.classList.remove('selected'); }
+      else { activeCategories.add(cat.id); item.classList.add('selected'); }
+      _syncGroupHeader(item.closest('.cat-group-wrap'));
+      updateCategoryInfo();
+    };
+    container.appendChild(item);
+    return;
+  }
+
+  // Non-leaf — accordion group
+  const wrap = document.createElement('div');
+  wrap.className = 'cat-group-wrap';
+
+  const qTotal = _countLeafQ(cat);
+  const header = document.createElement('div');
+  header.className = 'cat-group-header';
+  header.innerHTML =
+    '<span class="cat-group-chevron">▼</span>' +
+    '<span class="cat-group-icon">' + icon + '</span>' +
+    '<span class="cat-group-name">' + cat.name + '</span>' +
+    '<span class="cat-group-count">' + qTotal + ' Fragen</span>' +
+    '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" checked class="cat-group-cb">' +
+    '</label>';
+
+  const children = document.createElement('div');
+  children.className = 'cat-group-children';
+  subs.forEach(s => _buildCatNode(children, s, icon, depth + 1));
+
+  // Group checkbox toggles all leaves inside
+  header.querySelector('.cat-group-cb').addEventListener('change', e => {
+    const on = e.target.checked;
+    children.querySelectorAll('.cat-select-item').forEach(item => {
+      on ? activeCategories.add(item.dataset.catId) : activeCategories.delete(item.dataset.catId);
+      item.classList.toggle('selected', on);
+    });
+    updateCategoryInfo();
   });
+
+  // Header click expands/collapses
+  header.addEventListener('click', e => {
+    if (e.target.closest('label')) return;
+    const collapsed = header.classList.toggle('collapsed');
+    children.classList.toggle('hidden', collapsed);
+  });
+
+  wrap.appendChild(header);
+  wrap.appendChild(children);
+  container.appendChild(wrap);
+}
+
+function _countLeafQ(cat) {
+  if (!cat.subcategories?.length) return allQuestions.filter(q => q.kategorieId === cat.id).length;
+  return (cat.subcategories || []).reduce((s, c) => s + _countLeafQ(c), 0);
+}
+
+function _syncGroupHeader(wrap) {
+  if (!wrap) return;
+  const items = [...wrap.querySelectorAll('.cat-select-item')];
+  const allSel = items.length > 0 && items.every(i => i.classList.contains('selected'));
+  const cb = wrap.querySelector('.cat-group-cb');
+  if (cb) cb.checked = allSel;
+  const parentWrap = wrap.parentElement?.closest('.cat-group-wrap');
+  if (parentWrap) _syncGroupHeader(parentWrap);
+}
+
+function toggleAllCategories(on) {
+  document.querySelectorAll('#cat-select-list .cat-select-item').forEach(item => {
+    on ? activeCategories.add(item.dataset.catId) : activeCategories.delete(item.dataset.catId);
+    item.classList.toggle('selected', on);
+  });
+  document.querySelectorAll('#cat-select-list .cat-group-cb').forEach(cb => { cb.checked = on; });
   updateCategoryInfo();
 }
 
