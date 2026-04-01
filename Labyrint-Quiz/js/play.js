@@ -57,6 +57,7 @@ let questionContext = null;
 let timerInterval = null;
 let diceAnimId = null;
 let _ignoreNextUpdate = false; // verhindert Echo beim eigenen POST
+let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -157,6 +158,7 @@ function selectTeam(id) {
 function startPlayView() {
   buildLocalGrid();
   showScreen('play-screen');
+  renderCanvas(remoteState);
   applyState(remoteState);
   GameSync.subscribe(gameCode, onRemoteUpdate);
 }
@@ -170,6 +172,13 @@ function buildLocalGrid() {
 
   // Apply stored symbols + doors
   applyStateToGrid(localGrid, symbols || [], doors || []);
+
+  // Init canvas renderer
+  const canvas = document.getElementById('maze-canvas');
+  if (canvas && typeof MazeRenderer !== 'undefined') {
+    renderer = new MazeRenderer(canvas);
+    renderer.setMaze(result);
+  }
 }
 
 function applyStateToGrid(grid, symbols, doors) {
@@ -184,7 +193,20 @@ function onRemoteUpdate(data) {
   if (_ignoreNextUpdate) { _ignoreNextUpdate = false; return; }
   remoteState = data;
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
+  renderCanvas(data);
   applyState(data);
+}
+
+function renderCanvas(state) {
+  if (!renderer) return;
+  renderer.render({
+    phase: state.phase,
+    teams: state.teams,
+    currentTeamIdx: state.currentTeamIdx,
+    allSymbols: state.symbols || [],
+    doors: state.doors || [],
+    _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
+  });
 }
 
 // ── Hauptzustand anwenden ─────────────────────────────────────────
@@ -552,6 +574,8 @@ function clearTimer() { if (timerInterval) { clearInterval(timerInterval); timer
 function postState(newState) {
   _ignoreNextUpdate = true;
   remoteState = newState;
+  applyStateToGrid(localGrid, newState.symbols || [], newState.doors || []);
+  renderCanvas(newState);
   GameSync.save(gameCode, newState);
 }
 

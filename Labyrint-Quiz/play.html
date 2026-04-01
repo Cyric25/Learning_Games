@@ -46,7 +46,11 @@
     .my-sym-dot { font-size: 1rem; opacity: 0.35; }
     .my-sym-dot.found { opacity: 1; }
 
-    #play-area { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 1.5rem 1rem; box-sizing: border-box; }
+    /* Canvas strip */
+    .play-canvas-wrap { width: 100%; background: #111827; display: flex; justify-content: center; padding: 0.5rem; flex-shrink: 0; }
+    #maze-canvas { display: block; border-radius: 4px; max-height: 40vw; max-width: 100%; }
+
+    #play-area { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box; overflow-y: auto; }
 
     /* ── Waiting ──────────────────────────────────────────────── */
     .wait-screen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; }
@@ -153,6 +157,11 @@
       <div id="my-team-display">–</div>
       <div id="my-sym-bar"></div>
     </div>
+    <!-- Mini-Labyrinth Canvas -->
+    <div class="play-canvas-wrap">
+      <canvas id="maze-canvas"></canvas>
+    </div>
+
     <div id="play-area">
       <div class="wait-screen">
         <div class="wait-emoji">⏳</div>
@@ -187,6 +196,7 @@
   </div>
 
   <script src="js/maze.js"></script>
+  <script src="js/renderer.js"></script>
   <script src="js/play.js"></script>
 </body>
 </html>
