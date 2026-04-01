@@ -227,6 +227,62 @@ if ($key === 'game') {
     exit;
 }
 
+// ── Labyrinth SSE: ?f=labyrinth-sse&code=XXXX ────────────────────
+if ($key === 'labyrinth-sse') {
+    $code = strtoupper(trim($_GET['code'] ?? ''));
+    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
+        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
+    }
+    $lPath = __DIR__ . '/Labyrint-Quiz/data/games/' . $code . '.json';
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache'); header('Connection: keep-alive');
+    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
+    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
+    while (ob_get_level()) ob_end_flush();
+    $lastMtime = 0; $start = time();
+    while (true) {
+        if (connection_aborted()) break;
+        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
+        if (file_exists($lPath)) {
+            clearstatcache(true, $lPath);
+            $mtime = filemtime($lPath);
+            if ($mtime > $lastMtime) {
+                $lastMtime = $mtime;
+                echo "data: " . file_get_contents($lPath) . "\n\n"; @flush();
+            }
+        }
+        usleep(300000);
+    }
+    exit;
+}
+
+// ── Labyrinth Per-Game: ?f=labyrinth-game&code=XXXX ──────────────
+if ($key === 'labyrinth-game') {
+    $code = strtoupper(trim($_GET['code'] ?? ''));
+    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
+        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
+    }
+    $lDir  = __DIR__ . '/Labyrint-Quiz/data/games';
+    if (!is_dir($lDir)) mkdir($lDir, 0755, true);
+    $lPath = $lDir . '/' . $code . '.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($lPath) ? file_get_contents($lPath) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        file_put_contents($lPath, $body, LOCK_EX) !== false
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        if (file_exists($lPath)) @unlink($lPath);
+        echo json_encode(['ok' => true]);
+    }
+    exit;
+}
+
 // ── Legacy-Endpunkte: ?f=questions / ?f=gamestate ─────────────────
 if (!array_key_exists($key, $files)) {
     http_response_code(400);

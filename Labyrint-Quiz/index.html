@@ -15,46 +15,41 @@
       <div class="setup-header">
         <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
         <div class="setup-header-btns">
-          <a href="admin.html" class="header-btn" id="btn-admin">Fragen</a>
+          <a href="admin.html" class="header-btn">Fragen</a>
           <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
         </div>
       </div>
 
       <div class="setup-title">
         <h1>🏰 Labyrinth-Quiz</h1>
-        <p>Würfle, navigiere durch das Labyrinth und sammle als Erste alle deine Symbole ein!</p>
+        <p>Teams steuern ihr Gerät selbst – würfeln, navigieren, Symbole sammeln!</p>
       </div>
 
-      <!-- Kategorien -->
       <div class="setup-section" id="category-section" style="display:none;">
         <h3>Kategorien auswählen</h3>
         <div class="cat-select-actions">
-          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle auswählen</button>
+          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
           <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
         </div>
         <div class="cat-select-list" id="cat-select-list"></div>
         <div class="cat-select-info" id="cat-select-info"></div>
       </div>
 
-      <!-- Gruppen-Anzahl -->
       <div class="setup-section">
         <h3>Anzahl Gruppen</h3>
         <div class="param-row" id="team-count-row"></div>
       </div>
 
-      <!-- Gruppen konfigurieren -->
       <div class="setup-section">
         <h3>Gruppen konfigurieren</h3>
         <div class="team-config-list" id="team-config-list"></div>
       </div>
 
-      <!-- Symbole pro Gruppe -->
       <div class="setup-section">
         <h3>Symbole pro Gruppe</h3>
         <div class="param-row" id="symbols-per-team-row"></div>
       </div>
 
-      <!-- Timer -->
       <div class="setup-section">
         <h3>Zeitlimit pro Frage</h3>
         <div class="param-row" id="timer-row"></div>
@@ -63,7 +58,7 @@
       <div class="setup-error" id="setup-error"></div>
 
       <div class="setup-actions">
-        <button class="btn-start-game" id="btn-start" onclick="startGame()">Spiel starten</button>
+        <button class="btn-start-game" onclick="startGame()">Spiel starten</button>
       </div>
     </div>
   </div>
@@ -76,22 +71,19 @@
         <h2>🏰 Labyrinth-Quiz</h2>
         <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
       </div>
+
+      <!-- Game Code Banner -->
+      <div class="game-code-display" id="game-code-display" style="display:none;">
+        <span class="gc-label">Code:</span>
+        <span class="gc-value" id="game-code-value" onclick="copyCode(this)" title="Klick zum Kopieren"></span>
+        <a class="gc-link" id="game-play-link" href="#" target="_blank">play.html öffnen ↗</a>
+      </div>
+
+      <!-- Active Team Banner -->
       <div class="active-team-banner" id="active-team-banner"></div>
 
-      <!-- Würfel-Leiste -->
-      <div class="game-info-bar">
-        <div id="dice-area" class="dice-area" style="display:none;">
-          <div class="dice-face" id="dice-face">🎲</div>
-          <button class="btn-roll" id="btn-roll" onclick="rollDice()">Würfeln</button>
-        </div>
-        <div id="steps-area" class="steps-area" style="display:none;">
-          <div class="steps-counter">
-            <span class="steps-number" id="steps-count">0</span>
-            <span class="steps-label">Schritte</span>
-          </div>
-          <button class="btn-end-turn" onclick="skipRemainingSteps()">Zug beenden</button>
-        </div>
-      </div>
+      <!-- Phase -->
+      <div class="phase-display" id="phase-display"></div>
 
       <div class="canvas-wrap">
         <canvas id="maze-canvas"></canvas>
@@ -100,8 +92,8 @@
 
     <div class="sidebar">
       <div class="controls-hint">
-        <p>Würfeln → Richtung wählen</p>
-        <div class="keys">⬆⬇⬅➡ oder Klick</div>
+        <p>Teams spielen auf ihrem Gerät</p>
+        <p class="hint-small">play.html?code=<strong id="hint-code">–</strong></p>
       </div>
 
       <h3>Gruppen</h3>
@@ -119,36 +111,6 @@
     </div>
   </div>
 
-  <!-- ── Question Modal ──────────────────────────────────────── -->
-  <div class="modal-overlay" id="question-modal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-cat-name" id="q-cat-name"></span>
-        <span class="modal-difficulty" id="q-difficulty"></span>
-      </div>
-      <div class="modal-trigger" id="q-trigger-type"></div>
-      <div class="timer-bar-wrap"><div class="timer-bar" id="q-timer-bar"></div></div>
-      <div class="timer-text" id="q-timer-text"></div>
-      <div class="modal-question" id="q-text"></div>
-
-      <!-- MC answers -->
-      <div class="answer-options" id="q-options"></div>
-
-      <!-- Open question -->
-      <div class="open-answer-section" id="q-open-section" style="display:none;">
-        <button class="btn-show-answer" id="q-show-answer" onclick="showOpenAnswer()">Lösung anzeigen</button>
-        <div class="open-answer-text" id="q-open-answer"></div>
-        <div class="open-actions" id="q-open-actions">
-          <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
-          <button class="btn-wrong" onclick="resolveOpen(false)">✗ Falsch</button>
-        </div>
-      </div>
-
-      <div class="modal-result" id="q-result"></div>
-      <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
-    </div>
-  </div>
-
   <!-- ── Result Screen ───────────────────────────────────────── -->
   <div class="screen" id="result-screen">
     <div class="result-card">
@@ -156,17 +118,11 @@
       <h2>Spiel beendet!</h2>
       <div class="result-winner" id="result-winner"></div>
       <table class="result-ranking">
-        <thead>
-          <tr>
-            <th>Platz</th>
-            <th>Gruppe</th>
-            <th>Symbole</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Platz</th><th>Gruppe</th><th>Symbole</th></tr></thead>
         <tbody id="result-ranking-body"></tbody>
       </table>
       <div class="result-actions">
-        <button class="btn-result btn-result-primary" onclick="playAgain()">Neues Spiel</button>
+        <button class="btn-result btn-result-primary" onclick="location.reload()">Neues Spiel</button>
         <a href="../spiele.html" class="btn-result btn-result-secondary">Zur Übersicht</a>
       </div>
     </div>
@@ -175,6 +131,21 @@
   <script src="js/maze.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/labyrinth.js"></script>
-
+  <script>
+    function copyCode(el) {
+      const code = el.textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const orig = el.textContent; el.textContent = '✓ Kopiert!';
+        setTimeout(() => { el.textContent = orig; }, 1200);
+      }).catch(() => {});
+    }
+    // Also update sidebar hint when code is shown
+    const _origShow = window.showGameCode;
+    window.showGameCode = function() {
+      if (_origShow) _origShow();
+      const h = document.getElementById('hint-code');
+      if (h && window.gameCode) h.textContent = window.gameCode;
+    };
+  </script>
 </body>
 </html>
