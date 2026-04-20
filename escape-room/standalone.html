@@ -9,6 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <style>
+    /* Offline-Fallback falls Google Fonts nicht laden (kein Internet) */
+    body { font-family: 'Crimson Text', Georgia, 'Times New Roman', serif; }
+    h1, h2, h3 { font-family: 'Cinzel', 'Palatino Linotype', Palatino, 'Book Antiqua', serif; }
+  </style>
+  <style>
     /* ══════════════════════════════════════════════════════
        RESET & BASE
        ══════════════════════════════════════════════════════ */
@@ -754,8 +759,7 @@
       <div id="no-games" class="hidden" style="text-align:center;margin-top:40px;">
         <p style="color:var(--text-muted);font-size:1.1rem;">Noch kein Spiel angelegt — bitte Admin fragen.</p>
       </div>
-      <div style="text-align:center;margin-top:32px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-        <a href="../spiele.html" class="btn-ghost">← Zurück zur Übersicht</a>
+      <div style="text-align:center;margin-top:32px;">
         <button class="btn-ghost" onclick="enterAdminMode()" style="border-color:var(--gold-dim);color:var(--gold);">⚙️ Admin</button>
       </div>
     </div>
@@ -896,7 +900,6 @@
       <div class="scoreboard" id="scoreboard"></div>
       <div class="mt-24 flex justify-center gap-8 flex-wrap">
         <button class="btn-gold" onclick="showView('view-game-select');currentGame=null;currentTeam=null;">Neues Spiel</button>
-        <a href="../spiele.html" class="btn-ghost">← Übersicht</a>
       </div>
     </div>
   </div>
@@ -930,7 +933,6 @@
         <h1>🔐 Escape Room — Admin</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="admin-btn" onclick="exitAdminMode()">▶ Spieler-Ansicht</button>
-          <a href="../spiele.html" class="admin-btn">← Übersicht</a>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
@@ -2155,11 +2157,22 @@
     };
 
     function downloadJSON(obj, filename) {
-      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const json = JSON.stringify(obj, null, 2);
+      // Safari iOS: a.download on blob URLs not supported → open as data URI
+      const isSafariIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && /WebKit/.test(navigator.userAgent);
+      if (isSafariIOS) {
+        const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+        window.open(dataUrl, '_blank');
+        return;
+      }
+      const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     }
 
     window.importGameFile = function(event) {
@@ -3198,13 +3211,15 @@
 
     window.enterAdminMode = function() {
       isAdmin = true;
-      document.body.classList.replace('player-mode', 'admin-mode');
+      document.body.classList.remove('player-mode');
+      document.body.classList.add('admin-mode');
       showAdminView('admin-library');
     };
 
     window.exitAdminMode = function() {
       isAdmin = false;
-      document.body.classList.replace('admin-mode', 'player-mode');
+      document.body.classList.remove('admin-mode');
+      document.body.classList.add('player-mode');
       showView('view-game-select');
     };
 
