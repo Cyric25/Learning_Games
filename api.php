@@ -229,7 +229,7 @@ if ($key === 'game') {
 
 // ── Escape Room Library: ?f=er-library ───────────────────────────
 if ($key === 'er-library') {
-    $erDir = __DIR__ . '/escape-room/data/games';
+    $erDir = __DIR__ . '/escape-room/spiele';
     if (!is_dir($erDir)) mkdir($erDir, 0755, true);
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -252,7 +252,7 @@ if ($key === 'er-game') {
         echo json_encode(['error' => 'invalid id']);
         exit;
     }
-    $erDir = __DIR__ . '/escape-room/data/games';
+    $erDir = __DIR__ . '/escape-room/spiele';
     if (!is_dir($erDir)) mkdir($erDir, 0755, true);
     $path = $erDir . '/' . $id . '.json';
 
