@@ -1019,7 +1019,7 @@
        JAVASCRIPT
        ════════════════════════════════════════════════════ -->
   <script>
-  (async function() {
+  (function() {
     'use strict';
 
     // ══════════════════════════════════════════════════════
@@ -1040,43 +1040,9 @@
     let padlockDigits = [];   // current padlock wheel values
 
     // ══════════════════════════════════════════════════════
-    // LIBRARY (API-first, localStorage fallback)
+    // LIBRARY (localStorage — Standalone-Version)
     // ══════════════════════════════════════════════════════
-    let _useApi = false;
-
-    async function loadLibrary() {
-      // Try API (Webhosting)
-      try {
-        const r = await fetch('../api.php?f=er-library');
-        if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
-          const data = await r.json();
-          if (Array.isArray(data)) {
-            _useApi = true;
-            library = data;
-            // Migrate from localStorage if server is empty but localStorage has games
-            if (library.length === 0) {
-              try {
-                const ls = JSON.parse(localStorage.getItem('escaperoom_library') || '[]');
-                if (ls.length > 0) {
-                  library = ls;
-                  ls.forEach(g => saveGame(g));
-                  return;
-                }
-              } catch(e) {}
-            }
-            // Demo on first run
-            if (library.length === 0 && !localStorage.getItem('escaperoom_initialized')) {
-              const demo = createDemoGame();
-              library = [demo];
-              saveGame(demo);
-              localStorage.setItem('escaperoom_initialized', '1');
-            }
-            return;
-          }
-        }
-      } catch(e) {}
-      // Fallback: localStorage
-      _useApi = false;
+    function loadLibrary() {
       try {
         library = JSON.parse(localStorage.getItem('escaperoom_library') || '[]');
       } catch(e) { library = []; }
@@ -1088,28 +1054,12 @@
       }
     }
 
-    // Saves one game — always syncs localStorage, also writes to API if available
-    async function saveGame(game) {
+    function saveGame(game) {
       localStorage.setItem('escaperoom_library', JSON.stringify(library));
-      if (_useApi) {
-        try {
-          await fetch('../api.php?f=er-game&id=' + game.id, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(game)
-          });
-        } catch(e) {}
-      }
     }
 
-    // Deletes one game — always syncs localStorage, also deletes from API if available
-    async function deleteGameFile(id) {
+    function deleteGameFile(id) {
       localStorage.setItem('escaperoom_library', JSON.stringify(library));
-      if (_useApi) {
-        try {
-          await fetch('../api.php?f=er-game&id=' + id, { method: 'DELETE' });
-        } catch(e) {}
-      }
     }
 
     function getGame(id) {
@@ -3248,7 +3198,7 @@
     // ══════════════════════════════════════════════════════
     // INIT
     // ══════════════════════════════════════════════════════
-    await loadLibrary();
+    loadLibrary();
 
     if (isAdmin) {
       document.body.classList.add('admin-mode');

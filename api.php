@@ -227,6 +227,54 @@ if ($key === 'game') {
     exit;
 }
 
+// ── Escape Room Library: ?f=er-library ───────────────────────────
+if ($key === 'er-library') {
+    $erDir = __DIR__ . '/escape-room/data/games';
+    if (!is_dir($erDir)) mkdir($erDir, 0755, true);
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $games = [];
+        foreach (glob($erDir . '/game_*.json') as $file) {
+            $g = json_decode(file_get_contents($file), true);
+            if ($g) $games[] = $g;
+        }
+        usort($games, fn($a,$b) => strcmp($a['id']??'', $b['id']??''));
+        echo json_encode($games, JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+// ── Escape Room Individual Game: ?f=er-game&id=game_XXXX ──────────
+if ($key === 'er-game') {
+    $id = trim($_GET['id'] ?? '');
+    if (!preg_match('/^game_[0-9]+$/', $id)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'invalid id']);
+        exit;
+    }
+    $erDir = __DIR__ . '/escape-room/data/games';
+    if (!is_dir($erDir)) mkdir($erDir, 0755, true);
+    $path = $erDir . '/' . $id . '.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($path) ? file_get_contents($path) : 'null';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400);
+            echo json_encode(['error' => 'invalid JSON']);
+            exit;
+        }
+        file_put_contents($path, $body, LOCK_EX) !== false
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        if (file_exists($path)) @unlink($path);
+        echo json_encode(['ok' => true]);
+    }
+    exit;
+}
+
 // ── Labyrinth SSE: ?f=labyrinth-sse&code=XXXX ────────────────────
 if ($key === 'labyrinth-sse') {
     $code = strtoupper(trim($_GET['code'] ?? ''));

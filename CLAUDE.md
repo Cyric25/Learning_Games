@@ -484,15 +484,69 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
   "rooms": [{
     "id": "room_1", "name": "...", "subject": "...", "description": "...",
     "backgroundImage": "", "unlockCode": "4823",
+    "lockType": "padlock|digital",
+    "puzzleCard": { "type": "text|image", "content": "..." },
     "questions": [{
       "id": "q1", "type": "multiple_choice|text_input|number_code",
       "text": "...", "options": [], "correctAnswer": "...",
       "caseSensitive": false, "hint": "", "codeDigit": "4"
+    }],
+    "hotspots": [{
+      "id": "hs_...", "type": "puzzle|exit",
+      "label": "...", "icon": "🔍",
+      "x": 50, "y": 30,
+      "codeDigit": "3",
+      "questionIds": ["q1", "q2"]
     }]
   }]
 }
 ```
 Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
+
+`lockType`: `padlock` = Rad-Schloss (Ziffern scrollen), `digital` = Tastatur-Eingabe (PIN)
+
+`puzzleCard`: Hinweiskarte, die Spieler sehen bevor sie den Code eingeben — enthält Lösungshinweise aus den Hotspots
+
+### Explorer-Modus (Hotspot-Raum)
+Ein Raum wechselt automatisch in den Explorer-Modus, wenn er `hotspots` enthält (und optionales `backgroundImage`).
+
+- Spieler sehen ein Hintergrundbild (oder Fallback-Fläche) mit klickbaren Hotspots
+- `puzzle`-Hotspots: Enthalten Fragen → alle richtig beantworten → Hotspot gilt als gelöst
+- Jeder `puzzle`-Hotspot hat eine `codeDigit` → alle Ziffern zusammen ergeben den `unlockCode`
+- `exit`-Hotspot: Nur klickbar, wenn alle Puzzle-Hotspots gelöst → führt zum Padlock
+- Gelöste Hotspots zeigen bei erneutem Klick eine Zusammenfassung mit Antworten (Hilfe für Rätselkarte)
+
+### MD-Import Format
+```markdown
+# Spieltitel
+- timer: 30         ← Minuten
+- modus: kette      ← kette|einzeln
+- beschreibung: ...
+
+## Raumname
+- fach: Physik
+- beschreibung: ...
+- code: 4823        ← Unlock-Code (auto-generiert wenn weggelassen)
+- schloss: padlock  ← padlock|digital
+- bild: https://...  ← Hintergrundbild URL
+- rätselkarte: Hinweistext für die Rätselkarte
+
+### Hotspots
+- 🔍 | Bücherregal | 20 | 40 | 3 | 1,2   ← icon|label|x%|y%|codeDigit|questionIds
+- 🚪 | Ausgang     | 80 | 50             ← exit-Hotspot (kein codeDigit/questionIds)
+
+### Fragen
+- mc | Fragetext | Opt1 | Opt2 | Opt3 | Opt4 | RichtigeAntwort | Hinweis | Ziffer
+- text | Fragetext | Antwort | Hinweis | Ziffer
+- zahl | Fragetext | 42 | Hinweis | Ziffer
+
+### F1: mc
+- frage: Fragetext
+- optionen: A | B | C | D
+- antwort: A
+- hinweis: Tipp
+- ziffer: 4
+```
 
 ### Theme (Escape Room spezifisch)
 - Spieler-Modus: Dark/Mystery (`body.player-mode`) — Tiefes Dunkelblau, Gold-Akzente, Noise-Overlay
