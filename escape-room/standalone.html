@@ -754,8 +754,9 @@
       <div id="no-games" class="hidden" style="text-align:center;margin-top:40px;">
         <p style="color:var(--text-muted);font-size:1.1rem;">Noch kein Spiel angelegt — bitte Admin fragen.</p>
       </div>
-      <div style="text-align:center;margin-top:32px;">
+      <div style="text-align:center;margin-top:32px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
         <a href="../spiele.html" class="btn-ghost">← Zurück zur Übersicht</a>
+        <button class="btn-ghost" onclick="enterAdminMode()" style="border-color:var(--gold-dim);color:var(--gold);">⚙️ Admin</button>
       </div>
     </div>
   </div>
@@ -928,7 +929,7 @@
       <div class="admin-header">
         <h1>🔐 Escape Room — Admin</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a href="index.html" class="admin-btn">▶ Spieler-Ansicht</a>
+          <button class="admin-btn" onclick="exitAdminMode()">▶ Spieler-Ansicht</button>
           <a href="../spiele.html" class="admin-btn">← Übersicht</a>
         </div>
       </div>
@@ -3194,6 +3195,18 @@
     function escAttr(str) {
       return esc(str).replace(/"/g, '&quot;');
     }
+
+    window.enterAdminMode = function() {
+      isAdmin = true;
+      document.body.classList.replace('player-mode', 'admin-mode');
+      showAdminView('admin-library');
+    };
+
+    window.exitAdminMode = function() {
+      isAdmin = false;
+      document.body.classList.replace('admin-mode', 'player-mode');
+      showView('view-game-select');
+    };
 
     // ══════════════════════════════════════════════════════
     // INIT
