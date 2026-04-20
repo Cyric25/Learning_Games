@@ -528,7 +528,8 @@ Ein Raum wechselt automatisch in den Explorer-Modus, wenn er `hotspots` enthält
 - beschreibung: ...
 - code: 4823        ← Unlock-Code (auto-generiert wenn weggelassen)
 - schloss: padlock  ← padlock|digital
-- bild: https://...  ← Hintergrundbild URL
+- bild: https://...  ← Hintergrundbild URL (flat oder Equirectangular für 360°)
+- panorama: true    ← Aktiviert 360°-Modus (Pannellum), Synonyme: 360, typ360
 - rätselkarte: Hinweistext für die Rätselkarte
 
 ### Hotspots
@@ -547,6 +548,17 @@ Ein Raum wechselt automatisch in den Explorer-Modus, wenn er `hotspots` enthält
 - hinweis: Tipp
 - ziffer: 4
 ```
+
+### 360°-Panorama-Modus
+Ein Raum wechselt in den 360°-Modus wenn `backgroundType: "360"` gesetzt ist.
+
+- Renderer: **Pannellum** (CDN `pannellum@2.5.6`) — Equirectangular-Bild in `backgroundImage`
+- Hotspots: selbe `x/y` (0–100%) wie im Flat-Modus, werden mit `toYawPitch(x,y)` konvertiert
+  - `yaw = (x/100 * 360) - 180`
+  - `pitch = -((y/100 * 180) - 90)`
+- Admin: Checkbox "360° Panorama" im Raum-Editor, Hotspot-Platzierung auf Equirectangular-Vorschau (gleiche Koordinaten)
+- `pnlmViewer` (global) wird bei `destroyPnlmViewer()` aufgeräumt (aufgerufen in `renderRoomExplorer` + `goToPadlock`)
+- Kein 360°-Support in `standalone.html` (braucht CDN)
 
 ### Theme (Escape Room spezifisch)
 - Spieler-Modus: Dark/Mystery (`body.player-mode`) — Tiefes Dunkelblau, Gold-Akzente, Noise-Overlay
