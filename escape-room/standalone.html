@@ -1261,7 +1261,7 @@
 
       // Init room progress
       if (!currentTeam.roomProgress[room.id]) {
-        currentTeam.roomProgress[room.id] = { solvedQuestions: [], failCounts: {}, completed: false, completedAt: null };
+        currentTeam.roomProgress[room.id] = { solvedQuestions: [], readNotes: [], failCounts: {}, completed: false, completedAt: null };
       }
       currentTeam.currentRoom = roomIdx;
       saveTeamState();
@@ -1499,13 +1499,16 @@
     function renderRoomExplorer(room) {
       const container = document.getElementById('room-explorer-container');
       const progress = currentTeam.roomProgress[room.id];
-      const puzzleHotspots = (room.hotspots || []).filter(h => h.type === 'puzzle');
-      const solvedHs = puzzleHotspots.filter(h => isHotspotSolved(h, progress));
-      const allPuzzlesSolved = solvedHs.length >= puzzleHotspots.length && puzzleHotspots.length > 0;
+      const allHotspots = room.hotspots || [];
+
+      const visiblePuzzleHotspots = allHotspots.filter(h => h.type === 'puzzle' && isHotspotVisible(h, allHotspots, progress));
+      const solvedHs = visiblePuzzleHotspots.filter(h => isHotspotSolved(h, progress));
+      const allPuzzlesSolved = visiblePuzzleHotspots.length > 0 &&
+        allHotspots.filter(h => h.type === 'puzzle').every(h => isHotspotSolved(h, progress));
 
       document.getElementById('explorer-room-name').textContent = room.name;
       document.getElementById('explorer-progress').textContent =
-        solvedHs.length + ' / ' + puzzleHotspots.length + ' Rätsel gelöst';
+        solvedHs.length + ' / ' + visiblePuzzleHotspots.length + ' Rätsel gelöst';
 
       let html = '';
       if (room.backgroundImage) {
@@ -1514,17 +1517,20 @@
         html += '<div class="room-explorer-fallback">' + esc(room.name) + '</div>';
       }
 
-      (room.hotspots || []).forEach((hs, i) => {
+      allHotspots.forEach((hs, i) => {
+        if (!isHotspotVisible(hs, allHotspots, progress)) return;
         const isSolved = hs.type === 'puzzle' && isHotspotSolved(hs, progress);
+        const isRead = hs.type === 'note' && (progress.readNotes || []).includes(hs.id);
         const isExit = hs.type === 'exit';
         const unlocked = isExit && allPuzzlesSolved;
         const classes = 'hotspot'
           + (isSolved ? ' solved' : '')
+          + (hs.type === 'note' ? ' note' : '')
           + (isExit ? ' exit' : '')
           + (unlocked ? ' unlocked' : '')
           + (isExit && !unlocked ? ' locked' : '');
 
-        const icon = isExit ? '🚪' : (isSolved ? '✅' : (hs.icon || '🔍'));
+        const icon = isExit ? '🚪' : (isSolved ? '✅' : (isRead ? '✅' : (hs.icon || '🔍')));
         html += '<div class="' + classes + '" style="left:' + hs.x + '%;top:' + hs.y + '%;" onclick="onHotspotClick(' + i + ')">' +
           '<div class="hotspot-inner">' + icon + '</div>' +
           '<div class="hotspot-label">' + esc(hs.label || '') + '</div>' +
@@ -1539,19 +1545,38 @@
       return hs.questionIds.every(qid => progress.solvedQuestions.includes(qid));
     }
 
+    function isHotspotCompleted(hs, progress) {
+      if (hs.type === 'puzzle') return isHotspotSolved(hs, progress);
+      if (hs.type === 'note') return (progress.readNotes || []).includes(hs.id);
+      return true;
+    }
+
+    function isHotspotVisible(hs, allHotspots, progress) {
+      if (!hs.requires || hs.requires.length === 0) return true;
+      return hs.requires.every(reqId => {
+        const req = allHotspots.find(h => h.id === reqId);
+        return req ? isHotspotCompleted(req, progress) : true;
+      });
+    }
+
     window.onHotspotClick = function(hsIdx) {
       const room = currentGame.rooms[currentRoomIdx];
       const hs = room.hotspots[hsIdx];
       const progress = currentTeam.roomProgress[room.id];
 
       if (hs.type === 'note') {
+        if (!progress.readNotes) progress.readNotes = [];
+        if (!progress.readNotes.includes(hs.id)) {
+          progress.readNotes.push(hs.id);
+          saveTeamState();
+        }
         const modal = document.getElementById('hotspot-modal');
         document.getElementById('hotspot-modal-body').innerHTML =
           '<h3 style="color:#60a5fa;font-family:\'Cinzel\',serif;">📝 ' + esc(hs.label || 'Notiz') + '</h3>' +
           '<div style="color:var(--text-primary);margin-top:14px;white-space:pre-line;font-size:1.05rem;line-height:1.7;">' +
             esc(hs.noteText || '(Kein Text hinterlegt)') +
           '</div>' +
-          '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
+          '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal();renderRoomExplorer(currentGame.rooms[currentRoomIdx]);">Schließen</button></div>';
         modal.classList.remove('hidden');
         return;
       }
@@ -2743,11 +2768,13 @@
           const digitInp = hsEl.querySelector('.hs-digit');
           const noteInp = hsEl.querySelector('.hs-note-text');
           const qidsEl = hsEl.querySelectorAll('.hs-qid:checked');
+          const reqsEl = hsEl.querySelectorAll('.hs-requires:checked');
           if (labelInp) hs.label = labelInp.value;
           if (iconInp) hs.icon = iconInp.value;
           if (digitInp) hs.codeDigit = digitInp.value;
           if (noteInp) hs.noteText = noteInp.value;
           if (hs.type !== 'note') hs.questionIds = Array.from(qidsEl).map(c => c.value);
+          hs.requires = Array.from(reqsEl).map(c => c.value);
         });
 
         // Sync questions
@@ -2946,6 +2973,27 @@
           html += '</div></div>';
         }
 
+        // Prerequisites (requires) — for all non-exit hotspots
+        const otherHotspots = (room.hotspots || []).filter((_, j) => j !== hsIdx);
+        if (!isExit && otherHotspots.length > 0) {
+          html += '<div style="margin-top:8px;"><label class="admin-label" style="margin-top:0;">Sichtbar erst nach</label>';
+          html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+          otherHotspots.forEach((other) => {
+            const otherIsNote = other.type === 'note';
+            const otherIsExit = other.type === 'exit';
+            if (otherIsExit) return;
+            const otherIcon = otherIsNote ? '📝' : '🔍';
+            const otherLabel = other.label || (otherIsNote ? 'Notiz' : 'Rätsel');
+            const checked = (hs.requires || []).includes(other.id) ? ' checked' : '';
+            html += '<label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;' +
+              'background:rgba(255,255,255,0.04);padding:3px 8px;border-radius:6px;">' +
+              '<input type="checkbox" class="hs-requires" value="' + escAttr(other.id) + '"' + checked + '>' +
+              otherIcon + ' ' + esc(otherLabel) +
+            '</label>';
+          });
+          html += '</div></div>';
+        }
+
         div.innerHTML = html;
         listEl.appendChild(div);
       });
@@ -3025,7 +3073,8 @@
         x: 50, y: 50,
         icon: type === 'exit' ? '🚪' : type === 'note' ? '📝' : '🔍',
         label: type === 'exit' ? 'Ausgang' : '',
-        type: type
+        type: type,
+        requires: []
       };
       if (type === 'note') {
         hs.noteText = '';
