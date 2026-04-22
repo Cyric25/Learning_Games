@@ -621,6 +621,22 @@
       display: flex; align-items: center; justify-content: center;
       color: #999; font-size: 0.9rem;
     }
+    .hs-type-popup {
+      position: fixed; z-index: 9999;
+      background: #fff; border: 1px solid #d0d0d0;
+      border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+      padding: 6px; display: none; flex-direction: column; gap: 2px;
+      min-width: 170px;
+    }
+    .hs-type-popup.open { display: flex; }
+    .hs-type-popup button {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border: none; background: none;
+      border-radius: 7px; cursor: pointer; font-size: 0.9rem;
+      text-align: left; color: #333; transition: background 0.15s;
+    }
+    .hs-type-popup button:hover { background: #f0f0f0; }
+    .hs-type-popup .popup-divider { height: 1px; background: #e8e8e8; margin: 2px 0; }
     .hotspot-marker {
       position: absolute; width: 28px; height: 28px; border-radius: 50%;
       background: rgba(59,130,246,0.3); border: 2px solid #3b82f6;
@@ -1034,6 +1050,14 @@
 
   <!-- Confetti Container -->
   <div id="confetti-container" class="confetti-container hidden"></div>
+
+  <!-- Hotspot Type Popup -->
+  <div id="hs-type-popup" class="hs-type-popup">
+    <button onclick="confirmHotspotType('puzzle')">🔍 Rätsel-Hotspot</button>
+    <button onclick="confirmHotspotType('note')">📝 Notiz-Hotspot</button>
+    <div class="popup-divider"></div>
+    <button onclick="confirmHotspotType('exit')">🚪 Ausgang-Hotspot</button>
+  </div>
 
   <!-- ════════════════════════════════════════════════════
        ADMIN VIEWS
@@ -3312,29 +3336,73 @@
       });
     }
 
+    let _pendingHsPlacement = null;
+
     window.placeHotspot = function(event, rIdx) {
-      // Only place if clicking directly on image/preview (not on a marker)
       if (event.target.classList.contains('hotspot-marker')) return;
+      if (event.target.classList.contains('note-marker')) return;
       const preview = document.getElementById('hs-preview-' + rIdx);
       const rect = preview.getBoundingClientRect();
       const x = Math.round((event.clientX - rect.left) / rect.width * 1000) / 10;
       const y = Math.round((event.clientY - rect.top) / rect.height * 1000) / 10;
 
+      _pendingHsPlacement = { rIdx, x, y };
+
+      const popup = document.getElementById('hs-type-popup');
+      const pw = 176, ph = 116;
+      let left = event.clientX + 8;
+      let top = event.clientY + 8;
+      if (left + pw > window.innerWidth) left = event.clientX - pw - 4;
+      if (top + ph > window.innerHeight) top = event.clientY - ph - 4;
+      popup.style.left = left + 'px';
+      popup.style.top = top + 'px';
+      popup.classList.add('open');
+      event.stopPropagation();
+    };
+
+    window.confirmHotspotType = function(type) {
+      const popup = document.getElementById('hs-type-popup');
+      popup.classList.remove('open');
+      if (!_pendingHsPlacement) return;
+      const { rIdx, x, y } = _pendingHsPlacement;
+      _pendingHsPlacement = null;
+
       syncRoomsFromDOM();
       const room = editingGame.rooms[rIdx];
       if (!room.hotspots) room.hotspots = [];
-      room.hotspots.push({
+      const hs = {
         id: 'hs_' + Date.now(),
         x: x, y: y,
-        icon: '🔍',
-        label: '',
-        questionIds: [],
-        codeDigit: '',
-        type: 'puzzle'
-      });
+        icon: type === 'exit' ? '🚪' : type === 'note' ? '📝' : '🔍',
+        label: type === 'exit' ? 'Ausgang' : '',
+        type: type,
+        requires: []
+      };
+      if (type === 'note') {
+        hs.noteText = '';
+      } else {
+        hs.questionIds = [];
+        hs.codeDigit = '';
+      }
+      room.hotspots.push(hs);
       renderHotspotList(rIdx);
       renderHotspotMarkers(rIdx);
     };
+
+    document.addEventListener('click', function(e) {
+      const popup = document.getElementById('hs-type-popup');
+      if (popup && popup.classList.contains('open') && !popup.contains(e.target)) {
+        popup.classList.remove('open');
+        _pendingHsPlacement = null;
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const popup = document.getElementById('hs-type-popup');
+        if (popup) popup.classList.remove('open');
+        _pendingHsPlacement = null;
+      }
+    });
 
     window.addHotspotManual = function(rIdx, type) {
       syncRoomsFromDOM();
