@@ -1022,7 +1022,7 @@
        JAVASCRIPT
        ════════════════════════════════════════════════════ -->
   <script>
-  (function() {
+  (async function() {
     'use strict';
 
     // ══════════════════════════════════════════════════════
@@ -1043,9 +1043,39 @@
     let padlockDigits = [];   // current padlock wheel values
 
     // ══════════════════════════════════════════════════════
-    // LIBRARY (localStorage — Standalone-Version)
+    // LIBRARY (API wenn verfügbar, localStorage als Fallback)
     // ══════════════════════════════════════════════════════
-    function loadLibrary() {
+    let _useApi = false;
+
+    async function loadLibrary() {
+      // Nur auf echtem Webserver (http/https) API versuchen
+      if (location.protocol !== 'file:') {
+        try {
+          const r = await fetch('../api.php?f=er-library');
+          if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+              _useApi = true;
+              library = data;
+              if (library.length === 0) {
+                try {
+                  const ls = JSON.parse(localStorage.getItem('escaperoom_library') || '[]');
+                  if (ls.length > 0) { library = ls; ls.forEach(g => saveGame(g)); return; }
+                } catch(e) {}
+              }
+              if (library.length === 0 && !localStorage.getItem('escaperoom_initialized')) {
+                const demo = createDemoGame();
+                library = [demo];
+                saveGame(demo);
+                localStorage.setItem('escaperoom_initialized', '1');
+              }
+              return;
+            }
+          }
+        } catch(e) {}
+      }
+      // Fallback: localStorage
+      _useApi = false;
       try {
         library = JSON.parse(localStorage.getItem('escaperoom_library') || '[]');
       } catch(e) { library = []; }
@@ -1057,12 +1087,25 @@
       }
     }
 
-    function saveGame(game) {
-      localStorage.setItem('escaperoom_library', JSON.stringify(library));
+    async function saveGame(game) {
+      // localStorage immer synchron aktualisieren (schneller Fallback)
+      try { localStorage.setItem('escaperoom_library', JSON.stringify(library)); } catch(e) {}
+      if (_useApi) {
+        try {
+          await fetch('../api.php?f=er-game&id=' + game.id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(game)
+          });
+        } catch(e) {}
+      }
     }
 
-    function deleteGameFile(id) {
-      localStorage.setItem('escaperoom_library', JSON.stringify(library));
+    async function deleteGameFile(id) {
+      try { localStorage.setItem('escaperoom_library', JSON.stringify(library)); } catch(e) {}
+      if (_useApi) {
+        try { await fetch('../api.php?f=er-game&id=' + id, { method: 'DELETE' }); } catch(e) {}
+      }
     }
 
     function getGame(id) {
@@ -3226,7 +3269,7 @@
     // ══════════════════════════════════════════════════════
     // INIT
     // ══════════════════════════════════════════════════════
-    loadLibrary();
+    await loadLibrary();
 
     if (isAdmin) {
       document.body.classList.add('admin-mode');
