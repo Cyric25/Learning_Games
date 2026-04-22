@@ -419,6 +419,11 @@
       background: rgba(46,204,113,0.15); border-color: var(--success);
     }
     .hotspot.exit.locked { cursor: not-allowed; }
+    .hotspot.note .hotspot-inner {
+      background: rgba(59,130,246,0.15); border-color: #60a5fa;
+    }
+    .hotspot.note .hotspot-inner::after { border-color: rgba(96,165,250,0.3); }
+    .hotspot.note:hover .hotspot-inner { background: rgba(59,130,246,0.3); }
     .hotspot-label {
       position: absolute; bottom: -26px; left: 50%;
       transform: translateX(-50%); white-space: nowrap;
@@ -1539,6 +1544,18 @@
       const hs = room.hotspots[hsIdx];
       const progress = currentTeam.roomProgress[room.id];
 
+      if (hs.type === 'note') {
+        const modal = document.getElementById('hotspot-modal');
+        document.getElementById('hotspot-modal-body').innerHTML =
+          '<h3 style="color:#60a5fa;font-family:\'Cinzel\',serif;">📝 ' + esc(hs.label || 'Notiz') + '</h3>' +
+          '<div style="color:var(--text-primary);margin-top:14px;white-space:pre-line;font-size:1.05rem;line-height:1.7;">' +
+            esc(hs.noteText || '(Kein Text hinterlegt)') +
+          '</div>' +
+          '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
+        modal.classList.remove('hidden');
+        return;
+      }
+
       if (hs.type === 'exit') {
         const puzzleHotspots = room.hotspots.filter(h => h.type === 'puzzle');
         const allSolved = puzzleHotspots.every(h => isHotspotSolved(h, progress));
@@ -2149,7 +2166,6 @@
             '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' +
             '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
             '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
-            '<button class="admin-btn sm danger" onclick="deleteGame(\'' + g.id + '\')">Löschen</button>' +
           '</div>';
         list.appendChild(row);
       });
@@ -2399,16 +2415,18 @@
             const x = parseFloat(parts[2]) || 50;
             const y = parseFloat(parts[3]) || 50;
             const isExit = icon === '🚪' || label.toLowerCase() === 'ausgang' || label.toLowerCase() === 'exit' || label.toLowerCase() === 'tür';
+            const isNote = icon === '📝' || label.toLowerCase() === 'notiz' || label.toLowerCase() === 'note';
 
             const hs = {
               id: 'hs_' + Date.now() + '_' + currentRoom.hotspots.length,
               x: x, y: y, icon: icon, label: label,
-              type: isExit ? 'exit' : 'puzzle',
-              codeDigit: '', questionIds: []
+              type: isExit ? 'exit' : isNote ? 'note' : 'puzzle'
             };
-            if (!isExit && parts.length >= 5) hs.codeDigit = parts[4];
-            if (!isExit && parts.length >= 6) {
-              hs.questionIds = parts[5].split(',').map(s => 'q' + s.trim());
+            if (isNote) {
+              hs.noteText = parts.length >= 5 ? parts.slice(4).join('|').trim() : '';
+            } else if (!isExit) {
+              hs.codeDigit = parts.length >= 5 ? parts[4] : '';
+              hs.questionIds = parts.length >= 6 ? parts[5].split(',').map(s => 'q' + s.trim()) : [];
             }
             currentRoom.hotspots.push(hs);
           }
@@ -2631,6 +2649,7 @@
               '<div id="hs-list-' + rIdx + '"></div>' +
               '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">' +
                 '<button class="admin-btn sm" onclick="addHotspotManual(' + rIdx + ',\'puzzle\')">+ Rätsel-Hotspot</button>' +
+                '<button class="admin-btn sm" onclick="addHotspotManual(' + rIdx + ',\'note\')">+ Notiz-Hotspot</button>' +
                 '<button class="admin-btn sm" onclick="addHotspotManual(' + rIdx + ',\'exit\')">+ Ausgang-Hotspot</button>' +
               '</div>' +
             '</div>' +
@@ -2722,11 +2741,13 @@
           const labelInp = hsEl.querySelector('.hs-label');
           const iconInp = hsEl.querySelector('.hs-icon');
           const digitInp = hsEl.querySelector('.hs-digit');
+          const noteInp = hsEl.querySelector('.hs-note-text');
           const qidsEl = hsEl.querySelectorAll('.hs-qid:checked');
           if (labelInp) hs.label = labelInp.value;
           if (iconInp) hs.icon = iconInp.value;
           if (digitInp) hs.codeDigit = digitInp.value;
-          hs.questionIds = Array.from(qidsEl).map(c => c.value);
+          if (noteInp) hs.noteText = noteInp.value;
+          if (hs.type !== 'note') hs.questionIds = Array.from(qidsEl).map(c => c.value);
         });
 
         // Sync questions
@@ -2873,10 +2894,12 @@
 
       (room.hotspots || []).forEach((hs, hsIdx) => {
         const isExit = hs.type === 'exit';
+        const isNote = hs.type === 'note';
         const div = document.createElement('div');
         div.className = 'hs-config';
+        const typeLabel = isExit ? '🚪 Ausgang' : isNote ? '📝 Notiz ' + (hsIdx + 1) : '🔍 Rätsel ' + (hsIdx + 1);
         let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-          '<strong style="font-size:0.85rem;">' + (isExit ? '🚪 Ausgang' : '🔍 Rätsel ' + (hsIdx + 1)) + '</strong>' +
+          '<strong style="font-size:0.85rem;">' + typeLabel + '</strong>' +
           '<span style="font-size:0.75rem;color:#999;">(' + Math.round(hs.x) + '%, ' + Math.round(hs.y) + '%)</span>' +
           '<div style="margin-left:auto;">' +
             '<button class="admin-btn sm danger" onclick="deleteHotspot(' + rIdx + ',' + hsIdx + ')">✗</button>' +
@@ -2890,19 +2913,27 @@
           html += '<div><label class="admin-label" style="margin-top:0;">Icon</label>' +
             '<select class="admin-input hs-icon" style="width:80px;">' +
               '<option value="🔍"' + (hs.icon === '🔍' ? ' selected' : '') + '>🔍</option>' +
+              '<option value="📝"' + (hs.icon === '📝' ? ' selected' : '') + '>📝</option>' +
               '<option value="📖"' + (hs.icon === '📖' ? ' selected' : '') + '>📖</option>' +
               '<option value="🔑"' + (hs.icon === '🔑' ? ' selected' : '') + '>🔑</option>' +
               '<option value="🧪"' + (hs.icon === '🧪' ? ' selected' : '') + '>🧪</option>' +
               '<option value="🧩"' + (hs.icon === '🧩' ? ' selected' : '') + '>🧩</option>' +
               '<option value="💡"' + (hs.icon === '💡' ? ' selected' : '') + '>💡</option>' +
             '</select></div>';
-          html += '<div><label class="admin-label" style="margin-top:0;">Code-Ziffer</label>' +
-            '<input type="text" class="admin-input hs-digit" value="' + escAttr(hs.codeDigit || '') + '" maxlength="1" style="width:45px;text-align:center;"></div>';
+          if (!isNote) {
+            html += '<div><label class="admin-label" style="margin-top:0;">Code-Ziffer</label>' +
+              '<input type="text" class="admin-input hs-digit" value="' + escAttr(hs.codeDigit || '') + '" maxlength="1" style="width:45px;text-align:center;"></div>';
+          }
         }
         html += '</div>';
 
-        // Question assignment (only for puzzle hotspots)
-        if (!isExit && room.questions.length > 0) {
+        if (isNote) {
+          html += '<div style="margin-top:8px;"><label class="admin-label" style="margin-top:0;">Notiz-Text</label>' +
+            '<textarea class="admin-textarea hs-note-text" rows="3" placeholder="Text der den Spielern angezeigt wird…">' +
+              esc(hs.noteText || '') +
+            '</textarea></div>';
+        } else if (!isExit && room.questions.length > 0) {
+          // Question assignment (only for puzzle hotspots)
           html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Zugeordnete Fragen</label>';
           html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
           room.questions.forEach((q, qi) => {
@@ -2929,11 +2960,11 @@
 
       (room.hotspots || []).forEach((hs, hsIdx) => {
         const marker = document.createElement('div');
-        marker.className = 'hotspot-marker' + (hs.type === 'exit' ? ' exit-marker' : '');
+        marker.className = 'hotspot-marker' + (hs.type === 'exit' ? ' exit-marker' : hs.type === 'note' ? ' note-marker' : '');
         marker.style.left = hs.x + '%';
         marker.style.top = hs.y + '%';
-        marker.textContent = hs.type === 'exit' ? '🚪' : (hsIdx + 1);
-        marker.title = hs.label || (hs.type === 'exit' ? 'Ausgang' : 'Rätsel ' + (hsIdx + 1));
+        marker.textContent = hs.type === 'exit' ? '🚪' : hs.type === 'note' ? '📝' : (hsIdx + 1);
+        marker.title = hs.label || (hs.type === 'exit' ? 'Ausgang' : hs.type === 'note' ? 'Notiz' : 'Rätsel ' + (hsIdx + 1));
 
         // Drag support
         marker.onmousedown = function(e) {
@@ -2989,15 +3020,20 @@
       syncRoomsFromDOM();
       const room = editingGame.rooms[rIdx];
       if (!room.hotspots) room.hotspots = [];
-      room.hotspots.push({
+      const hs = {
         id: 'hs_' + Date.now(),
         x: 50, y: 50,
-        icon: type === 'exit' ? '🚪' : '🔍',
+        icon: type === 'exit' ? '🚪' : type === 'note' ? '📝' : '🔍',
         label: type === 'exit' ? 'Ausgang' : '',
-        questionIds: [],
-        codeDigit: '',
         type: type
-      });
+      };
+      if (type === 'note') {
+        hs.noteText = '';
+      } else {
+        hs.questionIds = [];
+        hs.codeDigit = '';
+      }
+      room.hotspots.push(hs);
       renderHotspotList(rIdx);
       renderHotspotMarkers(rIdx);
     };
