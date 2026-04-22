@@ -755,6 +755,69 @@
     }
 
     /* ══════════════════════════════════════════════════════
+       PASSWORD MODAL
+       ══════════════════════════════════════════════════════ */
+    .pw-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,0.7); align-items: center; justify-content: center;
+    }
+    .pw-overlay.open { display: flex; }
+    .pw-box {
+      background: #1e1e2e; border: 1px solid rgba(212,168,83,0.3);
+      border-radius: 16px; padding: 32px 28px; width: 340px; max-width: 90vw;
+      color: var(--text-primary); box-shadow: 0 8px 48px rgba(0,0,0,0.8);
+    }
+    .pw-box h2 { font-family: 'Cinzel', serif; color: var(--gold); margin-bottom: 8px; font-size: 1.2rem; }
+    .pw-box p { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 20px; }
+    .pw-input {
+      width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.06);
+      border: 2px solid rgba(212,168,83,0.2); border-radius: 8px;
+      color: var(--text-primary); font-size: 1rem; margin-bottom: 8px;
+    }
+    .pw-input:focus { outline: none; border-color: var(--gold); }
+    .pw-error { color: var(--danger); font-size: 0.85rem; min-height: 20px; margin-bottom: 12px; }
+    .pw-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .pw-btn {
+      padding: 8px 20px; border-radius: 8px; font-size: 0.9rem;
+      cursor: pointer; border: none; font-weight: 600;
+    }
+    .pw-btn-cancel { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+    .pw-btn-confirm { background: var(--gold); color: #1a1400; }
+
+    /* ── Publish badge & test mode ── */
+    .publish-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600; margin-left: 8px; vertical-align: middle;
+    }
+    .publish-badge.pub { background: rgba(46,204,113,0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+    .publish-badge.unpub { background: rgba(231,76,60,0.12); color: #e74c3c; border: 1px solid rgba(231,76,60,0.25); }
+    .admin-btn.publish { color: #2ecc71; border-color: rgba(46,204,113,0.4); }
+    .admin-btn.publish:hover { background: rgba(46,204,113,0.12); }
+    .admin-btn.test { color: var(--gold); border-color: rgba(212,168,83,0.4); }
+    .admin-btn.test:hover { background: rgba(212,168,83,0.1); }
+
+    #test-mode-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(212,168,83,0.9); color: #1a1400;
+      text-align: center; padding: 8px 16px; font-weight: 600; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    #test-mode-banner button {
+      background: rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.2);
+      padding: 3px 14px; border-radius: 6px; cursor: pointer; font-weight: 600;
+      font-size: 0.85rem; color: #1a1400;
+    }
+    #test-mode-banner button:hover { background: rgba(0,0,0,0.25); }
+
+    .admin-access-btn {
+      position: fixed; bottom: 20px; right: 20px; z-index: 200;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-muted); padding: 8px 14px; border-radius: 8px;
+      font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+    }
+    .admin-access-btn:hover { color: var(--gold); border-color: var(--gold); background: rgba(212,168,83,0.08); }
+
+    /* ══════════════════════════════════════════════════════
        PRINT (Admin: Raum-Codes)
        ══════════════════════════════════════════════════════ */
     @media print {
@@ -770,6 +833,27 @@
        PLAYER VIEWS
        ════════════════════════════════════════════════════ -->
 
+  <!-- Test-Mode Banner -->
+  <div id="test-mode-banner" class="hidden">
+    🔍 Test-Modus: Vorschau als Spieler
+    <button onclick="exitTestMode()">← Admin-Ansicht</button>
+  </div>
+
+  <!-- Password Modal -->
+  <div id="pw-modal" class="pw-overlay">
+    <div class="pw-box">
+      <h2>🔐 Admin-Zugang</h2>
+      <p>Passwort eingeben, um den Admin-Bereich zu öffnen.</p>
+      <input type="password" id="pw-input" class="pw-input" placeholder="Passwort"
+        autocomplete="off" onkeydown="if(event.key==='Enter') submitPassword()">
+      <div id="pw-error" class="pw-error"></div>
+      <div class="pw-actions">
+        <button class="pw-btn pw-btn-cancel" onclick="closePasswordModal()">Abbrechen</button>
+        <button class="pw-btn pw-btn-confirm" onclick="submitPassword()">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- View: Game Select -->
   <div id="view-game-select" class="view">
     <div class="player-container">
@@ -779,12 +863,13 @@
       </div>
       <div id="game-list"></div>
       <div id="no-games" class="hidden" style="text-align:center;margin-top:40px;">
-        <p style="color:var(--text-muted);font-size:1.1rem;">Noch kein Spiel angelegt — bitte Admin fragen.</p>
+        <p style="color:var(--text-muted);font-size:1.1rem;">Noch kein Spiel verfügbar.</p>
       </div>
       <div style="text-align:center;margin-top:32px;">
         <a href="../spiele.html" class="btn-ghost">← Zurück zur Übersicht</a>
       </div>
     </div>
+    <button class="admin-access-btn" onclick="showPasswordModal()" title="Admin-Zugang">⚙️ Admin</button>
   </div>
 
   <!-- View: Player Home -->
@@ -955,7 +1040,7 @@
       <div class="admin-header">
         <h1>🔐 Escape Room — Admin</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a href="index.html" class="admin-btn">▶ Spieler-Ansicht</a>
+          <button class="admin-btn" onclick="exitAdminMode()">▶ Spieler-Ansicht</button>
           <a href="../spiele.html" class="admin-btn">← Übersicht</a>
         </div>
       </div>
@@ -1052,7 +1137,11 @@
     // ══════════════════════════════════════════════════════
     // STATE
     // ══════════════════════════════════════════════════════
-    let isAdmin = new URLSearchParams(window.location.search).has('admin');
+    const LP_PASSWORD = 'LP@FOS';
+    const LP_SESSION_KEY = 'spiele_lp_mode';
+
+    let isAdmin = sessionStorage.getItem('spiele_lp_mode') === '1';
+    let isTestMode = false;
     let library = [];         // All games
     let currentGame = null;   // Selected game object
     let currentTeam = null;   // { gameId, teamName, startTime, currentRoom, completedRooms, roomProgress }
@@ -1164,6 +1253,72 @@
     window.showAdminView = showAdminView;
 
     // ══════════════════════════════════════════════════════
+    // ADMIN AUTH (Password Modal)
+    // ══════════════════════════════════════════════════════
+    window.showPasswordModal = function() {
+      document.getElementById('pw-input').value = '';
+      document.getElementById('pw-error').textContent = '';
+      document.getElementById('pw-modal').classList.add('open');
+      setTimeout(() => document.getElementById('pw-input').focus(), 100);
+    };
+
+    window.closePasswordModal = function() {
+      document.getElementById('pw-modal').classList.remove('open');
+    };
+
+    window.submitPassword = function() {
+      const val = document.getElementById('pw-input').value;
+      if (val === LP_PASSWORD) {
+        sessionStorage.setItem(LP_SESSION_KEY, '1');
+        isAdmin = true;
+        closePasswordModal();
+        document.body.classList.remove('player-mode');
+        document.body.classList.add('admin-mode');
+        showAdminView('admin-library');
+      } else {
+        const err = document.getElementById('pw-error');
+        err.textContent = 'Falsches Passwort.';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+      }
+    };
+
+    window.exitAdminMode = function() {
+      sessionStorage.removeItem(LP_SESSION_KEY);
+      isAdmin = false;
+      document.body.classList.remove('admin-mode');
+      document.body.classList.add('player-mode');
+      showView('view-game-select');
+    };
+
+    // ══════════════════════════════════════════════════════
+    // TEST MODE (Admin → Player Preview → Admin)
+    // ══════════════════════════════════════════════════════
+    window.testGame = function(gameId) {
+      isTestMode = true;
+      document.getElementById('test-mode-banner').classList.remove('hidden');
+      document.body.classList.remove('admin-mode');
+      document.body.classList.add('player-mode');
+      currentGame = getGame(gameId);
+      if (!currentGame) return;
+      renderPlayerHome();
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-player-home').classList.add('active');
+    };
+
+    window.exitTestMode = function() {
+      isTestMode = false;
+      document.getElementById('test-mode-banner').classList.add('hidden');
+      document.body.classList.remove('player-mode');
+      document.body.classList.add('admin-mode');
+      currentGame = null;
+      currentTeam = null;
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      destroyPnlmViewer();
+      showAdminView('admin-library');
+    };
+
+    // ══════════════════════════════════════════════════════
     // PLAYER: Game Select
     // ══════════════════════════════════════════════════════
     function renderGameSelect() {
@@ -1171,13 +1326,14 @@
       const noGames = document.getElementById('no-games');
       list.innerHTML = '';
 
-      if (library.length === 0) {
+      const visible = library.filter(g => g.published);
+      if (visible.length === 0) {
         noGames.classList.remove('hidden');
         return;
       }
       noGames.classList.add('hidden');
 
-      library.forEach(g => {
+      visible.forEach(g => {
         const tile = document.createElement('div');
         tile.className = 'game-tile';
         tile.style.marginBottom = '16px';
@@ -2241,12 +2397,21 @@
         const row = document.createElement('div');
         row.className = 'admin-game-row';
         const mins = Math.floor((g.game.totalTimer || 2400) / 60);
+        const isPub = !!g.published;
         row.innerHTML =
           '<div class="game-info">' +
-            '<h3>' + esc(g.game.title) + '</h3>' +
+            '<h3>' + esc(g.game.title) +
+              '<span class="publish-badge ' + (isPub ? 'pub' : 'unpub') + '">' +
+                (isPub ? '✓ Veröffentlicht' : '✗ Unveröffentlicht') +
+              '</span>' +
+            '</h3>' +
             '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
           '</div>' +
           '<div class="game-actions">' +
+            '<button class="admin-btn sm test" onclick="testGame(\'' + g.id + '\')">▶ Testen</button>' +
+            '<button class="admin-btn sm publish" onclick="togglePublish(\'' + g.id + '\')">' +
+              (isPub ? '✗ Verstecken' : '✓ Veröffentlichen') +
+            '</button>' +
             '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' +
             '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
             '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
@@ -2259,6 +2424,7 @@
     window.createNewGame = function() {
       const g = {
         id: 'game_' + Date.now(),
+        published: false,
         game: { title: 'Neues Spiel', description: '', totalTimer: 2400, mode: 'chain' },
         rooms: []
       };
@@ -2280,6 +2446,7 @@
       const dup = JSON.parse(JSON.stringify(orig));
       dup.id = 'game_' + Date.now();
       dup.game.title += ' (Kopie)';
+      dup.published = false;
       library.push(dup);
       saveGame(dup);
       renderAdminLibrary();
@@ -2292,6 +2459,15 @@
       deleteGameFile(gameId);
       renderAdminLibrary();
       showAdminStatus('Spiel gelöscht.', 'danger');
+    };
+
+    window.togglePublish = function(gameId) {
+      const g = getGame(gameId);
+      if (!g) return;
+      g.published = !g.published;
+      saveGame(g);
+      renderAdminLibrary();
+      showAdminStatus(g.published ? 'Spiel veröffentlicht.' : 'Spiel versteckt.', 'success');
     };
 
     window.exportGame = function(gameId) {
@@ -2317,6 +2493,7 @@
           const data = JSON.parse(e.target.result);
           if (data.game && data.rooms) {
             data.id = 'game_' + Date.now();
+            if (data.published === undefined) data.published = false;
             library.push(data);
             saveGame(data);
             renderAdminLibrary();
@@ -2341,6 +2518,7 @@
         try {
           const game = parseEscapeRoomMD(e.target.result);
           game.id = 'game_' + Date.now();
+          if (game.published === undefined) game.published = false;
           library.push(game);
           saveGame(game);
           renderAdminLibrary();
@@ -3177,6 +3355,7 @@
     function createDemoGame() {
       return {
         id: 'game_demo_001',
+        published: true,
         game: {
           title: 'Operation Zellkern',
           description: 'Das Institut ist gesperrt. Löst die Rätsel — Raum für Raum.',

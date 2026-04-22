@@ -2158,6 +2158,7 @@
     window.createNewGame = function() {
       const g = {
         id: 'game_' + Date.now(),
+        published: false,
         game: { title: 'Neues Spiel', description: '', totalTimer: 2400, mode: 'chain' },
         rooms: []
       };
@@ -2179,6 +2180,7 @@
       const dup = JSON.parse(JSON.stringify(orig));
       dup.id = 'game_' + Date.now();
       dup.game.title += ' (Kopie)';
+      dup.published = false;
       library.push(dup);
       saveGame(dup);
       renderAdminLibrary();
@@ -2227,6 +2229,7 @@
           const data = JSON.parse(e.target.result);
           if (data.game && data.rooms) {
             data.id = 'game_' + Date.now();
+            if (data.published === undefined) data.published = false;
             library.push(data);
             saveGame(data);
             renderAdminLibrary();
@@ -2251,6 +2254,7 @@
         try {
           const game = parseEscapeRoomMD(e.target.result);
           game.id = 'game_' + Date.now();
+          if (game.published === undefined) game.published = false;
           library.push(game);
           saveGame(game);
           renderAdminLibrary();
@@ -3075,6 +3079,7 @@
     function createDemoGame() {
       return {
         id: 'game_demo_001',
+        published: true,
         game: {
           title: 'Operation Zellkern',
           description: 'Das Institut ist gesperrt. Löst die Rätsel — Raum für Raum.',
