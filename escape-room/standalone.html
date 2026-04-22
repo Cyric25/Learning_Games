@@ -1593,6 +1593,7 @@
         if (!progress.readNotes.includes(hs.id)) {
           progress.readNotes.push(hs.id);
           saveTeamState();
+          renderRoomExplorer(currentGame.rooms[currentRoomIdx]);
         }
         const modal = document.getElementById('hotspot-modal');
         document.getElementById('hotspot-modal-body').innerHTML =
@@ -1600,7 +1601,7 @@
           '<div style="color:var(--text-primary);margin-top:14px;white-space:pre-line;font-size:1.05rem;line-height:1.7;">' +
             esc(hs.noteText || '(Kein Text hinterlegt)') +
           '</div>' +
-          '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal();renderRoomExplorer(currentGame.rooms[currentRoomIdx]);">Schließen</button></div>';
+          '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
         modal.classList.remove('hidden');
         return;
       }
