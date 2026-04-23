@@ -2030,6 +2030,9 @@
     window.closeHotspotModal = function() {
       document.getElementById('hotspot-modal').classList.add('hidden');
       currentHotspot = null;
+      if (explorerMode && currentGame && currentRoomIdx !== undefined) {
+        renderRoomExplorer(currentGame.rooms[currentRoomIdx]);
+      }
     };
 
     function onHotspotCorrect(q) {
@@ -2049,7 +2052,7 @@
               '<div class="code-digit revealed" style="margin:16px auto;animation:glowPulse 2s ease infinite;">' + esc(currentHotspot.codeDigit) + '</div>' +
               '<p style="color:var(--text-muted);font-size:0.85rem;">Merke dir diese Ziffer!</p>';
           }
-          html += '<div class="mt-16"><button class="btn-gold" onclick="closeHotspotModal();renderRoomExplorer(currentGame.rooms[currentRoomIdx]);">Weiter</button></div></div>';
+          html += '<div class="mt-16"><button class="btn-gold" onclick="closeHotspotModal()">Weiter</button></div></div>';
           document.getElementById('hotspot-modal-body').innerHTML = html;
 
           // Pulse the puzzle card button
