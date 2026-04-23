@@ -750,7 +750,7 @@
       .hotspot { width: 44px; height: 44px; }
       .hotspot-inner { font-size: 1.1rem; }
       .puzzle-card-box { padding: 20px; }
-      .room-explorer { aspect-ratio: 4/3; }
+      .room-explorer { aspect-ratio: unset; }
     }
 
     /* ══════════════════════════════════════════════════════
@@ -1520,8 +1520,14 @@
     // ══════════════════════════════════════════════════════
     // PLAYER: Room Explorer (hotspot mode)
     // ══════════════════════════════════════════════════════
+    window._applyImgRatio = function(img) {
+      const c = img.closest('.hotspot-preview, .room-explorer');
+      if (c && img.naturalWidth) c.style.aspectRatio = img.naturalWidth + '/' + img.naturalHeight;
+    };
+
     function renderRoomExplorer(room) {
       const container = document.getElementById('room-explorer-container');
+      container.style.aspectRatio = '';
       const progress = currentTeam.roomProgress[room.id];
       const allHotspots = room.hotspots || [];
 
@@ -1536,7 +1542,7 @@
 
       let html = '';
       if (room.backgroundImage) {
-        html += '<img class="explorer-bg" src="' + esc(room.backgroundImage) + '" alt="" draggable="false">';
+        html += '<img class="explorer-bg" src="' + esc(room.backgroundImage) + '" alt="" draggable="false" onload="_applyImgRatio(this)">';
       } else {
         html += '<div class="room-explorer-fallback">' + esc(room.name) + '</div>';
       }
@@ -1562,6 +1568,8 @@
       });
 
       container.innerHTML = html;
+      const _ei = container.querySelector('img.explorer-bg');
+      if (_ei && _ei.complete && _ei.naturalWidth) _applyImgRatio(_ei);
     }
 
     function isHotspotSolved(hs, progress) {
@@ -2692,7 +2700,7 @@
               '<h4 style="margin-bottom:8px;">📍 Hotspots <span style="font-size:0.75rem;color:#999;font-weight:normal;">(Klick auf Vorschau zum Platzieren)</span></h4>' +
               '<div class="hotspot-preview" id="hs-preview-' + rIdx + '" onclick="placeHotspot(event,' + rIdx + ')">' +
                 (room.backgroundImage
-                  ? '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false">'
+                  ? '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false" onload="_applyImgRatio(this)">'
                   : '<div class="hotspot-preview-empty">Kein Hintergrundbild — bitte zuerst eines setzen</div>'
                 ) +
               '</div>' +
@@ -3170,11 +3178,14 @@
       const preview = document.getElementById('hs-preview-' + rIdx);
       if (!preview) return;
       if (room.backgroundImage) {
-        preview.innerHTML = '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false">';
+        preview.innerHTML = '<img src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false" onload="_applyImgRatio(this)">';
       } else {
         preview.innerHTML = '<div class="hotspot-preview-empty">Kein Hintergrundbild</div>';
+        preview.style.aspectRatio = '';
       }
       renderHotspotMarkers(rIdx);
+      const _pi = preview.querySelector('img');
+      if (_pi && _pi.complete && _pi.naturalWidth) _applyImgRatio(_pi);
     };
 
     window.handleRoomImgUpload = function(event, rIdx) {
