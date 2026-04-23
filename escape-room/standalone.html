@@ -438,6 +438,16 @@
       50% { transform: scale(1.4); opacity: 0; }
     }
 
+    /* ── Leave Game Button ── */
+    .leave-game-btn {
+      position: fixed; top: 16px; left: 16px; z-index: 101;
+      padding: 8px 14px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-muted); font-size: 0.82rem; cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .leave-game-btn:hover { border-color: var(--danger); color: var(--danger); }
+
     /* ── Puzzle Card ── */
     .puzzle-card-btn {
       position: fixed; bottom: 20px; left: 20px; z-index: 100;
@@ -926,6 +936,9 @@
     </div>
   </div>
 
+  <!-- Leave Game Button -->
+  <button class="leave-game-btn hidden" id="leave-game-btn" onclick="confirmLeaveGame()">← Verlassen</button>
+
   <!-- Puzzle Card Button + Overlay -->
   <button class="puzzle-card-btn" id="puzzle-card-btn" onclick="showPuzzleCard()">🗺 Rätselkarte</button>
   <div id="puzzle-card-overlay" class="hidden"></div>
@@ -1167,8 +1180,23 @@
       const el = document.getElementById(viewId);
       if (el) el.classList.add('active');
 
+      const leaveBtn = document.getElementById('leave-game-btn');
+      if (leaveBtn) {
+        const gameViews = ['view-room-select','view-room-intro','view-room-questions','view-room-explorer','view-code-reveal','view-room-unlock'];
+        leaveBtn.classList.toggle('hidden', !gameViews.includes(viewId));
+      }
+
       if (viewId === 'view-game-select') renderGameSelect();
       if (viewId === 'view-game-complete') launchConfetti();
+    };
+
+    window.confirmLeaveGame = function() {
+      if (confirm('Spiel verlassen?\nDein Fortschritt wird gespeichert — du kannst später weitermachen.')) {
+        stopTimer();
+        document.getElementById('leave-game-btn').classList.add('hidden');
+        document.getElementById('puzzle-card-btn').style.display = 'none';
+        showView('view-player-home');
+      }
     };
 
     function showAdminView(viewId) {
