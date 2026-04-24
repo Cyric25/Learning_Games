@@ -470,6 +470,42 @@
     }
     .leave-game-btn:hover { border-color: var(--danger); color: var(--danger); }
 
+    /* ── Question / Note Media ── */
+    .q-media { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px; margin-bottom: 12px; display: block; }
+    .q-media-video { max-width: 100%; max-height: 260px; border-radius: 8px; margin-bottom: 12px; display: block; }
+
+    /* ── Error Find ── */
+    .ef-wrap { position: relative; display: block; max-width: 100%; cursor: crosshair; user-select: none; border-radius: 8px; }
+    .ef-img { max-width: 100%; display: block; border-radius: 8px; pointer-events: none; }
+    .ef-zone { position: absolute; border-radius: 50%; transform: translate(-50%,-50%); border: 3px solid transparent; pointer-events: none; transition: all 0.4s; }
+    .ef-zone.found { border-color: var(--success); background: rgba(46,204,113,0.3); box-shadow: 0 0 12px rgba(46,204,113,0.6); }
+    .ef-wrong { position: absolute; transform: translate(-50%,-50%); font-size: 1.4rem; pointer-events: none; animation: efFadeOut 0.7s forwards; z-index: 3; }
+    @keyframes efFadeOut { 0% { opacity:1; transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-50%) scale(1.7); } }
+    .ef-status { margin: 8px 0 0; font-size: 0.88rem; color: var(--text-secondary); }
+
+    /* ── Line Connect ── */
+    .lc-wrap { position: relative; display: block; max-width: 100%; }
+    .lc-img { max-width: 100%; border-radius: 8px; display: block; }
+    .lc-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .lc-svg .lc-line { stroke: var(--gold); stroke-width: 3; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
+    .lc-svg .lc-line.correct-line { stroke: var(--success); }
+    .lc-pt { position: absolute; transform: translate(-50%,-50%); width: 36px; height: 36px; border-radius: 50%; background: rgba(52,152,219,0.8); border: 2px solid #3498db; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fff; cursor: pointer; z-index: 5; transition: all 0.18s; touch-action: none; user-select: none; }
+    .lc-pt:hover { transform: translate(-50%,-50%) scale(1.15); }
+    .lc-pt.active { background: rgba(231,76,60,0.9); border-color: var(--accent); box-shadow: 0 0 14px rgba(231,76,60,0.6); transform: translate(-50%,-50%) scale(1.2); }
+    .lc-pt.connected { background: rgba(46,204,113,0.8); border-color: var(--success); }
+    .lc-actions { display: flex; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Admin: Image Editors ── */
+    .q-img-preview { position: relative; display: block; max-width: 100%; border-radius: 8px; overflow: hidden; border: 1px dashed rgba(255,255,255,0.2); cursor: crosshair; }
+    .q-img-preview img { max-width: 100%; max-height: 220px; object-fit: contain; display: block; border-radius: 7px; pointer-events: none; }
+    .ef-admin-zone { position: absolute; border-radius: 50%; transform: translate(-50%,-50%); border: 2px dashed #e74c3c; background: rgba(231,76,60,0.2); pointer-events: none; }
+    .lc-admin-svg { position: absolute; top:0; left:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+    .item-chip { display:flex; align-items:center; gap:6px; padding:3px 8px; border-radius:6px; font-size:0.8rem; }
+    .ef-chip { background:rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.3); }
+    .lc-chip { background:rgba(52,152,219,0.1); border:1px solid rgba(52,152,219,0.3); }
+    .conn-chip { background:rgba(240,192,64,0.1); border:1px solid rgba(240,192,64,0.3); }
+    .chip-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+
     /* ── Puzzle Card ── */
     .puzzle-card-btn {
       position: fixed; bottom: 20px; left: 20px; z-index: 100;
@@ -1214,6 +1250,8 @@
     let explorerMode = false; // true when room has hotspots + backgroundImage
     let currentHotspot = null; // hotspot being solved
     let padlockDigits = [];   // current padlock wheel values
+    let _efFound = new Set(); let _efMisses = 0; // error-find state
+    let _lcActivePoint = null; let _lcLines = []; // line-connect state
     let pnlmViewer = null;    // active Pannellum 360° viewer instance
 
     // ══════════════════════════════════════════════════════
@@ -1927,6 +1965,8 @@
         const modal = document.getElementById('hotspot-modal');
         document.getElementById('hotspot-modal-body').innerHTML =
           '<h3 style="color:#60a5fa;font-family:\'Cinzel\',serif;">📝 ' + esc(hs.label || 'Notiz') + '</h3>' +
+          (hs.noteImage ? '<img src="' + escAttr(hs.noteImage) + '" class="q-media" alt="">' : '') +
+          (hs.noteVideo ? '<video src="' + escAttr(hs.noteVideo) + '" class="q-media-video" controls></video>' : '') +
           '<div style="color:var(--text-primary);margin-top:14px;white-space:pre-line;font-size:1.05rem;line-height:1.7;">' +
             esc(hs.noteText || '(Kein Text hinterlegt)') +
           '</div>' +
@@ -1983,7 +2023,6 @@
 
     function renderHotspotQuestion(hs, progress) {
       const room = currentGame.rooms[currentRoomIdx];
-      // Find first unsolved question in this hotspot
       let qToShow = null;
       let qIdx = -1;
       for (const qid of hs.questionIds) {
@@ -1997,10 +2036,15 @@
       currentQuestionIdx = qIdx;
       const fails = progress.failCounts[qToShow.id] || 0;
       const modal = document.getElementById('hotspot-modal');
+      const isInteractive = qToShow.type === 'error_find' || qToShow.type === 'line_connect';
       let html = '<h3 style="font-family:\'Cinzel\',serif;color:var(--gold);margin-bottom:4px;">' + esc(hs.label || 'Rätsel') + '</h3>';
       html += '<p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">' +
         'Frage ' + (hs.questionIds.indexOf(qToShow.id) + 1) + ' von ' + hs.questionIds.length + '</p>';
       html += '<div style="margin-bottom:16px;">';
+
+      if (!isInteractive && qToShow.questionImage) html += '<img src="' + escAttr(qToShow.questionImage) + '" class="q-media" alt="">';
+      if (!isInteractive && qToShow.questionVideo) html += '<video src="' + escAttr(qToShow.questionVideo) + '" class="q-media-video" controls></video>';
+
       html += '<p style="font-size:1.1rem;font-weight:600;margin-bottom:14px;color:var(--text-primary);">' + esc(qToShow.text) + '</p>';
 
       if (qToShow.type === 'multiple_choice') {
@@ -2015,6 +2059,10 @@
         html += '<div style="display:flex;gap:8px;">' +
           '<input type="text" inputmode="numeric" class="player-input" id="hs-number-answer" placeholder="Zahl eingeben..." style="flex:1;max-width:200px;">' +
           '<button class="btn-gold" onclick="checkHotspotNumber()">Prüfen</button></div>';
+      } else if (qToShow.type === 'error_find') {
+        html += buildEfPlayerHtml(qToShow);
+      } else if (qToShow.type === 'line_connect') {
+        html += buildLcPlayerHtml(qToShow);
       }
 
       if (fails >= 2 && qToShow.hint) {
@@ -2025,6 +2073,96 @@
 
       document.getElementById('hotspot-modal-body').innerHTML = html;
       modal.classList.remove('hidden');
+
+      if (qToShow.type === 'error_find') {
+        _efFound = new Set((progress.errorProgress && progress.errorProgress[qToShow.id]) || []);
+        _efMisses = 0;
+        refreshEfDisplay(qToShow);
+      } else if (qToShow.type === 'line_connect') {
+        _lcActivePoint = null;
+        _lcLines = (progress.lcProgress && progress.lcProgress[qToShow.id]) ? JSON.parse(JSON.stringify(progress.lcProgress[qToShow.id])) : [];
+        refreshLcDisplay(qToShow);
+      }
+    }
+
+    function buildEfPlayerHtml(q) {
+      if (!q.questionImage) return '<p style="color:var(--text-secondary);margin-bottom:8px;">(Kein Bild konfiguriert)</p>';
+      return '<div class="ef-wrap" id="ef-wrap" onclick="efClick(event)">' +
+        '<img class="ef-img" src="' + escAttr(q.questionImage) + '" alt="" draggable="false">' +
+        '<div id="ef-overlay" style="position:absolute;inset:0;"></div>' +
+        '</div>' +
+        '<p class="ef-status" id="ef-status">0 / ' + (q.errors || []).length + ' Fehler gefunden</p>';
+    }
+
+    function buildLcPlayerHtml(q) {
+      let html = '<div class="lc-wrap" id="lc-wrap">';
+      if (q.questionImage) {
+        html += '<img class="lc-img" src="' + escAttr(q.questionImage) + '" alt="" draggable="false">';
+      } else {
+        html += '<div style="height:140px;background:var(--bg-secondary);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.9rem;">Kein Bild</div>';
+      }
+      html += '<svg class="lc-svg" id="lc-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>';
+      (q.points || []).forEach(pt => {
+        html += '<div class="lc-pt" id="lc-pt-' + escAttr(pt.id) + '" data-ptid="' + escAttr(pt.id) + '" style="left:' + pt.x + '%;top:' + pt.y + '%;" onclick="lcClickPoint(\'' + escAttr(pt.id) + '\')">' + esc(pt.label || '?') + '</div>';
+      });
+      html += '</div>';
+      html += '<div class="lc-actions">' +
+        '<button class="btn-gold" onclick="checkLineConnect()">Verbindungen prüfen</button>' +
+        '<button class="btn-ghost" onclick="lcClearLines()" style="font-size:0.85rem;">Linien löschen</button>' +
+        '</div>';
+      return html;
+    }
+
+    function refreshEfDisplay(q) {
+      const overlay = document.getElementById('ef-overlay');
+      if (!overlay) return;
+      overlay.querySelectorAll('.ef-zone').forEach(el => el.remove());
+      (q.errors || []).forEach(err => {
+        if (!_efFound.has(err.id)) return;
+        const div = document.createElement('div');
+        div.className = 'ef-zone found';
+        div.style.left = err.x + '%';
+        div.style.top = err.y + '%';
+        div.style.width = (err.radius * 2) + '%';
+        div.style.height = (err.radius * 2) + '%';
+        overlay.appendChild(div);
+      });
+      const status = document.getElementById('ef-status');
+      if (status) {
+        const total = (q.errors || []).length;
+        const found = _efFound.size;
+        if (found >= total && total > 0) {
+          status.textContent = '✓ Alle ' + total + ' Fehler gefunden!';
+          status.style.color = 'var(--success)';
+        } else {
+          status.textContent = found + ' / ' + total + ' Fehler gefunden';
+          status.style.color = '';
+        }
+      }
+    }
+
+    function refreshLcDisplay(q) {
+      const svg = document.getElementById('lc-svg');
+      if (!svg) return;
+      svg.innerHTML = '';
+      _lcLines.forEach((line, i) => {
+        const fromPt = (q.points || []).find(p => p.id === line.from);
+        const toPt = (q.points || []).find(p => p.id === line.to);
+        if (!fromPt || !toPt) return;
+        const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        lineEl.setAttribute('x1', fromPt.x); lineEl.setAttribute('y1', fromPt.y);
+        lineEl.setAttribute('x2', toPt.x); lineEl.setAttribute('y2', toPt.y);
+        lineEl.setAttribute('class', 'lc-line');
+        lineEl.style.pointerEvents = 'stroke';
+        lineEl.onclick = (function(idx) { return function(e) { e.stopPropagation(); lcRemoveLine(idx); }; })(i);
+        svg.appendChild(lineEl);
+      });
+      document.querySelectorAll('.lc-pt').forEach(el => {
+        el.classList.remove('active', 'connected');
+        const pid = el.dataset.ptid;
+        if (pid === _lcActivePoint) { el.classList.add('active'); return; }
+        if (_lcLines.some(l => l.from === pid || l.to === pid)) el.classList.add('connected');
+      });
     }
 
     window.closeHotspotModal = function() {
@@ -2115,6 +2253,116 @@
       if (!answer) return;
       if (answer === String(q.correctAnswer)) { input.style.borderColor = 'var(--success)'; onHotspotCorrect(q); }
       else { input.style.borderColor = 'var(--danger)'; input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); onHotspotWrong(q); }
+    };
+
+    window.efClick = function(e) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      if (!q || q.type !== 'error_find') return;
+      const wrap = document.getElementById('ef-wrap');
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width * 100;
+      const y = (e.clientY - rect.top) / rect.height * 100;
+      const progress = currentTeam.roomProgress[room.id];
+      let hit = false;
+      for (const err of (q.errors || [])) {
+        if (_efFound.has(err.id)) continue;
+        const dx = x - err.x, dy = y - err.y;
+        if (Math.sqrt(dx*dx + dy*dy) <= err.radius) {
+          _efFound.add(err.id);
+          hit = true;
+          if (!progress.errorProgress) progress.errorProgress = {};
+          progress.errorProgress[q.id] = [..._efFound];
+          saveTeamState();
+          refreshEfDisplay(q);
+          if (_efFound.size >= (q.errors || []).length) setTimeout(() => onHotspotCorrect(q), 600);
+          break;
+        }
+      }
+      if (!hit) {
+        const overlay = document.getElementById('ef-overlay');
+        if (overlay) {
+          const ind = document.createElement('div');
+          ind.className = 'ef-wrong';
+          ind.style.left = x + '%'; ind.style.top = y + '%';
+          ind.textContent = '✗';
+          overlay.appendChild(ind);
+          setTimeout(() => ind.remove(), 800);
+        }
+        _efMisses++;
+        if (_efMisses % 5 === 0) {
+          const progress2 = currentTeam.roomProgress[room.id];
+          if (!progress2.failCounts[q.id]) progress2.failCounts[q.id] = 0;
+          progress2.failCounts[q.id]++;
+          saveTeamState();
+        }
+      }
+    };
+
+    window.lcClickPoint = function(pointId) {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      if (!q || q.type !== 'line_connect') return;
+      if (_lcActivePoint === null) {
+        _lcActivePoint = pointId;
+        refreshLcDisplay(q);
+      } else if (_lcActivePoint === pointId) {
+        _lcActivePoint = null;
+        refreshLcDisplay(q);
+      } else {
+        const from = _lcActivePoint, to = pointId;
+        if (!_lcLines.some(l => (l.from===from&&l.to===to)||(l.from===to&&l.to===from))) {
+          _lcLines.push({ from, to });
+        }
+        _lcActivePoint = null;
+        const progress = currentTeam.roomProgress[room.id];
+        if (!progress.lcProgress) progress.lcProgress = {};
+        progress.lcProgress[q.id] = JSON.parse(JSON.stringify(_lcLines));
+        saveTeamState();
+        refreshLcDisplay(q);
+      }
+    };
+
+    window.lcRemoveLine = function(lineIdx) {
+      _lcLines.splice(lineIdx, 1);
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      if (progress.lcProgress) progress.lcProgress[q.id] = JSON.parse(JSON.stringify(_lcLines));
+      saveTeamState();
+      if (q) refreshLcDisplay(q);
+    };
+
+    window.lcClearLines = function() {
+      _lcLines = [];
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      const progress = currentTeam.roomProgress[room.id];
+      if (progress.lcProgress && q) delete progress.lcProgress[q.id];
+      saveTeamState();
+      if (q) refreshLcDisplay(q);
+    };
+
+    window.checkLineConnect = function() {
+      const room = currentGame.rooms[currentRoomIdx];
+      const q = room.questions[currentQuestionIdx];
+      if (!q || q.type !== 'line_connect') return;
+      const required = q.connections || [];
+      if (required.length === 0) return;
+      const allCorrect = required.every(conn =>
+        _lcLines.some(l => (l.from===conn.from&&l.to===conn.to)||(l.from===conn.to&&l.to===conn.from))
+      );
+      if (allCorrect) {
+        document.querySelectorAll('#lc-svg .lc-line').forEach(el => el.classList.add('correct-line'));
+        setTimeout(() => onHotspotCorrect(q), 800);
+      } else {
+        const progress = currentTeam.roomProgress[room.id];
+        if (!progress.failCounts[q.id]) progress.failCounts[q.id] = 0;
+        progress.failCounts[q.id]++;
+        saveTeamState();
+        setTimeout(() => renderHotspotQuestion(currentHotspot, progress), 1000);
+      }
     };
 
     // ══════════════════════════════════════════════════════
@@ -3147,6 +3395,10 @@
           if (iconInp) hs.icon = iconInp.value;
           if (digitInp) hs.codeDigit = digitInp.value;
           if (noteInp) hs.noteText = noteInp.value;
+          const noteImgInp = hsEl.querySelector('.hs-note-img');
+          const noteVidInp = hsEl.querySelector('.hs-note-vid');
+          if (noteImgInp) hs.noteImage = noteImgInp.value;
+          if (noteVidInp) hs.noteVideo = noteVidInp.value;
           const colorInp = hsEl.querySelector('.hs-color');
           if (colorInp) hs.color = colorInp.value;
           if (hs.type !== 'note') hs.questionIds = Array.from(qidsEl).map(c => c.value);
@@ -3162,6 +3414,10 @@
           q.text = qEl.querySelector('.q-text')?.value || q.text;
           q.codeDigit = qEl.querySelector('.q-digit')?.value || q.codeDigit;
           q.hint = qEl.querySelector('.q-hint')?.value || q.hint;
+          const imgUrlEl = qEl.querySelector('.q-img-url');
+          const vidUrlEl = qEl.querySelector('.q-vid-url');
+          if (imgUrlEl) q.questionImage = imgUrlEl.value;
+          if (vidUrlEl) q.questionVideo = vidUrlEl.value;
 
           if (q.type === 'multiple_choice') {
             const opts = qEl.querySelectorAll('.q-option');
@@ -3196,6 +3452,8 @@
             '<option value="multiple_choice"' + (q.type === 'multiple_choice' ? ' selected' : '') + '>Multiple Choice</option>' +
             '<option value="text_input"' + (q.type === 'text_input' ? ' selected' : '') + '>Texteingabe</option>' +
             '<option value="number_code"' + (q.type === 'number_code' ? ' selected' : '') + '>Zahlencode</option>' +
+            '<option value="error_find"' + (q.type === 'error_find' ? ' selected' : '') + '>Fehlersuche (Bild)</option>' +
+            '<option value="line_connect"' + (q.type === 'line_connect' ? ' selected' : '') + '>Verbinden (Linien)</option>' +
           '</select>' +
           '<span style="font-size:0.8rem;color:#999;">Frage ' + (qIdx + 1) + '</span>' +
           '<div style="margin-left:auto;display:flex;gap:4px;">' +
@@ -3207,6 +3465,23 @@
 
         html += '<label class="admin-label" style="margin-top:0;">Fragetext</label>';
         html += '<textarea class="admin-textarea q-text" rows="2">' + esc(q.text || '') + '</textarea>';
+
+        // Optional media (for standard types)
+        const _isInteractive = q.type === 'error_find' || q.type === 'line_connect';
+        if (!_isInteractive) {
+          html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+            '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Bild-URL (optional)</label>' +
+            '<input type="text" class="admin-input q-img-url" value="' + escAttr(q.questionImage || '') + '" placeholder="https://…bild.jpg"></div>' +
+            '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Video-URL (optional)</label>' +
+            '<input type="text" class="admin-input q-vid-url" value="' + escAttr(q.questionVideo || '') + '" placeholder="https://…video.mp4"></div>' +
+            '</div>';
+        } else {
+          html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Hintergrundbild URL</label>' +
+            '<div style="display:flex;gap:6px;">' +
+            '<input type="text" class="admin-input q-img-url" value="' + escAttr(q.questionImage || '') + '" placeholder="https://…bild.jpg" style="flex:1;">' +
+            '<button class="admin-btn sm" onclick="qAdminRefresh(' + rIdx + ',' + qIdx + ')">↺ Vorschau</button>' +
+            '</div></div>';
+        }
 
         // Type-specific fields
         if (q.type === 'multiple_choice') {
@@ -3227,6 +3502,10 @@
         } else if (q.type === 'number_code') {
           html += '<label class="admin-label">Richtige Antwort (Zahl)</label>';
           html += '<input type="text" class="admin-input q-correct-number" value="' + escAttr(q.correctAnswer || '') + '" style="max-width:200px;">';
+        } else if (q.type === 'error_find') {
+          html += buildEfAdminHtml(q, rIdx, qIdx);
+        } else if (q.type === 'line_connect') {
+          html += buildLcAdminHtml(q, rIdx, qIdx);
         }
 
         html += '<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">' +
@@ -3280,9 +3559,181 @@
       syncRoomsFromDOM();
       const q = editingGame.rooms[rIdx].questions[qIdx];
       q.type = newType;
-      if (newType === 'multiple_choice' && (!q.options || q.options.length < 4)) {
-        q.options = ['', '', '', ''];
+      if (newType === 'multiple_choice' && (!q.options || q.options.length < 4)) q.options = ['', '', '', ''];
+      if (newType === 'error_find' && !q.errors) q.errors = [];
+      if (newType === 'line_connect') { if (!q.points) q.points = []; if (!q.connections) q.connections = []; }
+      renderQuestionsList(rIdx);
+    };
+
+    function buildEfAdminHtml(q, rIdx, qIdx) {
+      const errors = q.errors || [];
+      let html = '<div style="margin-top:8px;">';
+      html += '<label class="admin-label" style="margin-top:0;">Fehler markieren — ins Bild klicken</label>';
+      html += '<div class="q-img-preview" id="ef-adm-' + rIdx + '-' + qIdx + '" onclick="efAdminClick(event,' + rIdx + ',' + qIdx + ')">';
+      if (q.questionImage) {
+        html += '<img src="' + escAttr(q.questionImage) + '" alt="" draggable="false">';
+        errors.forEach(err => {
+          html += '<div class="ef-admin-zone" style="left:' + err.x + '%;top:' + err.y + '%;width:' + (err.radius*2) + '%;height:' + (err.radius*2) + '%;"></div>';
+        });
+      } else {
+        html += '<div style="height:70px;display:flex;align-items:center;justify-content:center;color:#999;font-size:0.82rem;">Bild-URL eingeben → ↺ Vorschau</div>';
       }
+      html += '</div>';
+      if (errors.length > 0) {
+        html += '<div class="chip-list">';
+        errors.forEach((err, zi) => {
+          html += '<div class="item-chip ef-chip">F' + (zi+1) + ' (' + Math.round(err.x) + '%, ' + Math.round(err.y) + '%) R:' +
+            '<input type="number" value="' + (err.radius||8) + '" min="2" max="40" style="width:38px;background:transparent;border:none;color:inherit;padding:0 2px;" oninput="efAdminSetRadius(' + rIdx + ',' + qIdx + ',' + zi + ',this.value)">%' +
+            '<button onclick="efAdminDelete(' + rIdx + ',' + qIdx + ',' + zi + ')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:1rem;padding:0;line-height:1;">✗</button>' +
+            '</div>';
+        });
+        html += '</div>';
+      } else {
+        html += '<p style="font-size:0.8rem;color:#888;margin-top:4px;">Noch keine Fehler markiert. Ins Bild klicken.</p>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function buildLcAdminHtml(q, rIdx, qIdx) {
+      const points = q.points || [];
+      const conns = q.connections || [];
+      let html = '<div style="margin-top:8px;">';
+      html += '<label class="admin-label" style="margin-top:0;">Punkte setzen — ins Bild klicken</label>';
+      html += '<div class="q-img-preview" id="lc-adm-' + rIdx + '-' + qIdx + '" onclick="lcAdminClick(event,' + rIdx + ',' + qIdx + ')">';
+      if (q.questionImage) {
+        html += '<img src="' + escAttr(q.questionImage) + '" alt="" draggable="false">';
+        if (points.length > 0) {
+          html += '<svg class="lc-admin-svg" viewBox="0 0 100 100" preserveAspectRatio="none">';
+          conns.forEach(conn => {
+            const fp = points.find(p => p.id === conn.from), tp = points.find(p => p.id === conn.to);
+            if (fp && tp) html += '<line x1="' + fp.x + '" y1="' + fp.y + '" x2="' + tp.x + '" y2="' + tp.y + '" stroke="var(--gold)" stroke-width="2" stroke-dasharray="5 3"/>';
+          });
+          html += '</svg>';
+          points.forEach((pt, pi) => {
+            html += '<div style="position:absolute;left:' + pt.x + '%;top:' + pt.y + '%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:#3498db;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.75rem;pointer-events:none;">' + esc(pt.label || String.fromCharCode(65+pi)) + '</div>';
+          });
+        }
+      } else {
+        html += '<div style="height:70px;display:flex;align-items:center;justify-content:center;color:#999;font-size:0.82rem;">Bild-URL eingeben → ↺ Vorschau</div>';
+      }
+      html += '</div>';
+
+      if (points.length > 0) {
+        html += '<div class="chip-list">';
+        points.forEach((pt, pi) => {
+          html += '<div class="item-chip lc-chip">' +
+            '<input type="text" value="' + escAttr(pt.label||String.fromCharCode(65+pi)) + '" maxlength="4" style="width:32px;background:transparent;border:none;color:inherit;font-weight:700;padding:0;" oninput="lcAdminSetLabel(' + rIdx + ',' + qIdx + ',' + pi + ',this.value)">' +
+            '(' + Math.round(pt.x) + '%,' + Math.round(pt.y) + '%)' +
+            '<button onclick="lcAdminDeletePoint(' + rIdx + ',' + qIdx + ',\'' + escAttr(pt.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:1rem;padding:0;line-height:1;">✗</button>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
+      html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Verbindungen</label>';
+      if (points.length >= 2) {
+        const ptOpts = points.map((p,pi) => '<option value="' + escAttr(p.id) + '">' + esc(p.label||String.fromCharCode(65+pi)) + '</option>').join('');
+        html += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+          'Von <select id="lc-from-' + rIdx + '-' + qIdx + '" class="admin-input" style="width:65px;">' + ptOpts + '</select>' +
+          'Nach <select id="lc-to-' + rIdx + '-' + qIdx + '" class="admin-input" style="width:65px;">' + ptOpts + '</select>' +
+          '<button class="admin-btn sm" onclick="lcAdminAddConn(' + rIdx + ',' + qIdx + ')">+ Verbinden</button>' +
+          '</div>';
+      }
+      if (conns.length > 0) {
+        html += '<div class="chip-list">';
+        conns.forEach((conn, ci) => {
+          const fp = points.find(p => p.id === conn.from), tp = points.find(p => p.id === conn.to);
+          const fl = fp ? (fp.label||fp.id) : conn.from, tl = tp ? (tp.label||tp.id) : conn.to;
+          html += '<div class="item-chip conn-chip">' + esc(fl) + ' ↔ ' + esc(tl) +
+            '<button onclick="lcAdminDeleteConn(' + rIdx + ',' + qIdx + ',' + ci + ')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:1rem;padding:0;line-height:1;">✗</button>' +
+            '</div>';
+        });
+        html += '</div>';
+      } else if (points.length >= 2) {
+        html += '<p style="font-size:0.8rem;color:#888;margin-top:4px;">Noch keine Verbindungen definiert.</p>';
+      }
+      html += '</div></div>';
+      return html;
+    }
+
+    window.efAdminClick = function(e, rIdx, qIdx) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      syncRoomsFromDOM();
+      const wrap = document.getElementById('ef-adm-' + rIdx + '-' + qIdx);
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) / rect.width * 1000) / 10;
+      const y = Math.round((e.clientY - rect.top) / rect.height * 1000) / 10;
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (!q.errors) q.errors = [];
+      q.errors.push({ id: 'ef_' + Date.now(), x, y, radius: 8 });
+      renderQuestionsList(rIdx);
+    };
+
+    window.efAdminDelete = function(rIdx, qIdx, zi) {
+      syncRoomsFromDOM();
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (q.errors) q.errors.splice(zi, 1);
+      renderQuestionsList(rIdx);
+    };
+
+    window.efAdminSetRadius = function(rIdx, qIdx, zi, val) {
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (q.errors && q.errors[zi]) q.errors[zi].radius = Math.max(2, parseFloat(val) || 8);
+    };
+
+    window.lcAdminClick = function(e, rIdx, qIdx) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+      syncRoomsFromDOM();
+      const wrap = document.getElementById('lc-adm-' + rIdx + '-' + qIdx);
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) / rect.width * 1000) / 10;
+      const y = Math.round((e.clientY - rect.top) / rect.height * 1000) / 10;
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (!q.points) q.points = [];
+      const pi = q.points.length;
+      q.points.push({ id: 'pt_' + Date.now(), x, y, label: String.fromCharCode(65 + (pi % 26)) });
+      renderQuestionsList(rIdx);
+    };
+
+    window.lcAdminDeletePoint = function(rIdx, qIdx, ptId) {
+      syncRoomsFromDOM();
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      q.points = (q.points || []).filter(p => p.id !== ptId);
+      q.connections = (q.connections || []).filter(c => c.from !== ptId && c.to !== ptId);
+      renderQuestionsList(rIdx);
+    };
+
+    window.lcAdminSetLabel = function(rIdx, qIdx, pi, val) {
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (q.points && q.points[pi]) q.points[pi].label = val;
+    };
+
+    window.lcAdminAddConn = function(rIdx, qIdx) {
+      syncRoomsFromDOM();
+      const fromSel = document.getElementById('lc-from-' + rIdx + '-' + qIdx);
+      const toSel = document.getElementById('lc-to-' + rIdx + '-' + qIdx);
+      if (!fromSel || !toSel) return;
+      const from = fromSel.value, to = toSel.value;
+      if (!from || !to || from === to) return;
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (!q.connections) q.connections = [];
+      if (!q.connections.some(c => (c.from===from&&c.to===to)||(c.from===to&&c.to===from))) {
+        q.connections.push({ from, to });
+      }
+      renderQuestionsList(rIdx);
+    };
+
+    window.lcAdminDeleteConn = function(rIdx, qIdx, ci) {
+      syncRoomsFromDOM();
+      const q = editingGame.rooms[rIdx].questions[qIdx];
+      if (q.connections) q.connections.splice(ci, 1);
+      renderQuestionsList(rIdx);
+    };
+
+    window.qAdminRefresh = function(rIdx, qIdx) {
+      syncRoomsFromDOM();
       renderQuestionsList(rIdx);
     };
 
@@ -3339,6 +3790,12 @@
             '<textarea class="admin-textarea hs-note-text" rows="3" placeholder="Text der den Spielern angezeigt wird…">' +
               esc(hs.noteText || '') +
             '</textarea></div>';
+          html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
+            '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Bild-URL (optional)</label>' +
+            '<input type="text" class="admin-input hs-note-img" value="' + escAttr(hs.noteImage || '') + '" placeholder="https://…"></div>' +
+            '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Video-URL (optional)</label>' +
+            '<input type="text" class="admin-input hs-note-vid" value="' + escAttr(hs.noteVideo || '') + '" placeholder="https://…"></div>' +
+            '</div>';
         } else if (!isExit && room.questions.length > 0) {
           html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Zugeordnete Fragen</label>';
           html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
@@ -3505,7 +3962,7 @@
         requires: []
       };
       if (type === 'note') {
-        hs.noteText = '';
+        hs.noteText = ''; hs.noteImage = ''; hs.noteVideo = '';
       } else {
         hs.questionIds = [];
         hs.codeDigit = '';
@@ -3544,7 +4001,7 @@
         requires: []
       };
       if (type === 'note') {
-        hs.noteText = '';
+        hs.noteText = ''; hs.noteImage = ''; hs.noteVideo = '';
       } else {
         hs.questionIds = [];
         hs.codeDigit = '';
