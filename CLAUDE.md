@@ -41,7 +41,8 @@ Spiele/
     css/
       quizpfad.css              ← Styles (Brettspiel Classic, responsive)
   escape-room/
-    index.html                  ← Escape Room (Admin + Spieler, alles inline)
+    index.html                  ← Escape Room (Admin + Spieler, alles inline) — Lehrkraft-Version
+    standalone.html             ← Escape Room (Schüler/Offline, kein Passwort, kein 360°)
   risiko-quiz/
     index.html                  ← Risiko-Quiz Spieloberfläche (Join-Screen + Board)
     admin.html                  ← Risiko-Quiz Admin (Spielwähler + Editor)
@@ -458,16 +459,50 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 
 ---
 
+## Kritisches Muster: IIFE-Scope in Single-File-Apps
+
+**Problem (wiederkehrender Bug)**: In Single-File-Apps wird die gesamte Spiellogik in eine IIFE gepackt: `(async function() { ... })()`. Funktionen darin sind **nicht** aus inline `onclick="..."` Attributen erreichbar (globaler Scope). Nur `window.xxx = function()` Exports sind global zugänglich.
+
+**Symptom**: Inline-Click-Handler rufen eine Funktion auf → kein Fehler, nichts passiert → schwer zu debuggen.
+
+**Lösung**: Niemals IIFE-interne Funktionen aus `onclick="..."` aufrufen. Stattdessen Seiteneffekte in einen `window.`-Export verschieben, der dann innerhalb der IIFE ausgeführt wird.
+
+```js
+// FALSCH — renderRoomExplorer ist in der IIFE, nicht global:
+// <button onclick="renderRoomExplorer(room)">Weiter</button>
+
+// RICHTIG — closeHotspotModal ist window-exportiert und ruft intern renderRoomExplorer auf:
+window.closeHotspotModal = function() {
+  document.getElementById('hotspot-modal').classList.add('hidden');
+  if (explorerMode && currentGame) renderRoomExplorer(currentGame.rooms[currentRoomIdx]);
+};
+// <button onclick="closeHotspotModal()">Weiter</button>
+```
+
+Dieses Muster trat im Escape Room mehrfach auf (Note-Voraussetzungen, Rätsel-Voraussetzungen, Explorer-Re-Render).
+
+---
+
 ## Escape Room
 
 ### Architektur
-- Single-HTML-File-Anwendung: `escape-room/index.html` (Admin + Spieler in einer Datei)
+- **Zwei Dateien**: `escape-room/index.html` (Lehrkraft-Version) und `escape-room/standalone.html` (Schüler/Offline)
+  - `index.html`: Admin-Passwortschutz, Publish-System, Test-Modus, 360°-Panorama (CDN)
+  - `standalone.html`: Kein Passwort, kein Löschen-Button, kein 360°; ansonsten identisch
 - Kein Server nötig — rein localStorage-basiert
-- Admin-Modus über URL-Parameter: `?admin=true`
-- Spieler-Modus: ohne Parameter (Standard)
+- Admin-Modus über URL-Parameter: `?admin=true`; Spieler-Modus: ohne Parameter (Standard)
 - Multiple Games: Lehrkraft erstellt mehrere Spiele, Schüler wählen aus
 - Mehrere Teams können gleichzeitig auf verschiedenen Geräten dasselbe Spiel spielen
 - Google Fonts: Cinzel (Überschriften), Crimson Text (Fließtext)
+- Alle Styles und JS inline; kein Build-System
+
+### Admin-Authentifizierung (nur `index.html`)
+- Passwort: `LP_PASSWORD = 'LP@FOS'` (Hardcoded)
+- Gespeichert in `sessionStorage` mit Key `spiele_lp_mode = '1'`
+- **Publish-System**: Spiele haben `published: boolean`; Spieler sehen nur publizierte Spiele
+  - `togglePublish(gameId)` wechselt den Status; UI zeigt "Veröffentlicht" / "Entwurf"
+- **Test-Modus**: `isTestMode` Flag + gelbes Banner — Admin kann als Spieler vorschauen ohne Navigationswechsel
+  - `testGame(id)` startet Test, `exitTestMode()` kehrt zurück
 
 ### localStorage Keys
 | Key | Inhalt |
@@ -480,11 +515,12 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 ```json
 {
   "id": "game_...",
+  "published": true,
   "game": { "title": "...", "description": "...", "totalTimer": 2400, "mode": "chain|single" },
   "rooms": [{
     "id": "room_1", "name": "...", "subject": "...", "description": "...",
-    "backgroundImage": "", "unlockCode": "4823",
-    "lockType": "padlock|digital",
+    "backgroundImage": "", "backgroundType": "flat|360",
+    "unlockCode": "4823", "lockType": "padlock|digital",
     "puzzleCard": { "type": "text|image", "content": "..." },
     "questions": [{
       "id": "q1", "type": "multiple_choice|text_input|number_code",
@@ -492,11 +528,14 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
       "caseSensitive": false, "hint": "", "codeDigit": "4"
     }],
     "hotspots": [{
-      "id": "hs_...", "type": "puzzle|exit",
+      "id": "hs_...", "type": "puzzle|note|exit",
       "label": "...", "icon": "🔍",
       "x": 50, "y": 30,
+      "color": "#d4a853",
+      "requires": ["hs_other_id"],
       "codeDigit": "3",
-      "questionIds": ["q1", "q2"]
+      "questionIds": ["q1", "q2"],
+      "noteText": "Nur bei type=note: Freitext"
     }]
   }]
 }
@@ -511,10 +550,36 @@ Modi: `chain` (Räume der Reihe nach), `single` (frei wählbar)
 Ein Raum wechselt automatisch in den Explorer-Modus, wenn er `hotspots` enthält (und optionales `backgroundImage`).
 
 - Spieler sehen ein Hintergrundbild (oder Fallback-Fläche) mit klickbaren Hotspots
-- `puzzle`-Hotspots: Enthalten Fragen → alle richtig beantworten → Hotspot gilt als gelöst
-- Jeder `puzzle`-Hotspot hat eine `codeDigit` → alle Ziffern zusammen ergeben den `unlockCode`
-- `exit`-Hotspot: Nur klickbar, wenn alle Puzzle-Hotspots gelöst → führt zum Padlock
-- Gelöste Hotspots zeigen bei erneutem Klick eine Zusammenfassung mit Antworten (Hilfe für Rätselkarte)
+- **`puzzle`-Hotspots**: Enthalten Fragen → alle richtig beantworten → Hotspot gilt als gelöst; hat `codeDigit`
+- **`note`-Hotspots**: Zeigen nur einen Freitext (`noteText`) — kein Code, keine Fragen; als "gelesen" markiert nach Klick
+- **`exit`-Hotspot**: Nur klickbar, wenn alle Puzzle-Hotspots gelöst → führt zum Padlock
+- Gelöste/gelesene Hotspots zeigen bei erneutem Klick eine Zusammenfassung (Hilfe für Rätselkarte)
+- **Dynamisches Seitenverhältnis**: `window._applyImgRatio(img)` liest `naturalWidth/naturalHeight` und setzt `container.style.aspectRatio` → Portrait- und non-16:9-Bilder werden korrekt angezeigt
+
+### Hotspot-Abhängigkeiten (`requires`)
+- Hotspots können `requires: [hsId, ...]` setzen — sie sind unsichtbar, bis alle Voraussetzungen erfüllt sind
+- `isHotspotVisible(hs, progress)` prüft `isHotspotCompleted()` für jeden Voraussetzungs-Hotspot
+- `isHotspotCompleted(hs, progress)`: puzzle → `isHotspotSolved()`; note → `readNotes.includes(hs.id)`; exit → immer true
+- **Wichtig**: Nach dem Lösen eines Hotspots muss `renderRoomExplorer()` neu aufgerufen werden, damit abhängige Hotspots erscheinen
+
+### Hotspot-Farbe
+- Jeder Hotspot hat ein optionales `color: "#hexcolor"` Feld (Standard: `#d4a853` Gold)
+- `hexToRgba(hex, alpha)` konvertiert zu `rgba(...)` für Border, Hintergrund, Label und `--gold-glow` CSS-Variable
+- Im Admin: Color-Picker `<input type="color">` pro Hotspot in der Hotspot-Liste
+- Gelöste Hotspots ignorieren die custom color (behalten grünes CSS-Klassen-Styling)
+
+### Hotspot-Bewegung im Admin (Tablet-freundlich)
+- **Drag**: Klassisches Drag mit 5px-Threshold (`_hsMarkerDragging`) — Desktop
+- **Tap-to-Select**: Hotspot antippen → wählt aus (amber pulsierender Ring, `.selected` Klasse) → leere Stelle antippen → verschiebt dorthin
+  - `_selectedHsMove = { rIdx, hsIdx }` Zustand
+  - `preview[data-moving]::after` zeigt Banner "Neue Position antippen"
+  - Zweites Antippen desselben Hotspots → Auswahl aufheben
+  - Kein Konflikt mit Neu-Erstellen: Auswahl wird zuerst geprüft
+
+### Verlassen-Button
+- `<button class="leave-game-btn hidden" id="leave-game-btn">← Verlassen</button>` — `position: fixed; top: 16px; left: 16px`
+- Sichtbar bei Game-Views: `view-room-select`, `view-room-intro`, `view-room-questions`, `view-room-explorer`, `view-code-reveal`, `view-room-unlock`
+- `window.confirmLeaveGame()` zeigt `confirm()`-Dialog → stoppt Timer, kehrt zu `view-player-home` zurück; Fortschritt bleibt erhalten
 
 ### MD-Import Format
 ```markdown
@@ -534,7 +599,8 @@ Ein Raum wechselt automatisch in den Explorer-Modus, wenn er `hotspots` enthält
 
 ### Hotspots
 - 🔍 | Bücherregal | 20 | 40 | 3 | 1,2   ← icon|label|x%|y%|codeDigit|questionIds
-- 🚪 | Ausgang     | 80 | 50             ← exit-Hotspot (kein codeDigit/questionIds)
+- 📝 | Notizzettel | 30 | 60 |           ← note-Hotspot (kein codeDigit/questionIds)
+- 🚪 | Ausgang     | 80 | 50            ← exit-Hotspot (kein codeDigit/questionIds)
 
 ### Fragen
 - mc | Fragetext | Opt1 | Opt2 | Opt3 | Opt4 | RichtigeAntwort | Hinweis | Ziffer
