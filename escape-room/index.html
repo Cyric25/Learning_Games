@@ -337,6 +337,13 @@
     .admin-game-row .game-info h3 { font-size: 1rem; margin-bottom: 2px; }
     .admin-game-row .game-info p { font-size: 0.8rem; color: #888; }
     .admin-game-row .game-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .admin-game-row .pp-row {
+      width: 100%; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 6px 0 0; border-top: 1px solid #f0f0f0; margin-top: 4px; font-size: 12px;
+    }
+    .pp-row .pp-label { font-weight: 700; color: #bbb; margin-right: 2px; }
+    .pp-row label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: #555; }
+    .pp-row input[type=checkbox] { width: 14px; height: 14px; accent-color: #e74c3c; cursor: pointer; }
 
     /* Admin question editor */
     .question-editor {
@@ -1459,7 +1466,15 @@
             '<span>⏱ ' + mins + ' Min</span>' +
             '<span>' + (g.game.mode === 'chain' ? '🔗 Kette' : '🎯 Einzeln') + '</span>' +
           '</div>';
-        tile.onclick = () => selectGame(g.id);
+        if (g.passwordProtection && g.passwordProtection.view) {
+          tile.innerHTML += '<div style="font-size:11px;color:#aaa;margin-top:4px;">🔒 Passwortgeschützt</div>';
+          tile.onclick = () => {
+            if (!checkPassword('Spielen: ' + g.game.title)) return;
+            selectGame(g.id);
+          };
+        } else {
+          tile.onclick = () => selectGame(g.id);
+        }
         list.appendChild(tile);
       });
     }
@@ -2789,6 +2804,8 @@
         row.className = 'admin-game-row';
         const mins = Math.floor((g.game.totalTimer || 2400) / 60);
         const isPub = !!g.published;
+        const pp = g.passwordProtection || {};
+        const pfx = 'pp_' + g.id + '_';
         row.innerHTML =
           '<div class="game-info">' +
             '<h3>' + esc(g.game.title) +
@@ -2807,15 +2824,45 @@
             '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
             '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
             '<button class="admin-btn sm danger" onclick="deleteGame(\'' + g.id + '\')">Löschen</button>' +
+          '</div>' +
+          '<div class="pp-row">' +
+            '<span class="pp-label">🔒</span>' +
+            '<label><input type="checkbox" id="' + pfx + 'view" ' + (pp.view ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Anzeigen</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'edit" ' + (pp.edit ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Bearbeiten</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'duplicate" ' + (pp.duplicate ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Duplizieren</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'export" ' + (pp['export'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Exportieren</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'delete" ' + (pp['delete'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Löschen</label>' +
           '</div>';
         list.appendChild(row);
       });
     }
 
+    function checkPassword(label) {
+      const pw = prompt('🔒 Passwort für „' + label + '" erforderlich:');
+      return pw !== null && pw === LP_PASSWORD;
+    }
+
+    window.savePP = function(gameId) {
+      const g = getGame(gameId);
+      if (!g) return;
+      const pfx = 'pp_' + gameId + '_';
+      const val = (id) => { const el = document.getElementById(id); return !!(el && el.checked); };
+      g.passwordProtection = {
+        view:      val(pfx + 'view'),
+        edit:      val(pfx + 'edit'),
+        duplicate: val(pfx + 'duplicate'),
+        'export':  val(pfx + 'export'),
+        'delete':  val(pfx + 'delete')
+      };
+      saveGame(g);
+      showAdminStatus('Passwortschutz gespeichert.', 'success');
+    };
+
     window.createNewGame = function() {
       const g = {
         id: 'game_' + Date.now(),
         published: false,
+        passwordProtection: {},
         game: { title: 'Neues Spiel', description: '', totalTimer: 2400, mode: 'chain' },
         rooms: []
       };
@@ -2825,6 +2872,10 @@
     };
 
     window.editGame = function(gameId) {
+      const g = getGame(gameId);
+      if (g && g.passwordProtection && g.passwordProtection.edit) {
+        if (!checkPassword('Bearbeiten: ' + g.game.title)) return;
+      }
       editingGameId = gameId;
       editingGame = JSON.parse(JSON.stringify(getGame(gameId)));
       renderEditor();
@@ -2834,6 +2885,9 @@
     window.duplicateGame = function(gameId) {
       const orig = getGame(gameId);
       if (!orig) return;
+      if (orig.passwordProtection && orig.passwordProtection.duplicate) {
+        if (!checkPassword('Duplizieren: ' + orig.game.title)) return;
+      }
       const dup = JSON.parse(JSON.stringify(orig));
       dup.id = 'game_' + Date.now();
       dup.game.title += ' (Kopie)';
@@ -2845,6 +2899,10 @@
     };
 
     window.deleteGame = function(gameId) {
+      const g = getGame(gameId);
+      if (g && g.passwordProtection && g.passwordProtection['delete']) {
+        if (!checkPassword('Löschen: ' + g.game.title)) return;
+      }
       if (!confirm('Spiel wirklich löschen?')) return;
       library = library.filter(g => g.id !== gameId);
       deleteGameFile(gameId);
@@ -2864,6 +2922,9 @@
     window.exportGame = function(gameId) {
       const g = getGame(gameId);
       if (!g) return;
+      if (g.passwordProtection && g.passwordProtection['export']) {
+        if (!checkPassword('Exportieren: ' + g.game.title)) return;
+      }
       downloadJSON(g, (g.game.title || 'escape-room') + '.json');
     };
 
@@ -2885,6 +2946,7 @@
           if (data.game && data.rooms) {
             data.id = 'game_' + Date.now();
             if (data.published === undefined) data.published = false;
+            if (!data.passwordProtection) data.passwordProtection = {};
             library.push(data);
             saveGame(data);
             renderAdminLibrary();
@@ -2910,6 +2972,7 @@
           const game = parseEscapeRoomMD(e.target.result);
           game.id = 'game_' + Date.now();
           if (game.published === undefined) game.published = false;
+          if (!game.passwordProtection) game.passwordProtection = {};
           library.push(game);
           saveGame(game);
           renderAdminLibrary();
@@ -3471,7 +3534,10 @@
         if (!_isInteractive) {
           html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
             '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Bild-URL (optional)</label>' +
-            '<input type="text" class="admin-input q-img-url" value="' + escAttr(q.questionImage || '') + '" placeholder="https://…bild.jpg"></div>' +
+            '<div style="display:flex;gap:4px;align-items:center;">' +
+            '<input type="text" class="admin-input q-img-url" value="' + escAttr(q.questionImage || '') + '" placeholder="https://…bild.jpg" style="flex:1;">' +
+            '<label class="admin-btn sm" style="cursor:pointer;padding:4px 7px;white-space:nowrap;">📷<input type="file" accept="image/*" style="display:none" onchange="handleMediaImgUpload(event,this.parentElement.previousElementSibling)"></label>' +
+            '</div></div>' +
             '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Video-URL (optional)</label>' +
             '<input type="text" class="admin-input q-vid-url" value="' + escAttr(q.questionVideo || '') + '" placeholder="https://…video.mp4"></div>' +
             '</div>';
@@ -3479,6 +3545,7 @@
           html += '<div style="margin-top:6px;"><label class="admin-label" style="margin-top:0;">Hintergrundbild URL</label>' +
             '<div style="display:flex;gap:6px;">' +
             '<input type="text" class="admin-input q-img-url" value="' + escAttr(q.questionImage || '') + '" placeholder="https://…bild.jpg" style="flex:1;">' +
+            '<label class="admin-btn sm" style="cursor:pointer;padding:4px 7px;white-space:nowrap;">📷<input type="file" accept="image/*" style="display:none" onchange="handleMediaImgUpload(event,this.parentElement.previousElementSibling)"></label>' +
             '<button class="admin-btn sm" onclick="qAdminRefresh(' + rIdx + ',' + qIdx + ')">↺ Vorschau</button>' +
             '</div></div>';
         }
@@ -3792,7 +3859,10 @@
             '</textarea></div>';
           html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">' +
             '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Bild-URL (optional)</label>' +
-            '<input type="text" class="admin-input hs-note-img" value="' + escAttr(hs.noteImage || '') + '" placeholder="https://…"></div>' +
+            '<div style="display:flex;gap:4px;align-items:center;">' +
+            '<input type="text" class="admin-input hs-note-img" value="' + escAttr(hs.noteImage || '') + '" placeholder="https://…" style="flex:1;">' +
+            '<label class="admin-btn sm" style="cursor:pointer;padding:4px 7px;white-space:nowrap;">📷<input type="file" accept="image/*" style="display:none" onchange="handleMediaImgUpload(event,this.parentElement.previousElementSibling)"></label>' +
+            '</div></div>' +
             '<div style="flex:1;min-width:140px;"><label class="admin-label" style="margin-top:0;">Video-URL (optional)</label>' +
             '<input type="text" class="admin-input hs-note-vid" value="' + escAttr(hs.noteVideo || '') + '" placeholder="https://…"></div>' +
             '</div>';
@@ -4058,6 +4128,26 @@
           if (field) field.value = dataUrl;
           editingGame.rooms[rIdx].backgroundImage = dataUrl;
           updateHotspotPreview(rIdx);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.handleMediaImgUpload = function(event, targetInput) {
+      const file = event.target.files[0];
+      if (!file || !targetInput) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const maxW = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          targetInput.value = canvas.toDataURL('image/jpeg', 0.8);
         };
         img.src = e.target.result;
       };
