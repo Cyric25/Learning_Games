@@ -299,6 +299,9 @@
     .admin-btn.danger { color: #e74c3c; }
     .admin-btn.danger:hover { background: #e74c3c; color: #fff; border-color: #e74c3c; }
     .admin-btn.sm { padding: 5px 12px; font-size: 0.8rem; }
+    .publish-badge { display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+    .publish-badge.pub { background: rgba(46,204,113,0.12); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+    .publish-badge.unpub { background: rgba(180,180,180,0.1); color: #aaa; border: 1px solid rgba(180,180,180,0.3); }
     .admin-btn.publish { color: #2ecc71; border-color: rgba(46,204,113,0.4); }
     .admin-btn.publish:hover { background: rgba(46,204,113,0.12); }
     .admin-btn.master { color: #6d28d9; border-color: rgba(109,40,217,0.4); }
@@ -1281,13 +1284,14 @@
       const noGames = document.getElementById('no-games');
       list.innerHTML = '';
 
-      if (library.length === 0) {
+      const visible = library.filter(g => g.published);
+      if (visible.length === 0) {
         noGames.classList.remove('hidden');
         return;
       }
       noGames.classList.add('hidden');
 
-      library.forEach(g => {
+      visible.forEach(g => {
         const tile = document.createElement('div');
         tile.className = 'game-tile';
         tile.style.marginBottom = '16px';
@@ -1300,15 +1304,7 @@
             '<span>⏱ ' + mins + ' Min</span>' +
             '<span>' + (g.game.mode === 'chain' ? '🔗 Kette' : '🎯 Einzeln') + '</span>' +
           '</div>';
-        if (g.passwordProtection && g.passwordProtection.view) {
-          tile.innerHTML += '<div style="font-size:11px;color:#aaa;margin-top:4px;">🔒 Passwortgeschützt</div>';
-          tile.onclick = () => {
-            if (!checkPassword('Spielen: ' + g.game.title)) return;
-            selectGame(g.id);
-          };
-        } else {
-          tile.onclick = () => selectGame(g.id);
-        }
+        tile.onclick = () => selectGame(g.id);
         list.appendChild(tile);
       });
     }
@@ -2546,15 +2542,23 @@
         const row = document.createElement('div');
         row.className = 'admin-game-row';
         const mins = Math.floor((g.game.totalTimer || 2400) / 60);
+        const pp = g.passwordProtection || {};
+        const locked = pp.edit || pp.duplicate || pp['export'];
+        const isPub = !!g.published;
         row.innerHTML =
           '<div class="game-info">' +
-            '<h3>' + esc(g.game.title) + '</h3>' +
+            '<h3>' + esc(g.game.title) +
+              (locked ? ' <span style="font-size:0.72rem;color:#bbb;font-weight:normal;vertical-align:middle;">🔒</span>' : '') +
+              '<span class="publish-badge ' + (isPub ? 'pub' : 'unpub') + '">' +
+                (isPub ? '✓' : '✗ Entwurf') +
+              '</span>' +
+            '</h3>' +
             '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
           '</div>' +
           '<div class="game-actions">' +
-            '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' +
-            '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
-            '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
+            (!pp.edit ? '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' : '') +
+            (!pp.duplicate ? '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' : '') +
+            (!pp['export'] ? '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' : '') +
           '</div>';
         list.appendChild(row);
       });
@@ -2656,10 +2660,6 @@
     };
 
     window.editGame = function(gameId) {
-      const g = getGame(gameId);
-      if (g && g.passwordProtection && g.passwordProtection.edit) {
-        if (!checkPassword('Bearbeiten: ' + g.game.title)) return;
-      }
       editingGameId = gameId;
       editingGame = JSON.parse(JSON.stringify(getGame(gameId)));
       renderEditor();
@@ -2669,9 +2669,6 @@
     window.duplicateGame = function(gameId) {
       const orig = getGame(gameId);
       if (!orig) return;
-      if (orig.passwordProtection && orig.passwordProtection.duplicate) {
-        if (!checkPassword('Duplizieren: ' + orig.game.title)) return;
-      }
       const dup = JSON.parse(JSON.stringify(orig));
       dup.id = 'game_' + Date.now();
       dup.game.title += ' (Kopie)';
@@ -2697,9 +2694,6 @@
     window.exportGame = function(gameId) {
       const g = getGame(gameId);
       if (!g) return;
-      if (g.passwordProtection && g.passwordProtection['export']) {
-        if (!checkPassword('Exportieren: ' + g.game.title)) return;
-      }
       downloadJSON(g, (g.game.title || 'escape-room') + '.json');
     };
 
