@@ -299,6 +299,10 @@
     .admin-btn.danger { color: #e74c3c; }
     .admin-btn.danger:hover { background: #e74c3c; color: #fff; border-color: #e74c3c; }
     .admin-btn.sm { padding: 5px 12px; font-size: 0.8rem; }
+    .admin-btn.publish { color: #2ecc71; border-color: rgba(46,204,113,0.4); }
+    .admin-btn.publish:hover { background: rgba(46,204,113,0.12); }
+    .admin-btn.master { color: #6d28d9; border-color: rgba(109,40,217,0.4); }
+    .admin-btn.master:hover { background: rgba(109,40,217,0.1); }
 
     .admin-input {
       width: 100%; padding: 8px 12px; border: 1px solid #d0d0d0;
@@ -1029,6 +1033,21 @@
        ADMIN VIEWS
        ════════════════════════════════════════════════════ -->
 
+  <!-- Admin: Master Admin -->
+  <div id="admin-master" class="view">
+    <div class="admin-container">
+      <div class="admin-header">
+        <h1>🔑 Master Admin</h1>
+        <button class="admin-btn" onclick="showAdminView('admin-library')">← Übersicht</button>
+      </div>
+      <p style="color:#888;font-size:0.875rem;margin-bottom:16px;">Sichtbarkeit und Zugriffsberechtigungen für alle Escape Rooms.</p>
+      <div class="admin-card">
+        <div id="master-game-list"></div>
+        <div id="master-no-games" class="hidden" style="padding:20px;text-align:center;color:#999;">Noch keine Spiele angelegt.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Admin: Library -->
   <div id="admin-library" class="view">
     <div class="admin-container">
@@ -1045,6 +1064,7 @@
         <button class="admin-btn" onclick="document.getElementById('import-md-file').click()">📝 MD importieren</button>
         <input type="file" id="import-md-file" accept=".md,.txt,.markdown" style="display:none" onchange="importMDFile(event)">
         <button class="admin-btn" onclick="loadDemoGame()">📋 Demo-Spiel laden</button>
+        <button class="admin-btn master" onclick="openMasterAdmin()">🔑 Master Admin</button>
       </div>
       <div class="admin-card">
         <h3 style="margin-bottom:12px;">Spielbibliothek</h3>
@@ -1249,6 +1269,7 @@
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       document.getElementById(viewId).classList.add('active');
       if (viewId === 'admin-library') renderAdminLibrary();
+      if (viewId === 'admin-master') renderMasterAdmin();
     }
     window.showAdminView = showAdminView;
 
@@ -2525,26 +2546,15 @@
         const row = document.createElement('div');
         row.className = 'admin-game-row';
         const mins = Math.floor((g.game.totalTimer || 2400) / 60);
-        const pp = g.passwordProtection || {};
-        const pfx = 'pp_' + g.id + '_';
         row.innerHTML =
           '<div class="game-info">' +
-            '<h3>' + esc(g.game.title) + (pp.view ? ' 🔒' : '') + '</h3>' +
+            '<h3>' + esc(g.game.title) + '</h3>' +
             '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
           '</div>' +
           '<div class="game-actions">' +
             '<button class="admin-btn sm" onclick="editGame(\'' + g.id + '\')">Bearbeiten</button>' +
             '<button class="admin-btn sm" onclick="duplicateGame(\'' + g.id + '\')">Duplizieren</button>' +
             '<button class="admin-btn sm" onclick="exportGame(\'' + g.id + '\')">Exportieren</button>' +
-            '<button class="admin-btn sm danger" onclick="deleteGame(\'' + g.id + '\')">Löschen</button>' +
-          '</div>' +
-          '<div class="pp-row">' +
-            '<span class="pp-label">🔒</span>' +
-            '<label><input type="checkbox" id="' + pfx + 'view" ' + (pp.view ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Anzeigen</label>' +
-            '<label><input type="checkbox" id="' + pfx + 'edit" ' + (pp.edit ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Bearbeiten</label>' +
-            '<label><input type="checkbox" id="' + pfx + 'duplicate" ' + (pp.duplicate ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Duplizieren</label>' +
-            '<label><input type="checkbox" id="' + pfx + 'export" ' + (pp['export'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Exportieren</label>' +
-            '<label><input type="checkbox" id="' + pfx + 'delete" ' + (pp['delete'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Löschen</label>' +
           '</div>';
         list.appendChild(row);
       });
@@ -2569,6 +2579,67 @@
       };
       saveGame(g);
       showAdminStatus('Passwortschutz gespeichert.', 'success');
+    };
+
+    window.openMasterAdmin = function() {
+      if (!checkPassword('Master Admin')) return;
+      showAdminView('admin-master');
+    };
+
+    function renderMasterAdmin() {
+      const list = document.getElementById('master-game-list');
+      if (!list) return;
+      const noGames = document.getElementById('master-no-games');
+      list.innerHTML = '';
+      if (library.length === 0) { noGames.classList.remove('hidden'); return; }
+      noGames.classList.add('hidden');
+      library.forEach(g => {
+        const row = document.createElement('div');
+        row.className = 'admin-game-row';
+        const mins = Math.floor((g.game.totalTimer || 2400) / 60);
+        const isPub = !!g.published;
+        const pp = g.passwordProtection || {};
+        const pfx = 'pp_' + g.id + '_';
+        row.innerHTML =
+          '<div class="game-info">' +
+            '<h3>' + esc(g.game.title) + '</h3>' +
+            '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
+          '</div>' +
+          '<div class="game-actions">' +
+            '<button class="admin-btn sm publish" onclick="masterTogglePublish(\'' + g.id + '\')">' +
+              (isPub ? '✗ Verstecken' : '✓ Veröffentlichen') +
+            '</button>' +
+            '<button class="admin-btn sm danger" onclick="masterDeleteGame(\'' + g.id + '\')">Löschen</button>' +
+          '</div>' +
+          '<div class="pp-row">' +
+            '<span class="pp-label">🔒</span>' +
+            '<label><input type="checkbox" id="' + pfx + 'view" ' + (pp.view ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Anzeigen</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'edit" ' + (pp.edit ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Bearbeiten</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'duplicate" ' + (pp.duplicate ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Duplizieren</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'export" ' + (pp['export'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Exportieren</label>' +
+            '<label><input type="checkbox" id="' + pfx + 'delete" ' + (pp['delete'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Löschen</label>' +
+          '</div>';
+        list.appendChild(row);
+      });
+    }
+
+    window.masterTogglePublish = function(gameId) {
+      const g = getGame(gameId);
+      if (!g) return;
+      g.published = !g.published;
+      saveGame(g);
+      renderMasterAdmin();
+      renderAdminLibrary();
+      showAdminStatus(g.published ? 'Spiel veröffentlicht.' : 'Spiel versteckt.', 'success');
+    };
+
+    window.masterDeleteGame = function(gameId) {
+      if (!confirm('Spiel wirklich löschen?')) return;
+      library = library.filter(g => g.id !== gameId);
+      deleteGameFile(gameId);
+      renderMasterAdmin();
+      renderAdminLibrary();
+      showAdminStatus('Spiel gelöscht.', 'danger');
     };
 
     window.createNewGame = function() {
