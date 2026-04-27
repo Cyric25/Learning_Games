@@ -1053,11 +1053,17 @@
           <button class="admin-btn sm" onclick="masterSelectAll(false)">☐ Keine</button>
           <span id="master-sel-count" class="master-sel-count"></span>
           <div style="flex:1"></div>
-          <button class="admin-btn sm publish" onclick="bulkSetPublish(true)">👁 Anzeigen</button>
           <button class="admin-btn sm" onclick="bulkSetPublish(false)">🙈 Verstecken</button>
-          <button class="admin-btn sm" onclick="bulkSetProtection(true)">🔒 Schützen</button>
-          <button class="admin-btn sm" onclick="bulkSetProtection(false)">🔓 Freigeben</button>
           <button class="admin-btn sm danger" onclick="bulkDelete()">Löschen</button>
+          <div style="width:100%;height:1px;background:rgba(0,0,0,0.07);margin:4px 0;"></div>
+          <span style="font-size:0.8rem;color:#888;flex-shrink:0;">🔒 Schutz:</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;color:#555;cursor:pointer;"><input type="checkbox" id="bulk-pp-edit"> Bearbeiten</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;color:#555;cursor:pointer;"><input type="checkbox" id="bulk-pp-duplicate"> Duplizieren</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;color:#555;cursor:pointer;"><input type="checkbox" id="bulk-pp-export"> Exportieren</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;color:#555;cursor:pointer;"><input type="checkbox" id="bulk-pp-delete"> Löschen</label>
+          <div style="flex:1"></div>
+          <button class="admin-btn sm" onclick="bulkSetProtection(true)">Sperren</button>
+          <button class="admin-btn sm" onclick="bulkSetProtection(false)">Freigeben</button>
         </div>
         <div id="master-game-list"></div>
         <div id="master-no-games" class="hidden" style="padding:20px;text-align:center;color:#999;">Noch keine Spiele angelegt.</div>
@@ -2589,7 +2595,6 @@
       const pfx = 'pp_' + gameId + '_';
       const val = (id) => { const el = document.getElementById(id); return !!(el && el.checked); };
       g.passwordProtection = {
-        view:      val(pfx + 'view'),
         edit:      val(pfx + 'edit'),
         duplicate: val(pfx + 'duplicate'),
         'export':  val(pfx + 'export'),
@@ -2633,7 +2638,6 @@
           '</div>' +
           '<div class="pp-row">' +
             '<span class="pp-label">🔒</span>' +
-            '<label><input type="checkbox" id="' + pfx + 'view" ' + (pp.view ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Anzeigen</label>' +
             '<label><input type="checkbox" id="' + pfx + 'edit" ' + (pp.edit ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Bearbeiten</label>' +
             '<label><input type="checkbox" id="' + pfx + 'duplicate" ' + (pp.duplicate ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Duplizieren</label>' +
             '<label><input type="checkbox" id="' + pfx + 'export" ' + (pp['export'] ? 'checked' : '') + ' onchange="savePP(\'' + g.id + '\')"> Exportieren</label>' +
@@ -2682,17 +2686,21 @@
     window.bulkSetProtection = function(val) {
       const ids = [...document.querySelectorAll('.master-sel-cb:checked')].map(cb => cb.dataset.id);
       if (!ids.length) { showAdminStatus('Keine Spiele ausgewählt.', 'danger'); return; }
+      const fields = ['edit', 'duplicate', 'export', 'delete'];
+      const active = fields.filter(f => { const cb = document.getElementById('bulk-pp-' + f); return cb && cb.checked; });
+      if (!active.length) { showAdminStatus('Keine Schutz-Option ausgewählt.', 'danger'); return; }
       ids.forEach(id => {
         const g = getGame(id);
         if (!g) return;
-        g.passwordProtection = val
-          ? { view: true, edit: true, duplicate: true, 'export': true, 'delete': true }
-          : {};
+        const pp = g.passwordProtection || {};
+        active.forEach(f => { pp[f] = val; });
+        g.passwordProtection = pp;
         saveGame(g);
       });
       renderMasterAdmin();
       renderAdminLibrary();
-      showAdminStatus(val ? ids.length + ' Spiele gesperrt.' : ids.length + ' Spiele freigegeben.', 'success');
+      const labels = { edit: 'Bearbeiten', duplicate: 'Duplizieren', export: 'Exportieren', 'delete': 'Löschen' };
+      showAdminStatus(ids.length + ' Spiele — ' + active.map(f => labels[f]).join(', ') + (val ? ' gesperrt.' : ' freigegeben.'), 'success');
     };
     window.bulkDelete = function() {
       const ids = [...document.querySelectorAll('.master-sel-cb:checked')].map(cb => cb.dataset.id);
