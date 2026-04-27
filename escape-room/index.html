@@ -889,6 +889,9 @@
     .admin-btn.test:hover { background: rgba(212,168,83,0.1); }
     .admin-btn.master { color: #6d28d9; border-color: rgba(109,40,217,0.4); }
     .admin-btn.master:hover { background: rgba(109,40,217,0.1); }
+    .master-bulk-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; padding: 8px 10px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+    .master-sel-count { font-size: 0.82rem; color: #888; min-width: 60px; }
+    .master-sel-cb { width: 15px; height: 15px; cursor: pointer; margin-right: 2px; flex-shrink: 0; accent-color: #6d28d9; }
 
     #test-mode-banner {
       position: fixed; top: 0; left: 0; right: 0; z-index: 500;
@@ -1148,6 +1151,17 @@
       </div>
       <p style="color:#888;font-size:0.875rem;margin-bottom:16px;">Sichtbarkeit und Zugriffsberechtigungen für alle Escape Rooms.</p>
       <div class="admin-card">
+        <div class="master-bulk-bar">
+          <button class="admin-btn sm" onclick="masterSelectAll(true)">☑ Alle</button>
+          <button class="admin-btn sm" onclick="masterSelectAll(false)">☐ Keine</button>
+          <span id="master-sel-count" class="master-sel-count"></span>
+          <div style="flex:1"></div>
+          <button class="admin-btn sm publish" onclick="bulkSetPublish(true)">👁 Anzeigen</button>
+          <button class="admin-btn sm" onclick="bulkSetPublish(false)">🙈 Verstecken</button>
+          <button class="admin-btn sm" onclick="bulkSetProtection(true)">🔒 Schützen</button>
+          <button class="admin-btn sm" onclick="bulkSetProtection(false)">🔓 Freigeben</button>
+          <button class="admin-btn sm danger" onclick="bulkDelete()">Löschen</button>
+        </div>
         <div id="master-game-list"></div>
         <div id="master-no-games" class="hidden" style="padding:20px;text-align:center;color:#999;">Noch keine Spiele angelegt.</div>
       </div>
@@ -2885,13 +2899,15 @@
         const pp = g.passwordProtection || {};
         const pfx = 'pp_' + g.id + '_';
         row.innerHTML =
-          '<div class="game-info">' +
-            '<h3>' + esc(g.game.title) + '</h3>' +
-            '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p>' +
+          '<div class="game-info" style="display:flex;align-items:flex-start;gap:10px;">' +
+            '<input type="checkbox" class="master-sel-cb" data-id="' + g.id + '" onchange="updateMasterBulkBar()">' +
+            '<div><h3>' + esc(g.game.title) + '</h3>' +
+            '<p>' + g.rooms.length + ' Räume · ' + mins + ' Min · ' + (g.game.mode === 'chain' ? 'Kette' : 'Einzeln') + '</p></div>' +
           '</div>' +
           '<div class="game-actions">' +
-            '<button class="admin-btn sm publish" onclick="masterTogglePublish(\'' + g.id + '\')">' +
-              (isPub ? '✗ Verstecken' : '✓ Veröffentlichen') +
+            '<span class="publish-badge ' + (isPub ? 'pub' : 'unpub') + '">' + (isPub ? '👁 Sichtbar' : '🙈 Versteckt') + '</span>' +
+            '<button class="admin-btn sm ' + (isPub ? '' : 'publish') + '" onclick="masterTogglePublish(\'' + g.id + '\')">' +
+              (isPub ? 'Verstecken' : 'Anzeigen') +
             '</button>' +
             '<button class="admin-btn sm danger" onclick="masterDeleteGame(\'' + g.id + '\')">Löschen</button>' +
           '</div>' +
@@ -2924,6 +2940,48 @@
       renderMasterAdmin();
       renderAdminLibrary();
       showAdminStatus('Spiel gelöscht.', 'danger');
+    };
+
+    window.masterSelectAll = function(val) {
+      document.querySelectorAll('.master-sel-cb').forEach(cb => cb.checked = val);
+      updateMasterBulkBar();
+    };
+    window.updateMasterBulkBar = function() {
+      const n = document.querySelectorAll('.master-sel-cb:checked').length;
+      const el = document.getElementById('master-sel-count');
+      if (el) el.textContent = n ? n + ' gewählt' : '';
+    };
+    window.bulkSetPublish = function(val) {
+      const ids = [...document.querySelectorAll('.master-sel-cb:checked')].map(cb => cb.dataset.id);
+      if (!ids.length) { showAdminStatus('Keine Spiele ausgewählt.', 'danger'); return; }
+      ids.forEach(id => { const g = getGame(id); if (g) { g.published = val; saveGame(g); } });
+      renderMasterAdmin();
+      renderAdminLibrary();
+      showAdminStatus(val ? ids.length + ' Spiele veröffentlicht.' : ids.length + ' Spiele versteckt.', 'success');
+    };
+    window.bulkSetProtection = function(val) {
+      const ids = [...document.querySelectorAll('.master-sel-cb:checked')].map(cb => cb.dataset.id);
+      if (!ids.length) { showAdminStatus('Keine Spiele ausgewählt.', 'danger'); return; }
+      ids.forEach(id => {
+        const g = getGame(id);
+        if (!g) return;
+        g.passwordProtection = val
+          ? { view: true, edit: true, duplicate: true, 'export': true, 'delete': true }
+          : {};
+        saveGame(g);
+      });
+      renderMasterAdmin();
+      renderAdminLibrary();
+      showAdminStatus(val ? ids.length + ' Spiele gesperrt.' : ids.length + ' Spiele freigegeben.', 'success');
+    };
+    window.bulkDelete = function() {
+      const ids = [...document.querySelectorAll('.master-sel-cb:checked')].map(cb => cb.dataset.id);
+      if (!ids.length) { showAdminStatus('Keine Spiele ausgewählt.', 'danger'); return; }
+      if (!confirm(ids.length + ' Spiele wirklich löschen?')) return;
+      ids.forEach(id => { library = library.filter(g => g.id !== id); deleteGameFile(id); });
+      renderMasterAdmin();
+      renderAdminLibrary();
+      showAdminStatus(ids.length + ' Spiele gelöscht.', 'danger');
     };
 
     window.createNewGame = function() {
