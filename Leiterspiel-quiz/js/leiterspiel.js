@@ -1541,6 +1541,8 @@ function nextTurn() {
 // ── Winner ───────────────────────────────────────────────────
 function showWinner() {
   gameState.phase = 'finished';
+  gameState.liveQuestion = null;
+  LsStorage.save(gameState);
   const team = getCurrentTeam();
 
   document.getElementById('winner-team-name').textContent = team.emoji + ' ' + team.name;
@@ -1599,6 +1601,91 @@ function resetToSetup() {
 function confirmQuit() {
   if (confirm('Spiel wirklich beenden?')) {
     resetToSetup();
+  }
+}
+
+// ── Multi-Player: SSE + Code-Banner ──────────────────────────
+
+function showCodeBanner() {
+  const code = LsStorage.getCode();
+  if (!code) return;
+  const existing = document.getElementById('ls-code-banner');
+  if (existing) { existing.querySelector('.ls-code-val').textContent = code; return; }
+
+  const banner = document.createElement('div');
+  banner.id = 'ls-code-banner';
+  banner.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-field,#2d4a7a);color:var(--text-primary,#fff);border-radius:12px;padding:10px 16px;font-size:0.85rem;box-shadow:0 2px 12px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;';
+  const viewUrl = 'view.html?code=' + code;
+  banner.innerHTML =
+    '<span>📱 Schüler:</span>' +
+    '<strong class="ls-code-val" style="font-size:1.2rem;letter-spacing:2px">' + code + '</strong>' +
+    '<a href="' + viewUrl + '" target="_blank" style="color:var(--accent,#e94560);font-size:0.8rem;text-decoration:none">Link ↗</a>';
+  document.body.appendChild(banner);
+}
+
+function startSSESubscription() {
+  const code = LsStorage.getCode();
+  if (!code) return;
+  if (lsSub) { lsSub.unsubscribe(); lsSub = null; }
+
+  lsSub = LsStorage.subscribe(code, onSSEUpdate);
+}
+
+let _lastSSEPhase = null;
+let _lastSSELiveQId = null;
+
+function onSSEUpdate(newGs) {
+  // Only react when we're in game/dice-order phase and the update came from ANOTHER device
+  if (newGs.phase !== 'playing' && newGs.phase !== 'dice-order') return;
+
+  // Sync positions and scores (non-disruptive)
+  if (newGs.phase === 'playing') {
+    if (gameState.phase !== 'playing') return;
+
+    // Sync team positions and scores
+    newGs.teams.forEach((t, i) => {
+      if (gameState.teams[i]) {
+        gameState.teams[i].position = t.position;
+        gameState.teams[i].score = t.score;
+        gameState.teams[i].correctCount = t.correctCount;
+        gameState.teams[i].wrongCount = t.wrongCount;
+      }
+    });
+    gameState.currentTurnIdx = newGs.currentTurnIdx;
+    gameState.pendingDice = newGs.pendingDice;
+
+    // React to a new liveQuestion (student rolled dice)
+    const lq = newGs.liveQuestion;
+    const lqChanged = lq && lq.id !== _lastSSELiveQId;
+
+    if (lqChanged && !lq.resolved && !questionResolved) {
+      _lastSSELiveQId = lq.id;
+      gameState.liveQuestion = lq;
+      gameState.usedQuestionIds = newGs.usedQuestionIds;
+      updatePieces();
+      updateActiveBanner();
+
+      // Show question modal if not already open
+      const modal = document.getElementById('question-modal');
+      if (!modal.classList.contains('open')) {
+        currentQuestion = lq.question;
+        askQuestion(lq.question);
+      }
+    }
+
+    // React to liveQuestion cleared (student handled movement)
+    if (!lq && gameState.liveQuestion && gameState.liveQuestion.resolved) {
+      _lastSSELiveQId = null;
+      gameState.liveQuestion = null;
+      gameState.currentTurnIdx = newGs.currentTurnIdx;
+      updatePieces();
+      updateActiveBanner();
+      updateTeamList();
+      const modal = document.getElementById('question-modal');
+      if (modal.classList.contains('open')) modal.classList.remove('open');
+      document.getElementById('dice-display').textContent = '🎲';
+      updateDiceButton(true);
+    }
   }
 }
 
