@@ -189,6 +189,25 @@ const MemoryMDParser = {
     return s;
   },
 
+  // Bereinigt bereits gespeicherte Paare: entfernt $ aus Formel-Inhalten
+  migrateDollarDelimiters(pairsData) {
+    let changed = false;
+    for (const cat of (pairsData.categories || [])) {
+      for (const pair of (cat.pairs || [])) {
+        for (const side of [pair.sideA, pair.sideB]) {
+          if (side && side.type === 'formula' && side.content) {
+            const stripped = this._stripMathDelimiters(side.content);
+            if (stripped !== side.content) {
+              side.content = stripped;
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+    return changed;
+  },
+
   _normalizeType(t) {
     t = t.toLowerCase().trim();
     if (t === 'text' || t === 'formula' || t === 'image') return t;

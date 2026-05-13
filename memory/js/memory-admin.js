@@ -7,6 +7,9 @@ let importedCategories = null;
 // ── Init ────────────────────────────────────────────────────
 async function init() {
   pairsData = await MemoryStorageManager.loadPairs();
+  if (MemoryMDParser.migrateDollarDelimiters(pairsData)) {
+    await MemoryStorageManager.savePairs(pairsData);
+  }
   renderCategories();
   populateCatSelect();
 }

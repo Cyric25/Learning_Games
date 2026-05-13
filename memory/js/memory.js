@@ -19,6 +19,7 @@ let locked = false;          // Klick-Sperre während Vergleich
 // ── Init ────────────────────────────────────────────────────
 async function init() {
   pairsData = await MemoryStorageManager.loadPairs();
+  MemoryMDParser.migrateDollarDelimiters(pairsData);
   renderCategoryList();
   updateStartButton();
 }
