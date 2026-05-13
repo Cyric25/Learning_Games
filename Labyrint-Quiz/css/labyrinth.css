@@ -1,32 +1,32 @@
 /* labyrinth.css – Labyrinth-Quiz v3 (modernes UI + mittelalterliches Canvas) */
 
-/* ── Light Theme ──────────────────────────────────────────────────── */
+/* ── Light Theme (Standard Orange) ───────────────────────────────── */
 :root {
-  --bg-primary:     #f5f3ff;
-  --bg-secondary:   #ede9fe;
+  --bg-primary:     #fdf6f0;
+  --bg-secondary:   #fff3ee;
   --bg-card:        #ffffff;
-  --bg-card-hover:  #f5f3ff;
-  --text-primary:   #1e1b4b;
-  --text-secondary: #6b7280;
-  --accent:         #7c3aed;
-  --accent-light:   #ede9fe;
-  --accent-hover:   #6d28d9;
-  --border:         rgba(124,58,237,0.15);
-  --border-card:    #ddd6fe;
-  --shadow:         0 2px 8px rgba(109,40,217,0.1);
-  --shadow-lg:      0 8px 32px rgba(109,40,217,0.15);
+  --bg-card-hover:  #fff3ee;
+  --text-primary:   #1e293b;
+  --text-secondary: #64748b;
+  --accent:         #E34F20;
+  --accent-light:   #ffe8df;
+  --accent-hover:   #c73518;
+  --border:         rgba(227,79,32,0.15);
+  --border-card:    #e0d5cf;
+  --shadow:         0 2px 8px rgba(227,79,32,0.10);
+  --shadow-lg:      0 8px 32px rgba(227,79,32,0.15);
   --success:        #16a34a;
   --danger:         #dc2626;
   --warning:        #d97706;
 
-  /* Maze-Canvas – mittelalterlicher Stein/Pergament-Stil bleibt */
+  /* Maze-Canvas – mittelalterlicher Stein/Pergament-Stil */
   --maze-wall:       #2c1810;
   --maze-path:       #f5e6c8;
-  --maze-door:       #8b1a1a;
-  --maze-door-open:  #2d5a27;
-  --maze-valid-free: rgba(124,58,237,0.30);
-  --maze-valid-door: rgba(139,26,26,0.32);
-  --maze-valid-sym:  rgba(80,40,160,0.30);
+  --maze-door:       #E34F20;
+  --maze-door-open:  #16a34a;
+  --maze-valid-free: rgba(227,79,32,0.30);
+  --maze-valid-door: rgba(220,38,38,0.32);
+  --maze-valid-sym:  rgba(247,151,30,0.25);
 
   /* Team */
   --team-1: #1a3a8f;
@@ -37,32 +37,32 @@
   --team-6: #1a6b6b;
 }
 
-/* ── Dark Mode ────────────────────────────────────────────────────── */
+/* ── Dark Mode (Standard Dunkelblau) ─────────────────────────────── */
 body.dark {
-  --bg-primary:     #0f0e17;
-  --bg-secondary:   #1a1830;
-  --bg-card:        #1e1b4b;
-  --bg-card-hover:  #272457;
-  --text-primary:   #e0e7ff;
-  --text-secondary: #a5b4fc;
-  --accent:         #a78bfa;
-  --accent-light:   #2e2a5a;
-  --accent-hover:   #8b5cf6;
-  --border:         rgba(167,139,250,0.15);
-  --border-card:    #3730a3;
+  --bg-primary:     #16213e;
+  --bg-secondary:   #1a1a2e;
+  --bg-card:        #1a2744;
+  --bg-card-hover:  #1a4a80;
+  --text-primary:   #ffffff;
+  --text-secondary: #a8a8b3;
+  --accent:         #f7971e;
+  --accent-light:   rgba(247,151,30,0.12);
+  --accent-hover:   #E34F20;
+  --border:         rgba(255,255,255,0.12);
+  --border-card:    rgba(255,255,255,0.15);
   --shadow:         0 4px 20px rgba(0,0,0,0.5);
-  --shadow-lg:      0 12px 40px rgba(0,0,0,0.7);
-  --success:        #4ade80;
-  --danger:         #f87171;
-  --warning:        #fbbf24;
+  --shadow-lg:      0 8px 32px rgba(0,0,0,0.7);
+  --success:        #2ecc71;
+  --danger:         #e74c3c;
+  --warning:        #f39c12;
 
   --maze-wall:      #c8a87a;
   --maze-path:      #1a1208;
-  --maze-door:      #c8472a;
-  --maze-door-open: #4ade80;
-  --maze-valid-free: rgba(167,139,250,0.30);
-  --maze-valid-door: rgba(200,71,42,0.30);
-  --maze-valid-sym:  rgba(140,80,220,0.30);
+  --maze-door:      #E34F20;
+  --maze-door-open: #2ecc71;
+  --maze-valid-free: rgba(247,151,30,0.30);
+  --maze-valid-door: rgba(220,38,38,0.32);
+  --maze-valid-sym:  rgba(247,151,30,0.20);
 }
 
 /* ── Base ─────────────────────────────────────────────────────────── */
@@ -71,10 +71,13 @@ html,body { height:100%; }
 
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--bg-primary);
+  background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
   color: var(--text-primary);
   transition: background 0.35s, color 0.35s;
   overflow: hidden;
+}
+body.dark {
+  background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
 }
 
 .screen { display:none; width:100%; height:100%; }
@@ -469,20 +472,20 @@ body.dark #game-screen { background: #090c14; }
 .board-header h2 {
   font-size: clamp(0.95rem,1.8vw,1.3rem);
   font-weight: 700;
-  color: var(--bg-card);
+  color: #fff;
   letter-spacing: 0.05em;
 }
-.board-header .header-btn { background:rgba(245,230,200,0.15); color:var(--bg-card); border-color:rgba(245,230,200,0.3); }
+.board-header .header-btn { background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.30); }
 
 /* ── Game Code Banner ─────────────────────────────────────────────── */
 .game-code-display {
   display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;
-  background: rgba(201,162,39,0.15); border: 1px solid rgba(201,162,39,0.4);
+  background: rgba(247,151,30,0.15); border: 1px solid rgba(247,151,30,0.4);
   border-radius: 6px; padding: 0.35rem 0.8rem; margin-bottom: 0.4rem;
   flex-wrap: wrap;
 }
 .gc-label { font-size: 0.8rem; color: var(--accent); font-weight: 600; letter-spacing: 0.05em; }
-.gc-value { font-size: 1.2rem; font-weight: 900; letter-spacing: 0.18em; color: var(--bg-card); cursor: pointer; font-variant-numeric: tabular-nums; }
+.gc-value { font-size: 1.2rem; font-weight: 900; letter-spacing: 0.18em; color: #fff; cursor: pointer; font-variant-numeric: tabular-nums; }
 .gc-value:hover { color: var(--accent); }
 .gc-link { font-size: 0.78rem; color: var(--accent); opacity: 0.75; text-decoration: none; margin-left: auto; }
 .gc-link:hover { opacity: 1; }
@@ -494,7 +497,7 @@ body.dark #game-screen { background: #090c14; }
 }
 
 /* ── Sidebar hint ─────────────────────────────────────────────────── */
-.hint-small { font-size: 0.7rem; color: rgba(245,230,200,0.5); margin: 0; word-break: break-all; }
+.hint-small { font-size: 0.7rem; color: rgba(255,255,255,0.45); margin: 0; word-break: break-all; }
 .hint-small strong { color: var(--accent); }
 
 /* ── Game Info Bar (Dice + Steps) ─────────────────────────────────── */
@@ -504,9 +507,9 @@ body.dark #game-screen { background: #090c14; }
   gap: 0.8rem;
   padding: 0.5rem 0.8rem;
   margin-bottom: 0.5rem;
-  background: var(--bg-secondary);
+  background: rgba(255,255,255,0.10);
   border-radius: 6px;
-  border: 1px solid rgba(245,230,200,0.2);
+  border: 1px solid rgba(255,255,255,0.15);
   flex-shrink: 0;
 }
 
@@ -522,7 +525,7 @@ body.dark #game-screen { background: #090c14; }
 .team-name-large {
   font-size: clamp(0.85rem,1.4vw,1.1rem);
   font-weight: 700;
-  color: var(--bg-card);
+  color: #fff;
 }
 
 .team-score-display {
@@ -600,7 +603,7 @@ body.dark #game-screen { background: #090c14; }
 .steps-label {
   display: block;
   font-size: 0.7rem;
-  color: rgba(245,230,200,0.6);
+  color: rgba(255,255,255,0.55);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -608,9 +611,9 @@ body.dark #game-screen { background: #090c14; }
 .btn-end-turn {
   padding: 0.5rem 0.9rem;
   border-radius: 4px;
-  border: 2px solid rgba(245,230,200,0.4);
+  border: 2px solid rgba(255,255,255,0.35);
   background: transparent;
-  color: var(--bg-card);
+  color: #fff;
   font-size: 0.85rem;
   font-weight: 700;
   font-family: inherit;
@@ -618,7 +621,7 @@ body.dark #game-screen { background: #090c14; }
   transition: all 0.15s;
   white-space: nowrap;
 }
-.btn-end-turn:hover { border-color:var(--bg-card); background:rgba(245,230,200,0.1); }
+.btn-end-turn:hover { border-color:#fff; background:rgba(255,255,255,0.10); }
 
 /* ── Canvas ──────────────────────────────────────────────────────── */
 .canvas-wrap {
@@ -640,8 +643,8 @@ body.dark #game-screen { background: #090c14; }
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .sidebar {
   width: clamp(200px,18vw,280px);
-  background: var(--bg-secondary);
-  border-left: 2px solid rgba(245,230,200,0.15);
+  background: rgba(0,0,0,0.30);
+  border-left: 2px solid rgba(255,255,255,0.12);
   padding: 0.8rem;
   display: flex;
   flex-direction: column;
@@ -667,18 +670,18 @@ body.dark #game-screen { background: #090c14; }
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
   border-radius: 4px;
-  background: rgba(245,230,200,0.06);
+  background: rgba(255,255,255,0.06);
   border: 2px solid transparent;
   transition: all 0.2s;
 }
 .team-item.active {
   border-color: var(--accent);
-  background: rgba(201,162,39,0.12);
+  background: rgba(247,151,30,0.15);
 }
 
 .team-figure { font-size: 1.2rem; width:28px; text-align:center; }
 .team-info   { flex:1; min-width:0; }
-.team-name   { font-size:0.82rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--bg-card); }
+.team-name   { font-size:0.82rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#fff; }
 .team-score  { font-size:0.75rem; color:var(--accent); font-weight:600; }
 
 .team-sym-bar { display:flex; gap:2px; margin-top:3px; flex-wrap:wrap; }
@@ -689,10 +692,10 @@ body.dark #game-screen { background: #090c14; }
 .sidebar-legend {
   margin-top: auto;
   padding-top: 0.8rem;
-  border-top: 1px solid rgba(245,230,200,0.15);
+  border-top: 1px solid rgba(255,255,255,0.12);
 }
 .legend-list  { display:flex; flex-direction:column; gap:0.3rem; }
-.legend-item  { display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; color:rgba(245,230,200,0.65); }
+.legend-item  { display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; color:rgba(255,255,255,0.60); }
 .legend-icon  { font-size:0.95rem; width:20px; text-align:center; }
 
 /* ── Question Modal ───────────────────────────────────────────────── */
@@ -939,7 +942,7 @@ body.dark .modal-result.wrong   { background:#7f1d1d; color:#f87171; }
 @media (max-width: 768px) {
   #game-screen { flex-direction:column; }
   .sidebar {
-    width:100%; border-left:none; border-top:1px solid rgba(245,230,200,0.15);
+    width:100%; border-left:none; border-top:1px solid rgba(255,255,255,0.12);
     max-height:30vh; flex-direction:row; flex-wrap:wrap; gap:0.4rem;
   }
   .sidebar h3       { width:100%; }
