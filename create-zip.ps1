@@ -97,7 +97,12 @@ Add-Folder $zip (Join-Path $lq "css")           "Labyrint-Quiz/css"
 
 # Escape Room
 $er = Join-Path $source "escape-room"
-Add-File   $zip (Join-Path $er "index.html")    "escape-room/index.html"
+Add-File   $zip (Join-Path $er "index.html")      "escape-room/index.html"
+Add-File   $zip (Join-Path $er "standalone.html") "escape-room/standalone.html"
+
+# Lernkarten
+$lk = Join-Path $source "lernkarten"
+Add-File   $zip (Join-Path $lk "index.html")    "lernkarten/index.html"
 
 # Stadt-Land-Fluss
 $slf = Join-Path $source "stadt-land-fluss"
