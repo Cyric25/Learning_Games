@@ -85,6 +85,7 @@ Add-Folder $zip (Join-Path $qp "css")           "quizpfad/css"
 $ls = Join-Path $source "Leiterspiel-quiz"
 Add-File   $zip (Join-Path $ls "index.html")    "Leiterspiel-quiz/index.html"
 Add-File   $zip (Join-Path $ls "admin.html")    "Leiterspiel-quiz/admin.html"
+Add-File   $zip (Join-Path $ls "view.html")     "Leiterspiel-quiz/view.html"
 Add-Folder $zip (Join-Path $ls "js")            "Leiterspiel-quiz/js"
 Add-Folder $zip (Join-Path $ls "css")           "Leiterspiel-quiz/css"
 
@@ -92,6 +93,7 @@ Add-Folder $zip (Join-Path $ls "css")           "Leiterspiel-quiz/css"
 $lq = Join-Path $source "Labyrint-Quiz"
 Add-File   $zip (Join-Path $lq "index.html")    "Labyrint-Quiz/index.html"
 Add-File   $zip (Join-Path $lq "admin.html")    "Labyrint-Quiz/admin.html"
+Add-File   $zip (Join-Path $lq "play.html")     "Labyrint-Quiz/play.html"
 Add-Folder $zip (Join-Path $lq "js")            "Labyrint-Quiz/js"
 Add-Folder $zip (Join-Path $lq "css")           "Labyrint-Quiz/css"
 
@@ -108,6 +110,11 @@ Add-File   $zip (Join-Path $lk "index.html")    "lernkarten/index.html"
 $slf = Join-Path $source "stadt-land-fluss"
 Add-File $zip (Join-Path $slf "index.html")      "stadt-land-fluss/index.html"
 Add-File $zip (Join-Path $slf "categories.json") "stadt-land-fluss/categories.json"
+
+# Root-Hilfsdateien
+Add-File $zip (Join-Path $source "Unterrichtsspiele starten.bat") "Unterrichtsspiele starten.bat"
+Add-File $zip (Join-Path $source "vorlage-fragen.md")             "vorlage-fragen.md"
+Add-File $zip (Join-Path $source "vorschlaege.html")              "vorschlaege.html"
 
 $zip.Dispose()
 
