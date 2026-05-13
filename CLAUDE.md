@@ -712,6 +712,16 @@ Nutzt das **Spielverwaltungs-Muster** → siehe `## Spielverwaltung`.
 
 Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspiel-Quiz (`index.html` + `leiterspiel.js`).
 
+**Kopiervorlagen** für neue Spiele in `_templates/spielverwaltung/`:
+| Datei | Inhalt |
+|-------|--------|
+| `gs-selector.html` | HTML-Block Spielwähler-Screen |
+| `gs-styles.css` | Alle `.gs-*` CSS-Regeln (kanonisch) |
+| `XxxStorage.js` | Storage-Objekt mit API + localStorage-Fallback |
+| `game-manager.js` | Spielwähler-JS (createNewGame, _gsEnter, _gsDelete, …) |
+
+→ `_templates/README.md` erklärt die Checkliste und Regeln für die Integration.
+
 ---
 
 ### Konzept & Ablauf
@@ -898,25 +908,43 @@ Erster Screen (`.screen.active`) in der Spiel-HTML-Datei. Der Spielwähler ist d
 
 ### Spielwähler — CSS-Klassen
 
-Minimal-Set; Farben über CSS-Variablen des jeweiligen Spiels:
+**Kanonische Version** (Referenz: `risiko-quiz/css/admin.css`). Fertige Kopiervorlage: `_templates/spielverwaltung/gs-styles.css`.
+
+Zwei Varianten je nach CSS-Variable-Schema des Spiels:
+- **Variante A** (`--bg-sidebar`, `--bg-field`, `--border`) → Leiterspiel-Stil
+- **Variante B** (`--bg-card`, `--bg-secondary`, `--border-card`) → Labyrinth-Stil
 
 ```css
-#game-selector { flex-direction:column; align-items:center; justify-content:flex-start; padding:clamp(16px,3vh,40px); overflow-y:auto; }
-.gs-container  { background:var(--bg-sidebar); border-radius:20px; box-shadow:var(--shadow-lg); padding:clamp(20px,3vh,40px) clamp(20px,3vw,48px); max-width:640px; width:100%; border:2px solid var(--border); }
-.gs-header     { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+/* Screen: zentriert, scrollbar */
+#game-selector { align-items:center; justify-content:center; overflow-y:auto; padding:2rem; }
+
+/* Container-Karte */
+.gs-container  { width:100%; max-width:640px; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:18px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+
+/* Header mit Trennlinie */
+.gs-header     { display:flex; align-items:center; justify-content:space-between; padding:1.2rem 1.5rem; border-bottom:1px solid var(--border); }
 .gs-title      { font-size:clamp(1.4rem,3vw,1.9rem); font-weight:700; color:var(--accent); }
-.gs-section-title { font-size:1.15rem; font-weight:700; margin-bottom:4px; }
+
+/* Body */
+.gs-body       { padding:1.5rem; display:flex; flex-direction:column; }
+.gs-section-title { font-size:1.1rem; font-weight:700; margin-bottom:4px; color:var(--text-primary); }
 .gs-subtitle   { color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem; }
-.gs-game-list  { display:flex; flex-direction:column; gap:10px; }
+
+/* Spielliste — max 50vh, eigene Scrollbar */
+.gs-game-list  { display:flex; flex-direction:column; gap:0.5rem; max-height:50vh; overflow-y:auto; }
 .gs-empty      { color:var(--text-secondary); font-style:italic; }
-.gs-game-card  { display:flex; align-items:center; gap:14px; background:var(--bg-field); border:1px solid var(--border); border-radius:14px; padding:14px 16px; cursor:pointer; transition:background .15s,border-color .15s; }
-.gs-game-card:hover { background:var(--bg-field-hover); border-color:var(--accent); }
-.gs-game-code  { font-size:1.3rem; font-weight:800; letter-spacing:3px; color:var(--accent); min-width:56px; text-align:center; font-family:monospace; }
-.gs-game-info  { flex:1; }
-.gs-game-title { font-weight:600; font-size:0.95rem; }
-.gs-game-meta  { font-size:0.8rem; color:var(--text-secondary); margin-top:2px; }
+
+/* Spielkarte */
+.gs-game-card  { display:flex; align-items:center; gap:1rem; background:var(--bg-field); border:1.5px solid var(--border); border-radius:12px; padding:0.9rem 1.2rem; cursor:pointer; transition:border-color .2s,background .2s; }
+.gs-game-card:hover { border-color:var(--accent); background:var(--bg-field-hover); }
+.gs-game-code  { font-size:1.3rem; font-weight:800; font-family:'Consolas','SF Mono',monospace; letter-spacing:0.15em; color:var(--accent); min-width:5ch; }
+.gs-game-info  { flex:1; min-width:0; }
+.gs-game-title { font-weight:600; font-size:1rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gs-game-meta  { font-size:0.82rem; color:var(--text-secondary); margin-top:0.15rem; }
+.gs-game-actions { flex-shrink:0; }
 .gs-btn-delete { background:none; border:1px solid var(--border); color:var(--danger); border-radius:8px; width:30px; height:30px; cursor:pointer; }
 .gs-btn-delete:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+
 /* Beitreten-Sektion */
 .gs-join-row   { display:flex; gap:8px; margin-top:4px; }
 .gs-code-input { flex:1; padding:12px 14px; font-size:1.4rem; font-weight:800; letter-spacing:6px; text-align:center; text-transform:uppercase; background:var(--bg-field); border:2px solid var(--border); border-radius:12px; color:var(--text-primary); font-family:monospace; outline:none; transition:border-color .2s; }
