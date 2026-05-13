@@ -329,48 +329,17 @@ Jedes Spiel, das die zentrale DB nutzt, bietet im Setup-Screen eine **Kategoriea
 
 ## Multi-Game Architektur (Paralleles Spielen)
 
-### Prinzip
-Wenn ein Spiel **paralleles Spielen** mit mehreren Klassen/Gruppen unterstützen soll, wird das Multi-Game-Muster des Risiko-Quiz verwendet. Bei der Implementierung eines neuen Spiels **nachfragen**, ob Multi-Game sinnvoll ist (z.B. wenn mehrere Klassen gleichzeitig spielen könnten).
+Spiele, die paralleles Spielen unterstützen, verwenden das **Spielverwaltungs-Muster** — vollständig beschrieben in `→ ## Spielverwaltung` weiter unten.
 
-### Ablauf
-1. **Spiel erstellen**: Lehrkraft erstellt ein neues Spiel im Admin → generiert einen **4-stelligen Zugangscode** (z.B. `A3K7`)
-2. **Beitreten**: Spieler geben den Code ein → URL-Parameter `?code=XXXX`
-3. **Spielstand pro Spiel**: Jedes Spiel hat eine eigene JSON-Datei (`games/XXXX.json`)
-4. **Registry**: `games/index.json` enthält alle aktiven Spiele mit Metadaten (Titel, Status, Zeitstempel)
-5. **Echtzeit-Sync**: SSE-Endpunkt (`?f=sse&code=XXXX`) liefert Live-Updates an alle Clients
-6. **Auto-Cleanup**: Spiele werden **nach 24 Stunden automatisch gelöscht** (serverseitig in `api.php`)
-
-### Technische Umsetzung
-```
-api.php Endpunkte:
-  GET  ?f=games            → Registry aller Spiele laden
-  POST ?f=games            → Registry speichern
-  GET  ?f=game&code=XXXX   → Spielstand laden
-  POST ?f=game&code=XXXX   → Spielstand speichern + Registry updaten
-  DELETE ?f=game&code=XXXX → Spiel löschen
-  GET  ?f=sse&code=XXXX   → Server-Sent Events Stream
-
-Dateistruktur:
-  risiko-quiz/data/games/
-    index.json              ← Registry: { "A3K7": { title, status, createdAt, updatedAt } }
-    A3K7.json               ← Spielstand für Spiel A3K7
-```
-
-### Cleanup-Logik (`cleanupExpiredGames`)
-- Wird bei jedem Registry-Abruf (`GET ?f=games`) ausgeführt
-- Löscht Spiele, deren `updatedAt`/`createdAt` > 24 Stunden alt ist
-- Entfernt sowohl die Spieldatei als auch den Registry-Eintrag
-- File-Locking (`LOCK_EX`) für konkurrierende Zugriffe
-
-### Spiele mit Multi-Game
-| Spiel | Multi-Game | Grund |
-|-------|-----------|-------|
-| Risiko-Quiz | Ja | Mehrere Klassen parallel, SSE-Live-Updates |
-| QuizPfad | Nein | Einzelspiel im Browser |
-| Labyrinth-Quiz | Nein | Einzelspiel im Browser |
-| Leiterspiel-Quiz | Ja | Spielwähler in index.html, Schülergesteuert (view.html), code-basiert, SSE-Sync |
-| Memory | Nein | Singleplayer |
-| Escape Room | Nein | localStorage-basiert, eigenes Multi-Team-System |
+### Spiele mit Spielverwaltung
+| Spiel | Spielverwaltung | Schüleransicht |
+|-------|----------------|----------------|
+| Risiko-Quiz | Ja (admin.html Spielwähler) | view.html via SSE |
+| Leiterspiel-Quiz | Ja (index.html Spielwähler) | view.html via SSE |
+| QuizPfad | Nein — Einzelspiel | — |
+| Labyrinth-Quiz | Nein — Einzelspiel | — |
+| Memory | Nein — Singleplayer | — |
+| Escape Room | Nein — eigenes Multi-Team-System | — |
 
 ---
 
@@ -728,131 +697,392 @@ Ein Raum wechselt in den 360°-Modus wenn `backgroundType: "360"` gesetzt ist.
 - Zeitlimits: leicht=30s, mittel=45s, schwer=60s
 - Punkte: leicht=10, mittel=20, schwer=30
 
-### Spielverwaltung (Spielwähler)
-- `index.html` öffnet zuerst den **Spielwähler-Screen** (`#game-selector`) — analog zu Risiko-Quiz Admin
-- `createNewGame()`: generiert 4-stelligen Code → speichert Skeleton-State → zeigt Setup-Screen
-- `_gsEnter(code)`: lädt Spielstand → resume (playing/dice-order → Game-Screen) oder Setup-Screen
-- `_gsDelete(code)`: löscht Spielstand aus Registry + localStorage/Server
-- `LsStorage.loadGamesRegistry()`: lädt Registry von `api.php?f=ls-games` (Fallback: localStorage-Scan)
-- `LsStorage.deleteGame(code)`: DELETE via API + localStorage-Cleanup
-- URL-Parameter `?code=XXXX`: direkt in ein Spiel einsteigen (ohne Spielwähler)
-- `resetToSetup()` / "← Spielübersicht"-Button kehrt zum Spielwähler zurück (nicht zu Setup)
-- Spieltitel: optionales Eingabefeld `#setup-game-title` im Setup-Screen
-
-### Schüleransicht + Multi-Game
-- `view.html` ist die Schüler-App: Beitreten per Code, Team wählen, Würfeln, Fragen beantworten
-- `LsStorage` (inline in `leiterspiel.js` und `view.html`) übernimmt Server-Sync via `api.php?f=ls-*`
-- Spielstände in `Leiterspiel-quiz/data/games/XXXX.json` + Registry `index.json`
-- Code wird in `createNewGame()` generiert (nicht mehr in `proceedToGame()`)
-- `gameState.activeCategoryIds` speichert die gewählten Kategorien für Resume-Fähigkeit
-- Lehrkraft sieht Code-Badge (rechts unten) + Link zu `view.html?code=XXXX`
-- SSE-Subscription in `index.html` reagiert auf Student-Aktionen (Würfeln, MC-Antworten)
-- **Verantwortlichkeiten**: Schüler: würfeln + MC antworten; Lehrkraft: offene Fragen auswerten + Bonus-Felder
-- Bonus-Felder (roll_again, free_move, swap) werden aktuell nur vom Lehrkraft-Device behandelt
+### Spielverwaltung + Schüleransicht
+Nutzt das **Spielverwaltungs-Muster** → siehe `## Spielverwaltung`.
+- Storage-Objekt: `LsStorage` (Prefix `ls-` / `ls_gs_`), inline in `leiterspiel.js` und `view.html`
+- Spielwähler in `index.html` (erster Screen `#game-selector`)
+- Schüler-App: `view.html` — Code eingeben, Team wählen, Würfeln, MC antworten
+- Bonus-Felder (roll_again, free_move, swap) werden nur vom Lehrkraft-Device behandelt
 
 ---
 
-## Schüleransicht + Multi-Game: Anleitung für neue Spiele
+## Spielverwaltung
 
-**Wann sinnvoll?** Wenn mehrere Schüler/Gruppen gleichzeitig auf eigenen Geräten spielen sollen (nicht nur zuschauen). Beim Implementieren eines neuen Spiels **nachfragen**, ob Schüleransicht gewünscht ist.
+**Wann sinnvoll?** Wenn mehrere Klassen/Gruppen das Spiel gleichzeitig auf eigenen Geräten spielen sollen (parallele Sessions) — und/oder Schüler auf eigenen Geräten aktiv mitspielen. Beim Implementieren eines neuen Spiels **nachfragen**.
 
-### Checkliste: Was ein Spiel braucht
+Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspiel-Quiz (`index.html` + `leiterspiel.js`).
 
-**1. `api.php` – neue Endpunkte**
-Füge drei Blöcke analog zu `ls-*` hinzu (Prefix wählen, z.B. `qp-` für QuizPfad):
-- `?f=PREFIX-sse&code=XXXX` → SSE-Stream auf `SPIEL/data/games/XXXX.json`
-- `?f=PREFIX-games` → GET/POST `index.json` (Registry, inkl. `cleanupExpiredGames()`)
-- `?f=PREFIX-game&code=XXXX` → GET/POST/DELETE `XXXX.json` + Registry-Update
+---
 
-**2. Inline `XxxStorage`-Objekt** (in Spiellogik-JS + view.html kopieren)
+### Konzept & Ablauf
+
+1. **Spielwähler** — Lehrkraft sieht alle aktiven Spiele, erstellt neues Spiel → **4-stelliger Code** (`A3K7`)
+2. **Setup** — Lehrkraft konfiguriert Spiel; Code wird sofort beim Erstellen generiert (nicht erst beim Start)
+3. **Beitreten** — Schüler öffnen `view.html?code=XXXX` oder geben Code manuell ein
+4. **Sync** — alle Geräte erhalten Updates per SSE (`?f=PREFIX-sse&code=XXXX`) bzw. Polling-Fallback
+5. **Auto-Cleanup** — Spiele werden **24 Stunden nach letztem Update** automatisch gelöscht (`api.php`)
+
+---
+
+### Dateistruktur
+
+```
+SPIEL/data/games/
+  index.json          ← Registry: { "A3K7": { title, status, createdAt, updatedAt } }
+  A3K7.json           ← Spielstand für Code A3K7
+```
+
+---
+
+### API-Endpunkte in `api.php`
+
+Prefix pro Spiel wählen (Risiko-Quiz: kein Prefix; Leiterspiel: `ls-`):
+
+```
+GET  ?f=PREFIX-games              → Registry laden (löst 24h-Cleanup aus)
+POST ?f=PREFIX-games              → Registry speichern (selten nötig, da POST game die Registry auto-updated)
+GET  ?f=PREFIX-game&code=XXXX     → Spielstand laden
+POST ?f=PREFIX-game&code=XXXX     → Spielstand speichern + Registry auto-update (title, status, updatedAt)
+DELETE ?f=PREFIX-game&code=XXXX   → Spielstand + Registry-Eintrag löschen
+GET  ?f=PREFIX-sse&code=XXXX      → SSE-Stream (sendet Spielstand bei jeder Änderung)
+```
+
+**PHP-Muster** (analog zu `ls-*` Blöcken in `api.php`):
+- Registry-Abruf ruft `cleanupExpiredGames($dir)` auf → löscht abgelaufene Einträge + Dateien mit `LOCK_EX`
+- POST auf game aktualisiert Registry-Eintrag automatisch (`title`, `status`, `createdAt`, `updatedAt`)
+- SSE streamt die Spielstand-Datei bei Änderungen (30s-Reconnect-Keepalive)
+
+---
+
+### Storage-Objekt (`XxxStorage`)
+
+Inline in Spiellogik-JS und `view.html` kopieren. Prefix für localStorage-Keys pro Spiel wählen.
+
 ```js
 const XxxStorage = {
   _code: null, _serverOk: null,
+
   setCode(c)   { this._code = c ? c.toUpperCase() : null; },
   getCode()    { return this._code; },
-  generateCode() { /* 4 Zeichen aus ABCDEFGHJKLMN...23456789 */ },
-  async checkServer() { /* HEAD-Request auf api.php */ },
-  _ser(gs)     { /* Set → Array für JSON */ },
-  _deser(d)    { /* Array → Set */ },
-  async save(gs) { /* localStorage + Server POST */ },
-  async load(code) { /* Server GET → localStorage Fallback */ },
-  async loadGamesRegistry() { /* Server GET ?f=PREFIX-games → localStorage-Scan Fallback */ },
-  async deleteGame(code) { /* localStorage.removeItem + Server DELETE */ },
-  subscribe(code, cb) { /* SSE → Poll → localStorage-Poll */ }
+
+  generateCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein O/I/1/0 → Verwechslungsgefahr
+    return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
+  },
+
+  async checkServer() {
+    if (this._serverOk !== null) return this._serverOk;
+    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    try {
+      await fetch('../api.php?f=PREFIX-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
+      this._serverOk = true;
+    } catch { this._serverOk = false; }
+    return this._serverOk;
+  },
+
+  // Set-Felder (z.B. usedQuestionIds) vor JSON serialisieren / nach JSON wiederherstellen
+  _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]}; },
+  _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}; },
+
+  async save(gs) {
+    if (!this._code) return;
+    const json = JSON.stringify(this._ser(gs));
+    localStorage.setItem('PREFIX_gs_'+this._code, json);
+    if (await this.checkServer())
+      try { await fetch('../api.php?f=PREFIX-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+  },
+
+  async load(code) {
+    code = (code||this._code||'').toUpperCase();
+    if (!code) return null;
+    if (await this.checkServer())
+      try { const r = await fetch('../api.php?f=PREFIX-game&code='+code); if (r.ok) { const d=await r.json(); if(d&&d.meta) return this._deser(d); } } catch {}
+    const s = localStorage.getItem('PREFIX_gs_'+code);
+    if (s) try { return this._deser(JSON.parse(s)); } catch {}
+    return null;
+  },
+
+  async loadGamesRegistry() {
+    if (await this.checkServer())
+      try { const r = await fetch('../api.php?f=PREFIX-games'); if (r.ok) return await r.json(); } catch {}
+    // localStorage-Fallback: alle PREFIX_gs_*-Einträge scannen
+    const reg = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('PREFIX_gs_')) {
+        const code = k.slice('PREFIX_gs_'.length);
+        try { const d = JSON.parse(localStorage.getItem(k)); if (d&&d.meta) reg[code] = { title: d.meta.title||'Spiel', status: d.phase||'setup', updatedAt: d.meta.createdAt||'' }; } catch {}
+      }
+    }
+    return reg;
+  },
+
+  async deleteGame(code) {
+    localStorage.removeItem('PREFIX_gs_' + code.toUpperCase());
+    if (await this.checkServer())
+      try { await fetch('../api.php?f=PREFIX-game&code='+code, {method:'DELETE'}); } catch {}
+  },
+
+  subscribe(code, cb) {
+    code = code.toUpperCase();
+    let stopped = false, src = null, timer = null;
+    const startSSE = () => {
+      if (stopped) return;
+      src = new EventSource('../api.php?f=PREFIX-sse&code='+code);
+      src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+      src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
+      src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
+    };
+    const startPoll = () => {
+      if(stopped||timer) return;
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=PREFIX-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
+      fn(); timer = setInterval(fn, 1000);
+    };
+    const startLocalPoll = () => {
+      if(stopped||timer) return; let last='';
+      timer = setInterval(() => { if(stopped) return; const s=localStorage.getItem('PREFIX_gs_'+code); if(s&&s!==last){last=s;try{const d=JSON.parse(s);if(d&&d.meta)cb(this._deser(d));}catch{}} }, 500);
+    };
+    (async () => { if (await this.checkServer()) startSSE(); else startLocalPoll(); })();
+    return { unsubscribe() { stopped=true; src&&src.close(); timer&&clearInterval(timer); } };
+  }
 };
 ```
 
-**3. `gameState` – Pflichtfelder**
+---
+
+### Spielwähler — HTML
+
+Erster Screen (`.screen.active`) in der Spiel-HTML-Datei. Buttons rufen `window`-Exports auf (IIFE-Scope-Problem beachten → alle onclick-Funktionen müssen als `window.xxx = ...` exportiert werden).
+
+```html
+<div class="screen active" id="game-selector">
+  <div class="gs-container">
+    <div class="gs-header">
+      <div class="gs-title">🎮 Spielname</div>
+      <div style="display:flex;gap:8px;">
+        <a href="../spiele.html" class="header-btn">← Übersicht</a>
+        <button class="header-btn" onclick="toggleTheme()">🌙 Darkmode</button>
+      </div>
+    </div>
+    <div class="gs-body">
+      <h2 class="gs-section-title">Spiel auswählen</h2>
+      <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+      <div id="gs-game-list" class="gs-game-list"></div>
+      <div style="margin-top:1.2rem;">
+        <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+### Spielwähler — CSS-Klassen
+
+Minimal-Set; Farben über CSS-Variablen des jeweiligen Spiels:
+
+```css
+#game-selector { flex-direction:column; align-items:center; justify-content:flex-start; padding:clamp(16px,3vh,40px); overflow-y:auto; }
+.gs-container  { background:var(--bg-sidebar); border-radius:20px; box-shadow:var(--shadow-lg); padding:clamp(20px,3vh,40px) clamp(20px,3vw,48px); max-width:640px; width:100%; border:2px solid var(--border); }
+.gs-header     { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.gs-title      { font-size:clamp(1.4rem,3vw,1.9rem); font-weight:700; color:var(--accent); }
+.gs-section-title { font-size:1.15rem; font-weight:700; margin-bottom:4px; }
+.gs-subtitle   { color:var(--text-secondary); font-size:0.9rem; margin-bottom:1rem; }
+.gs-game-list  { display:flex; flex-direction:column; gap:10px; }
+.gs-empty      { color:var(--text-secondary); font-style:italic; }
+.gs-game-card  { display:flex; align-items:center; gap:14px; background:var(--bg-field); border:1px solid var(--border); border-radius:14px; padding:14px 16px; cursor:pointer; transition:background .15s,border-color .15s; }
+.gs-game-card:hover { background:var(--bg-field-hover); border-color:var(--accent); }
+.gs-game-code  { font-size:1.3rem; font-weight:800; letter-spacing:3px; color:var(--accent); min-width:56px; text-align:center; font-family:monospace; }
+.gs-game-info  { flex:1; }
+.gs-game-title { font-weight:600; font-size:0.95rem; }
+.gs-game-meta  { font-size:0.8rem; color:var(--text-secondary); margin-top:2px; }
+.gs-btn-delete { background:none; border:1px solid var(--border); color:var(--danger); border-radius:8px; width:30px; height:30px; cursor:pointer; }
+.gs-btn-delete:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+```
+
+---
+
+### Spielwähler — JS-Logik
+
+```js
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function showGameSelector() {
+  showScreen('game-selector');
+  const list = document.getElementById('gs-game-list');
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  const registry = await XxxStorage.loadGamesRegistry();
+  const entries = Object.entries(registry);
+  if (entries.length === 0) { list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden.</p>'; return; }
+  entries.sort((a,b) => (b[1].updatedAt||b[1].createdAt||'').localeCompare(a[1].updatedAt||a[1].createdAt||''));
+  list.innerHTML = entries.map(([code, info]) => {
+    const statusLabel = {playing:'🟢 Läuft', finished:'🏁 Beendet', 'dice-order':'🎲 Startreihe'}[info.status] || '⚙ Setup';
+    const date = info.updatedAt ? new Date(info.updatedAt).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const ts = info.updatedAt||info.createdAt;
+    let expiryHint = '';
+    if (ts) { const rem = 24*3600000-(Date.now()-new Date(ts).getTime()); if(rem>0){const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000); expiryHint=` · ${h}h ${m}m übrig`;} }
+    return `<div class="gs-game-card" onclick="window._gsEnter('${code}')">
+      <div class="gs-game-code">${code}</div>
+      <div class="gs-game-info">
+        <div class="gs-game-title">${escapeHtml(info.title||'Spiel')}</div>
+        <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
+      </div>
+      <div class="gs-game-actions">
+        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Als window-Export (onclick-Kompatibilität)
+window.createNewGame = async function() {
+  const code = XxxStorage.generateCode();
+  XxxStorage.setCode(code);
+  await XxxStorage.save({ meta:{gameCode:code,title:'Spielname',createdAt:new Date().toISOString()}, phase:'setup', teams:[], usedQuestionIds:new Set(), liveQuestion:null });
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  showScreen('setup-screen');
+  // Titelfeld leeren, Code-Badge zeigen:
+  const t = document.getElementById('setup-game-title'); if(t) t.value='';
+  showCodeBanner();
+};
+
+window._gsEnter = async function(code) {
+  XxxStorage.setCode(code);
+  const gs = await XxxStorage.load(code);
+  if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  gameState = gs;
+  if (gs.phase === 'playing' || gs.phase === 'dice-order') {
+    // Spiel fortsetzen → ggf. selectedCategoryIds aus gs.activeCategoryIds wiederherstellen
+    showScreen('game-screen'); /* Board neu rendern, SSE starten */ startSSESubscription(); showCodeBanner();
+  } else {
+    showScreen('setup-screen'); showCodeBanner();
+  }
+};
+
+window._gsDelete = async function(code) {
+  if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
+  await XxxStorage.deleteGame(code);
+  showGameSelector();
+};
+
+// init(): URL-Code direkt einsteigen oder Spielwähler zeigen
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadData(); // Fragen / Spielkonfiguration laden
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) await window._gsEnter(urlCode.toUpperCase());
+  else showGameSelector();
+});
+
+// Zurück zum Spielwähler (z.B. nach Spielende oder Quit)
+function resetToSelector() {
+  XxxStorage.setCode(null);
+  window.history.replaceState({}, '', 'index.html');
+  const banner = document.getElementById('code-banner'); if(banner) banner.remove();
+  showGameSelector();
+}
+```
+
+---
+
+### Code-Badge (Lehrkraft-View)
+
+Fixiertes Badge unten-rechts, zeigt Code + Link zu `view.html?code=XXXX`:
+
+```js
+function showCodeBanner() {
+  const code = XxxStorage.getCode(); if (!code) return;
+  const existing = document.getElementById('code-banner');
+  if (existing) { existing.querySelector('.code-val').textContent = code; return; }
+  const b = document.createElement('div');
+  b.id = 'code-banner';
+  b.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-card,#1a2744);color:var(--text-primary,#fff);border-radius:12px;padding:10px 16px;font-size:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;';
+  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">'+code+'</strong><a href="view.html?code='+code+'" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Link ↗</a>';
+  document.body.appendChild(b);
+}
+```
+
+---
+
+### `gameState` — Pflichtfelder
+
 ```js
 gameState = {
-  meta: { gameCode: '', title: '...', createdAt: '' },
-  // ... spielspezifische Felder ...
-  usedQuestionIds: new Set(),  // muss als Array serialisiert werden
-  liveQuestion: null           // Pflicht für Fragen-Sync
+  meta: { gameCode: '', title: 'Spielname', createdAt: '' },
+  phase: 'setup',          // 'setup' | 'playing' | 'finished' | spielspezifisch
+  teams: [],
+  usedQuestionIds: new Set(),   // wird als Array serialisiert (_ser/_deser)
+  activeCategoryIds: [],         // gewählte Kategorien → für Resume nötig
+  liveQuestion: null,            // Pflicht für Schüleransicht-Sync
+  // ...spielspezifische Felder...
 };
 ```
 
-**`liveQuestion`-Struktur:**
+**`liveQuestion`-Struktur** (wenn Schüleransicht vorhanden):
 ```js
 liveQuestion: {
-  id: questionId,
-  teamIdx: number,      // welches Team ist dran
-  diceResult: number,   // (falls würfelbasiert)
-  question: { ... },    // vollständiges Fragen-Objekt (für SSE-Empfänger)
-  resolved: boolean,
+  id: questionId,          // eindeutige ID für Change-Detection
+  teamIdx: number,         // welches Team ist dran
+  question: { ... },       // vollständiges Fragen-Objekt (für SSE-Empfänger)
+  resolved: boolean,       // Antwort eingegangen
   selectedMcIndex: null | number,
   autoCorrect: null | boolean
 }
 ```
 
-**4. State-Machine eines Zuges**
-```
-waiting_for_dice → (Schüler würfelt, liveQuestion gesetzt, save()) → question_active
-question_active  → (MC: Schüler antwortet + save() ODER Offen: Lehrkraft + save()) → resolved
-resolved         → (Bewegung + nextTurn + liveQuestion=null + save()) → waiting_for_dice
-```
+---
 
-**5. Spiellogik-JS – Saves einbauen**
-| Stelle | Was speichern |
-|--------|---------------|
-| Nach `proceedToGame()` | Code generieren, `meta` setzen, `save()` |
-| In `rollDice()` | `liveQuestion` erstellen, `save()` (fire-and-forget) |
-| In `resolveQuestion()` | `liveQuestion.resolved=true`, `save()` |
-| In `nextTurn()` | `liveQuestion=null`, `save()` |
-| Nach Spielende | `phase='finished'`, `save()` |
+### Schüleransicht (`view.html`) — Pflicht-Screens
 
-**6. `view.html` – Pflicht-Screens**
 | Screen | Inhalt |
 |--------|--------|
 | `screen-join` | Code-Input (4 Zeichen), "Beitreten"-Button |
 | `screen-team` | Team-Liste aus `gameState.teams`, Zuschauer-Option |
-| `screen-wait` | Warte-Screen für Setup/Dice-Order-Phase |
-| `screen-game` | Spielbrett + Status + Würfeln-Button (nur wenn dran) |
-| Question-Overlay | MC-Buttons (nur wenn dran), offene Fragen = warten |
+| `screen-wait` | Warte-Screen während Setup/Dice-Order |
+| `screen-game` | Spielbrett + Status + Aktions-Button (nur wenn dran) |
+| Question-Overlay | MC-Buttons (nur wenn dran), offene Fragen → warten |
 
-**7. SSE-Reaktion im Lehrkraft-View**
+**SSE-Reaktion in `view.html`:**
 ```js
-function onSSEUpdate(newGs) {
-  // Neues liveQuestion (Schüler hat gewürfelt) → Frage-Modal öffnen
-  // liveQuestion=null (Schüler hat Zug beendet) → Modal schließen, Board updaten
-  // Bei Phasenänderungen (finished) → Gewinner zeigen
-}
+sub = XxxStorage.subscribe(code, function onUpdate(newGs) {
+  // liveQuestion neu → Frage-Overlay zeigen (wenn dran)
+  // liveQuestion null → Overlay schließen, Board updaten
+  // phase=finished → Gewinner-Screen
+});
 ```
 
-**8. Code-Badge im Lehrkraft-View**
-Zeige Code + Link zu `view.html?code=XXXX` als fixiertes Badge (Position: `fixed; bottom; right`).
+**SSE-Reaktion im Lehrkraft-View:**
+```js
+lsSub = XxxStorage.subscribe(code, function onSSEUpdate(newGs) {
+  // liveQuestion vom Schüler gesetzt → Frage-Modal öffnen (offene Fragen)
+  // liveQuestion=null → Modal schließen, Board neu rendern
+});
+```
 
-### Verantwortlichkeitstrennung (Standard)
+---
+
+### Verantwortlichkeitstrennung
+
 | Aktion | Wer |
 |--------|-----|
 | Spiel erstellen + Code | Lehrkraft |
-| Würfeln (primär) | Schüler, Lehrkraft als Fallback |
-| MC-Frage beantworten | Schüler (schreibt Ergebnis + Bewegung + save) |
-| Offene Frage auswerten | Lehrkraft (klickt Richtig/Falsch + Bewegung + save) |
+| Würfeln / Ziehen | Schüler (primär), Lehrkraft als Fallback |
+| MC-Frage beantworten | Schüler → schreibt Ergebnis + save() |
+| Offene Frage auswerten | Lehrkraft → klickt Richtig/Falsch + save() |
 | Sonderfelder / Bonus | Lehrkraft (kann lokal bleiben) |
 
-### localStorage-Keys (pro Spiel eigener Prefix)
-```
-ls_gs_XXXX   ← Leiterspiel-Quiz Spielstand (Code XXXX)
-```
-Anderen Spielen: anderen Prefix wählen (z.B. `qp_gs_`, `laby_gs_`).
+---
+
+### Saves — wann & was
+
+| Stelle | Was |
+|--------|-----|
+| `createNewGame()` | Skeleton-State mit Code + meta |
+| `proceedToGame()` / Spielstart | Teams, Board, activeCategoryIds, phase=playing |
+| `rollDice()` | `liveQuestion` setzen, fire-and-forget save |
+| `resolveQuestion()` | `liveQuestion.resolved=true`, `autoCorrect` |
+| `nextTurn()` | `liveQuestion=null`, Positionen/Scores |
+| Spielende | `phase='finished'` |
