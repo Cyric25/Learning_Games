@@ -253,7 +253,7 @@
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <label class="btn btn-secondary" style="cursor:pointer;margin:0;">
           📂 Datei öffnen
-          <input type="file" id="import-file" accept=".md,.txt" style="display:none;">
+          <input type="file" id="import-file" accept=".md,.txt" style="display:none;" onchange="handleImportFile(this)">
         </label>
         <span id="import-filename" style="font-size:0.85rem;color:var(--text-secondary);"></span>
       </div>
