@@ -131,6 +131,9 @@ const MemoryMDParser = {
    * Schwierigkeit: 1 (leicht), 2 (mittel), 3 (schwer) — Standard: 1
    */
   parse(mdText) {
+    // BOM entfernen (Windows-Editoren schreiben oft UTF-8 mit BOM)
+    if (mdText.charCodeAt(0) === 0xFEFF) mdText = mdText.slice(1);
+
     const lines = mdText.split('\n');
     const categories = [];
     let currentCat = null;
@@ -149,6 +152,10 @@ const MemoryMDParser = {
       }
 
       // Paar-Zeile
+      if (line.startsWith('- ') && !currentCat) {
+        currentCat = MemoryModel.createCategory('Importiert');
+        categories.push(currentCat);
+      }
       if (line.startsWith('- ') && currentCat) {
         const content = line.substring(2).trim();
         const parts = content.split('|').map(p => p.trim());
