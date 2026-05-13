@@ -251,15 +251,18 @@
         Format: <code>## Kategoriename</code> → <code>- Formel | $Li^+$ | Text | Lithium-Ion | 1</code>
       </p>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <label class="btn btn-secondary" style="cursor:pointer;margin:0;">
-          📂 Datei öffnen
-          <input type="file" id="import-file" accept=".md,.txt" style="display:none;" onchange="handleImportFile(this)">
-        </label>
+        <button class="btn btn-secondary" style="margin:0;" onclick="document.getElementById('import-file').click()">📂 Datei öffnen</button>
+        <input type="file" id="import-file" accept=".md,.txt"
+               style="position:absolute;opacity:0;width:0;height:0;overflow:hidden;"
+               onchange="handleImportFile(this)">
         <span id="import-filename" style="font-size:0.85rem;color:var(--text-secondary);"></span>
       </div>
       <textarea id="import-textarea" placeholder="## Kationen
 - Formel | $Li^+$ | Text | Lithium-Ion | 1
-- Formel | $Na^+$ | Text | Natrium-Ion | 1"></textarea>
+- Formel | $Na^+$ | Text | Natrium-Ion | 1"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor=''"
+        ondrop="handleImportDrop(event)"></textarea>
       <button class="btn btn-secondary" onclick="previewImport()">Vorschau</button>
       <div class="import-preview" id="import-preview" style="display:none;"></div>
       <button class="btn btn-primary" id="btn-confirm-import" onclick="confirmImport()" style="display:none;margin-top:8px;">Import bestätigen</button>

@@ -14,11 +14,22 @@ async function init() {
 function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
+  loadFileIntoTextarea(file);
+}
+
+function handleImportDrop(event) {
+  event.preventDefault();
+  document.getElementById('import-textarea').style.borderColor = '';
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  loadFileIntoTextarea(file);
+}
+
+function loadFileIntoTextarea(file) {
   const reader = new FileReader();
   reader.onload = function(ev) {
     document.getElementById('import-textarea').value = ev.target.result;
     document.getElementById('import-filename').textContent = file.name;
-    previewImport();
   };
   reader.readAsText(file, 'UTF-8');
 }
