@@ -1,52 +1,55 @@
 /* leiterspiel.css – Schlangen & Leitern (Spielerisch, Bunt) */
 
 :root {
-  --bg-body: #f0f7e6;
-  --bg-board: #faf8f0;
+  --bg-body: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+  --bg-board: #fdfaf8;
   --bg-sidebar: #ffffff;
-  --bg-field: #fff8f0;
-  --bg-field-hover: #fff0e0;
-  --text-primary: #2d3a1e;
-  --text-secondary: #5a6b48;
-  --text-light: #8a9a78;
-  --accent: #4caf50;
-  --accent-warm: #ff9800;
-  --accent-red: #ef5350;
-  --border: rgba(45, 58, 30, 0.12);
-  --border-strong: rgba(45, 58, 30, 0.25);
-  --shadow: 0 2px 8px rgba(45, 58, 30, 0.1);
-  --shadow-lg: 0 8px 32px rgba(45, 58, 30, 0.15);
-  --success: #2e7d32;
-  --danger: #c62828;
-  --warning: #f9a825;
+  --bg-field: #fff3ee;
+  --bg-field-hover: #ffe0d0;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-light: #94a3b8;
+  --accent: #E34F20;
+  --accent-warm: #f7971e;
+  --accent-red: #c73518;
+  --border: #e0e0e0;
+  --border-strong: rgba(0, 0, 0, 0.2);
+  --shadow: 0 4px 20px rgba(227, 79, 32, 0.12);
+  --shadow-lg: 0 8px 32px rgba(227, 79, 32, 0.18);
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
   --field-easy: #66bb6a;
   --field-medium: #fdd835;
   --field-hard: #ef5350;
-  --field-start: #4caf50;
+  --field-start: #E34F20;
   --field-goal: #ff6f00;
   --bonus-roll: #42a5f5;
   --bonus-free: #7e57c2;
   --bonus-swap: #e91e63;
-  --ladder-color: #2e7d32;
-  --snake-color: #c62828;
+  --ladder-color: #16a34a;
+  --snake-color: #dc2626;
 }
 
 body.dark {
-  --bg-body: #1a2e1a;
-  --bg-board: #243324;
-  --bg-sidebar: #1e2e1e;
-  --bg-field: #2e4030;
-  --bg-field-hover: #3a5040;
-  --text-primary: #e8f0e0;
-  --text-secondary: #b0c8a0;
-  --text-light: #708860;
-  --accent: #66bb6a;
-  --accent-warm: #ffb74d;
-  --accent-red: #ef5350;
-  --border: rgba(232, 240, 224, 0.1);
-  --border-strong: rgba(232, 240, 224, 0.2);
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --bg-body: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  --bg-board: #16213e;
+  --bg-sidebar: #16213e;
+  --bg-field: #1a2744;
+  --bg-field-hover: #1a4a80;
+  --text-primary: #ffffff;
+  --text-secondary: #a8a8b3;
+  --text-light: #6b7280;
+  --accent: #f7971e;
+  --accent-warm: #E34F20;
+  --accent-red: #e74c3c;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.40);
+  --success: #2ecc71;
+  --danger: #e74c3c;
+  --warning: #f39c12;
   --field-easy: #388e3c;
   --field-medium: #f9a825;
   --field-hard: #d32f2f;
@@ -248,8 +251,8 @@ body {
 .animal-btn:hover { border-color: var(--accent); transform: scale(1.1); }
 .animal-btn.selected {
   border-color: var(--accent);
-  background: rgba(76, 175, 80, 0.15);
-  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+  background: rgba(227, 79, 32, 0.12);
+  box-shadow: 0 0 8px rgba(227, 79, 32, 0.25);
 }
 .animal-btn.taken {
   opacity: 0.25;
@@ -367,13 +370,13 @@ body {
   padding: 14px 36px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--accent), #388e3c);
+  background: linear-gradient(135deg, var(--accent-warm), var(--accent));
   color: #fff;
   font-size: 1.15rem;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
-  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 16px rgba(227, 79, 32, 0.3);
 }
 .btn-start-game:hover { opacity: 0.9; transform: scale(1.02); }
 .btn-start-game:active { transform: scale(0.98); }
@@ -737,7 +740,7 @@ body {
 
 .team-card.active-turn {
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(76, 175, 80, 0.25);
+  box-shadow: 0 0 12px rgba(227, 79, 32, 0.25);
   background: var(--bg-field-hover);
 }
 
@@ -1165,12 +1168,12 @@ body {
   padding: 14px 32px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--accent), #388e3c);
+  background: linear-gradient(135deg, var(--accent-warm), var(--accent));
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 16px rgba(227, 79, 32, 0.3);
 }
 .btn-new-game:hover { opacity: 0.9; }
 
