@@ -40,6 +40,34 @@ const LsStorage = {
     }
   },
 
+  async loadGamesRegistry() {
+    if (await this.checkServer()) {
+      try {
+        const r = await fetch('../api.php?f=ls-games');
+        if (r.ok) return await r.json();
+      } catch {}
+    }
+    const reg = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('ls_gs_')) {
+        const code = k.slice(6);
+        try {
+          const d = JSON.parse(localStorage.getItem(k));
+          if (d && d.meta) reg[code] = { title: d.meta.title || 'Schlangen & Leitern', status: d.phase || 'setup', updatedAt: d.meta.createdAt || '' };
+        } catch {}
+      }
+    }
+    return reg;
+  },
+
+  async deleteGame(code) {
+    localStorage.removeItem('ls_gs_' + code.toUpperCase());
+    if (await this.checkServer()) {
+      try { await fetch('../api.php?f=ls-game&code='+code, {method:'DELETE'}); } catch {}
+    }
+  },
+
   async load(code) {
     code = (code||this._code||'').toUpperCase();
     if (!code) return null;
@@ -158,10 +186,16 @@ let pendingBonusAfterMove = null;
 let diceOrderState = null;
 
 // ── Init ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   renderModeSelector();
   renderTeamCountSelector(4);
-  loadFragen();
+  await loadFragen();
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) {
+    await enterGame(urlCode.toUpperCase());
+  } else {
+    showGameSelector();
+  }
 });
 
 // ── Question Loading (shared with Risiko-Quiz) ──────────────
@@ -507,12 +541,14 @@ function proceedToGame() {
   gameState.usedQuestionIds = new Set();
   gameState.pendingDice = null;
   gameState.liveQuestion = null;
+  gameState.activeCategoryIds = [...selectedCategoryIds];
   generateBoard();
 
-  // Generate game code for multi-player sync
-  const code = LsStorage.generateCode();
-  gameState.meta = { gameCode: code, title: 'Schlangen & Leitern', createdAt: new Date().toISOString() };
-  LsStorage.setCode(code);
+  // Use existing code (set by createNewGame or enterGame), update title from input
+  const code = LsStorage.getCode();
+  const titleInput = document.getElementById('setup-game-title');
+  const title = (titleInput && titleInput.value.trim()) || 'Schlangen & Leitern';
+  gameState.meta = { gameCode: code, title: title, createdAt: gameState.meta.createdAt || new Date().toISOString() };
 
   if (gameState.singlePlayerMode) {
     gameState.turnOrder = [0];
@@ -1584,6 +1620,102 @@ function spawnConfetti() {
   }
 }
 
+// ── Spielwähler ──────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function showGameSelector() {
+  showScreen('game-selector');
+  const list = document.getElementById('gs-game-list');
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  const registry = await LsStorage.loadGamesRegistry();
+  const entries = Object.entries(registry);
+  if (entries.length === 0) {
+    list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden. Erstelle ein neues Spiel!</p>';
+    return;
+  }
+  entries.sort((a,b) => (b[1].updatedAt||b[1].createdAt||'').localeCompare(a[1].updatedAt||a[1].createdAt||''));
+  list.innerHTML = entries.map(([code, info]) => {
+    const statusLabel = info.status==='playing' ? '🟢 Läuft' :
+                        info.status==='finished' ? '🏁 Beendet' :
+                        info.status==='dice-order' ? '🎲 Startreihe' : '⚙ Setup';
+    const date = info.updatedAt ? new Date(info.updatedAt).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    let expiryHint = '';
+    const ts = info.updatedAt || info.createdAt;
+    if (ts) {
+      const remaining = 24*60*60*1000 - (Date.now() - new Date(ts).getTime());
+      if (remaining > 0) {
+        const h = Math.floor(remaining/3600000);
+        const m = Math.floor((remaining%3600000)/60000);
+        expiryHint = ` · ${h}h ${m}m übrig`;
+      }
+    }
+    return `<div class="gs-game-card" onclick="window._gsEnter('${code}')">
+      <div class="gs-game-code">${code}</div>
+      <div class="gs-game-info">
+        <div class="gs-game-title">${escapeHtml(info.title||'Schlangen & Leitern')}</div>
+        <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
+      </div>
+      <div class="gs-game-actions">
+        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window._gsEnter = async function(code) {
+  LsStorage.setCode(code);
+  const gs = await LsStorage.load(code);
+  if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  gameState = gs;
+  if (gs.phase === 'playing' || gs.phase === 'dice-order') {
+    if (gs.activeCategoryIds && fragenBank) {
+      selectedCategoryIds = new Set(gs.activeCategoryIds);
+      activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
+    }
+    showScreen('game-screen');
+    renderBoard();
+    renderTeamList();
+    updateActiveBanner();
+    updateDiceButton(false);
+    showCodeBanner();
+    drawLaddersAndSnakes();
+    window.addEventListener('resize', drawLaddersAndSnakes);
+    startSSESubscription();
+  } else {
+    showScreen('setup-screen');
+    const titleEl = document.getElementById('setup-game-title');
+    if (titleEl && gs.meta && gs.meta.title && gs.meta.title !== 'Schlangen & Leitern') titleEl.value = gs.meta.title;
+    showCodeBanner();
+  }
+};
+
+window._gsDelete = async function(code) {
+  if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
+  await LsStorage.deleteGame(code);
+  showGameSelector();
+};
+
+async function createNewGame() {
+  const code = LsStorage.generateCode();
+  LsStorage.setCode(code);
+  const skeleton = {
+    meta: { gameCode: code, title: 'Schlangen & Leitern', createdAt: new Date().toISOString() },
+    phase: 'setup', teams: [], usedQuestionIds: new Set(), liveQuestion: null
+  };
+  await LsStorage.save(skeleton);
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  showScreen('setup-screen');
+  document.getElementById('setup-game-title').value = '';
+  showCodeBanner();
+}
+
+async function enterGame(code) {
+  await window._gsEnter(code);
+}
+
 // ── Reset & Quit ─────────────────────────────────────────────
 function resetToSetup() {
   if (lsSub) { lsSub.unsubscribe(); lsSub = null; }
@@ -1594,8 +1726,12 @@ function resetToSetup() {
   gameState.usedQuestionIds = new Set();
   gameState.pendingDice = null;
   gameState.liveQuestion = null;
+  LsStorage.setCode(null);
   window.removeEventListener('resize', drawLaddersAndSnakes);
-  showScreen('setup-screen');
+  const banner = document.getElementById('ls-code-banner');
+  if (banner) banner.remove();
+  window.history.replaceState({}, '', 'index.html');
+  showGameSelector();
 }
 
 function confirmQuit() {

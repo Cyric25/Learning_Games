@@ -9,8 +9,29 @@
 </head>
 <body>
 
+  <!-- ── Spielwähler ───────────────────────────────────────── -->
+  <div class="screen active" id="game-selector">
+    <div class="gs-container">
+      <div class="gs-header">
+        <div class="gs-title">🐍 Schlangen &amp; Leitern</div>
+        <div style="display:flex;gap:8px;">
+          <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+          <button class="header-btn" onclick="toggleTheme()">🌙 Darkmode</button>
+        </div>
+      </div>
+      <div class="gs-body">
+        <h2 class="gs-section-title">Spiel auswählen</h2>
+        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+        <div id="gs-game-list" class="gs-game-list"></div>
+        <div style="margin-top:1.2rem;">
+          <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Setup Screen ────────────────────────────────────── -->
-  <div class="screen active" id="setup-screen">
+  <div class="screen" id="setup-screen">
     <div class="setup-card">
       <div class="setup-header">
         <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
@@ -23,6 +44,11 @@
       <div class="setup-title">
         <h1>🐍 Schlangen &amp; Leitern</h1>
         <p>Würfeln, Fragen beantworten, Leitern hochklettern!</p>
+      </div>
+
+      <div class="setup-section">
+        <h3>Spieltitel (optional)</h3>
+        <input type="text" id="setup-game-title" class="setup-title-input" placeholder="z.B. Biologie 3BT" maxlength="60">
       </div>
 
       <div class="setup-section">
@@ -158,7 +184,7 @@
     <div class="winner-team-name" id="winner-team-name"></div>
     <div class="winner-stats" id="winner-stats"></div>
     <div class="winner-actions">
-      <button class="btn-new-game" onclick="resetToSetup()">Neues Spiel</button>
+      <button class="btn-new-game" onclick="resetToSetup()">← Spielübersicht</button>
       <a href="../spiele.html" class="btn-back">Zur Übersicht</a>
     </div>
   </div>

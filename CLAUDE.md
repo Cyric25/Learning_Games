@@ -368,7 +368,7 @@ Dateistruktur:
 | Risiko-Quiz | Ja | Mehrere Klassen parallel, SSE-Live-Updates |
 | QuizPfad | Nein | Einzelspiel im Browser |
 | Labyrinth-Quiz | Nein | Einzelspiel im Browser |
-| Leiterspiel-Quiz | Ja | Schülergesteuert (view.html), code-basiert, SSE-Sync |
+| Leiterspiel-Quiz | Ja | Spielwähler in index.html, Schülergesteuert (view.html), code-basiert, SSE-Sync |
 | Memory | Nein | Singleplayer |
 | Escape Room | Nein | localStorage-basiert, eigenes Multi-Team-System |
 
@@ -728,11 +728,23 @@ Ein Raum wechselt in den 360°-Modus wenn `backgroundType: "360"` gesetzt ist.
 - Zeitlimits: leicht=30s, mittel=45s, schwer=60s
 - Punkte: leicht=10, mittel=20, schwer=30
 
+### Spielverwaltung (Spielwähler)
+- `index.html` öffnet zuerst den **Spielwähler-Screen** (`#game-selector`) — analog zu Risiko-Quiz Admin
+- `createNewGame()`: generiert 4-stelligen Code → speichert Skeleton-State → zeigt Setup-Screen
+- `_gsEnter(code)`: lädt Spielstand → resume (playing/dice-order → Game-Screen) oder Setup-Screen
+- `_gsDelete(code)`: löscht Spielstand aus Registry + localStorage/Server
+- `LsStorage.loadGamesRegistry()`: lädt Registry von `api.php?f=ls-games` (Fallback: localStorage-Scan)
+- `LsStorage.deleteGame(code)`: DELETE via API + localStorage-Cleanup
+- URL-Parameter `?code=XXXX`: direkt in ein Spiel einsteigen (ohne Spielwähler)
+- `resetToSetup()` / "← Spielübersicht"-Button kehrt zum Spielwähler zurück (nicht zu Setup)
+- Spieltitel: optionales Eingabefeld `#setup-game-title` im Setup-Screen
+
 ### Schüleransicht + Multi-Game
 - `view.html` ist die Schüler-App: Beitreten per Code, Team wählen, Würfeln, Fragen beantworten
 - `LsStorage` (inline in `leiterspiel.js` und `view.html`) übernimmt Server-Sync via `api.php?f=ls-*`
 - Spielstände in `Leiterspiel-quiz/data/games/XXXX.json` + Registry `index.json`
-- Code wird automatisch beim Spielstart generiert (`proceedToGame()`)
+- Code wird in `createNewGame()` generiert (nicht mehr in `proceedToGame()`)
+- `gameState.activeCategoryIds` speichert die gewählten Kategorien für Resume-Fähigkeit
 - Lehrkraft sieht Code-Badge (rechts unten) + Link zu `view.html?code=XXXX`
 - SSE-Subscription in `index.html` reagiert auf Student-Aktionen (Würfeln, MC-Antworten)
 - **Verantwortlichkeiten**: Schüler: würfeln + MC antworten; Lehrkraft: offene Fragen auswerten + Bonus-Felder
@@ -764,6 +776,8 @@ const XxxStorage = {
   _deser(d)    { /* Array → Set */ },
   async save(gs) { /* localStorage + Server POST */ },
   async load(code) { /* Server GET → localStorage Fallback */ },
+  async loadGamesRegistry() { /* Server GET ?f=PREFIX-games → localStorage-Scan Fallback */ },
+  async deleteGame(code) { /* localStorage.removeItem + Server DELETE */ },
   subscribe(code, cb) { /* SSE → Poll → localStorage-Poll */ }
 };
 ```
