@@ -1,5 +1,100 @@
 /* leiterspiel.js – Schlangen & Leitern mit Wissensfragen */
 
+// ── LsStorage: Server-Sync für Multi-Game ────────────────────
+const LsStorage = {
+  _code: null,
+  _serverOk: null,
+  _sub: null,
+
+  setCode(c) { this._code = c ? c.toUpperCase() : null; },
+  getCode() { return this._code; },
+
+  generateCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
+  },
+
+  async checkServer() {
+    if (this._serverOk !== null) return this._serverOk;
+    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    try {
+      await fetch('../api.php?f=ls-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
+      this._serverOk = true;
+    } catch { this._serverOk = false; }
+    return this._serverOk;
+  },
+
+  _ser(gs) {
+    return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]};
+  },
+  _deser(d) {
+    return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};
+  },
+
+  async save(gs) {
+    if (!this._code) return;
+    const json = JSON.stringify(this._ser(gs));
+    localStorage.setItem('ls_gs_'+this._code, json);
+    if (await this.checkServer()) {
+      try { await fetch('../api.php?f=ls-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+    }
+  },
+
+  async load(code) {
+    code = (code||this._code||'').toUpperCase();
+    if (!code) return null;
+    if (await this.checkServer()) {
+      try {
+        const r = await fetch('../api.php?f=ls-game&code='+code);
+        if (r.ok) { const d = await r.json(); if (d&&d.meta) return this._deser(d); }
+      } catch {}
+    }
+    const s = localStorage.getItem('ls_gs_'+code);
+    if (s) try { return this._deser(JSON.parse(s)); } catch {}
+    return null;
+  },
+
+  subscribe(code, cb) {
+    code = code.toUpperCase();
+    let stopped = false, src = null, timer = null;
+
+    const startSSE = () => {
+      if (stopped) return;
+      src = new EventSource('../api.php?f=ls-sse&code='+code);
+      src.onmessage = e => {
+        if (stopped) return;
+        try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {}
+      };
+      src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
+      src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
+    };
+    const startPoll = () => {
+      if (stopped||timer) return;
+      const fn = async () => {
+        if (stopped) return;
+        try {
+          const r = await fetch('../api.php?f=ls-game&code='+code);
+          if (r.ok) { const d=await r.json(); if(d&&d.meta) cb(this._deser(d)); }
+        } catch {}
+      };
+      fn(); timer = setInterval(fn, 1000);
+    };
+    const startLocalPoll = () => {
+      if (stopped||timer) return;
+      let last='';
+      timer = setInterval(() => {
+        if (stopped) return;
+        const s = localStorage.getItem('ls_gs_'+code);
+        if (s&&s!==last) { last=s; try { const d=JSON.parse(s); if(d&&d.meta) cb(this._deser(d)); } catch {} }
+      }, 500);
+    };
+
+    (async () => { if (await this.checkServer()) startSSE(); else startLocalPoll(); })();
+
+    return { unsubscribe() { stopped=true; src&&src.close(); timer&&clearInterval(timer); } };
+  }
+};
+
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 100;
 const COLS = 10;
@@ -40,6 +135,7 @@ let selectedCategoryIds = new Set();
 let activeFragenBank = null;
 
 let gameState = {
+  meta: { gameCode: '', title: 'Schlangen & Leitern', createdAt: '' },
   board: [],
   teams: [],
   turnOrder: [],
@@ -47,8 +143,11 @@ let gameState = {
   phase: 'setup',
   usedQuestionIds: new Set(),
   pendingDice: null,
-  singlePlayerMode: false
+  singlePlayerMode: false,
+  liveQuestion: null
 };
+
+let lsSub = null;  // SSE subscription handle
 
 let timerInterval = null;
 let timerRemaining = 0;
@@ -407,22 +506,34 @@ function proceedToGame() {
   gameState.teams = teams;
   gameState.usedQuestionIds = new Set();
   gameState.pendingDice = null;
+  gameState.liveQuestion = null;
   generateBoard();
+
+  // Generate game code for multi-player sync
+  const code = LsStorage.generateCode();
+  gameState.meta = { gameCode: code, title: 'Schlangen & Leitern', createdAt: new Date().toISOString() };
+  LsStorage.setCode(code);
 
   if (gameState.singlePlayerMode) {
     gameState.turnOrder = [0];
     gameState.currentTurnIdx = 0;
     gameState.phase = 'playing';
+    LsStorage.save(gameState);
     showScreen('game-screen');
     renderBoard();
     renderTeamList();
     updateActiveBanner();
     updateDiceButton(true);
+    startSSESubscription();
+    showCodeBanner();
+    drawLaddersAndSnakes();
+    window.addEventListener('resize', drawLaddersAndSnakes);
   } else {
-    // Go to dice order phase
     gameState.phase = 'dice-order';
+    LsStorage.save(gameState);
     initDiceOrder();
     showScreen('dice-order-screen');
+    showCodeBanner();
   }
 }
 
@@ -633,6 +744,7 @@ function resolveOrderRolls() {
   btn.onclick = () => {
     gameState.phase = 'playing';
     gameState.currentTurnIdx = 0;
+    LsStorage.save(gameState);
     showScreen('game-screen');
     renderBoard();
     renderTeamList();
@@ -640,6 +752,7 @@ function resolveOrderRolls() {
     updateDiceButton(true);
     drawLaddersAndSnakes();
     window.addEventListener('resize', drawLaddersAndSnakes);
+    startSSESubscription();
   };
 }
 
@@ -993,42 +1106,66 @@ function rollDice() {
       display.textContent = DICE_FACES[result - 1];
       gameState.pendingDice = result;
 
-      // Show question for current field
-      setTimeout(() => askQuestion(), 400);
+      // Pick question and store in liveQuestion for multi-player sync
+      const q = pickQuestion();
+      if (q) {
+        gameState.liveQuestion = {
+          id: q.id,
+          teamIdx: gameState.turnOrder[gameState.currentTurnIdx],
+          diceResult: result,
+          question: q,
+          resolved: false,
+          selectedMcIndex: null,
+          autoCorrect: null
+        };
+        gameState.usedQuestionIds.add(q.id);
+        currentQuestion = q;
+        LsStorage.save(gameState);
+      }
+
+      setTimeout(() => askQuestion(q), 400);
     }
   }, 80);
 }
 
 // ── Question System ──────────────────────────────────────────
-function askQuestion() {
+function pickQuestion() {
   const team = getCurrentTeam();
+  if (!team || !activeFragenBank || !activeFragenBank.length) return null;
   const field = gameState.board[team.position];
-  const difficulty = field.difficulty;
+  const difficulty = field ? field.difficulty : 'leicht';
 
-  // Find matching question
   const available = activeFragenBank.filter(q =>
     q.schwierigkeit === difficulty && !gameState.usedQuestionIds.has(q.id)
   );
+  if (available.length > 0) return available[Math.floor(Math.random() * available.length)];
 
-  // Fallback: any difficulty
-  let question;
-  if (available.length > 0) {
-    question = available[Math.floor(Math.random() * available.length)];
+  const fallback = activeFragenBank.filter(q => !gameState.usedQuestionIds.has(q.id));
+  if (fallback.length > 0) return fallback[Math.floor(Math.random() * fallback.length)];
+
+  // All used – reset pool
+  gameState.usedQuestionIds.clear();
+  const all = activeFragenBank.filter(q => q.schwierigkeit === difficulty);
+  return all.length > 0 ? all[Math.floor(Math.random() * all.length)]
+                        : activeFragenBank[Math.floor(Math.random() * activeFragenBank.length)];
+}
+
+function askQuestion(questionOverride) {
+  // Use provided question (from rollDice or SSE) or pick a new one
+  let question = questionOverride || null;
+  if (!question) {
+    question = pickQuestion();
+    if (!question) return;
+    gameState.usedQuestionIds.add(question.id);
+    currentQuestion = question;
   } else {
-    const fallback = activeFragenBank.filter(q => !gameState.usedQuestionIds.has(q.id));
-    if (fallback.length > 0) {
-      question = fallback[Math.floor(Math.random() * fallback.length)];
-    } else {
-      // All questions used - reset pool
-      gameState.usedQuestionIds.clear();
-      const all = activeFragenBank.filter(q => q.schwierigkeit === difficulty);
-      question = all.length > 0 ? all[Math.floor(Math.random() * all.length)] :
-        activeFragenBank[Math.floor(Math.random() * activeFragenBank.length)];
-    }
+    currentQuestion = question;
   }
 
-  gameState.usedQuestionIds.add(question.id);
-  currentQuestion = question;
+  const team = getCurrentTeam();
+  const field = gameState.board[team.position];
+  const difficulty = (question.schwierigkeit) || (field ? field.difficulty : 'leicht');
+
   questionResolved = false;
 
   // Populate modal
@@ -1159,16 +1296,18 @@ function resolveQuestion(correct) {
     team.wrongCount++;
   }
 
-  // Show explanation
-  if (currentQuestion.erklaerung) {
+  if (currentQuestion && currentQuestion.erklaerung) {
     document.getElementById('q-explanation-text').textContent = currentQuestion.erklaerung;
     document.getElementById('q-explanation').classList.add('visible');
   }
 
-  // Store result for movement
   gameState.lastAnswerCorrect = correct;
+  if (gameState.liveQuestion) {
+    gameState.liveQuestion.resolved = true;
+    gameState.liveQuestion.autoCorrect = correct;
+  }
+  LsStorage.save(gameState);
 
-  // Show continue
   document.getElementById('q-continue').classList.add('visible');
 }
 
@@ -1389,13 +1528,14 @@ function freeMove() {
 function nextTurn() {
   gameState.currentTurnIdx = (gameState.currentTurnIdx + 1) % gameState.turnOrder.length;
   gameState.pendingDice = null;
+  gameState.liveQuestion = null;
 
-  // Reset dice display
   document.getElementById('dice-display').textContent = '🎲';
 
   updateActiveBanner();
   updatePieces();
   updateDiceButton(true);
+  LsStorage.save(gameState);
 }
 
 // ── Winner ───────────────────────────────────────────────────
@@ -1444,12 +1584,14 @@ function spawnConfetti() {
 
 // ── Reset & Quit ─────────────────────────────────────────────
 function resetToSetup() {
+  if (lsSub) { lsSub.unsubscribe(); lsSub = null; }
   gameState.phase = 'setup';
   gameState.teams = [];
   gameState.turnOrder = [];
   gameState.currentTurnIdx = 0;
   gameState.usedQuestionIds = new Set();
   gameState.pendingDice = null;
+  gameState.liveQuestion = null;
   window.removeEventListener('resize', drawLaddersAndSnakes);
   showScreen('setup-screen');
 }
