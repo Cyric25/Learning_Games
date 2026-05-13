@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Lernkarten</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="../memory/lib/katex/katex.min.css">
+  <style>
+    /* ─── CSS Variablen: Light (Standard) ─────────────── */
+    :root {
+      --bg-body:         linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+      --bg-container:    #ffffff;
+      --bg-card:         #f8fafc;
+      --bg-card-back:    #f0f9ff;
+      --bg-option:       #f1f5f9;
+      --bg-option-hover: #e2e8f0;
+      --accent:          #0ea5e9;
+      --accent-dark:     #0284c7;
+      --text-primary:    #1e293b;
+      --text-secondary:  #64748b;
+      --border:          #e2e8f0;
+      --success:         #16a34a;
+      --danger:          #dc2626;
+      --warning:         #d97706;
+      --shadow:          0 4px 20px rgba(14,165,233,0.10);
+      --shadow-card:     0 8px 32px rgba(0,0,0,0.10);
+      --radius:          16px;
+    }
+    body.dark {
+      --bg-body:         linear-gradient(135deg, #0c1a2e 0%, #0a0f1e 100%);
+      --bg-container:    #0f1e35;
+      --bg-card:         #162032;
+      --bg-card-back:    #0d1927;
+      --bg-option:       #1a2744;
+      --bg-option-hover: #223060;
+      --accent:          #38bdf8;
+      --accent-dark:     #0ea5e9;
+      --text-primary:    #f1f5f9;
+      --text-secondary:  #94a3b8;
+      --border:          rgba(255,255,255,0.10);
+      --success:         #4ade80;
+      --danger:          #f87171;
+      --warning:         #fbbf24;
+      --shadow:          0 4px 20px rgba(0,0,0,0.30);
+      --shadow-card:     0 8px 32px rgba(0,0,0,0.40);
+    }
+
+    /* ─── Reset ──────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    body {
+      background: var(--bg-body);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.3s;
+    }
+
+    /* ─── Header ─────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: var(--bg-container);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+    .header-btn {
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: background 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .header-btn:hover { background: var(--bg-option); }
+    .header-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      flex: 1;
+      color: var(--accent);
+    }
+    .session-counter {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      background: var(--bg-option);
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: none;
+    }
+
+    /* ─── Screens ────────────────────────────────────── */
+    .screen { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
+    .screen.active { display: flex; }
+
+    /* ─── Setup ──────────────────────────────────────── */
+    .setup-wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: clamp(16px, 4vw, 36px);
+      width: 100%;
+    }
+    .setup-section {
+      background: var(--bg-container);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .setup-section h2 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .source-row { display: flex; gap: 8px; }
+    .source-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-option);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.18s;
+      text-align: center;
+    }
+    .source-btn.active {
+      border-color: var(--accent);
+      background: rgba(14,165,233,0.10);
+      color: var(--accent);
+    }
+    body.dark .source-btn.active { background: rgba(56,189,248,0.12); }
+
+    .cat-list { display: flex; flex-direction: column; gap: 7px; }
+    .cat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: var(--bg-option);
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .cat-item:hover { background: var(--bg-option-hover); }
+    .cat-item.checked { border-color: var(--accent); }
+    .cat-item input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+    .cat-item-name { flex: 1; font-size: 0.88rem; font-weight: 500; }
+    .cat-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .badge-due  { background: rgba(220,38,38,0.12);  color: var(--danger); }
+    .badge-new  { background: rgba(22,163,74,0.12);  color: var(--success); }
+    .badge-done { background: rgba(100,116,139,0.12); color: var(--text-secondary); }
+
+    .no-data {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .slider-row { display: flex; align-items: center; gap: 14px; }
+    .slider-row input[type=range] { flex: 1; accent-color: var(--accent); }
+    .slider-val { font-size: 1.1rem; font-weight: 800; color: var(--accent); min-width: 30px; text-align: right; }
+
+    .stats-row { display: flex; gap: 10px; }
+    .stat-pill { flex: 1; text-align: center; padding: 12px 6px; border-radius: 12px; }
+    .stat-pill .val { font-size: 1.5rem; font-weight: 800; }
+    .stat-pill .lbl { font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; }
+    .stat-due  { background: rgba(220,38,38,0.08);  color: var(--danger); }
+    .stat-new  { background: rgba(22,163,74,0.08);  color: var(--success); }
+    .stat-done { background: rgba(100,116,139,0.08); color: var(--text-secondary); }
+
+    .btn-start-learn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 4px;
+    }
+    .btn-start-learn:hover:not(:disabled) { opacity: 0.9; }
+    .btn-start-learn:active:not(:disabled) { transform: scale(0.985); }
+    .btn-start-learn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ─── Learn Screen ───────────────────────────────── */
+    .learn-wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 18px clamp(12px, 4vw, 28px) 24px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .progress-bar-wrap {
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0ea5e9, #0284c7);
+      border-radius: 3px;
+      transition: width 0.45s ease;
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .card-cat-tag {
+      background: var(--bg-option);
+      padding: 3px 10px;
+      border-radius: 20px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .meta-tags { display: flex; gap: 5px; }
+    .tag-sm {
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .tag-new      { background: rgba(22,163,74,0.12);  color: var(--success); }
+    .tag-learning { background: rgba(217,119,6,0.12);  color: var(--warning); }
+    .tag-review   { background: rgba(14,165,233,0.12); color: var(--accent); }
+    .tag-diff-1   { background: rgba(22,163,74,0.10);  color: var(--success); }
+    .tag-diff-2   { background: rgba(217,119,6,0.10);  color: var(--warning); }
+    .tag-diff-3   { background: rgba(220,38,38,0.10);  color: var(--danger); }
+
+    /* Karten-Flip */
+    .card-scene {
+      perspective: 1000px;
+      flex: 1;
+      min-height: 230px;
+      margin-bottom: 18px;
+      cursor: pointer;
+    }
+    .card-flipper {
+      width: 100%;
+      height: 100%;
+      min-height: 230px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.52s cubic-bezier(0.4,0,0.2,1);
+    }
+    .card-flipper.flipped { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: var(--shadow-card);
+      overflow: auto;
+    }
+    .card-front {
+      background: var(--bg-container);
+      border: 2px solid var(--border);
+    }
+    .card-back {
+      background: var(--bg-card-back);
+      border: 2px solid var(--accent);
+      transform: rotateY(180deg);
+    }
+    .face-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      align-self: flex-start;
+    }
+    .card-back .face-label { color: var(--accent); }
+    .card-content {
+      font-size: clamp(1.05rem, 3.5vw, 1.5rem);
+      font-weight: 600;
+      text-align: center;
+      color: var(--text-primary);
+      word-break: break-word;
+      width: 100%;
+    }
+    .card-content img {
+      max-width: 100%;
+      max-height: 140px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .card-content .katex-display { margin: 0.2em 0; }
+
+    /* MC Options */
+    .mc-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      width: 100%;
+      margin-top: 14px;
+    }
+    .mc-opt {
+      padding: 9px 11px;
+      background: var(--bg-option);
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-size: 0.83rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      word-break: break-word;
+      transition: all 0.25s;
+    }
+    .mc-opt .opt-letter {
+      font-weight: 800;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      font-size: 0.76rem;
+      margin-top: 1px;
+    }
+    .mc-opt.correct {
+      background: rgba(22,163,74,0.14);
+      border-color: var(--success);
+      color: var(--success);
+    }
+    .mc-opt.correct .opt-letter { color: var(--success); }
+    .mc-opt.wrong { opacity: 0.38; }
+
+    /* Aktions-Bereich */
+    .action-area { display: flex; flex-direction: column; gap: 10px; }
+    .btn-reveal {
+      width: 100%;
+      padding: 14px;
+      background: var(--bg-container);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-reveal:hover { background: rgba(14,165,233,0.08); }
+
+    .rating-btns {
+      display: none;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 9px;
+    }
+    .rating-btns.visible { display: grid; }
+    .btn-rate {
+      padding: 13px 6px;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.18s, transform 0.1s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-rate:hover  { opacity: 0.86; }
+    .btn-rate:active { transform: scale(0.96); }
+    .rate-interval   { font-size: 0.71rem; font-weight: 500; opacity: 0.82; }
+    .btn-again   { background: rgba(220,38,38,0.12);  color: var(--danger);  border-color: var(--danger); }
+    .btn-good    { background: rgba(217,119,6,0.12);  color: var(--warning); border-color: var(--warning); }
+    .btn-perfect { background: rgba(22,163,74,0.12);  color: var(--success); border-color: var(--success); }
+
+    /* ─── Done Screen ────────────────────────────────── */
+    .done-wrap {
+      max-width: 480px;
+      margin: auto;
+      padding: clamp(24px,5vw,48px) clamp(16px,4vw,28px);
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .done-emoji    { font-size: 3.8rem; }
+    .done-title    { font-size: 1.7rem; font-weight: 800; }
+    .done-subtitle { color: var(--text-secondary); font-size: 0.95rem; }
+    .done-stats    { display: flex; gap: 10px; width: 100%; justify-content: center; }
+    .done-stat {
+      flex: 1;
+      max-width: 110px;
+      background: var(--bg-container);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 6px;
+      box-shadow: var(--shadow);
+    }
+    .done-stat .val { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+    .done-stat .lbl { font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; }
+    .next-info {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      background: var(--bg-option);
+      padding: 10px 18px;
+      border-radius: 10px;
+    }
+    .done-btns { display: flex; gap: 9px; width: 100%; }
+    .btn-done {
+      flex: 1;
+      padding: 13px;
+      border-radius: var(--radius);
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.18s;
+    }
+    .btn-done:hover { opacity: 0.88; }
+    .btn-done-primary   { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; }
+    .btn-done-secondary { background: var(--bg-option); color: var(--text-primary); border: 1px solid var(--border); }
+
+    @media (max-width: 480px) {
+      .mc-options   { grid-template-columns: 1fr; }
+      .stats-row    { gap: 7px; }
+      .source-row   { flex-direction: column; }
+      .rating-btns  { gap: 7px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Header ──────────────────────────────────────── -->
+  <div class="header">
+    <a href="../spiele.html" class="header-btn" title="Zurück">&#8592;</a>
+    <span class="header-title">📚 Lernkarten</span>
+    <span class="session-counter" id="session-counter"></span>
+    <button class="header-btn" id="btn-theme" onclick="toggleTheme()" title="Theme wechseln">🌙</button>
+  </div>
+
+  <!-- ─── Setup Screen ────────────────────────────────── -->
+  <div class="screen active" id="screen-setup">
+    <div class="setup-wrap">
+
+      <div class="setup-section">
+        <h2>Datenquelle</h2>
+        <div class="source-row">
+          <button class="source-btn active" data-source="memory"    onclick="setSource('memory')">🃏 Memory-Paare</button>
+          <button class="source-btn"        data-source="questions" onclick="setSource('questions')">❓ Fragenpool</button>
+          <button class="source-btn"        data-source="both"      onclick="setSource('both')">📦 Beides</button>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <h2>Kategorien</h2>
+        <div id="cat-list-wrap"><div class="no-data">Lade Daten…</div></div>
+      </div>
+
+      <div class="setup-section">
+        <h2>Neue Karten pro Sitzung</h2>
+        <div class="slider-row">
+          <input type="range" id="new-cards-slider" min="5" max="50" step="5" value="20"
+                 oninput="onSliderChange(this.value)">
+          <span class="slider-val" id="new-cards-val">20</span>
+        </div>
+      </div>
+
+      <div class="setup-section">
+        <h2>Übersicht (gewählte Kategorien)</h2>
+        <div class="stats-row">
+          <div class="stat-pill stat-due">
+            <div class="val" id="stat-due">–</div>
+            <div class="lbl">Heute fällig</div>
+          </div>
+          <div class="stat-pill stat-new">
+            <div class="val" id="stat-new">–</div>
+            <div class="lbl">Neu</div>
+          </div>
+          <div class="stat-pill stat-done">
+            <div class="val" id="stat-done">–</div>
+            <div class="lbl">Gelernt</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-start-learn" id="btn-start" disabled onclick="startSession()">
+        Lernen starten
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Learn Screen ────────────────────────────────── -->
+  <div class="screen" id="screen-learn">
+    <div class="learn-wrap">
+
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div class="card-meta">
+        <span class="card-cat-tag" id="card-cat"></span>
+        <div class="meta-tags">
+          <span class="tag-sm" id="tag-state"></span>
+          <span class="tag-sm" id="tag-diff"></span>
+        </div>
+      </div>
+
+      <div class="card-scene" id="card-scene" onclick="revealCard()">
+        <div class="card-flipper" id="card-flipper">
+
+          <div class="card-face card-front">
+            <div class="face-label" id="front-label">Begriff</div>
+            <div class="card-content" id="front-content"></div>
+            <div class="mc-options" id="mc-front" style="display:none;"></div>
+          </div>
+
+          <div class="card-face card-back">
+            <div class="face-label">Antwort</div>
+            <div class="card-content" id="back-content"></div>
+            <div class="mc-options" id="mc-back" style="display:none;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="action-area">
+        <button class="btn-reveal" id="btn-reveal" onclick="revealCard()">Aufdecken ↓</button>
+        <div class="rating-btns" id="rating-btns">
+          <button class="btn-rate btn-again"   onclick="rateCard('again')">
+            🔴 Nochmal
+            <span class="rate-interval" id="iv-again">in 1 Tag</span>
+          </button>
+          <button class="btn-rate btn-good"    onclick="rateCard('good')">
+            🟡 Gut
+            <span class="rate-interval" id="iv-good">in 4 Tagen</span>
+          </button>
+          <button class="btn-rate btn-perfect" onclick="rateCard('perfect')">
+            🟢 Perfekt
+            <span class="rate-interval" id="iv-perfect">in 7 Tagen</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── Done Screen ─────────────────────────────────── -->
+  <div class="screen" id="screen-done">
+    <div class="done-wrap">
+      <div class="done-emoji">🎉</div>
+      <div class="done-title">Sitzung abgeschlossen!</div>
+      <div class="done-subtitle" id="done-subtitle">Gut gemacht!</div>
+      <div class="done-stats">
+        <div class="done-stat"><div class="val" id="done-total">0</div><div class="lbl">Karten</div></div>
+        <div class="done-stat"><div class="val" id="done-new">0</div><div class="lbl">Neu gelernt</div></div>
+        <div class="done-stat"><div class="val" id="done-again">0</div><div class="lbl">Wiederholt</div></div>
+      </div>
+      <div class="next-info" id="next-info">Nächste Wiederholung: –</div>
+      <div class="done-btns">
+        <button class="btn-done btn-done-secondary" onclick="goToSetup()">← Zurück</button>
+        <button class="btn-done btn-done-primary"   id="btn-continue" onclick="continueSession()" style="display:none;">Weiter lernen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../memory/lib/katex/katex.min.js"></script>
+  <script>
+  // ═══════════════════════════════════════════════════════════
+  //  LERNKARTEN – SM-2 Spaced Repetition System
+  // ═══════════════════════════════════════════════════════════
+
+  const LS_PROGRESS = 'lernkarten_progress';
+  const LS_THEME    = 'spiele_theme';
+
+  // ── App-State ───────────────────────────────────────────
+  var allCards       = [];
+  var catGroups      = [];
+  var selectedCatIds = new Set();
+  var currentSource  = 'memory';
+  var newCardsLimit  = 20;
+
+  // Session-State
+  var sessionQueue = [];
+  var sessionIdx   = 0;
+  var requeuedSet  = new Set();
+  var revealed     = false;
+  var sessionStats = { total: 0, newLearned: 0, again: 0 };
+
+  // ── Hilfsfunktionen ─────────────────────────────────────
+  function dayMs(d) { return d * 86400000; }
+
+  function stripDollar(s) {
+    s = (s || '').trim();
+    if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
+    if (s.startsWith('$')  && s.endsWith('$')  && s.length > 2) return s.slice(1, -1).trim();
+    return s;
+  }
+
+  function renderContent(el, type, content) {
+    el.innerHTML = '';
+    var c = content || '';
+    var isFormula = type === 'formula' || (c.startsWith('$') && c.trimEnd().endsWith('$'));
+    if (isFormula && c) {
+      try { katex.render(stripDollar(c), el, { throwOnError: false, displayMode: false }); }
+      catch (e) { el.textContent = c; }
+    } else if (type === 'image' && c) {
+      var img = document.createElement('img');
+      img.src = c; img.alt = '';
+      el.appendChild(img);
+    } else {
+      el.textContent = c;
+    }
+  }
+
+  function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function fmtInterval(days) {
+    if (days <= 0) return 'sofort';
+    if (days === 1) return 'in 1 Tag';
+    if (days < 30)  return 'in ' + days + ' Tagen';
+    var w = Math.round(days / 7);
+    if (w < 9)      return 'in ' + w + ' Wochen';
+    return 'in ' + Math.round(days / 30) + ' Monaten';
+  }
+
+  function fmtTimeUntil(ts) {
+    var diff = ts - Date.now();
+    if (diff <= 0) return 'jetzt';
+    var mins = Math.round(diff / 60000);
+    if (mins < 60)  return 'in ' + mins + ' Min.';
+    var hrs = Math.round(diff / 3600000);
+    if (hrs < 24)   return 'in ' + hrs + ' Std.';
+    return fmtInterval(Math.round(diff / 86400000));
+  }
+
+  // ── Fortschritt (localStorage) ───────────────────────────
+  function getProgress() {
+    try { var s = localStorage.getItem(LS_PROGRESS); return s ? JSON.parse(s) : {}; }
+    catch (e) { return {}; }
+  }
+
+  function saveProgress(prog) {
+    try { localStorage.setItem(LS_PROGRESS, JSON.stringify(prog)); } catch (e) {}
+  }
+
+  function defaultCP() {
+    return { state: 'new', repetitions: 0, easeFactor: 2.5, lastInterval: 0,
+             nextReview: 0, lastReview: 0, lapses: 0 };
+  }
+
+  function getCP(prog, id) { return prog[id] || defaultCP(); }
+
+  // ── SM-2 Algorithmus ────────────────────────────────────
+  function computeNext(cp, rating) {
+    var now = Date.now();
+    if (rating === 'again') {
+      return { state: 'learning', repetitions: 0,
+               easeFactor: Math.max(1.3, cp.easeFactor - 0.2),
+               lastInterval: 1, nextReview: now + dayMs(1),
+               lastReview: now, lapses: (cp.lapses || 0) + 1 };
+    }
+    var newRep = cp.repetitions + 1;
+    var newEF  = rating === 'perfect'
+      ? Math.min(2.5, cp.easeFactor + 0.15)
+      : cp.easeFactor;
+    var interval;
+    if (newRep === 1)      interval = rating === 'perfect' ? 3 : 1;
+    else if (newRep === 2) interval = rating === 'perfect' ? 7 : 4;
+    else {
+      interval = Math.round(cp.lastInterval * newEF);
+      if (rating === 'perfect') interval = Math.round(interval * 1.3);
+    }
+    interval = Math.max(1, interval);
+    return { state: newRep >= 2 ? 'review' : 'learning',
+             repetitions: newRep, easeFactor: newEF,
+             lastInterval: interval, nextReview: now + dayMs(interval),
+             lastReview: now, lapses: cp.lapses || 0 };
+  }
+
+  function previewDays(cp, rating) { return computeNext(cp, rating).lastInterval; }
+
+  // ── Daten laden ─────────────────────────────────────────
+  async function loadMemoryPairs() {
+    try { var r = await fetch('../api.php?f=memory-pairs');
+          if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
+    try { var r = await fetch('../memory/data/pairs.json');
+          if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
+    var c = localStorage.getItem('memory_pairs');
+    return c ? JSON.parse(c) : { categories: [] };
+  }
+
+  async function loadQuestions() {
+    try { var r = await fetch('../api.php?f=questions');
+          if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
+    try { var r = await fetch('../data/questions.json');
+          if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
+    var c = localStorage.getItem('rq_questions');
+    return c ? JSON.parse(c) : { categories: [] };
+  }
+
+  // ── Karten-Konvertierung ─────────────────────────────────
+  function diffMem(d)  { return Math.max(1, Math.min(3, parseInt(d) || 1)); }
+  function diffQ(d)    { return d <= 200 ? 1 : d <= 300 ? 2 : 3; }
+
+  function buildMemCards(data) {
+    var cards = [];
+    if (!data || !data.categories) return cards;
+    data.categories.forEach(function(cat) {
+      (cat.pairs || []).forEach(function(pair) {
+        if (!pair.sideA || !pair.sideB) return;
+        var base = { source: 'memory', categoryId: 'mem_' + cat.id,
+                     categoryName: cat.name, difficulty: diffMem(pair.difficulty) };
+        cards.push(Object.assign({}, base, {
+          id: 'mem_' + pair.id + '_ab',
+          frontType: pair.sideA.type, frontContent: pair.sideA.content,
+          backType:  pair.sideB.type, backContent:  pair.sideB.content,
+          options: null, correctIndex: -1
+        }));
+        cards.push(Object.assign({}, base, {
+          id: 'mem_' + pair.id + '_ba',
+          frontType: pair.sideB.type, frontContent: pair.sideB.content,
+          backType:  pair.sideA.type, backContent:  pair.sideA.content,
+          options: null, correctIndex: -1
+        }));
+      });
+    });
+    return cards;
+  }
+
+  function buildQCards(data) {
+    var cards = [];
+    if (!data || !data.categories) return cards;
+
+    function processQ(catId, catName, questions) {
+      (questions || []).forEach(function(q) {
+        if (!q || !q.question) return;
+        var card = {
+          id: 'q_' + q.id,
+          source: 'questions',
+          categoryId: 'qc_' + catId,
+          categoryName: catName,
+          difficulty: diffQ(q.difficulty || 100),
+          options: null, correctIndex: -1
+        };
+        if (q.type === 'mc' && q.options && q.options.length > 0) {
+          card.frontType    = 'text';
+          card.frontContent = q.question;
+          card.backType     = 'mc';
+          card.backContent  = q.options[q.correctIndex] || '';
+          card.options      = q.options;
+          card.correctIndex = q.correctIndex || 0;
+        } else {
+          card.frontType    = 'text';
+          card.frontContent = q.question;
+          card.backType     = 'text';
+          card.backContent  = q.answer || '';
+        }
+        cards.push(card);
+      });
+    }
+
+    function walkCat(catName, node) {
+      if (node.questions) {
+        processQ(node.id, catName, node.questions);
+      }
+      if (node.subcategories) {
+        node.subcategories.forEach(function(sub) {
+          walkCat(catName + ' › ' + sub.name, sub);
+        });
+      }
+    }
+
+    data.categories.forEach(function(cat) { walkCat(cat.name, cat); });
+    return cards;
+  }
+
+  // ── Kategorien-Gruppen ────────────────────────────────────
+  function buildCatGroups(cards) {
+    var now  = Date.now();
+    var prog = getProgress();
+    var map  = new Map();
+    cards.forEach(function(card) {
+      if (!map.has(card.categoryId))
+        map.set(card.categoryId, { id: card.categoryId, name: card.categoryName,
+                                   due: 0, newCount: 0, done: 0 });
+      var g  = map.get(card.categoryId);
+      var cp = getCP(prog, card.id);
+      if (cp.state === 'new')             g.newCount++;
+      else if (cp.nextReview <= now)      g.due++;
+      else                                g.done++;
+    });
+    return Array.from(map.values());
+  }
+
+  // ── Setup UI ──────────────────────────────────────────────
+  function setSource(src) {
+    currentSource = src;
+    document.querySelectorAll('.source-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.source === src);
+    });
+    rebuildForSource();
+  }
+
+  function getSourceCards() {
+    if (currentSource === 'memory')    return allCards.filter(function(c) { return c.source === 'memory'; });
+    if (currentSource === 'questions') return allCards.filter(function(c) { return c.source === 'questions'; });
+    return allCards;
+  }
+
+  function rebuildForSource() {
+    catGroups      = buildCatGroups(getSourceCards());
+    selectedCatIds = new Set(catGroups.map(function(g) { return g.id; }));
+    renderCatList();
+    refreshStats();
+    refreshStartBtn();
+  }
+
+  function renderCatList() {
+    var wrap = document.getElementById('cat-list-wrap');
+    if (catGroups.length === 0) {
+      wrap.innerHTML = '<div class="no-data">Keine Kategorien gefunden.<br>Bitte zuerst Inhalte importieren.</div>';
+      return;
+    }
+    var list = document.createElement('div');
+    list.className = 'cat-list';
+    catGroups.forEach(function(g) {
+      var item = document.createElement('label');
+      item.className = 'cat-item' + (selectedCatIds.has(g.id) ? ' checked' : '');
+
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = selectedCatIds.has(g.id);
+      cb.dataset.catId = g.id;
+      cb.addEventListener('change', (function(gId, labelEl) {
+        return function() {
+          if (this.checked) selectedCatIds.add(gId);
+          else              selectedCatIds.delete(gId);
+          labelEl.classList.toggle('checked', this.checked);
+          refreshStats();
+          refreshStartBtn();
+        };
+      })(g.id, item));
+
+      var name = document.createElement('span');
+      name.className = 'cat-item-name';
+      name.textContent = g.name;
+
+      var badges = document.createElement('div');
+      badges.className = 'cat-badges';
+      if (g.due > 0)
+        badges.innerHTML += '<span class="badge badge-due">⏰ ' + g.due + '</span>';
+      if (g.newCount > 0)
+        badges.innerHTML += '<span class="badge badge-new">✨ ' + g.newCount + '</span>';
+      if (g.due === 0 && g.newCount === 0 && g.done > 0)
+        badges.innerHTML += '<span class="badge badge-done">✓ ' + g.done + '</span>';
+
+      item.appendChild(cb);
+      item.appendChild(name);
+      item.appendChild(badges);
+      list.appendChild(item);
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(list);
+  }
+
+  function getFilteredCards() {
+    return getSourceCards().filter(function(c) { return selectedCatIds.has(c.categoryId); });
+  }
+
+  function onSliderChange(val) {
+    newCardsLimit = parseInt(val);
+    document.getElementById('new-cards-val').textContent = val;
+    refreshStats();
+    refreshStartBtn();
+  }
+
+  function refreshStats() {
+    var prog  = getProgress();
+    var now   = Date.now();
+    var due = 0, neu = 0, done = 0;
+    getFilteredCards().forEach(function(c) {
+      var cp = getCP(prog, c.id);
+      if (cp.state === 'new')        neu++;
+      else if (cp.nextReview <= now) due++;
+      else                           done++;
+    });
+    document.getElementById('stat-due').textContent  = due;
+    document.getElementById('stat-new').textContent  = neu;
+    document.getElementById('stat-done').textContent = done;
+  }
+
+  function refreshStartBtn() {
+    var prog    = getProgress();
+    var now     = Date.now();
+    var cards   = getFilteredCards();
+    var due     = cards.filter(function(c) { var cp = getCP(prog,c.id); return cp.state !== 'new' && cp.nextReview <= now; });
+    var newC    = cards.filter(function(c) { return getCP(prog,c.id).state === 'new'; });
+    var total   = due.length + Math.min(newCardsLimit, newC.length);
+    var btn     = document.getElementById('btn-start');
+    btn.disabled = total === 0 || selectedCatIds.size === 0;
+    btn.textContent = total > 0
+      ? 'Lernen starten (' + total + ' Karten)'
+      : (selectedCatIds.size === 0 ? 'Keine Kategorie gewählt' : 'Nichts zu lernen ✓');
+  }
+
+  // ── Session ───────────────────────────────────────────────
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function startSession() {
+    var prog  = getProgress();
+    var now   = Date.now();
+    var cards = getFilteredCards();
+
+    var reviewDue   = shuffle(cards.filter(function(c) { var cp = getCP(prog,c.id); return cp.state === 'review'   && cp.nextReview <= now; }));
+    var learningDue = shuffle(cards.filter(function(c) { var cp = getCP(prog,c.id); return cp.state === 'learning' && cp.nextReview <= now; }));
+    var newCards    = shuffle(cards.filter(function(c) { return getCP(prog,c.id).state === 'new'; })).slice(0, newCardsLimit);
+
+    sessionQueue = reviewDue.concat(learningDue).concat(newCards);
+    sessionIdx   = 0;
+    requeuedSet  = new Set();
+    sessionStats = { total: sessionQueue.length, newLearned: 0, again: 0 };
+
+    document.getElementById('session-counter').style.display = '';
+    showScreen('screen-learn');
+    showCard();
+  }
+
+  // ── Karte anzeigen ────────────────────────────────────────
+  function showCard() {
+    if (sessionIdx >= sessionQueue.length) { showDoneScreen(); return; }
+
+    var card = sessionQueue[sessionIdx];
+    var prog = getProgress();
+    var cp   = getCP(prog, card.id);
+
+    revealed = false;
+
+    // Fortschritt
+    var pct = Math.round(sessionIdx / Math.max(1, sessionQueue.length) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    var rem = sessionQueue.length - sessionIdx;
+    document.getElementById('session-counter').textContent = rem + ' Karte' + (rem !== 1 ? 'n' : '') + ' übrig';
+
+    // Meta-Tags
+    document.getElementById('card-cat').textContent = card.categoryName;
+
+    var stTag = document.getElementById('tag-state');
+    stTag.className = 'tag-sm tag-' + cp.state;
+    stTag.textContent = { new: 'Neu', learning: 'Lernphase', review: 'Wiederholung' }[cp.state] || 'Neu';
+
+    var dfTag = document.getElementById('tag-diff');
+    dfTag.className = 'tag-sm tag-diff-' + card.difficulty;
+    dfTag.textContent = ['', 'Leicht', 'Mittel', 'Schwer'][card.difficulty] || '';
+
+    // Karte zurückflipppen
+    document.getElementById('card-flipper').classList.remove('flipped');
+    document.getElementById('card-scene').style.pointerEvents = '';
+
+    // Vorderseite
+    document.getElementById('front-label').textContent =
+      card.source === 'memory' ? 'Begriff' : 'Frage';
+    renderContent(document.getElementById('front-content'), card.frontType, card.frontContent);
+
+    // MC-Optionen auf Vorderseite
+    var mcFront = document.getElementById('mc-front');
+    if (card.backType === 'mc' && card.options && card.options.length) {
+      mcFront.style.display = '';
+      mcFront.innerHTML     = '';
+      var letters = ['A','B','C','D','E'];
+      card.options.forEach(function(opt, i) {
+        var div = document.createElement('div');
+        div.className = 'mc-opt';
+        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + escHtml(opt) + '</span>';
+        mcFront.appendChild(div);
+      });
+    } else {
+      mcFront.style.display = 'none';
+      mcFront.innerHTML     = '';
+    }
+
+    // Rückseite (vorab befüllen für Text/Formel)
+    var backEl = document.getElementById('back-content');
+    if (card.backType === 'mc') backEl.textContent = '';
+    else renderContent(backEl, card.backType, card.backContent);
+
+    var mcBack = document.getElementById('mc-back');
+    mcBack.style.display = 'none';
+    mcBack.innerHTML     = '';
+
+    // Buttons
+    document.getElementById('btn-reveal').style.display = '';
+    document.getElementById('rating-btns').classList.remove('visible');
+
+    // Interval-Vorschau
+    document.getElementById('iv-again').textContent   = fmtInterval(previewDays(cp, 'again'));
+    document.getElementById('iv-good').textContent    = fmtInterval(previewDays(cp, 'good'));
+    document.getElementById('iv-perfect').textContent = fmtInterval(previewDays(cp, 'perfect'));
+  }
+
+  function revealCard() {
+    if (revealed) return;
+    revealed = true;
+
+    var card = sessionQueue[sessionIdx];
+    document.getElementById('card-flipper').classList.add('flipped');
+    document.getElementById('card-scene').style.pointerEvents = 'none';
+
+    // MC-Optionen auf Rückseite hervorheben
+    if (card.backType === 'mc' && card.options && card.options.length) {
+      var mcBack = document.getElementById('mc-back');
+      mcBack.style.display = '';
+      mcBack.innerHTML     = '';
+      var letters = ['A','B','C','D','E'];
+      card.options.forEach(function(opt, i) {
+        var div = document.createElement('div');
+        div.className = 'mc-opt ' + (i === card.correctIndex ? 'correct' : 'wrong');
+        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + escHtml(opt) + '</span>';
+        mcBack.appendChild(div);
+      });
+    }
+
+    document.getElementById('btn-reveal').style.display = 'none';
+    document.getElementById('rating-btns').classList.add('visible');
+  }
+
+  function rateCard(rating) {
+    var card   = sessionQueue[sessionIdx];
+    var prog   = getProgress();
+    var cp     = getCP(prog, card.id);
+    var wasNew = cp.state === 'new';
+
+    prog[card.id] = computeNext(cp, rating);
+    saveProgress(prog);
+
+    if (rating === 'again') {
+      sessionStats.again++;
+      if (!requeuedSet.has(card.id)) {
+        requeuedSet.add(card.id);
+        sessionQueue.push(card);
+      }
+    } else if (wasNew) {
+      sessionStats.newLearned++;
+    }
+
+    sessionIdx++;
+    showCard();
+  }
+
+  // ── Done Screen ───────────────────────────────────────────
+  function showDoneScreen() {
+    document.getElementById('session-counter').style.display = 'none';
+    showScreen('screen-done');
+
+    document.getElementById('done-total').textContent = sessionStats.total;
+    document.getElementById('done-new').textContent   = sessionStats.newLearned;
+    document.getElementById('done-again').textContent = sessionStats.again;
+
+    // Nächste fällige Karte
+    var prog   = getProgress();
+    var nextTs = Infinity;
+    getFilteredCards().forEach(function(c) {
+      var cp = prog[c.id];
+      if (cp && cp.nextReview && cp.state !== 'new' && cp.nextReview < nextTs)
+        nextTs = cp.nextReview;
+    });
+    document.getElementById('next-info').textContent =
+      nextTs === Infinity ? 'Keine weiteren Wiederholungen geplant.' :
+      'Nächste Wiederholung: ' + fmtTimeUntil(nextTs);
+
+    // "Weiter lernen" wenn noch Karten fällig
+    var prog2 = getProgress();
+    var now   = Date.now();
+    var more  = getFilteredCards().filter(function(c) {
+      var cp = getCP(prog2, c.id);
+      return (cp.state !== 'new' && cp.nextReview <= now) || cp.state === 'new';
+    });
+    document.getElementById('btn-continue').style.display = more.length > 0 ? '' : 'none';
+  }
+
+  function continueSession() { startSession(); }
+
+  function goToSetup() {
+    document.getElementById('session-counter').style.display = 'none';
+    rebuildForSource();
+    showScreen('screen-setup');
+  }
+
+  // ── Screens ───────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function(s) {
+      s.classList.toggle('active', s.id === id);
+    });
+  }
+
+  // ── Theme ─────────────────────────────────────────────────
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('btn-theme').textContent = dark ? '☀️' : '🌙';
+  }
+  window.toggleTheme = function() {
+    var isDark = !document.body.classList.contains('dark');
+    localStorage.setItem(LS_THEME, isDark ? 'dark' : 'light');
+    applyTheme(isDark);
+  };
+
+  // ── Init ──────────────────────────────────────────────────
+  async function init() {
+    applyTheme(localStorage.getItem(LS_THEME) === 'dark');
+
+    var memData = await loadMemoryPairs();
+    var qData   = await loadQuestions();
+    var memC    = buildMemCards(memData);
+    var qC      = buildQCards(qData);
+    allCards    = memC.concat(qC);
+
+    // Auto-Quelle: Fragenpool wenn keine Memory-Paare vorhanden
+    if (memC.length === 0 && qC.length > 0) {
+      currentSource = 'questions';
+      document.querySelectorAll('.source-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.source === 'questions');
+      });
+    }
+
+    rebuildForSource();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
