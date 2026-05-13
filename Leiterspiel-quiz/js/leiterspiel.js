@@ -127,6 +127,18 @@ const LsStorage = {
 // window._gsEnter/_gsDelete werden nach den Funktionsdeklarationen gesetzt (s.u.)
 // createNewGame ist eine hoisted function declaration → automatisch window.createNewGame
 
+function joinAsStudent() {
+  const input = document.getElementById('gs-code-input');
+  const errEl = document.getElementById('gs-join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (errEl) errEl.textContent = '';
+  if (!code || code.length < 4) {
+    if (errEl) errEl.textContent = 'Bitte 4-stelligen Code eingeben.';
+    return;
+  }
+  window.location.href = 'view.html?code=' + code;
+}
+
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 100;
 const COLS = 10;
