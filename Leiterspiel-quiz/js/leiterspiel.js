@@ -1698,7 +1698,7 @@ window._gsDelete = async function(code) {
   showGameSelector();
 };
 
-async function createNewGame() {
+window.createNewGame = async function() {
   const code = LsStorage.generateCode();
   LsStorage.setCode(code);
   const skeleton = {
@@ -1710,7 +1710,7 @@ async function createNewGame() {
   showScreen('setup-screen');
   document.getElementById('setup-game-title').value = '';
   showCodeBanner();
-}
+};
 
 async function enterGame(code) {
   await window._gsEnter(code);
