@@ -1670,7 +1670,8 @@ window._gsEnter = async function(code) {
   if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = gs;
-  if (gs.phase === 'playing' || gs.phase === 'dice-order') {
+
+  if (gs.phase === 'playing') {
     if (gs.activeCategoryIds && fragenBank) {
       selectedCategoryIds = new Set(gs.activeCategoryIds);
       activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
@@ -1684,7 +1685,19 @@ window._gsEnter = async function(code) {
     drawLaddersAndSnakes();
     window.addEventListener('resize', drawLaddersAndSnakes);
     startSSESubscription();
+
+  } else if (gs.phase === 'dice-order') {
+    if (gs.activeCategoryIds && fragenBank) {
+      selectedCategoryIds = new Set(gs.activeCategoryIds);
+      activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
+    }
+    showScreen('dice-order-screen');
+    initDiceOrder();
+    showCodeBanner();
+    startSSESubscription();
+
   } else {
+    // phase='setup' oder unbekannt → Setup-Screen
     showScreen('setup-screen');
     const titleEl = document.getElementById('setup-game-title');
     if (titleEl && gs.meta && gs.meta.title && gs.meta.title !== 'Schlangen & Leitern') titleEl.value = gs.meta.title;

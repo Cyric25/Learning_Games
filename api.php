@@ -183,7 +183,7 @@ if ($key === 'game') {
                     $gameData = json_decode($body, true);
                     $registry[$code] = [
                         'title'     => $gameData['meta']['title'] ?? 'Spiel ' . $code,
-                        'status'    => $gameData['status'] ?? 'setup',
+                        'status'    => $gameData['phase'] ?? 'setup',
                         'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
                         'updatedAt' => date('c'),
                     ];
@@ -306,7 +306,7 @@ if ($key === 'ls-game') {
                     $gameData = json_decode($body, true);
                     $registry[$code] = [
                         'title'     => $gameData['meta']['title'] ?? 'Spiel ' . $code,
-                        'status'    => $gameData['status'] ?? 'setup',
+                        'status'    => $gameData['phase'] ?? 'setup',
                         'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
                         'updatedAt' => date('c'),
                     ];
