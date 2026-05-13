@@ -852,7 +852,9 @@ const XxxStorage = {
 
 ### Spielwähler — HTML
 
-Erster Screen (`.screen.active`) in der Spiel-HTML-Datei. Buttons rufen `window`-Exports auf (IIFE-Scope-Problem beachten → alle onclick-Funktionen müssen als `window.xxx = ...` exportiert werden).
+Erster Screen (`.screen.active`) in der Spiel-HTML-Datei. Der Spielwähler ist der **einzige Einstiegspunkt** für alle — Schüler geben einen Code ein und landen in `view.html`, Lehrkräfte sehen die Spielliste und können neue Spiele erstellen. Kein separater "Schüleransicht"-Button in `spiele.html` nötig.
+
+> **onclick-Kompatibilität**: `onclick="createNewGame()"` funktioniert nur, wenn `createNewGame` im globalen Scope liegt. `window.xxx = async function()` ist eine **Zuweisung** — sie ist NICHT hoisted und scheitert, wenn ein Laufzeitfehler davor auftritt. Stattdessen: `async function createNewGame()` als top-level **Function Declaration** → wird gehoisted und ist automatisch `window.createNewGame`. Für `window._gsEnter` / `window._gsDelete` (explizit `window.`-qualifiziert im onclick-String) separate Declarations + manuelle Exports nach den Declarations (siehe JS-Abschnitt).
 
 ```html
 <div class="screen active" id="game-selector">
@@ -865,12 +867,28 @@ Erster Screen (`.screen.active`) in der Spiel-HTML-Datei. Buttons rufen `window`
       </div>
     </div>
     <div class="gs-body">
-      <h2 class="gs-section-title">Spiel auswählen</h2>
+
+      <!-- Schüler: Beitreten -->
+      <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
+      <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
+      <div class="gs-join-row">
+        <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+          onkeydown="if(event.key==='Enter')joinAsStudent()">
+        <button class="btn-join-student" onclick="joinAsStudent()">Beitreten →</button>
+      </div>
+      <div class="gs-join-error" id="gs-join-error"></div>
+
+      <div class="gs-divider"></div>
+
+      <!-- Lehrkraft: Spiele verwalten -->
+      <h2 class="gs-section-title">Als Lehrkraft</h2>
       <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
       <div id="gs-game-list" class="gs-game-list"></div>
       <div style="margin-top:1.2rem;">
         <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
       </div>
+
     </div>
   </div>
 </div>
@@ -899,11 +917,21 @@ Minimal-Set; Farben über CSS-Variablen des jeweiligen Spiels:
 .gs-game-meta  { font-size:0.8rem; color:var(--text-secondary); margin-top:2px; }
 .gs-btn-delete { background:none; border:1px solid var(--border); color:var(--danger); border-radius:8px; width:30px; height:30px; cursor:pointer; }
 .gs-btn-delete:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
+/* Beitreten-Sektion */
+.gs-join-row   { display:flex; gap:8px; margin-top:4px; }
+.gs-code-input { flex:1; padding:12px 14px; font-size:1.4rem; font-weight:800; letter-spacing:6px; text-align:center; text-transform:uppercase; background:var(--bg-field); border:2px solid var(--border); border-radius:12px; color:var(--text-primary); font-family:monospace; outline:none; transition:border-color .2s; }
+.gs-code-input:focus { border-color:var(--accent); }
+.btn-join-student { padding:12px 20px; background:linear-gradient(135deg,var(--accent-warm),var(--accent)); color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:opacity .2s; }
+.btn-join-student:hover { opacity:.9; }
+.gs-join-error { color:var(--danger); font-size:0.85rem; min-height:1.2em; margin-top:6px; }
+.gs-divider    { border:none; border-top:1px solid var(--border); margin:20px 0; }
 ```
 
 ---
 
 ### Spielwähler — JS-Logik
+
+> **Hoisting-Regel**: `createNewGame` als `async function createNewGame()` deklarieren (Function Declaration), **nicht** als `window.createNewGame = async function()` (Assignment). Function Declarations werden gehoisted → `onclick="createNewGame()"` findet die Funktion immer. `_gsEnter` / `_gsDelete` können nicht direkt als `window._gsEnter` deklariert werden; stattdessen als reguläre Declarations definieren und danach manuell exportieren: `window._gsEnter = _gsEnter;` — das geschieht nach dem Laden der anderen Deklarationen, aber bevor DOMContentLoaded feuert, also bevor der User klicken kann.
 
 ```js
 function escapeHtml(s) {
@@ -937,43 +965,63 @@ async function showGameSelector() {
   }).join('');
 }
 
-// Als window-Export (onclick-Kompatibilität)
-window.createNewGame = async function() {
+// ── Schüler beitreten ─────────────────────────────────────────
+// Kein window.xxx nötig — Function Declaration ist automatisch global
+function joinAsStudent() {
+  const input = document.getElementById('gs-code-input');
+  const errEl = document.getElementById('gs-join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (errEl) errEl.textContent = '';
+  if (!code || code.length < 4) { if (errEl) errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+  window.location.href = 'view.html?code=' + code;
+}
+
+// ── Lehrkraft: Spiel erstellen ────────────────────────────────
+// Function Declaration → gehoisted → automatisch window.createNewGame
+async function createNewGame() {
   const code = XxxStorage.generateCode();
   XxxStorage.setCode(code);
   await XxxStorage.save({ meta:{gameCode:code,title:'Spielname',createdAt:new Date().toISOString()}, phase:'setup', teams:[], usedQuestionIds:new Set(), liveQuestion:null });
   window.history.replaceState({}, '', 'index.html?code=' + code);
   showScreen('setup-screen');
-  // Titelfeld leeren, Code-Badge zeigen:
   const t = document.getElementById('setup-game-title'); if(t) t.value='';
   showCodeBanner();
-};
+}
 
-window._gsEnter = async function(code) {
+// ── Spielwähler-Aktionen ──────────────────────────────────────
+// _gsEnter/_gsDelete als Declarations + manuell auf window exportieren
+// (onclick-Strings verwenden window._gsEnter / window._gsDelete explizit)
+async function _gsEnter(code) {
   XxxStorage.setCode(code);
   const gs = await XxxStorage.load(code);
   if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = gs;
-  if (gs.phase === 'playing' || gs.phase === 'dice-order') {
-    // Spiel fortsetzen → ggf. selectedCategoryIds aus gs.activeCategoryIds wiederherstellen
-    showScreen('game-screen'); /* Board neu rendern, SSE starten */ startSSESubscription(); showCodeBanner();
+  if (gs.phase === 'playing') {
+    // Kategorien wiederherstellen, Board rendern, SSE starten
+    if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    showScreen('game-screen'); renderBoard(); startSSESubscription(); showCodeBanner();
+  } else if (gs.phase === 'dice-order') {
+    if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    showScreen('dice-order-screen'); initDiceOrder(); startSSESubscription(); showCodeBanner();
   } else {
     showScreen('setup-screen'); showCodeBanner();
   }
-};
-
-window._gsDelete = async function(code) {
+}
+async function _gsDelete(code) {
   if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
   await XxxStorage.deleteGame(code);
   showGameSelector();
-};
+}
+// Exports NACH den Declarations (vor DOMContentLoaded, also sicher)
+window._gsEnter  = _gsEnter;
+window._gsDelete = _gsDelete;
 
 // init(): URL-Code direkt einsteigen oder Spielwähler zeigen
 document.addEventListener('DOMContentLoaded', async () => {
   await loadData(); // Fragen / Spielkonfiguration laden
   const urlCode = new URLSearchParams(window.location.search).get('code');
-  if (urlCode) await window._gsEnter(urlCode.toUpperCase());
+  if (urlCode) await _gsEnter(urlCode.toUpperCase());
   else showGameSelector();
 });
 
