@@ -123,10 +123,9 @@ const LsStorage = {
   }
 };
 
-// ── Spielwähler onclick-Exports (früh, damit onclick-Handler immer erreichbar) ──
-window.createNewGame  = function() { return _createNewGame(); };
-window._gsEnter       = function(c) { return _gsEnter(c); };
-window._gsDelete      = function(c) { return _gsDelete(c); };
+// ── Spielwähler onclick-Exports ──────────────────────────────
+// window._gsEnter/_gsDelete werden nach den Funktionsdeklarationen gesetzt (s.u.)
+// createNewGame ist eine hoisted function declaration → automatisch window.createNewGame
 
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 100;
@@ -1716,7 +1715,7 @@ async function _gsDelete(code) {
   showGameSelector();
 }
 
-async function _createNewGame() {
+async function createNewGame() {
   const code = LsStorage.generateCode();
   LsStorage.setCode(code);
   const skeleton = {
@@ -1729,6 +1728,10 @@ async function _createNewGame() {
   document.getElementById('setup-game-title').value = '';
   showCodeBanner();
 }
+
+// onclick-Strings in gs-game-card verwenden window._gsEnter / window._gsDelete
+window._gsEnter = _gsEnter;
+window._gsDelete = _gsDelete;
 
 async function enterGame(code) {
   await _gsEnter(code);
