@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frage vorschlagen – Unterrichtsspiele</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>">
+  <style>
+    :root {
+      --bg-body:      linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+      --bg-card:      #ffffff;
+      --card-shadow:  0 20px 60px rgba(0,0,0,0.25);
+      --accent:       #E34F20;
+      --text-primary: #222;
+      --text-sec:     #666;
+      --border:       #e0e0e0;
+      --input-bg:     #f8f9fa;
+      --label-color:  #444;
+      --divider:      #e0e0e0;
+    }
+    body.dark {
+      --bg-body:      linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      --bg-card:      #16213e;
+      --card-shadow:  0 20px 60px rgba(0,0,0,0.4);
+      --text-primary: #ffffff;
+      --text-sec:     #a8a8b3;
+      --border:       rgba(255,255,255,0.12);
+      --input-bg:     rgba(255,255,255,0.06);
+      --label-color:  #c0c0d0;
+      --divider:      rgba(255,255,255,0.1);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      background: var(--bg-body);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem 3rem;
+      transition: background 0.35s;
+    }
+    .page-container { width: 100%; max-width: 1060px; }
+    .page-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .back-link {
+      color: rgba(255,255,255,0.92);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: opacity 0.2s;
+    }
+    .back-link:hover { opacity: 0.75; }
+    .theme-btn {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      padding: 0.4rem 0.9rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .theme-btn:hover { opacity: 0.8; }
+    .card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: var(--card-shadow);
+      padding: clamp(1.4rem, 4vw, 2.2rem);
+      transition: background 0.35s;
+    }
+    .card-header { text-align: center; margin-bottom: 1.8rem; }
+    .card-header h1 {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+    .card-header p { color: var(--text-sec); font-size: 0.92rem; line-height: 1.55; }
+    .form-group { margin-bottom: 1.1rem; }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--label-color);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .label-opt {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-sec);
+      font-size: 0.8rem;
+    }
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 0.72rem 0.9rem;
+      background: var(--input-bg);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(227,79,32,0.12);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    select option { background: #fff; color: #222; }
+    body.dark select option { background: #16213e; color: #fff; }
+    .radio-group { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+    .radio-opt { flex: 1; min-width: 110px; }
+    .radio-opt input[type="radio"] { display: none; }
+    .radio-opt label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.55rem 0.8rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-sec);
+      transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .radio-opt input:checked + label {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(227,79,32,0.08);
+    }
+    hr.divider { border: none; border-top: 1px solid var(--divider); margin: 1.4rem 0; }
+    /* MC options */
+    .mc-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .mc-opt-row { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
+    .mc-opt-row input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    .mc-opt-row input[type="text"] { margin: 0; }
+    .btn-rm {
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.3rem 0.55rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+      line-height: 1;
+      transition: opacity 0.2s;
+    }
+    .btn-rm:hover { opacity: 0.8; }
+    .btn-rm:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-add-opt {
+      background: none;
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 0.4rem 1rem;
+      color: var(--text-sec);
+      cursor: pointer;
+      font-size: 0.83rem;
+      width: 100%;
+      transition: all 0.18s;
+      font-family: inherit;
+    }
+    .btn-add-opt:hover { border-color: var(--accent); color: var(--accent); }
+    /* Submit */
+    .submit-btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      margin-top: 0.4rem;
+      font-family: inherit;
+    }
+    .submit-btn:hover { opacity: 0.9; transform: scale(1.01); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    /* Alert */
+    .alert {
+      padding: 0.7rem 1rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+      border: 1px solid;
+    }
+    .alert-danger { background: rgba(220,53,69,0.1); border-color: rgba(220,53,69,0.35); color: #c82333; }
+    body.dark .alert-danger { color: #ff7b85; background: rgba(220,53,69,0.15); }
+    /* Success */
+    .success-card {
+      text-align: center;
+      padding: 3rem 2rem;
+    }
+    .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .success-card h2 { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.6rem; }
+    .success-card p { color: var(--text-sec); margin-bottom: 1.5rem; line-height: 1.5; }
+    .btn-again {
+      background: linear-gradient(135deg, #f7971e, #E34F20);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.7rem 1.6rem;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: inherit;
+    }
+    .btn-again:hover { opacity: 0.9; }
+    /* Hint text */
+    .field-hint { font-size: 0.8rem; color: var(--text-sec); margin-top: 0.35rem; }
+    /* ── Zweispalten-Layout ── */
+    .page-layout { display: flex; gap: 1.5rem; align-items: flex-start; }
+    .stats-col { width: 270px; flex-shrink: 0; }
+    .form-col { flex: 1; min-width: 0; }
+    /* Stats-Karte */
+    .stats-card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: var(--card-shadow);
+      padding: 1.3rem;
+      position: sticky;
+      top: 1rem;
+      transition: background 0.35s;
+    }
+    .stats-card h2 { font-size: 0.92rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.9rem; }
+    .stats-card select { margin-bottom: 1rem; }
+    .subcat-block { margin-bottom: 0.9rem; }
+    .subcat-name {
+      font-size: 0.74rem;
+      color: var(--text-sec);
+      margin-bottom: 0.3rem;
+      word-break: break-word;
+      line-height: 1.35;
+    }
+    .diff-row { display: flex; gap: 0.25rem; }
+    .diff-slot {
+      flex: 1;
+      border-radius: 6px;
+      padding: 0.28rem 0.1rem;
+      text-align: center;
+      cursor: default;
+    }
+    .diff-num { font-size: 0.78rem; font-weight: 700; line-height: 1.15; display: block; }
+    .diff-lbl { font-size: 0.58rem; color: var(--text-sec); line-height: 1.2; display: block; }
+    .d-empty { background: rgba(220,53,69,0.12); border: 1px solid rgba(220,53,69,0.3); }
+    .d-empty .diff-num { color: #c82333; }
+    .d-low   { background: rgba(243,156,18,0.12); border: 1px solid rgba(243,156,18,0.3); }
+    .d-low   .diff-num { color: #b7770d; }
+    .d-good  { background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.3); }
+    .d-good  .diff-num { color: #1e8449; }
+    body.dark .d-empty .diff-num { color: #ff8090; }
+    body.dark .d-low   .diff-num { color: #f8c66b; }
+    body.dark .d-good  .diff-num { color: #5dde9a; }
+    .stats-legend { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.8rem; }
+    .legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: var(--text-sec); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    @media (max-width: 820px) {
+      .page-layout { flex-direction: column; }
+      .stats-col { width: 100%; }
+      .stats-card { position: static; }
+    }
+    @media (max-width: 480px) {
+      body { padding: 1rem; }
+      .card { padding: 1.3rem; }
+      .card-header h1 { font-size: 1.35rem; }
+      .radio-group { gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-container">
+  <div class="page-top">
+    <a class="back-link" href="spiele.html">← Zurück zu den Spielen</a>
+    <button class="theme-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+  </div>
+
+  <div class="page-layout">
+
+  <!-- Links: Fragenverteilung -->
+  <div class="stats-col">
+    <div class="stats-card">
+      <h2>📊 Fragenverteilung</h2>
+      <select id="stats-cat" onchange="renderStats()">
+        <option value="">Kategorie wählen…</option>
+      </select>
+      <div id="stats-content">
+        <p style="font-size:0.8rem;color:var(--text-sec);line-height:1.5;">
+          Wähle eine Kategorie, um zu sehen welche Schwierigkeiten noch fehlen oder wenig Fragen haben.
+        </p>
+      </div>
+      <div class="stats-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#c82333;"></div> 0 Fragen</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#b7770d;"></div> 1 Frage</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1e8449;"></div> 2+ Fragen</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rechts: Formular -->
+  <div class="form-col">
+
+  <!-- Eingabe-Formular -->
+  <div class="card" id="form-card">
+    <div class="card-header">
+      <h1>💡 Frage vorschlagen</h1>
+      <p>Schlage eine neue Frage vor. Die Lehrkraft prüft sie und nimmt sie bei Eignung in die Fragendatenbank auf.</p>
+    </div>
+
+    <div id="form-alert"></div>
+
+    <!-- Name -->
+    <div class="form-group">
+      <label>Dein Name <span class="label-opt">(optional)</span></label>
+      <input type="text" id="f-name" placeholder="z.B. Max Mustermann" maxlength="100">
+    </div>
+
+    <hr class="divider">
+
+    <!-- Kategorie -->
+    <div class="form-group">
+      <label>Kategorie</label>
+      <select id="f-category">
+        <option value="">Wird geladen…</option>
+      </select>
+      <p class="field-hint" id="cat-hint" style="display:none;">
+        Keine Kategorien geladen – Lehrkraft wird die Kategorie beim Review zuweisen.
+      </p>
+    </div>
+
+    <!-- Schwierigkeit -->
+    <div class="form-group">
+      <label>Schwierigkeit</label>
+      <select id="f-difficulty">
+        <option value="100">100 – sehr leicht</option>
+        <option value="200">200 – leicht</option>
+        <option value="300" selected>300 – mittel</option>
+        <option value="400">400 – schwer</option>
+        <option value="500">500 – sehr schwer</option>
+      </select>
+    </div>
+
+    <!-- Fragetyp -->
+    <div class="form-group">
+      <label>Fragetyp</label>
+      <div class="radio-group">
+        <div class="radio-opt">
+          <input type="radio" name="qtype" id="type-open" value="open" checked>
+          <label for="type-open">✏️ Offene Frage</label>
+        </div>
+        <div class="radio-opt">
+          <input type="radio" name="qtype" id="type-mc" value="mc">
+          <label for="type-mc">☑ Multiple Choice</label>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Fragetext -->
+    <div class="form-group">
+      <label>Fragetext</label>
+      <textarea id="f-question" placeholder="Deine Frage…" maxlength="500"></textarea>
+    </div>
+
+    <!-- Offene Antwort -->
+    <div id="section-open">
+      <div class="form-group">
+        <label>Korrekte Antwort</label>
+        <textarea id="f-answer" placeholder="Die richtige Antwort auf deine Frage…" maxlength="300" rows="2"></textarea>
+      </div>
+    </div>
+
+    <!-- Multiple Choice -->
+    <div id="section-mc" style="display:none;">
+      <div class="form-group">
+        <label>Antwortmöglichkeiten <span class="label-opt">(Kreis = korrekte Antwort)</span></label>
+        <div class="mc-options" id="mc-options-container"></div>
+        <button type="button" class="btn-add-opt" id="btn-add-mc" onclick="addMcOption()">+ Option hinzufügen</button>
+      </div>
+    </div>
+
+    <!-- Hinweis -->
+    <div class="form-group">
+      <label>Hinweis <span class="label-opt">(optional)</span></label>
+      <input type="text" id="f-hint" placeholder="Ein Tipp für Mitschüler…" maxlength="200">
+    </div>
+
+    <button type="button" class="submit-btn" id="submit-btn" onclick="submitSuggestion()">
+      Vorschlag einreichen
+    </button>
+  </div>
+
+  <!-- Erfolg -->
+  <div class="card success-card" id="success-card" style="display:none;">
+    <div class="success-icon">✅</div>
+    <h2>Danke für deinen Vorschlag!</h2>
+    <p>Die Lehrkraft wird ihn prüfen und bei Eignung in die Fragendatenbank aufnehmen.</p>
+    <button class="btn-again" onclick="resetForm()">Noch eine Frage vorschlagen</button>
+  </div>
+
+  </div><!-- /form-col -->
+  </div><!-- /page-layout -->
+</div>
+
+<script>
+// ── Theme ──────────────────────────────────────────────────────────
+(function() {
+  const KEY = 'spiele_theme';
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+  }
+  window.toggleTheme = function() {
+    const isDark = !document.body.classList.contains('dark');
+    localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+    applyTheme(isDark);
+  };
+  applyTheme(localStorage.getItem(KEY) === 'dark');
+})();
+
+// ── Kategorien laden ───────────────────────────────────────────────
+let allCategories = [];
+
+async function loadCategories() {
+  try {
+    const r = await fetch('./api.php?f=questions');
+    if (r.ok) { const d = await r.json(); return d.categories || []; }
+  } catch(e) {}
+  try {
+    const r = await fetch('./data/questions.json');
+    if (r.ok) { const d = await r.json(); return d.categories || []; }
+  } catch(e) {}
+  const cached = localStorage.getItem('rq_questions');
+  return cached ? (JSON.parse(cached).categories || []) : [];
+}
+
+function getLeafPaths(categories) {
+  const result = [];
+  function walk(node, prefix) {
+    const subs = node.subcategories || [];
+    if (subs.length === 0) {
+      result.push(prefix);
+    } else {
+      subs.forEach(s => walk(s, prefix + ' › ' + s.name));
+    }
+  }
+  (categories || []).forEach(cat => {
+    const subs = cat.subcategories || [];
+    if (subs.length === 0) {
+      result.push(cat.name);
+    } else {
+      subs.forEach(s => walk(s, cat.name + ' › ' + s.name));
+    }
+  });
+  return result;
+}
+
+async function initCategories() {
+  const cats = await loadCategories();
+  allCategories = cats;
+  const sel = document.getElementById('f-category');
+  const hint = document.getElementById('cat-hint');
+  if (cats.length === 0) {
+    sel.innerHTML = '<option value="">Keine Kategorien verfügbar</option>';
+    hint.style.display = '';
+    return;
+  }
+  // Formular-Dropdown: alle Blatt-Pfade
+  const paths = getLeafPaths(cats);
+  sel.innerHTML = '<option value="">– Kategorie wählen –</option>';
+  paths.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+  // Stats-Dropdown: nur Hauptkategorien
+  const statsSel = document.getElementById('stats-cat');
+  statsSel.innerHTML = '<option value="">Kategorie wählen…</option>';
+  cats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name;
+    statsSel.appendChild(opt);
+  });
+}
+
+// ── Fragenverteilung ────────────────────────────────────────────────
+function getLeafNodesWithStats(catId) {
+  const cat = allCategories.find(c => c.id === catId);
+  if (!cat) return [];
+  const leaves = [];
+  function walk(node, path) {
+    const subs = node.subcategories || [];
+    if (subs.length === 0) {
+      const qs = node.questions || [];
+      const counts = {};
+      [100, 200, 300, 400, 500].forEach(d => { counts[d] = qs.filter(q => q.difficulty === d).length; });
+      leaves.push({ path, counts });
+    } else {
+      subs.forEach(s => walk(s, path ? path + ' › ' + s.name : s.name));
+    }
+  }
+  const subs = cat.subcategories || [];
+  if (subs.length === 0) {
+    const qs = cat.questions || [];
+    const counts = {};
+    [100, 200, 300, 400, 500].forEach(d => { counts[d] = qs.filter(q => q.difficulty === d).length; });
+    return [{ path: cat.name, counts }];
+  }
+  subs.forEach(s => walk(s, s.name));
+  return leaves;
+}
+
+function renderStats() {
+  const catId = document.getElementById('stats-cat').value;
+  const container = document.getElementById('stats-content');
+  if (!catId) {
+    container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-sec);line-height:1.5;">Wähle eine Kategorie, um die Fragenverteilung zu sehen.</p>';
+    return;
+  }
+  const leaves = getLeafNodesWithStats(catId);
+  if (leaves.length === 0) {
+    container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-sec);">Keine Fragen vorhanden.</p>';
+    return;
+  }
+  let html = '';
+  leaves.forEach(leaf => {
+    html += '<div class="subcat-block">';
+    html += '<div class="subcat-name">' + escHtml(leaf.path) + '</div>';
+    html += '<div class="diff-row">';
+    [100, 200, 300, 400, 500].forEach(d => {
+      const n = leaf.counts[d];
+      const cls = n === 0 ? 'd-empty' : n === 1 ? 'd-low' : 'd-good';
+      html += `<div class="diff-slot ${cls}" title="${d}: ${n} Frage${n !== 1 ? 'n' : ''}">
+        <span class="diff-num">${n}</span>
+        <span class="diff-lbl">${d}</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+// ── Fragetyp-Toggle ────────────────────────────────────────────────
+let mcOptions = ['', '', '', ''];
+let correctMcIdx = 0;
+
+document.querySelectorAll('input[name="qtype"]').forEach(r => r.addEventListener('change', updateType));
+
+function updateType() {
+  const isOpen = document.querySelector('input[name="qtype"]:checked')?.value === 'open';
+  document.getElementById('section-open').style.display = isOpen ? '' : 'none';
+  document.getElementById('section-mc').style.display = isOpen ? 'none' : '';
+  if (!isOpen) renderMcOptions();
+}
+
+function renderMcOptions() {
+  const container = document.getElementById('mc-options-container');
+  container.innerHTML = '';
+  mcOptions.forEach((opt, i) => {
+    const row = document.createElement('div');
+    row.className = 'mc-opt-row';
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'mc-correct'; radio.value = i;
+    if (i === correctMcIdx) radio.checked = true;
+    radio.addEventListener('change', () => { correctMcIdx = i; });
+    const text = document.createElement('input');
+    text.type = 'text'; text.placeholder = 'Option ' + (i + 1);
+    text.value = opt; text.maxLength = 200;
+    text.addEventListener('input', () => { mcOptions[i] = text.value; });
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'btn-rm'; rm.textContent = '✕';
+    rm.disabled = mcOptions.length <= 2;
+    rm.addEventListener('click', () => removeMcOption(i));
+    row.appendChild(radio); row.appendChild(text); row.appendChild(rm);
+    container.appendChild(row);
+  });
+}
+
+function addMcOption() {
+  if (mcOptions.length >= 6) return;
+  mcOptions.push('');
+  renderMcOptions();
+}
+
+function removeMcOption(idx) {
+  if (mcOptions.length <= 2) return;
+  mcOptions.splice(idx, 1);
+  if (correctMcIdx >= mcOptions.length) correctMcIdx = 0;
+  else if (correctMcIdx > idx) correctMcIdx--;
+  renderMcOptions();
+}
+
+// ── Einreichen ─────────────────────────────────────────────────────
+async function submitSuggestion() {
+  document.getElementById('form-alert').innerHTML = '';
+  const name      = document.getElementById('f-name').value.trim();
+  const category  = document.getElementById('f-category').value;
+  const difficulty = parseInt(document.getElementById('f-difficulty').value || '300');
+  const type      = document.querySelector('input[name="qtype"]:checked')?.value || 'open';
+  const question  = document.getElementById('f-question').value.trim();
+  const hint      = document.getElementById('f-hint').value.trim();
+
+  if (!question) { showAlert('Bitte gib einen Fragetext ein.'); return; }
+
+  let answer = '', options = [], correctIndex = null;
+  if (type === 'open') {
+    answer = document.getElementById('f-answer').value.trim();
+    if (!answer) { showAlert('Bitte gib die korrekte Antwort ein.'); return; }
+  } else {
+    // Aktuellen Stand der Inputs lesen
+    const inputs = [...document.querySelectorAll('#mc-options-container .mc-opt-row input[type="text"]')];
+    const checked = document.querySelector('#mc-options-container input[type="radio"]:checked');
+    options = inputs.map(i => i.value.trim());
+    correctIndex = checked ? parseInt(checked.value) : 0;
+    answer = options[correctIndex] || '';
+    if (options.length < 2) { showAlert('Mindestens 2 Antwortoptionen erforderlich.'); return; }
+    if (options.some(o => !o)) { showAlert('Bitte alle Antwortoptionen ausfüllen.'); return; }
+    if (!answer) { showAlert('Bitte markiere die korrekte Antwort.'); return; }
+  }
+
+  const draft = {
+    id: 'draft-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+    submittedAt: new Date().toISOString(),
+    submitter: name || null,
+    type,
+    question,
+    answer,
+    options: type === 'mc' ? options : [],
+    correctIndex: type === 'mc' ? correctIndex : null,
+    hint: hint || '',
+    suggestedCategory: category || '',
+    difficulty
+  };
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Wird eingereicht…';
+
+  const ok = await sendDraft(draft);
+  if (ok) {
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('success-card').style.display = '';
+  } else {
+    btn.disabled = false; btn.textContent = 'Vorschlag einreichen';
+    showAlert('Fehler beim Einreichen. Bitte versuche es erneut.');
+  }
+}
+
+async function sendDraft(draft) {
+  if (window.location.protocol !== 'file:') {
+    try {
+      const r = await fetch('./api.php?f=drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft)
+      });
+      if (r.ok) return true;
+    } catch(e) {}
+  }
+  // Fallback: localStorage (file:// oder Server-Fehler)
+  try {
+    const key = 'rq_drafts';
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    existing.push(draft);
+    localStorage.setItem(key, JSON.stringify(existing));
+    return true;
+  } catch(e) { return false; }
+}
+
+function showAlert(msg) {
+  document.getElementById('form-alert').innerHTML =
+    '<div class="alert alert-danger">' + escHtml(msg) + '</div>';
+}
+
+function resetForm() {
+  document.getElementById('form-card').style.display = '';
+  document.getElementById('success-card').style.display = 'none';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-question').value = '';
+  document.getElementById('f-answer').value = '';
+  document.getElementById('f-hint').value = '';
+  document.getElementById('f-category').value = '';
+  document.getElementById('f-difficulty').value = '300';
+  document.getElementById('type-open').checked = true;
+  document.getElementById('section-open').style.display = '';
+  document.getElementById('section-mc').style.display = 'none';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Vorschlag einreichen';
+  document.getElementById('form-alert').innerHTML = '';
+  mcOptions = ['', '', '', ''];
+  correctMcIdx = 0;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+initCategories();
+renderMcOptions();
+</script>
+</body>
+</html>

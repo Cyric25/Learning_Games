@@ -19,6 +19,84 @@
       overflow: visible !important;
       text-overflow: unset !important;
     }
+    /* Vorschläge-Badge */
+    #drafts-count {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 0.1rem 0.45rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+    /* Draft-Karten */
+    .draft-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.8rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .draft-info { flex: 1; min-width: 0; }
+    .draft-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.45rem;
+    }
+    .draft-meta-tag {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.78rem;
+      padding: 0.15rem 0.5rem;
+      color: var(--text-secondary);
+    }
+    body.light .draft-meta-tag { background: rgba(0,0,0,0.05); }
+    .draft-question { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.35rem; word-break: break-word; }
+    .draft-answer { font-size: 0.83rem; color: var(--text-secondary); word-break: break-word; }
+    .draft-hint { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; }
+    .draft-actions { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
+    /* Draft approval modal */
+    #draft-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1000;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      overflow-y: auto;
+    }
+    #draft-modal.open { display: flex; }
+    #draft-modal-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    #draft-modal-panel h3 { margin-bottom: 1rem; font-size: 1.15rem; }
+    body.light #draft-modal-panel { box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .dm-info-bar {
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      margin-bottom: 1.2rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    body.light .dm-info-bar { background: rgba(0,0,0,0.04); }
   </style>
 </head>
 <body>
@@ -35,6 +113,7 @@
   <button class="tab-btn active" data-tab="tab-questions">❓ Fragen</button>
   <button class="tab-btn" data-tab="tab-import">📥 MD-Import</button>
   <button class="tab-btn" data-tab="tab-save">💾 Speichern</button>
+  <button class="tab-btn" data-tab="tab-drafts">📬 Vorschläge<span id="drafts-count" style="display:none;"></span></button>
 </nav>
 
 <main id="content">
@@ -138,7 +217,108 @@
     </div>
   </section>
 
+
+  <!-- ──── TAB: VORSCHLÄGE ─────────────────────────────────────── -->
+  <section id="tab-drafts" class="tab-panel">
+    <h2 class="section-title">Vorgeschlagene Fragen</h2>
+    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.2rem;">
+      Fragen, die Schüler über <a href="vorschlaege.html" target="_blank"
+        style="color:var(--accent);text-decoration:none;">vorschlaege.html</a> eingereicht haben.
+      Prüfen, bei Bedarf bearbeiten und in die Datenbank übernehmen oder ablehnen.
+    </p>
+    <div id="drafts-alert" style="margin-bottom:1rem;"></div>
+    <div id="drafts-list">
+      <p style="color:var(--text-secondary);">Wird geladen…</p>
+    </div>
+  </section>
+
 </main>
+
+<!-- ──── DRAFT APPROVAL MODAL ────────────────────────────────── -->
+<div id="draft-modal">
+  <div id="draft-modal-panel">
+    <h3>Frage aus Vorschlag übernehmen</h3>
+    <div class="dm-info-bar">
+      <span id="dm-submitter"></span><span id="dm-date-sep" style="display:none;"> · </span><span id="dm-date"></span>
+    </div>
+
+    <!-- Kategorie-Auswahl -->
+    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.2rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Kategorie</label>
+          <select id="dm-cat"></select>
+        </div>
+        <div class="form-group" id="dm-subcat-group" style="margin-bottom:0;display:none;">
+          <label>1. Unterkat</label>
+          <select id="dm-subcat"></select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+        <div class="form-group" id="dm-subsubcat-group" style="margin-bottom:0;display:none;">
+          <label>2. Unterkat</label>
+          <select id="dm-subsubcat"><option value="">– Direkt –</option></select>
+        </div>
+        <div class="form-group" id="dm-l4cat-group" style="margin-bottom:0;display:none;">
+          <label>3. Unterkat</label>
+          <select id="dm-l4cat"><option value="">– Direkt –</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.2rem;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Schwierigkeit</label>
+        <select id="dm-diff">
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="300" selected>300</option>
+          <option value="400">400</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Typ</label>
+        <select id="dm-type">
+          <option value="open">Offene Frage</option>
+          <option value="mc">Multiple Choice</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Fragetext</label>
+      <textarea id="dm-question" rows="3" placeholder="Fragetext…"></textarea>
+    </div>
+
+    <div id="dm-open-section">
+      <div class="form-group">
+        <label>Korrekte Antwort</label>
+        <textarea id="dm-answer" rows="2" placeholder="Antwort…"></textarea>
+      </div>
+    </div>
+
+    <div id="dm-mc-section" style="display:none;">
+      <div class="form-group">
+        <label>Antwortoptionen <span style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <div class="mc-options-editor" id="dm-mc-options"></div>
+        <button class="btn btn-secondary btn-sm" id="btn-dm-add-mc" style="margin-top:0.5rem;">+ Option</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Hinweis <span style="color:var(--text-secondary);font-size:0.85rem;">(optional)</span></label>
+      <input type="text" id="dm-hint" placeholder="Lösungshinweis (optional)">
+    </div>
+
+    <div id="dm-alert" style="margin-bottom:0.8rem;"></div>
+
+    <div class="btn-group" style="justify-content:flex-end;margin-top:1rem;">
+      <button class="btn btn-secondary" id="btn-dm-cancel">Abbrechen</button>
+      <button class="btn btn-success" id="btn-dm-save">✓ In Datenbank übernehmen</button>
+    </div>
+  </div>
+</div>
 
 <!-- ──── QUESTION MODAL ─────────────────────────────────────── -->
 <div id="q-modal">
@@ -1083,6 +1263,347 @@ function bindEvents() {
 
 // ── Start ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
+</script>
+
+<script>
+// ── Vorschläge-Tab ───────────────────────────────────────────────
+let draftsList = [];
+let approvingDraftId = null;
+
+async function apiLoadDrafts() {
+  if (window.location.protocol !== 'file:') {
+    try {
+      const r = await fetch('./api.php?f=drafts');
+      if (r.ok) return await r.json();
+    } catch(e) {}
+  }
+  return JSON.parse(localStorage.getItem('rq_drafts') || '[]');
+}
+
+async function apiDeleteDraft(id) {
+  if (window.location.protocol !== 'file:') {
+    try { await fetch('./api.php?f=draft&id=' + encodeURIComponent(id), { method: 'DELETE' }); } catch(e) {}
+  }
+  localStorage.setItem('rq_drafts', JSON.stringify(
+    JSON.parse(localStorage.getItem('rq_drafts') || '[]').filter(d => d.id !== id)
+  ));
+}
+
+async function initDraftsTab() {
+  draftsList = await apiLoadDrafts();
+  updateDraftsBadge();
+  renderDraftsList();
+}
+
+function updateDraftsBadge() {
+  const badge = document.getElementById('drafts-count');
+  if (!badge) return;
+  if (draftsList.length > 0) {
+    badge.textContent = draftsList.length;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderDraftsList() {
+  const container = document.getElementById('drafts-list');
+  if (!container) return;
+  if (draftsList.length === 0) {
+    container.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--text-secondary);">✓ Keine ausstehenden Vorschläge</div>';
+    return;
+  }
+
+  // Nach Kategorie gruppieren
+  const groups = new Map();
+  draftsList.forEach(draft => {
+    const key = draft.suggestedCategory || '(Keine Kategorie)';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(draft);
+  });
+
+  container.innerHTML = '';
+
+  groups.forEach((drafts, catName) => {
+    // Kategorie-Header
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);padding:0.4rem 0 0.5rem;margin-top:1rem;border-bottom:1px solid var(--border);margin-bottom:0.6rem;';
+    header.innerHTML = `<span style="color:var(--accent);">●</span> ${escHtml(catName)} <span style="font-weight:400;opacity:0.6;">(${drafts.length})</span>`;
+    container.appendChild(header);
+
+    drafts.forEach(draft => {
+      const date = draft.submittedAt ? new Date(draft.submittedAt).toLocaleDateString('de-DE') : '';
+      let answerPreview = '';
+      if (draft.type === 'mc' && draft.options && draft.options.length) {
+        answerPreview = 'Optionen: ' + draft.options.map((o, i) =>
+          i === draft.correctIndex ? '<strong>' + escHtml(o) + '</strong>' : escHtml(o)
+        ).join(' · ');
+      } else {
+        answerPreview = 'Antwort: ' + escHtml(draft.answer || '');
+      }
+      const card = document.createElement('div');
+      card.className = 'draft-card';
+      card.innerHTML = `
+        <div class="draft-info">
+          <div class="draft-meta">
+            <span class="type-badge type-${draft.type}">${draft.type === 'mc' ? 'MC' : 'Offen'}</span>
+            <span class="draft-meta-tag">${draft.difficulty}</span>
+            ${draft.submitter ? `<span class="draft-meta-tag">von ${escHtml(draft.submitter)}</span>` : ''}
+            ${date ? `<span style="font-size:0.78rem;color:var(--text-secondary);margin-left:auto;">${escHtml(date)}</span>` : ''}
+          </div>
+          <div class="draft-question">${escHtml(draft.question)}</div>
+          <div class="draft-answer">${answerPreview}</div>
+          ${draft.hint ? `<div class="draft-hint">Hinweis: ${escHtml(draft.hint)}</div>` : ''}
+        </div>
+        <div class="draft-actions">
+          <button class="btn btn-success btn-sm" data-id="${escHtml(draft.id)}" data-action="approve">✓ Annehmen</button>
+          <button class="btn btn-danger btn-sm" data-id="${escHtml(draft.id)}" data-action="reject">✕ Ablehnen</button>
+        </div>`;
+      container.appendChild(card);
+    });
+  });
+
+  container.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.dataset.id;
+      if (this.dataset.action === 'approve') openDraftApproval(id);
+      else rejectDraft(id);
+    });
+  });
+}
+
+async function rejectDraft(id) {
+  if (!await showConfirmDialog('Diesen Vorschlag ablehnen und löschen?')) return;
+  await apiDeleteDraft(id);
+  draftsList = draftsList.filter(d => d.id !== id);
+  updateDraftsBadge();
+  renderDraftsList();
+  showAlert('drafts-alert', 'success', 'Vorschlag abgelehnt.');
+}
+
+function openDraftApproval(id) {
+  const draft = draftsList.find(d => d.id === id);
+  if (!draft) return;
+  approvingDraftId = id;
+
+  // Submitter info
+  const subEl = document.getElementById('dm-submitter');
+  const dateEl = document.getElementById('dm-date');
+  const sepEl = document.getElementById('dm-date-sep');
+  subEl.textContent = draft.submitter ? 'von ' + draft.submitter : 'Anonym';
+  if (draft.submittedAt) {
+    dateEl.textContent = new Date(draft.submittedAt).toLocaleDateString('de-DE');
+    sepEl.style.display = '';
+  } else {
+    dateEl.textContent = ''; sepEl.style.display = 'none';
+  }
+
+  // Pre-fill fields
+  document.getElementById('dm-type').value = draft.type || 'open';
+  document.getElementById('dm-question').value = draft.question || '';
+  document.getElementById('dm-answer').value = draft.answer || '';
+  document.getElementById('dm-hint').value = draft.hint || '';
+  document.getElementById('dm-diff').value = draft.difficulty || 300;
+
+  // Category selector
+  const catSel = document.getElementById('dm-cat');
+  catSel.innerHTML = '<option value="">– Kategorie wählen –</option>';
+  questionBank.categories.forEach(c => {
+    const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name;
+    catSel.appendChild(opt);
+  });
+  // Vollständigen Pfad "Kat › Unterkat › 2.Unterkat › 3.Unterkat" auflösen
+  const pathParts = (draft.suggestedCategory || '').split(' › ').map(s => s.trim()).filter(Boolean);
+  const matchedCat = pathParts.length > 0
+    ? questionBank.categories.find(c => c.name.toLowerCase() === pathParts[0].toLowerCase())
+    : null;
+  if (matchedCat) {
+    catSel.value = matchedCat.id;
+    const matchedSub = pathParts.length > 1
+      ? (matchedCat.subcategories || []).find(s => s.name.toLowerCase() === pathParts[1].toLowerCase())
+      : null;
+    dmPopulateSubcat(matchedCat.id, matchedSub ? matchedSub.id : '');
+    if (matchedSub) {
+      const matchedSS = pathParts.length > 2
+        ? (matchedSub.subcategories || []).find(s => s.name.toLowerCase() === pathParts[2].toLowerCase())
+        : null;
+      dmPopulateSubsubcat(matchedCat.id, matchedSub.id, matchedSS ? matchedSS.id : '');
+      if (matchedSS) {
+        const matchedL4 = pathParts.length > 3
+          ? (matchedSS.subcategories || []).find(s => s.name.toLowerCase() === pathParts[3].toLowerCase())
+          : null;
+        dmPopulateL4(matchedCat.id, matchedSub.id, matchedSS.id, matchedL4 ? matchedL4.id : '');
+      } else {
+        dmPopulateL4('', '', '', '');
+      }
+    } else {
+      dmPopulateSubsubcat(matchedCat.id, '', ''); dmPopulateL4('', '', '', '');
+    }
+  } else {
+    dmPopulateSubcat('', ''); dmPopulateSubsubcat('', '', ''); dmPopulateL4('', '', '', '');
+  }
+
+  // MC options
+  if (draft.type === 'mc' && draft.options && draft.options.length) {
+    dmRenderMcOptions(draft.options, draft.correctIndex ?? 0);
+  } else {
+    dmRenderMcOptions(['', '', '', ''], 0);
+  }
+  dmUpdateType(draft.type || 'open');
+
+  showAlert('dm-alert', '', '');
+  document.getElementById('draft-modal').classList.add('open');
+}
+
+function closeDraftModal() {
+  document.getElementById('draft-modal').classList.remove('open');
+  approvingDraftId = null;
+}
+
+function dmUpdateType(type) {
+  document.getElementById('dm-open-section').style.display = type === 'open' ? '' : 'none';
+  document.getElementById('dm-mc-section').style.display = type === 'mc' ? '' : 'none';
+}
+
+function dmPopulateSubcat(catId, selectedId) {
+  const sel = document.getElementById('dm-subcat');
+  const group = document.getElementById('dm-subcat-group');
+  sel.innerHTML = '<option value="">– Direkt –</option>';
+  if (!catId) { group.style.display = 'none'; dmPopulateSubsubcat('', '', ''); return; }
+  const cat = questionBank.categories.find(c => c.id === catId);
+  const subs = (cat && cat.subcategories) || [];
+  if (!subs.length) { group.style.display = 'none'; return; }
+  group.style.display = '';
+  subs.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; if (s.id === selectedId) o.selected = true; sel.appendChild(o); });
+}
+
+function dmPopulateSubsubcat(catId, subcatId, selectedId) {
+  const sel = document.getElementById('dm-subsubcat');
+  const group = document.getElementById('dm-subsubcat-group');
+  sel.innerHTML = '<option value="">– Direkt –</option>';
+  if (!catId || !subcatId) { group.style.display = 'none'; dmPopulateL4('', '', '', ''); return; }
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) { group.style.display = 'none'; return; }
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  const subs = (sub && sub.subcategories) || [];
+  if (!subs.length) { group.style.display = 'none'; return; }
+  group.style.display = '';
+  subs.forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; if (s.id === selectedId) o.selected = true; sel.appendChild(o); });
+}
+
+function dmPopulateL4(catId, subcatId, subsubId, selectedId) {
+  const sel = document.getElementById('dm-l4cat');
+  const group = document.getElementById('dm-l4cat-group');
+  sel.innerHTML = '<option value="">– Direkt –</option>';
+  if (!subsubId) { group.style.display = 'none'; return; }
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) { group.style.display = 'none'; return; }
+  const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+  if (!sub) { group.style.display = 'none'; return; }
+  const ss = (sub.subcategories || []).find(x => x.id === subsubId);
+  const l4s = (ss && ss.subcategories) || [];
+  if (!l4s.length) { group.style.display = 'none'; return; }
+  group.style.display = '';
+  l4s.forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; if (x.id === selectedId) o.selected = true; sel.appendChild(o); });
+}
+
+// MC options in draft modal
+function dmRenderMcOptions(options, correctIndex) {
+  const container = document.getElementById('dm-mc-options'); container.innerHTML = '';
+  options.forEach((opt, i) => {
+    const row = document.createElement('div'); row.className = 'mc-option-row';
+    row.innerHTML = `<input type="radio" name="dm-mc-correct" value="${i}" ${correctIndex === i ? 'checked' : ''}>
+      <input type="text" class="dm-mc-opt" value="${escHtml(opt)}" placeholder="Option ${i + 1}">
+      <button class="btn btn-danger btn-sm" ${options.length <= 2 ? 'disabled' : ''} data-dmi="${i}">✕</button>`;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const idx = parseInt(b.dataset.dmi);
+    const opts = [...document.querySelectorAll('#dm-mc-options .dm-mc-opt')].map(i => i.value);
+    if (opts.length <= 2) return;
+    const ci = parseInt(document.querySelector('#dm-mc-options input[type="radio"]:checked')?.value || '0');
+    opts.splice(idx, 1);
+    dmRenderMcOptions(opts, ci > idx ? ci - 1 : ci === idx ? 0 : ci);
+  }));
+}
+
+function dmGetMcOptions() {
+  return [...document.querySelectorAll('#dm-mc-options .dm-mc-opt')].map(i => i.value);
+}
+function dmGetCorrectMcIndex() {
+  const c = document.querySelector('#dm-mc-options input[type="radio"]:checked');
+  return c ? parseInt(c.value) : 0;
+}
+
+async function saveApprovedDraft() {
+  const catId = document.getElementById('dm-cat').value;
+  const subcatId = document.getElementById('dm-subcat').value;
+  const subsubId = document.getElementById('dm-subsubcat').value;
+  const l4Id = document.getElementById('dm-l4cat').value;
+  const type = document.getElementById('dm-type').value;
+  const diff = parseInt(document.getElementById('dm-diff').value);
+  const qText = document.getElementById('dm-question').value.trim();
+  const hint = document.getElementById('dm-hint').value.trim();
+
+  if (!qText) { showAlert('dm-alert', 'danger', 'Bitte Fragetext eingeben.'); return; }
+  if (!catId) { showAlert('dm-alert', 'danger', 'Bitte Kategorie wählen.'); return; }
+
+  let answer = '', options = [], correctIndex = null;
+  if (type === 'open') {
+    answer = document.getElementById('dm-answer').value.trim();
+    if (!answer) { showAlert('dm-alert', 'danger', 'Bitte Antwort eingeben.'); return; }
+  } else {
+    options = dmGetMcOptions(); correctIndex = dmGetCorrectMcIndex();
+    answer = options[correctIndex] || '';
+    if (options.length < 2 || !answer) { showAlert('dm-alert', 'danger', 'Bitte Optionen ausfüllen und korrekte Antwort markieren.'); return; }
+  }
+
+  // Zielknoten finden
+  const cat = questionBank.categories.find(c => c.id === catId);
+  if (!cat) { showAlert('dm-alert', 'danger', 'Kategorie nicht gefunden.'); return; }
+  let targetNode = cat;
+  if (subcatId) {
+    const sub = (cat.subcategories || []).find(s => s.id === subcatId);
+    if (sub) {
+      targetNode = sub;
+      if (subsubId) {
+        const ss = (sub.subcategories || []).find(x => x.id === subsubId);
+        if (ss) { targetNode = ss; if (l4Id) { const l4 = (ss.subcategories || []).find(x => x.id === l4Id); if (l4) targetNode = l4; } }
+      }
+    }
+  }
+  if (!targetNode.questions) targetNode.questions = [];
+  targetNode.questions.push(GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint }));
+
+  await saveQuestionsToServer();
+  await apiDeleteDraft(approvingDraftId);
+  draftsList = draftsList.filter(d => d.id !== approvingDraftId);
+
+  closeDraftModal();
+  renderCategories(); updateStats();
+  updateDraftsBadge(); renderDraftsList();
+  showAlert('drafts-alert', 'success', 'Frage übernommen und in die Datenbank aufgenommen!');
+}
+
+// Bind draft modal events + refresh when tab opened
+document.addEventListener('DOMContentLoaded', function() {
+  // Load badge count immediately
+  initDraftsTab();
+
+  // Refresh when tab is opened
+  const draftsTabBtn = document.querySelector('[data-tab="tab-drafts"]');
+  if (draftsTabBtn) draftsTabBtn.addEventListener('click', initDraftsTab);
+
+  // Draft modal events
+  document.getElementById('dm-type').addEventListener('change', function() { dmUpdateType(this.value); });
+  document.getElementById('dm-cat').addEventListener('change', function() { dmPopulateSubcat(this.value, ''); dmPopulateSubsubcat(this.value, '', ''); dmPopulateL4(this.value, '', '', ''); });
+  document.getElementById('dm-subcat').addEventListener('change', function() { const c = document.getElementById('dm-cat').value; dmPopulateSubsubcat(c, this.value, ''); dmPopulateL4(c, this.value, '', ''); });
+  document.getElementById('dm-subsubcat').addEventListener('change', function() { dmPopulateL4(document.getElementById('dm-cat').value, document.getElementById('dm-subcat').value, this.value, ''); });
+  document.getElementById('btn-dm-add-mc').addEventListener('click', function() { const opts = dmGetMcOptions(); const ci = dmGetCorrectMcIndex(); opts.push(''); dmRenderMcOptions(opts, ci); });
+  document.getElementById('btn-dm-cancel').addEventListener('click', closeDraftModal);
+  document.getElementById('btn-dm-save').addEventListener('click', saveApprovedDraft);
+  document.getElementById('draft-modal').addEventListener('click', function(e) { if (e.target === this) closeDraftModal(); });
+});
 </script>
 
 <script>

@@ -248,11 +248,18 @@
     <!-- ── Tab: MD-Import ──────────────────────────────── -->
     <div class="tab-content" id="tab-import">
       <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;">
-        Format: <code>## Kategoriename</code> → <code>- typA | inhaltA | typB | inhaltB | schwierigkeit</code>
+        Format: <code>## Kategoriename</code> → <code>- Formel | $Li^+$ | Text | Lithium-Ion | 1</code>
       </p>
-      <textarea id="import-textarea" placeholder="## Chemie - Summenformeln
-- text | Schwefelsäure | formula | H_2SO_4
-- text | Wasser | formula | H_2O"></textarea>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <label class="btn btn-secondary" style="cursor:pointer;margin:0;">
+          📂 Datei öffnen
+          <input type="file" id="import-file" accept=".md,.txt" style="display:none;">
+        </label>
+        <span id="import-filename" style="font-size:0.85rem;color:var(--text-secondary);"></span>
+      </div>
+      <textarea id="import-textarea" placeholder="## Kationen
+- Formel | $Li^+$ | Text | Lithium-Ion | 1
+- Formel | $Na^+$ | Text | Natrium-Ion | 1"></textarea>
       <button class="btn btn-secondary" onclick="previewImport()">Vorschau</button>
       <div class="import-preview" id="import-preview" style="display:none;"></div>
       <button class="btn btn-primary" id="btn-confirm-import" onclick="confirmImport()" style="display:none;margin-top:8px;">Import bestätigen</button>

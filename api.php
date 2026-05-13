@@ -331,6 +331,56 @@ if ($key === 'labyrinth-game') {
     exit;
 }
 
+// ── Drafts (Schüler-Vorschläge): ?f=drafts ───────────────────────
+if ($key === 'drafts') {
+    $draftsPath = __DIR__ . '/data/drafts.json';
+    if (!is_dir(dirname($draftsPath))) @mkdir(dirname($draftsPath), 0755, true);
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($draftsPath) ? file_get_contents($draftsPath) : '[]';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        $draft = json_decode($body, true);
+        if ($draft === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        $fp = fopen($draftsPath, 'c+');
+        if (!$fp || !flock($fp, LOCK_EX)) {
+            if ($fp) fclose($fp);
+            http_response_code(500); echo json_encode(['error' => 'lock error']); exit;
+        }
+        $existing = json_decode(stream_get_contents($fp), true) ?: [];
+        $existing[] = $draft;
+        ftruncate($fp, 0); rewind($fp);
+        fwrite($fp, json_encode($existing, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+        echo json_encode(['ok' => true]);
+    }
+    exit;
+}
+
+// ── Single Draft: ?f=draft&id=X ──────────────────────────────────
+if ($key === 'draft') {
+    $draftsPath = __DIR__ . '/data/drafts.json';
+    $draftId = trim($_GET['id'] ?? '');
+    if ($_SERVER['REQUEST_METHOD'] === 'DELETE' && $draftId !== '') {
+        if (file_exists($draftsPath)) {
+            $fp = fopen($draftsPath, 'c+');
+            if ($fp && flock($fp, LOCK_EX)) {
+                $drafts = json_decode(stream_get_contents($fp), true) ?: [];
+                $drafts = array_values(array_filter($drafts, fn($d) => ($d['id'] ?? '') !== $draftId));
+                ftruncate($fp, 0); rewind($fp);
+                fwrite($fp, json_encode($drafts, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+            }
+        }
+        echo json_encode(['ok' => true]);
+    } else {
+        http_response_code(400); echo json_encode(['error' => 'invalid request']);
+    }
+    exit;
+}
+
 // ── Legacy-Endpunkte: ?f=questions / ?f=gamestate ─────────────────
 if (!array_key_exists($key, $files)) {
     http_response_code(400);

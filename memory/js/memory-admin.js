@@ -9,6 +9,17 @@ async function init() {
   pairsData = await MemoryStorageManager.loadPairs();
   renderCategories();
   populateCatSelect();
+  document.getElementById('import-file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      document.getElementById('import-textarea').value = ev.target.result;
+      document.getElementById('import-filename').textContent = file.name;
+      previewImport();
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
 }
 
 // ── Tabs ────────────────────────────────────────────────────

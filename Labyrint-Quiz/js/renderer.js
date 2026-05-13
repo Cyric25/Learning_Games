@@ -1,4 +1,4 @@
-/* renderer.js – Canvas-Renderer für das Labyrinth */
+/* renderer.js – Mittelalter Canvas-Renderer v2 */
 
 class MazeRenderer {
   constructor(canvas) {
@@ -9,398 +9,395 @@ class MazeRenderer {
     this.cellSize = 0;
     this.offsetX = 0;
     this.offsetY = 0;
-    this._animationId = null;
-    this._pendingAnimations = [];
-
-    // Team figure emojis
-    this.FIGURES = ['🛡️', '🐉', '🦉', '🦊', '🧙', '🤖'];
-
-    // Cache colors
+    this._animId = null;
     this._colors = null;
     this._colorsTheme = null;
   }
 
-  // ── Color helpers ──────────────────────────────────────────────
-  _readColors() {
-    const currentTheme = document.body.classList.contains('dark') ? 'dark' : 'light';
-    if (this._colors && this._colorsTheme === currentTheme) return this._colors;
-
+  // ── Color cache ────────────────────────────────────────────────
+  _c() {
+    const theme = document.body.classList.contains('dark') ? 'dark' : 'light';
+    if (this._colors && this._colorsTheme === theme) return this._colors;
     const s = getComputedStyle(document.body);
-    const get = (prop, fallback) => s.getPropertyValue(prop).trim() || fallback;
-
+    const g = (v, fb) => s.getPropertyValue(v).trim() || fb;
     this._colors = {
-      wall:       get('--maze-wall', '#2d1b69'),
-      path:       get('--maze-path', '#f3f0ff'),
-      door:       get('--maze-door', '#dc2626'),
-      doorOpen:   get('--maze-door-open', '#16a34a'),
-      symbol:     get('--maze-symbol', '#eab308'),
-      symbolFound: get('--maze-symbol-found', '#9ca3af'),
-      goal:       get('--maze-goal', '#f59e0b'),
-      start:      get('--maze-start', '#3b82f6'),
-      bg:         get('--bg-primary', '#fdf6f0'),
-      text:       get('--text-primary', '#1a1a1a'),
-      accent:     get('--accent', '#7c3aed'),
+      wall:         g('--maze-wall',         '#2c1810'),
+      path:         g('--maze-path',         '#f5e6c8'),
+      door:         g('--maze-door',         '#8b1a1a'),
+      doorOpen:     g('--maze-door-open',    '#2d5a27'),
+      validFree:    g('--maze-valid-free',   'rgba(201,162,39,0.35)'),
+      validDoor:    g('--maze-valid-door',   'rgba(139,26,26,0.30)'),
+      validSym:     g('--maze-valid-sym',    'rgba(80,40,160,0.30)'),
+      gold:         g('--accent',            '#c9a227'),
       teams: [
-        get('--team-1', '#3b82f6'),
-        get('--team-2', '#ef4444'),
-        get('--team-3', '#22c55e'),
-        get('--team-4', '#f59e0b'),
-        get('--team-5', '#a855f7'),
-        get('--team-6', '#ec4899')
+        g('--team-1','#1a3a8f'), g('--team-2','#8f1a1a'),
+        g('--team-3','#1a6b1a'), g('--team-4','#6b1a6b'),
+        g('--team-5','#8f5a1a'), g('--team-6','#1a6b6b'),
       ]
     };
-    this._colorsTheme = currentTheme;
+    this._colorsTheme = theme;
     return this._colors;
   }
 
+  invalidateColors() { this._colors = null; }
+
   // ── Sizing ─────────────────────────────────────────────────────
   resize() {
+    if (!this.maze || !this.canvas.parentElement) return;
     const parent = this.canvas.parentElement;
-    if (!parent || !this.maze) return;
-
-    const available = Math.min(parent.clientWidth, parent.clientHeight);
+    const size = Math.min(parent.clientWidth, parent.clientHeight);
     const dpr = window.devicePixelRatio || 1;
-    const size = Math.floor(available);
-
-    this.canvas.style.width = size + 'px';
+    this.canvas.style.width  = size + 'px';
     this.canvas.style.height = size + 'px';
-    this.canvas.width = size * dpr;
+    this.canvas.width  = size * dpr;
     this.canvas.height = size * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const wallWidth = 2;
-    this.cellSize = Math.floor((size - wallWidth) / this.maze.grid[0].length);
-    this.offsetX = Math.floor((size - this.cellSize * this.maze.grid[0].length) / 2);
-    this.offsetY = Math.floor((size - this.cellSize * this.maze.grid.length) / 2);
+    const cols = this.maze.grid[0].length;
+    const rows = this.maze.grid.length;
+    this.cellSize = Math.floor(size / Math.max(cols, rows));
+    this.offsetX  = Math.floor((size - this.cellSize * cols) / 2);
+    this.offsetY  = Math.floor((size - this.cellSize * rows) / 2);
   }
 
-  // ── Main render ────────────────────────────────────────────────
   setMaze(maze) {
     this.maze = maze;
     this.resize();
   }
 
-  render(gameState) {
-    this.gameState = gameState;
+  // ── Full render ────────────────────────────────────────────────
+  render(gs) {
+    this.gameState = gs;
     const ctx = this.ctx;
-    const c = this._readColors();
-    const cs = this.cellSize;
-    const ox = this.offsetX;
-    const oy = this.offsetY;
+    const c   = this._c();
+    const cs  = this.cellSize;
+    const ox  = this.offsetX;
+    const oy  = this.offsetY;
     const grid = this.maze.grid;
-    const h = grid.length;
-    const w = grid[0].length;
+    const rows = grid.length;
+    const cols = grid[0].length;
 
-    // Clear
+    // Background (dark stone for canvas area)
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw cells
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        this._drawCell(ctx, x, y, c, cs, ox, oy);
-      }
+    // 1. Draw all path backgrounds
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < cols; x++)
+        this._drawPathBg(ctx, x, y, c, cs, ox, oy);
+
+    // 2. Draw valid move highlights
+    if (gs && (gs.phase === 'moving' || gs.phase === 'animating-dice')) {
+      this._drawValidHighlights(ctx, gs, c, cs, ox, oy);
     }
 
-    // Draw walls
+    // 3. Draw walls (thick, stone)
+    this._drawAllWalls(ctx, grid, c, cs, ox, oy, rows, cols);
+
+    // 4. Draw stone corner squares
+    this._drawCornerSquares(ctx, c, cs, ox, oy, rows, cols);
+
+    // 5. Outer border
     ctx.strokeStyle = c.wall;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        this._drawWalls(ctx, grid[y][x], x, y, cs, ox, oy);
-      }
-    }
+    ctx.lineWidth = 4;
+    ctx.strokeRect(ox, oy, cols * cs, rows * cs);
 
-    // Draw outer border
-    ctx.strokeStyle = c.wall;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(ox, oy, w * cs, h * cs);
+    // 6. Door icons
+    if (gs) gs.doors.forEach(d => this._drawDoor(ctx, d, c, cs, ox, oy));
 
-    // Draw door icons
-    for (const door of gameState.doors) {
-      this._drawDoor(ctx, door, c, cs, ox, oy);
-    }
+    // 7. Team symbols
+    if (gs) this._drawAllSymbols(ctx, gs, c, cs, ox, oy);
 
-    // Draw symbols
-    for (const sym of gameState.symbols) {
-      this._drawSymbol(ctx, sym, gameState, c, cs, ox, oy);
-    }
+    // 8. Start position markers (faint, under figures)
+    if (gs) this._drawStartMarkers(ctx, gs, c, cs, ox, oy);
 
-    // Draw start marker
-    this._drawMarker(ctx, this.maze.start.x, this.maze.start.y, 'S', c.start, c, cs, ox, oy);
-
-    // Draw goal marker
-    this._drawMarker(ctx, this.maze.goal.x, this.maze.goal.y, '🏁', c.goal, c, cs, ox, oy);
-
-    // Draw team figures
-    this._drawTeams(ctx, gameState, c, cs, ox, oy);
+    // 9. Team figures
+    if (gs) this._drawTeamFigures(ctx, gs, c, cs, ox, oy);
   }
 
-  // ── Cell background ────────────────────────────────────────────
-  _drawCell(ctx, x, y, c, cs, ox, oy) {
-    const cell = this.maze.grid[y][x];
-    let color = c.path;
-
-    if (cell.type === 'start') color = c.start + '33'; // 20% opacity
-    else if (cell.type === 'goal') color = c.goal + '33';
-
-    ctx.fillStyle = color;
+  // ── Path background ────────────────────────────────────────────
+  _drawPathBg(ctx, x, y, c, cs, ox, oy) {
+    // Alternating parchment shade for checkerboard texture
+    const shade = (x + y) % 2 === 0 ? c.path : this._darkenHex(c.path, 8);
+    ctx.fillStyle = shade;
     ctx.fillRect(ox + x * cs, oy + y * cs, cs, cs);
   }
 
+  _darkenHex(hex, amount) {
+    // Simple darkening: parse rgb, subtract amount
+    hex = hex.replace('#', '');
+    const r = Math.max(0, parseInt(hex.substr(0,2),16) - amount);
+    const g = Math.max(0, parseInt(hex.substr(2,2),16) - amount);
+    const b = Math.max(0, parseInt(hex.substr(4,2),16) - amount);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ── Valid move highlights ──────────────────────────────────────
+  _drawValidHighlights(ctx, gs, c, cs, ox, oy) {
+    const validFree = gs._validFree || new Set();
+    const validDoor = gs._validDoor || new Set();
+    const validSym  = gs._validSym  || new Set();
+
+    for (const key of validFree) {
+      const [x, y] = key.split(',').map(Number);
+      ctx.fillStyle = c.validFree;
+      ctx.fillRect(ox + x * cs + 1, oy + y * cs + 1, cs - 2, cs - 2);
+    }
+    for (const key of validDoor) {
+      const [x, y] = key.split(',').map(Number);
+      ctx.fillStyle = c.validDoor;
+      ctx.fillRect(ox + x * cs + 1, oy + y * cs + 1, cs - 2, cs - 2);
+    }
+    for (const key of validSym) {
+      const [x, y] = key.split(',').map(Number);
+      ctx.fillStyle = c.validSym;
+      ctx.fillRect(ox + x * cs + 1, oy + y * cs + 1, cs - 2, cs - 2);
+    }
+  }
+
   // ── Walls ──────────────────────────────────────────────────────
-  _drawWalls(ctx, cell, x, y, cs, ox, oy) {
-    const px = ox + x * cs;
-    const py = oy + y * cs;
+  _drawAllWalls(ctx, grid, c, cs, ox, oy, rows, cols) {
+    ctx.strokeStyle = c.wall;
+    ctx.lineWidth = Math.max(2.5, cs * 0.12);
+    ctx.lineCap = 'square';
 
     ctx.beginPath();
-    if (cell.walls & 1) { // N
-      ctx.moveTo(px, py);
-      ctx.lineTo(px + cs, py);
-    }
-    if (cell.walls & 2) { // E
-      ctx.moveTo(px + cs, py);
-      ctx.lineTo(px + cs, py + cs);
-    }
-    if (cell.walls & 4) { // S
-      ctx.moveTo(px, py + cs);
-      ctx.lineTo(px + cs, py + cs);
-    }
-    if (cell.walls & 8) { // W
-      ctx.moveTo(px, py);
-      ctx.lineTo(px, py + cs);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const px = ox + x * cs;
+        const py = oy + y * cs;
+        const cell = grid[y][x];
+        if (cell.walls & 1) { ctx.moveTo(px, py);      ctx.lineTo(px + cs, py);      } // N
+        if (cell.walls & 2) { ctx.moveTo(px + cs, py); ctx.lineTo(px + cs, py + cs); } // E
+        if (cell.walls & 4) { ctx.moveTo(px, py + cs); ctx.lineTo(px + cs, py + cs); } // S
+        if (cell.walls & 8) { ctx.moveTo(px, py);      ctx.lineTo(px, py + cs);      } // W
+      }
     }
     ctx.stroke();
+  }
+
+  // ── Corner squares (stone block joints) ───────────────────────
+  _drawCornerSquares(ctx, c, cs, ox, oy, rows, cols) {
+    const sq = Math.max(2, Math.ceil(cs * 0.13));
+    ctx.fillStyle = c.wall;
+    for (let y = 0; y <= rows; y++)
+      for (let x = 0; x <= cols; x++)
+        ctx.fillRect(ox + x * cs - sq / 2, oy + y * cs - sq / 2, sq, sq);
   }
 
   // ── Door icon ──────────────────────────────────────────────────
   _drawDoor(ctx, door, c, cs, ox, oy) {
     const cx = ox + door.x * cs + cs / 2;
     const cy = oy + door.y * cs + cs / 2;
-    const r = cs * 0.32;
+    const r  = cs * 0.34;
 
     if (door.open) {
-      // Open door: green circle with checkmark
       ctx.fillStyle = c.doorOpen;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#fff';
-      ctx.font = `bold ${cs * 0.35}px sans-serif`;
+      ctx.font = `bold ${cs * 0.32}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('✓', cx, cy);
+      ctx.fillText('✓', cx, cy + 1);
     } else {
-      // Closed door: red circle with lock
+      // Stone arch / locked door
       ctx.fillStyle = c.door;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.roundRect(cx - r, cy - r, r * 2, r * 2, cs * 0.08);
       ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = `${cs * 0.35}px sans-serif`;
+
+      // Lock icon
+      ctx.fillStyle = '#f5e6c8';
+      ctx.font = `${cs * 0.36}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('🔒', cx, cy + 1);
     }
   }
 
-  // ── Symbol icon ────────────────────────────────────────────────
-  _drawSymbol(ctx, sym, gameState, c, cs, ox, oy) {
-    const cx = ox + sym.x * cs + cs / 2;
-    const cy = oy + sym.y * cs + cs / 2;
-    const r = cs * 0.30;
+  // ── Team symbols ───────────────────────────────────────────────
+  _drawAllSymbols(ctx, gs, c, cs, ox, oy) {
+    const pulse = 0.85 + 0.15 * Math.sin(Date.now() / 400);
 
-    if (sym.found) {
-      // Found: dimmed circle
-      ctx.fillStyle = c.symbolFound;
-      ctx.globalAlpha = 0.4;
+    for (const sym of gs.allSymbols) {
+      if (sym.found) continue;
+      const cx = ox + sym.x * cs + cs / 2;
+      const cy = oy + sym.y * cs + cs / 2;
+      const teamColor = c.teams[sym.teamId % c.teams.length];
+      const r = cs * 0.30;
+
+      // Glow for active team's symbols
+      const isActiveTeam = sym.teamId === gs.currentTeamIdx;
+      if (isActiveTeam) {
+        ctx.shadowColor = teamColor;
+        ctx.shadowBlur  = 8 * pulse;
+      }
+
+      // Filled circle in team color
+      ctx.fillStyle = teamColor;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = 1;
-      return;
+      ctx.shadowBlur = 0;
+
+      // Symbol icon (team-specific)
+      const icon = gs.teams[sym.teamId] ? gs.teams[sym.teamId].symbolIcon : '⭐';
+      ctx.font = `${cs * 0.32}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(icon, cx, cy + 1);
+
+      // Border ring
+      ctx.strokeStyle = '#f5e6c8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
     }
-
-    // Active symbol: golden circle with category emoji or star
-    const cat = sym._category;
-    const icon = (cat && cat.icon) ? cat.icon : '⭐';
-
-    // Glow effect
-    ctx.shadowColor = c.symbol;
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = c.symbol;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.font = `${cs * 0.35}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(icon, cx, cy + 1);
   }
 
-  // ── Start/Goal marker ─────────────────────────────────────────
-  _drawMarker(ctx, x, y, label, color, c, cs, ox, oy) {
-    const cx = ox + x * cs + cs / 2;
-    const cy = oy + y * cs + cs / 2;
-
-    if (label.length > 1) {
-      // Emoji marker (goal)
-      ctx.font = `${cs * 0.5}px sans-serif`;
+  // ── Start markers ──────────────────────────────────────────────
+  _drawStartMarkers(ctx, gs, c, cs, ox, oy) {
+    if (!this.maze.startPositions) return;
+    this.maze.startPositions.forEach((pos, i) => {
+      const team = gs.teams[i];
+      if (!team) return;
+      const cx = ox + pos.x * cs + cs / 2;
+      const cy = oy + pos.y * cs + cs / 2;
+      // Faint colored corner marker
+      ctx.fillStyle = c.teams[i % c.teams.length] + '33'; // 20% opacity
+      ctx.fillRect(ox + pos.x * cs + 1, oy + pos.y * cs + 1, cs - 2, cs - 2);
+      // Small flag
+      ctx.font = `${cs * 0.28}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, cx, cy + 1);
-    } else {
-      // Letter marker (start)
-      ctx.fillStyle = color;
-      ctx.font = `bold ${cs * 0.45}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, cx, cy);
-    }
+      ctx.fillText('🏠', cx, cy + 1);
+    });
   }
 
   // ── Team figures ───────────────────────────────────────────────
-  _drawTeams(ctx, gameState, c, cs, ox, oy) {
-    const teams = gameState.teams;
-    if (!teams || teams.length === 0) return;
+  _drawTeamFigures(ctx, gs, c, cs, ox, oy) {
+    const { teams, currentTeamIdx } = gs;
+    if (!teams.length) return;
 
-    // Group teams by position
-    const posGroups = {};
-    teams.forEach((team, i) => {
-      const key = `${team.x},${team.y}`;
-      if (!posGroups[key]) posGroups[key] = [];
-      posGroups[key].push(i);
+    // Group by position
+    const groups = {};
+    teams.forEach((t, i) => {
+      const key = `${Math.round(t.x)},${Math.round(t.y)}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(i);
     });
 
-    for (const key of Object.keys(posGroups)) {
-      const indices = posGroups[key];
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 280);
+
+    for (const key of Object.keys(groups)) {
+      const idxs = groups[key];
       const [tx, ty] = key.split(',').map(Number);
       const baseCx = ox + tx * cs + cs / 2;
       const baseCy = oy + ty * cs + cs / 2;
+      const offsets = this._getOffsets(idxs.length, cs * 0.22);
 
-      // Offset positions if multiple teams on same cell
-      const offsets = this._getMultiOffsets(indices.length, cs * 0.2);
+      idxs.forEach((ti, oi) => {
+        const team = teams[ti];
+        const isActive = ti === currentTeamIdx;
+        const fcx = baseCx + offsets[oi].dx;
+        const fcy = baseCy + offsets[oi].dy;
+        const teamColor = c.teams[ti % c.teams.length];
 
-      indices.forEach((teamIdx, offsetIdx) => {
-        const team = teams[teamIdx];
-        const isActive = teamIdx === gameState.currentTeamIdx;
-        const figCx = baseCx + offsets[offsetIdx].dx;
-        const figCy = baseCy + offsets[offsetIdx].dy;
-
-        // Active team: pulsing glow ring
+        // Active ring
         if (isActive) {
-          const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
-          ctx.strokeStyle = c.teams[teamIdx % c.teams.length];
-          ctx.lineWidth = 2;
           ctx.globalAlpha = pulse;
+          ctx.strokeStyle = teamColor;
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(figCx, figCy, cs * 0.35, 0, Math.PI * 2);
+          ctx.arc(fcx, fcy, cs * 0.34, 0, Math.PI * 2);
           ctx.stroke();
           ctx.globalAlpha = 1;
         }
 
-        // Figure background circle
-        ctx.fillStyle = c.teams[teamIdx % c.teams.length];
+        // Figure circle
+        ctx.fillStyle = teamColor;
         ctx.beginPath();
-        ctx.arc(figCx, figCy, cs * 0.25, 0, Math.PI * 2);
+        ctx.arc(fcx, fcy, cs * 0.26, 0, Math.PI * 2);
         ctx.fill();
 
+        // White ring
+        ctx.strokeStyle = '#f5e6c8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(fcx, fcy, cs * 0.26, 0, Math.PI * 2);
+        ctx.stroke();
+
         // Figure emoji
-        const emoji = team.emoji || this.FIGURES[teamIdx % this.FIGURES.length];
-        const fontSize = isActive ? cs * 0.32 : cs * 0.28;
-        ctx.font = `${fontSize}px sans-serif`;
+        ctx.font = `${isActive ? cs * 0.30 : cs * 0.26}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(emoji, figCx, figCy + 1);
+        ctx.fillText(team.emoji || '🛡️', fcx, fcy + 1);
       });
     }
   }
 
-  _getMultiOffsets(count, spacing) {
+  _getOffsets(count, spacing) {
     if (count === 1) return [{ dx: 0, dy: 0 }];
     if (count === 2) return [{ dx: -spacing, dy: 0 }, { dx: spacing, dy: 0 }];
     if (count === 3) return [
-      { dx: 0, dy: -spacing },
+      { dx: 0, dy: -spacing * 0.8 },
       { dx: -spacing, dy: spacing * 0.6 },
       { dx: spacing, dy: spacing * 0.6 }
     ];
-    // 4+: square arrangement
-    const offsets = [];
     const cols = Math.ceil(Math.sqrt(count));
-    for (let i = 0; i < count; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      offsets.push({
-        dx: (col - (cols - 1) / 2) * spacing,
-        dy: (row - (Math.ceil(count / cols) - 1) / 2) * spacing
-      });
-    }
-    return offsets;
+    return Array.from({ length: count }, (_, i) => ({
+      dx: ((i % cols) - (cols - 1) / 2) * spacing,
+      dy: (Math.floor(i / cols) - (Math.ceil(count / cols) - 1) / 2) * spacing
+    }));
   }
 
-  // ── Click detection ────────────────────────────────────────────
+  // ── Click → cell ───────────────────────────────────────────────
   getCellFromClick(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.clientWidth / (this.canvas.clientWidth); // CSS vs canvas
     const mx = clientX - rect.left;
     const my = clientY - rect.top;
-
     const gx = Math.floor((mx - this.offsetX) / this.cellSize);
     const gy = Math.floor((my - this.offsetY) / this.cellSize);
-
-    if (gx >= 0 && gx < this.maze.grid[0].length && gy >= 0 && gy < this.maze.grid.length) {
-      return { x: gx, y: gy };
-    }
+    const cols = this.maze.grid[0].length;
+    const rows = this.maze.grid.length;
+    if (gx >= 0 && gx < cols && gy >= 0 && gy < rows) return { x: gx, y: gy };
     return null;
   }
 
-  // ── Animate movement ──────────────────────────────────────────
-  animateMove(teamIdx, fromX, fromY, toX, toY, callback) {
-    const duration = 250; // ms
-    const startTime = performance.now();
+  // ── Animated move ──────────────────────────────────────────────
+  animateMove(teamIdx, fromX, fromY, toX, toY, cb) {
+    const duration = 220;
+    const start = performance.now();
     const teams = this.gameState.teams;
 
-    const animate = (now) => {
-      const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      // Ease out quad
-      const eased = 1 - (1 - t) * (1 - t);
-
-      teams[teamIdx].x = fromX + (toX - fromX) * eased;
-      teams[teamIdx].y = fromY + (toY - fromY) * eased;
-
+    const tick = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const e = 1 - (1 - t) * (1 - t);  // ease-out
+      teams[teamIdx].x = fromX + (toX - fromX) * e;
+      teams[teamIdx].y = fromY + (toY - fromY) * e;
       this.render(this.gameState);
-
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
+      if (t < 1) requestAnimationFrame(tick);
+      else {
         teams[teamIdx].x = toX;
         teams[teamIdx].y = toY;
         this.render(this.gameState);
-        if (callback) callback();
+        if (cb) cb();
       }
     };
-
-    requestAnimationFrame(animate);
+    requestAnimationFrame(tick);
   }
 
-  // ── Pulse animation for active team (called in game loop) ─────
+  // ── Pulse loop ─────────────────────────────────────────────────
   startPulseLoop() {
-    const pulse = () => {
-      if (this.gameState && this.maze) {
-        this.render(this.gameState);
-      }
-      this._animationId = requestAnimationFrame(pulse);
+    const loop = () => {
+      if (this.gameState && this.maze) this.render(this.gameState);
+      this._animId = requestAnimationFrame(loop);
     };
-    this._animationId = requestAnimationFrame(pulse);
+    this._animId = requestAnimationFrame(loop);
   }
 
   stopPulseLoop() {
-    if (this._animationId) {
-      cancelAnimationFrame(this._animationId);
-      this._animationId = null;
-    }
+    if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
   }
 }

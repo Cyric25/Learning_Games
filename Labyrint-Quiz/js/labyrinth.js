@@ -326,13 +326,14 @@ async function startGame() {
   gameState = state;
   localGrid = mazeResult.grid;
 
-  // Init canvas
+  // Show screen first so canvas has correct clientWidth/clientHeight
+  showScreen('game-screen');
+  showGameCode();
+
+  // Init canvas (after screen is visible so resize() gets real dimensions)
   const canvas = document.getElementById('maze-canvas');
   renderer = new MazeRenderer(canvas);
   renderer.setMaze(mazeResult);
-
-  showScreen('game-screen');
-  showGameCode();
   renderBoard();
 
   // Subscribe SSE for live updates from team devices
@@ -449,8 +450,11 @@ function showGameCode() {
   const codeEl = document.getElementById('game-code-value'); if (codeEl) codeEl.textContent = gameCode;
   const link = document.getElementById('game-play-link');
   if (link) {
-    const playUrl = new URL('play.html?code=' + gameCode, location.href).href;
-    link.href = playUrl; link.textContent = playUrl;
+    const playUrl = location.protocol === 'file:'
+      ? 'play.html?code=' + gameCode
+      : new URL('play.html?code=' + gameCode, location.href).href;
+    link.href = playUrl;
+    link.textContent = 'play.html?code=' + gameCode + ' ↗';
   }
 }
 
