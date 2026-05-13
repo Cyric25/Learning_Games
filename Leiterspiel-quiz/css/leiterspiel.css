@@ -1279,7 +1279,7 @@ body {
 #game-selector {
   position: fixed;
   inset: 0;
-  background: var(--bg-body);
+  background: var(--bg-board);
   z-index: 600;
   flex-direction: column;
   align-items: center;
