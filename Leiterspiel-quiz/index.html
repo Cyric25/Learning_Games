@@ -11,38 +11,39 @@
 
   <!-- ── Spielwähler ───────────────────────────────────────── -->
   <div class="screen active" id="game-selector">
-    <div class="gs-container">
-      <div class="gs-header">
-        <h1 style="font-size:clamp(1.5rem,3vw,2rem);margin:0;">🐍 Schlangen &amp; Leitern</h1>
-        <div style="display:flex;gap:0.6rem;">
-          <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
-          <button class="btn btn-secondary" onclick="toggleTheme()">🌙</button>
-        </div>
-      </div>
-      <div class="gs-body">
-
-        <!-- Schüler: Beitreten -->
-        <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Schüler/in beitreten</h2>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Gib den Code deiner Lehrkraft ein.</p>
-        <div class="gs-join-row">
-          <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
-            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-            onkeydown="if(event.key==='Enter')joinAsStudent()">
-          <button class="btn btn-primary" onclick="joinAsStudent()">Beitreten →</button>
-        </div>
-        <div class="gs-join-error" id="gs-join-error"></div>
-
-        <div class="gs-divider"></div>
-
-        <!-- Lehrkraft: Spiele verwalten -->
-        <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Lehrkraft</h2>
-        <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
-        <div id="gs-game-list" class="gs-game-list"></div>
-        <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
-          <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
-        </div>
-
-      </div>
+    <h1 style="color:var(--accent);font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;text-align:center;">🐍 Schlangen &amp; Leitern</h1>
+    <p style="color:var(--text-secondary);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;text-align:center;">Spielcode eingeben um beizutreten</p>
+    <input id="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+      placeholder="CODE"
+      style="font-size:clamp(2rem,5vw,3.5rem);text-align:center;letter-spacing:0.4em;
+        width:7em;padding:0.5em 0.3em;background:var(--bg-sidebar);color:var(--text-primary);
+        border:2px solid var(--border);border-radius:14px;font-family:monospace;font-weight:700;
+        outline:none;text-transform:uppercase;transition:border-color 0.2s;"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')joinAsStudent()"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--border)'">
+    <button onclick="joinAsStudent()"
+      style="margin-top:1.2rem;padding:0.8rem 3rem;font-size:clamp(1.1rem,2vw,1.4rem);
+        font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:12px;
+        cursor:pointer;transition:opacity 0.2s;"
+      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      Beitreten →
+    </button>
+    <div id="gs-join-error" style="color:var(--danger);min-height:1.5em;margin-top:0.8rem;font-size:0.95rem;font-weight:600;text-align:center;"></div>
+    <div style="margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.5rem;text-align:center;width:100%;max-width:520px;">
+      <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Oder als Lehrkraft:</p>
+      <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
+      <button onclick="createNewGame()"
+        style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
+          background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
+          transition:opacity 0.2s;"
+        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+        + Neues Spiel erstellen
+      </button>
+    </div>
+    <div style="margin-top:1.5rem;">
+      <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;text-decoration:none;">← Zurück zur Übersicht</a>
     </div>
   </div>
 

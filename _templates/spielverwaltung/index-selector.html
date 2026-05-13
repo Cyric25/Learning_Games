@@ -1,0 +1,74 @@
+<!-- ── Spielwähler (index.html-Stil) ────────────────────────────────────
+     Erster Screen in Spielen MIT eigenem Lehrkraft-/Schülerbereich
+     (index.html-Architektur: Leiterspiel, Labyrinth)
+
+     Vorlage orientiert sich an risiko-quiz/index.html join-screen:
+     - Kein Card-Wrapper — full-screen zentriertes Column-Layout
+     - Großes Code-Input wie im Risiko-Quiz
+     - Teacher-Sektion mit Spielliste + "Neues Spiel erstellen"
+     - "← Zurück zur Übersicht"-Link am Ende
+
+     ANPASSEN:
+       "🎮 Spielname"      → Emoji + Spielname
+       --bg-sidebar        → Input-Hintergrundvariable des Spiels
+       --border            → Rahmen-Variable des Spiels
+       joinAsStudent()     → bleibt (globale Function Declaration)
+       createNewGame()     → bleibt (globale Function Declaration)
+
+     CSS (in Spiel-CSS-Datei):
+       #game-selector {
+         position: fixed; inset: 0;
+         background: var(--bg-body);   ← oder --bg-primary je nach Spiel
+         z-index: 600;
+         flex-direction: column;       ← wichtig!
+         align-items: center;
+         justify-content: center;
+         padding: 2rem;
+         overflow-y: auto;
+       }
+     ──────────────────────────────────────────────────────────────────── -->
+
+<div class="screen active" id="game-selector">
+  <h1 style="color:var(--accent);font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;text-align:center;">🎮 Spielname</h1>
+  <p style="color:var(--text-secondary);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;text-align:center;">Spielcode eingeben um beizutreten</p>
+
+  <input id="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+    placeholder="CODE"
+    style="font-size:clamp(2rem,5vw,3.5rem);text-align:center;letter-spacing:0.4em;
+      width:7em;padding:0.5em 0.3em;background:var(--bg-sidebar);color:var(--text-primary);
+      border:2px solid var(--border);border-radius:14px;font-family:monospace;font-weight:700;
+      outline:none;text-transform:uppercase;transition:border-color 0.2s;"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')joinAsStudent()"
+    onfocus="this.style.borderColor='var(--accent)'"
+    onblur="this.style.borderColor='var(--border)'">
+
+  <button onclick="joinAsStudent()"
+    style="margin-top:1.2rem;padding:0.8rem 3rem;font-size:clamp(1.1rem,2vw,1.4rem);
+      font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:12px;
+      cursor:pointer;transition:opacity 0.2s;"
+    onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+    Beitreten &rarr;
+  </button>
+
+  <div id="gs-join-error"
+    style="color:var(--danger);min-height:1.5em;margin-top:0.8rem;font-size:0.95rem;font-weight:600;text-align:center;"></div>
+
+  <div style="margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.5rem;text-align:center;width:100%;max-width:520px;">
+    <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Oder als Lehrkraft:</p>
+    <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
+    <button onclick="createNewGame()"
+      style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
+        background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
+        transition:opacity 0.2s;"
+      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      + Neues Spiel erstellen
+    </button>
+  </div>
+
+  <div style="margin-top:1.5rem;">
+    <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;text-decoration:none;">
+      &larr; Zurück zur Übersicht
+    </a>
+  </div>
+</div>
