@@ -1251,6 +1251,30 @@ body {
   .animal-btn { width: 30px; height: 30px; font-size: 1rem; }
 }
 
+/* ── Buttons (Risiko-Quiz-System) ────────────────────────────────── */
+.btn {
+  padding: 0.6rem 1.3rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  text-decoration: none;
+}
+.btn:hover  { opacity: 0.85; }
+.btn:active { transform: scale(0.98); }
+.btn-primary   { background: var(--accent);  color: #fff; }
+.btn-success   { background: var(--success); color: #fff; }
+.btn-danger    { background: var(--danger);  color: #fff; }
+.btn-secondary { background: var(--bg-field); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-lg { padding: 0.9rem 2rem; font-size: 1.1rem; border-radius: 10px; }
+.btn-sm { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+
 /* ── Spielwähler ─────────────────────────────────────────── */
 #game-selector {
   position: fixed;
@@ -1280,27 +1304,8 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.gs-title {
-  font-size: clamp(1.4rem, 3vw, 1.9rem);
-  font-weight: 700;
-  color: var(--accent);
-}
-
 .gs-body {
   padding: 1.5rem;
-}
-
-.gs-section-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.gs-subtitle {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
 }
 
 .gs-game-list {
@@ -1351,18 +1356,6 @@ body {
 .gs-game-meta { font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.15rem; }
 
 .gs-game-actions { flex-shrink: 0; }
-.gs-btn-delete {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--danger);
-  border-radius: 8px;
-  width: 30px;
-  height: 30px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.15s;
-}
-.gs-btn-delete:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
 
 /* Spielwähler – Beitreten-Sektion */
 .gs-join-row {
@@ -1388,19 +1381,6 @@ body {
 }
 .gs-code-input:focus { border-color: var(--accent); }
 .gs-code-input::placeholder { color: var(--text-light); letter-spacing: 4px; }
-.btn-join-student {
-  padding: 12px 20px;
-  background: linear-gradient(135deg, var(--accent-warm), var(--accent));
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity 0.2s;
-}
-.btn-join-student:hover { opacity: 0.9; }
 .gs-join-error {
   color: var(--danger);
   font-size: 0.85rem;

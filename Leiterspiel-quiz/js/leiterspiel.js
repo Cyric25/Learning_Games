@@ -1644,11 +1644,11 @@ function escapeHtml(s) {
 async function showGameSelector() {
   showScreen('game-selector');
   const list = document.getElementById('gs-game-list');
-  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  list.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">Lade Spiele…</p>';
   const registry = await LsStorage.loadGamesRegistry();
   const entries = Object.entries(registry);
   if (entries.length === 0) {
-    list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden. Erstelle ein neues Spiel!</p>';
+    list.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">Noch keine Spiele vorhanden.</p>';
     return;
   }
   entries.sort((a,b) => (b[1].updatedAt||b[1].createdAt||'').localeCompare(a[1].updatedAt||a[1].createdAt||''));
@@ -1674,7 +1674,7 @@ async function showGameSelector() {
         <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
       </div>
       <div class="gs-game-actions">
-        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
       </div>
     </div>`;
   }).join('');

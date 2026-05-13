@@ -9,37 +9,37 @@
 </head>
 <body>
 
-  <!-- ── Spielwähler ───────────────────────────────────────────── -->
+  <!-- ── Spielwähler ───────────────────────────────────────────────── -->
   <div class="screen active" id="game-selector">
     <div class="gs-container">
       <div class="gs-header">
-        <div class="gs-title">🏰 Labyrinth-Quiz</div>
-        <div style="display:flex;gap:8px;">
-          <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
-          <button class="header-btn" id="btn-theme-join" onclick="toggleTheme()">🌙 Darkmode</button>
+        <h1 style="font-size:clamp(1.5rem,3vw,2rem);margin:0;">🏰 Labyrinth-Quiz</h1>
+        <div style="display:flex;gap:0.6rem;">
+          <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
+          <button class="btn btn-secondary" onclick="toggleTheme()">🌙</button>
         </div>
       </div>
       <div class="gs-body">
 
         <!-- Schüler: Beitreten -->
-        <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
-        <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
+        <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Schüler/in beitreten</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Gib den Code deiner Lehrkraft ein.</p>
         <div class="gs-join-row">
           <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
             oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
             onkeydown="if(event.key==='Enter')joinAsStudent()">
-          <button class="btn-join-student" onclick="joinAsStudent()">Beitreten →</button>
+          <button class="btn btn-primary" onclick="joinAsStudent()">Beitreten →</button>
         </div>
         <div class="gs-join-error" id="gs-join-error"></div>
 
         <div class="gs-divider"></div>
 
         <!-- Lehrkraft: Spiele verwalten -->
-        <h2 class="gs-section-title">Als Lehrkraft</h2>
-        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+        <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Lehrkraft</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
         <div id="gs-game-list" class="gs-game-list"></div>
-        <div style="margin-top:1.2rem;">
-          <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+        <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
+          <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
         </div>
 
       </div>

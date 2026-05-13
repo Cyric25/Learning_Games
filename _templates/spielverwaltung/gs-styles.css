@@ -17,6 +17,32 @@
    → Unten die passende Variante einfach einkommentieren / löschen.
    ──────────────────────────────────────────────────────────────── */
 
+/* ── Buttons (Risiko-Quiz-System) ────────────────────────────────── */
+/* Exakt wie risiko-quiz/css/admin.css — Variablen je nach Spiel anpassen */
+.btn {
+  padding: 0.6rem 1.3rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  text-decoration: none;
+}
+.btn:hover  { opacity: 0.85; }
+.btn:active { transform: scale(0.98); }
+.btn-primary   { background: var(--accent);  color: #fff; }
+.btn-success   { background: var(--success); color: #fff; }
+.btn-danger    { background: var(--danger);  color: #fff; }
+/* Variante A (Leiterspiel): */ .btn-secondary { background: var(--bg-field); color: var(--text-primary); border: 1px solid var(--border); }
+/* Variante B (Labyrinth):     .btn-secondary { background: var(--bg-card);  color: var(--text-primary); border: 1px solid var(--border-card); } */
+.btn-lg { padding: 0.9rem 2rem; font-size: 1.1rem; border-radius: 10px; }
+.btn-sm { padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+
 /* ── Screen-Positionierung (Vollbild-Overlay wie Risiko-Quiz) ────── */
 #game-selector {
   position: fixed;
