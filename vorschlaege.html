@@ -339,13 +339,19 @@
 
     <!-- Kategorie -->
     <div class="form-group">
-      <label>Kategorie</label>
-      <select id="f-category">
+      <label>Oberkategorie</label>
+      <select id="f-cat-top" onchange="onTopCatChange()">
         <option value="">Wird geladen…</option>
       </select>
       <p class="field-hint" id="cat-hint" style="display:none;">
         Keine Kategorien geladen – Lehrkraft wird die Kategorie beim Review zuweisen.
       </p>
+    </div>
+    <div class="form-group" id="f-subcat-group" style="display:none;">
+      <label>Unterkategorie</label>
+      <select id="f-cat-sub">
+        <option value="">– Direkt in Oberkategorie –</option>
+      </select>
     </div>
 
     <!-- Schwierigkeit -->
@@ -480,20 +486,19 @@ function getLeafPaths(categories) {
 async function initCategories() {
   const cats = await loadCategories();
   allCategories = cats;
-  const sel = document.getElementById('f-category');
+  const topSel = document.getElementById('f-cat-top');
   const hint = document.getElementById('cat-hint');
   if (cats.length === 0) {
-    sel.innerHTML = '<option value="">Keine Kategorien verfügbar</option>';
+    topSel.innerHTML = '<option value="">Keine Kategorien verfügbar</option>';
     hint.style.display = '';
     return;
   }
-  // Formular-Dropdown: alle Blatt-Pfade
-  const paths = getLeafPaths(cats);
-  sel.innerHTML = '<option value="">– Kategorie wählen –</option>';
-  paths.forEach(p => {
+  // Formular-Dropdown: Oberkategorien
+  topSel.innerHTML = '<option value="">– Oberkategorie wählen –</option>';
+  cats.forEach(c => {
     const opt = document.createElement('option');
-    opt.value = p; opt.textContent = p;
-    sel.appendChild(opt);
+    opt.value = c.id; opt.textContent = c.name;
+    topSel.appendChild(opt);
   });
   // Stats-Dropdown: nur Hauptkategorien
   const statsSel = document.getElementById('stats-cat');
@@ -503,6 +508,25 @@ async function initCategories() {
     opt.value = c.id; opt.textContent = c.name;
     statsSel.appendChild(opt);
   });
+}
+
+function onTopCatChange() {
+  const topSel = document.getElementById('f-cat-top');
+  const subGroup = document.getElementById('f-subcat-group');
+  const subSel = document.getElementById('f-cat-sub');
+  const catId = topSel.value;
+  subSel.innerHTML = '<option value="">– Direkt in Oberkategorie –</option>';
+  subGroup.style.display = 'none';
+  if (!catId) return;
+  const cat = allCategories.find(c => c.id === catId);
+  const subs = (cat && cat.subcategories) ? cat.subcategories : [];
+  if (subs.length === 0) return;
+  subs.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id; opt.textContent = s.name;
+    subSel.appendChild(opt);
+  });
+  subGroup.style.display = '';
 }
 
 // ── Fragenverteilung ────────────────────────────────────────────────
@@ -616,7 +640,15 @@ function removeMcOption(idx) {
 async function submitSuggestion() {
   document.getElementById('form-alert').innerHTML = '';
   const name      = document.getElementById('f-name').value.trim();
-  const category  = document.getElementById('f-category').value;
+  const topSel    = document.getElementById('f-cat-top');
+  const subSel    = document.getElementById('f-cat-sub');
+  const topName   = topSel.options[topSel.selectedIndex]?.text || '';
+  const subName   = subSel.options[subSel.selectedIndex]?.text || '';
+  const category  = topSel.value
+    ? (subSel.value && subName !== '– Direkt in Oberkategorie –'
+        ? topName + ' › ' + subName
+        : topName)
+    : '';
   const difficulty = parseInt(document.getElementById('f-difficulty').value || '300');
   const type      = document.querySelector('input[name="qtype"]:checked')?.value || 'open';
   const question  = document.getElementById('f-question').value.trim();
@@ -700,7 +732,9 @@ function resetForm() {
   document.getElementById('f-question').value = '';
   document.getElementById('f-answer').value = '';
   document.getElementById('f-hint').value = '';
-  document.getElementById('f-category').value = '';
+  document.getElementById('f-cat-top').value = '';
+  document.getElementById('f-cat-sub').innerHTML = '<option value="">– Direkt in Oberkategorie –</option>';
+  document.getElementById('f-subcat-group').style.display = 'none';
   document.getElementById('f-difficulty').value = '300';
   document.getElementById('type-open').checked = true;
   document.getElementById('section-open').style.display = '';
