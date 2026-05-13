@@ -358,9 +358,10 @@
     <div class="form-group">
       <label>Schwierigkeit</label>
       <select id="f-difficulty">
+        <option value="">– Schwierigkeit wählen –</option>
         <option value="100">100 – sehr leicht</option>
         <option value="200">200 – leicht</option>
-        <option value="300" selected>300 – mittel</option>
+        <option value="300">300 – mittel</option>
         <option value="400">400 – schwer</option>
         <option value="500">500 – sehr schwer</option>
       </select>
@@ -649,12 +650,16 @@ async function submitSuggestion() {
         ? topName + ' › ' + subName
         : topName)
     : '';
-  const difficulty = parseInt(document.getElementById('f-difficulty').value || '300');
+  const diffVal    = document.getElementById('f-difficulty').value;
   const type      = document.querySelector('input[name="qtype"]:checked')?.value || 'open';
   const question  = document.getElementById('f-question').value.trim();
   const hint      = document.getElementById('f-hint').value.trim();
 
+  if (!topSel.value) { showAlert('Bitte wähle eine Kategorie aus.'); return; }
+  if (!diffVal) { showAlert('Bitte wähle eine Schwierigkeit aus.'); return; }
   if (!question) { showAlert('Bitte gib einen Fragetext ein.'); return; }
+
+  const difficulty = parseInt(diffVal);
 
   let answer = '', options = [], correctIndex = null;
   if (type === 'open') {
@@ -735,7 +740,7 @@ function resetForm() {
   document.getElementById('f-cat-top').value = '';
   document.getElementById('f-cat-sub').innerHTML = '<option value="">– Direkt in Oberkategorie –</option>';
   document.getElementById('f-subcat-group').style.display = 'none';
-  document.getElementById('f-difficulty').value = '300';
+  document.getElementById('f-difficulty').value = '';
   document.getElementById('type-open').checked = true;
   document.getElementById('section-open').style.display = '';
   document.getElementById('section-mc').style.display = 'none';
