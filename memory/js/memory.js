@@ -162,19 +162,24 @@ function stripMathDelimiters(s) {
 }
 
 function renderCardContent(el, card) {
-  if (card.type === 'formula') {
+  const content = card.content || '';
+  const stripped = stripMathDelimiters(content);
+  const looksLikeFormula = card.type === 'formula' ||
+    (content.startsWith('$') && content.trimEnd().endsWith('$'));
+
+  if (looksLikeFormula) {
     try {
-      katex.render(stripMathDelimiters(card.content), el, { throwOnError: false, displayMode: false });
+      katex.render(stripped, el, { throwOnError: false, displayMode: false });
     } catch {
-      el.textContent = card.content;
+      el.textContent = content;
     }
   } else if (card.type === 'image') {
     var img = document.createElement('img');
-    img.src = card.content;
+    img.src = content;
     img.alt = 'Bild';
     el.appendChild(img);
   } else {
-    el.textContent = card.content;
+    el.textContent = content;
   }
 }
 

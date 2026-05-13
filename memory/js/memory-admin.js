@@ -189,20 +189,24 @@ function renderPreview(side, data, idx) {
   if (!el) return;
   el.innerHTML = '';
 
-  if (data.type === 'formula' && data.content) {
+  const content = data.content || '';
+  const looksLikeFormula = data.type === 'formula' ||
+    (content.startsWith('$') && content.trimEnd().endsWith('$'));
+
+  if (looksLikeFormula && content) {
     try {
-      katex.render(stripMathDelimiters(data.content), el, { throwOnError: false, displayMode: false });
+      katex.render(stripMathDelimiters(content), el, { throwOnError: false, displayMode: false });
     } catch {
-      el.textContent = data.content;
+      el.textContent = content;
     }
-  } else if (data.type === 'image' && data.content) {
+  } else if (data.type === 'image' && content) {
     var img = document.createElement('img');
-    img.src = data.content;
+    img.src = content;
     img.style.maxHeight = '50px';
     img.style.maxWidth = '100%';
     el.appendChild(img);
   } else {
-    el.textContent = data.content || '–';
+    el.textContent = content || '–';
   }
 }
 
