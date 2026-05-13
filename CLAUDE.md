@@ -100,6 +100,7 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 | `risiko-quiz/admin.html` | Dark | `body.light` |
 | `Labyrint-Quiz/index.html` | Light (Mystisch-Lila) | `body.dark` |
 | `Labyrint-Quiz/admin.html` | Light (Mystisch-Lila) | `body.dark` |
+| `lernkarten/index.html` | Light (Orange Standard) | `body.dark` |
 
 **JS-Muster (immer gleich, nur `'dark'`/`'light'` und Klassenname tauschen):**
 
@@ -122,7 +123,65 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 
 ### CSS-Variablen-Paletten
 
-**Dark Theme (Risiko-Quiz Standard / `:root` in game.css + admin.css):**
+> **Standard-Farbpalette für neue Spiele: Orange (Light) + Dunkelblau (Dark)**
+> Neue Spiele sollen diese Palette verwenden, sofern kein spielspezifischer Grund dagegen spricht.
+
+**Standard Light Theme (Orange — `spiele.html`, `lernkarten/`, neue Spiele):**
+```css
+/* Hintergrund */
+--bg-body:         linear-gradient(135deg, #f7971e 0%, #E34F20 100%)
+--bg-container:    #ffffff
+--bg-card:         #f8f9fa
+--bg-card-back:    #fff3ee        /* Karten-Rückseite / Highlights */
+--bg-option:       #fff3ee
+--bg-option-hover: #ffe0d0
+
+/* Akzentfarben */
+--accent:          #E34F20        /* Orange-Rot (primär) */
+--accent-dark:     #c73518        /* Dunkleres Orange-Rot (Hover/aktiv) */
+--accent-light:    #f7971e        /* Helles Orange (Gradient-Start) */
+
+/* Text */
+--text-primary:    #1e293b
+--text-secondary:  #64748b
+
+/* Struktur */
+--border:          #e0e0e0
+--card-hover-border: #E34F20
+--card-shadow-hover: 0 12px 35px rgba(227,79,32,0.2)
+--shadow:          0 4px 20px rgba(227,79,32,0.12)
+--tag-bg:          #ffe8df
+--tag-color:       #c73518
+
+/* Button */
+--btn-play-bg:     linear-gradient(135deg, #f7971e 0%, #E34F20 100%)
+
+/* Status */
+--success:         #16a34a
+--danger:          #dc2626
+--warning:         #d97706
+```
+
+**Standard Dark Theme (Dunkelblau — `body.dark` für neue Spiele):**
+```css
+--bg-body:         linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)
+--bg-container:    #16213e
+--bg-card:         #1a2744
+--bg-card-back:    #0f3460
+--bg-option:       #1a2744
+--bg-option-hover: #1a4a80
+--accent:          #f7971e        /* Helles Orange im Dunkelmodus */
+--accent-dark:     #E34F20
+--text-primary:    #ffffff
+--text-secondary:  #a8a8b3
+--border:          rgba(255,255,255,0.12)
+--success:         #2ecc71
+--danger:          #e74c3c
+--warning:         #f39c12
+--shadow:          0 4px 20px rgba(0,0,0,0.30)
+```
+
+**Risiko-Quiz Dark Theme (`:root` in game.css + admin.css — spielspezifisch):**
 ```css
 --bg-primary:    #1a1a2e
 --bg-secondary:  #16213e
@@ -143,17 +202,7 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 --locked:    #1e1e30
 ```
 
-**Light Theme (SLF-Stil / `:root` in index.html, body.light in CSS-Dateien):**
-```css
-Hintergrund:  linear-gradient(135deg, #f7971e, #E34F20)   /* orange Gradient */
-Container:    #ffffff (weiß, border-radius: 20px, box-shadow)
---accent:     #E34F20       /* SLF Orange-Rot */
-Text:         #222 / #555 / #666
-Karten:       #f8f9fa (bg), #e0e0e0 (border)
-Tags:         #ffe8df (bg), #c73518 (text)
-```
-
-**Light Mode Overrides für Risiko-Quiz (body.light in CSS-Dateien):**
+**Risiko-Quiz Light Mode Overrides (body.light in CSS-Dateien):**
 ```css
 --bg-primary:    #fdf6f0
 --bg-secondary:  #ffffff

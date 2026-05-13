@@ -9,39 +9,39 @@
   <style>
     /* ─── CSS Variablen: Light (Standard) ─────────────── */
     :root {
-      --bg-body:         linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+      --bg-body:         linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
       --bg-container:    #ffffff;
-      --bg-card:         #f8fafc;
-      --bg-card-back:    #f0f9ff;
-      --bg-option:       #f1f5f9;
-      --bg-option-hover: #e2e8f0;
-      --accent:          #0ea5e9;
-      --accent-dark:     #0284c7;
+      --bg-card:         #f8f9fa;
+      --bg-card-back:    #fff3ee;
+      --bg-option:       #fff3ee;
+      --bg-option-hover: #ffe0d0;
+      --accent:          #E34F20;
+      --accent-dark:     #c73518;
       --text-primary:    #1e293b;
       --text-secondary:  #64748b;
-      --border:          #e2e8f0;
+      --border:          #e0e0e0;
       --success:         #16a34a;
       --danger:          #dc2626;
       --warning:         #d97706;
-      --shadow:          0 4px 20px rgba(14,165,233,0.10);
+      --shadow:          0 4px 20px rgba(227,79,32,0.12);
       --shadow-card:     0 8px 32px rgba(0,0,0,0.10);
       --radius:          16px;
     }
     body.dark {
-      --bg-body:         linear-gradient(135deg, #0c1a2e 0%, #0a0f1e 100%);
-      --bg-container:    #0f1e35;
-      --bg-card:         #162032;
-      --bg-card-back:    #0d1927;
+      --bg-body:         linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+      --bg-container:    #16213e;
+      --bg-card:         #1a2744;
+      --bg-card-back:    #0f3460;
       --bg-option:       #1a2744;
-      --bg-option-hover: #223060;
-      --accent:          #38bdf8;
-      --accent-dark:     #0ea5e9;
-      --text-primary:    #f1f5f9;
-      --text-secondary:  #94a3b8;
-      --border:          rgba(255,255,255,0.10);
-      --success:         #4ade80;
-      --danger:          #f87171;
-      --warning:         #fbbf24;
+      --bg-option-hover: #1a4a80;
+      --accent:          #f7971e;
+      --accent-dark:     #E34F20;
+      --text-primary:    #ffffff;
+      --text-secondary:  #a8a8b3;
+      --border:          rgba(255,255,255,0.12);
+      --success:         #2ecc71;
+      --danger:          #e74c3c;
+      --warning:         #f39c12;
       --shadow:          0 4px 20px rgba(0,0,0,0.30);
       --shadow-card:     0 8px 32px rgba(0,0,0,0.40);
     }
@@ -202,7 +202,7 @@
     .btn-start-learn {
       width: 100%;
       padding: 15px;
-      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      background: linear-gradient(135deg, #f7971e, #E34F20);
       color: #fff;
       border: none;
       border-radius: var(--radius);
@@ -236,7 +236,7 @@
     }
     .progress-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #0ea5e9, #0284c7);
+      background: linear-gradient(90deg, #f7971e, #E34F20);
       border-radius: 3px;
       transition: width 0.45s ease;
     }
@@ -269,7 +269,7 @@
     }
     .tag-new      { background: rgba(22,163,74,0.12);  color: var(--success); }
     .tag-learning { background: rgba(217,119,6,0.12);  color: var(--warning); }
-    .tag-review   { background: rgba(14,165,233,0.12); color: var(--accent); }
+    .tag-review   { background: rgba(227,79,32,0.12); color: var(--accent); }
     .tag-diff-1   { background: rgba(22,163,74,0.10);  color: var(--success); }
     .tag-diff-2   { background: rgba(217,119,6,0.10);  color: var(--warning); }
     .tag-diff-3   { background: rgba(220,38,38,0.10);  color: var(--danger); }
@@ -464,7 +464,7 @@
       transition: opacity 0.18s;
     }
     .btn-done:hover { opacity: 0.88; }
-    .btn-done-primary   { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; }
+    .btn-done-primary   { background: linear-gradient(135deg, #f7971e, #E34F20); color: #fff; }
     .btn-done-secondary { background: var(--bg-option); color: var(--text-primary); border: 1px solid var(--border); }
 
     @media (max-width: 480px) {
