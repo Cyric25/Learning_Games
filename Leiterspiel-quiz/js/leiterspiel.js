@@ -123,6 +123,11 @@ const LsStorage = {
   }
 };
 
+// ── Spielwähler onclick-Exports (früh, damit onclick-Handler immer erreichbar) ──
+window.createNewGame  = function() { return _createNewGame(); };
+window._gsEnter       = function(c) { return _gsEnter(c); };
+window._gsDelete      = function(c) { return _gsDelete(c); };
+
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 100;
 const COLS = 10;
@@ -1664,7 +1669,7 @@ async function showGameSelector() {
   }).join('');
 }
 
-window._gsEnter = async function(code) {
+async function _gsEnter(code) {
   LsStorage.setCode(code);
   const gs = await LsStorage.load(code);
   if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
@@ -1703,15 +1708,15 @@ window._gsEnter = async function(code) {
     if (titleEl && gs.meta && gs.meta.title && gs.meta.title !== 'Schlangen & Leitern') titleEl.value = gs.meta.title;
     showCodeBanner();
   }
-};
+}
 
-window._gsDelete = async function(code) {
+async function _gsDelete(code) {
   if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
   await LsStorage.deleteGame(code);
   showGameSelector();
-};
+}
 
-window.createNewGame = async function() {
+async function _createNewGame() {
   const code = LsStorage.generateCode();
   LsStorage.setCode(code);
   const skeleton = {
@@ -1723,10 +1728,10 @@ window.createNewGame = async function() {
   showScreen('setup-screen');
   document.getElementById('setup-game-title').value = '';
   showCodeBanner();
-};
+}
 
 async function enterGame(code) {
-  await window._gsEnter(code);
+  await _gsEnter(code);
 }
 
 // ── Reset & Quit ─────────────────────────────────────────────
