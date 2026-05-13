@@ -368,7 +368,7 @@ Dateistruktur:
 | Risiko-Quiz | Ja | Mehrere Klassen parallel, SSE-Live-Updates |
 | QuizPfad | Nein | Einzelspiel im Browser |
 | Labyrinth-Quiz | Nein | Einzelspiel im Browser |
-| Leiterspiel-Quiz | Nein | Einzelspiel im Browser |
+| Leiterspiel-Quiz | Ja | Schülergesteuert (view.html), code-basiert, SSE-Sync |
 | Memory | Nein | Singleplayer |
 | Escape Room | Nein | localStorage-basiert, eigenes Multi-Team-System |
 
@@ -727,3 +727,118 @@ Ein Raum wechselt in den 360°-Modus wenn `backgroundType: "360"` gesetzt ist.
 - 5 Schlangen: 16→6, 47→26, 62→19, 93→73, 98→87
 - Zeitlimits: leicht=30s, mittel=45s, schwer=60s
 - Punkte: leicht=10, mittel=20, schwer=30
+
+### Schüleransicht + Multi-Game
+- `view.html` ist die Schüler-App: Beitreten per Code, Team wählen, Würfeln, Fragen beantworten
+- `LsStorage` (inline in `leiterspiel.js` und `view.html`) übernimmt Server-Sync via `api.php?f=ls-*`
+- Spielstände in `Leiterspiel-quiz/data/games/XXXX.json` + Registry `index.json`
+- Code wird automatisch beim Spielstart generiert (`proceedToGame()`)
+- Lehrkraft sieht Code-Badge (rechts unten) + Link zu `view.html?code=XXXX`
+- SSE-Subscription in `index.html` reagiert auf Student-Aktionen (Würfeln, MC-Antworten)
+- **Verantwortlichkeiten**: Schüler: würfeln + MC antworten; Lehrkraft: offene Fragen auswerten + Bonus-Felder
+- Bonus-Felder (roll_again, free_move, swap) werden aktuell nur vom Lehrkraft-Device behandelt
+
+---
+
+## Schüleransicht + Multi-Game: Anleitung für neue Spiele
+
+**Wann sinnvoll?** Wenn mehrere Schüler/Gruppen gleichzeitig auf eigenen Geräten spielen sollen (nicht nur zuschauen). Beim Implementieren eines neuen Spiels **nachfragen**, ob Schüleransicht gewünscht ist.
+
+### Checkliste: Was ein Spiel braucht
+
+**1. `api.php` – neue Endpunkte**
+Füge drei Blöcke analog zu `ls-*` hinzu (Prefix wählen, z.B. `qp-` für QuizPfad):
+- `?f=PREFIX-sse&code=XXXX` → SSE-Stream auf `SPIEL/data/games/XXXX.json`
+- `?f=PREFIX-games` → GET/POST `index.json` (Registry, inkl. `cleanupExpiredGames()`)
+- `?f=PREFIX-game&code=XXXX` → GET/POST/DELETE `XXXX.json` + Registry-Update
+
+**2. Inline `XxxStorage`-Objekt** (in Spiellogik-JS + view.html kopieren)
+```js
+const XxxStorage = {
+  _code: null, _serverOk: null,
+  setCode(c)   { this._code = c ? c.toUpperCase() : null; },
+  getCode()    { return this._code; },
+  generateCode() { /* 4 Zeichen aus ABCDEFGHJKLMN...23456789 */ },
+  async checkServer() { /* HEAD-Request auf api.php */ },
+  _ser(gs)     { /* Set → Array für JSON */ },
+  _deser(d)    { /* Array → Set */ },
+  async save(gs) { /* localStorage + Server POST */ },
+  async load(code) { /* Server GET → localStorage Fallback */ },
+  subscribe(code, cb) { /* SSE → Poll → localStorage-Poll */ }
+};
+```
+
+**3. `gameState` – Pflichtfelder**
+```js
+gameState = {
+  meta: { gameCode: '', title: '...', createdAt: '' },
+  // ... spielspezifische Felder ...
+  usedQuestionIds: new Set(),  // muss als Array serialisiert werden
+  liveQuestion: null           // Pflicht für Fragen-Sync
+};
+```
+
+**`liveQuestion`-Struktur:**
+```js
+liveQuestion: {
+  id: questionId,
+  teamIdx: number,      // welches Team ist dran
+  diceResult: number,   // (falls würfelbasiert)
+  question: { ... },    // vollständiges Fragen-Objekt (für SSE-Empfänger)
+  resolved: boolean,
+  selectedMcIndex: null | number,
+  autoCorrect: null | boolean
+}
+```
+
+**4. State-Machine eines Zuges**
+```
+waiting_for_dice → (Schüler würfelt, liveQuestion gesetzt, save()) → question_active
+question_active  → (MC: Schüler antwortet + save() ODER Offen: Lehrkraft + save()) → resolved
+resolved         → (Bewegung + nextTurn + liveQuestion=null + save()) → waiting_for_dice
+```
+
+**5. Spiellogik-JS – Saves einbauen**
+| Stelle | Was speichern |
+|--------|---------------|
+| Nach `proceedToGame()` | Code generieren, `meta` setzen, `save()` |
+| In `rollDice()` | `liveQuestion` erstellen, `save()` (fire-and-forget) |
+| In `resolveQuestion()` | `liveQuestion.resolved=true`, `save()` |
+| In `nextTurn()` | `liveQuestion=null`, `save()` |
+| Nach Spielende | `phase='finished'`, `save()` |
+
+**6. `view.html` – Pflicht-Screens**
+| Screen | Inhalt |
+|--------|--------|
+| `screen-join` | Code-Input (4 Zeichen), "Beitreten"-Button |
+| `screen-team` | Team-Liste aus `gameState.teams`, Zuschauer-Option |
+| `screen-wait` | Warte-Screen für Setup/Dice-Order-Phase |
+| `screen-game` | Spielbrett + Status + Würfeln-Button (nur wenn dran) |
+| Question-Overlay | MC-Buttons (nur wenn dran), offene Fragen = warten |
+
+**7. SSE-Reaktion im Lehrkraft-View**
+```js
+function onSSEUpdate(newGs) {
+  // Neues liveQuestion (Schüler hat gewürfelt) → Frage-Modal öffnen
+  // liveQuestion=null (Schüler hat Zug beendet) → Modal schließen, Board updaten
+  // Bei Phasenänderungen (finished) → Gewinner zeigen
+}
+```
+
+**8. Code-Badge im Lehrkraft-View**
+Zeige Code + Link zu `view.html?code=XXXX` als fixiertes Badge (Position: `fixed; bottom; right`).
+
+### Verantwortlichkeitstrennung (Standard)
+| Aktion | Wer |
+|--------|-----|
+| Spiel erstellen + Code | Lehrkraft |
+| Würfeln (primär) | Schüler, Lehrkraft als Fallback |
+| MC-Frage beantworten | Schüler (schreibt Ergebnis + Bewegung + save) |
+| Offene Frage auswerten | Lehrkraft (klickt Richtig/Falsch + Bewegung + save) |
+| Sonderfelder / Bonus | Lehrkraft (kann lokal bleiben) |
+
+### localStorage-Keys (pro Spiel eigener Prefix)
+```
+ls_gs_XXXX   ← Leiterspiel-Quiz Spielstand (Code XXXX)
+```
+Anderen Spielen: anderen Prefix wählen (z.B. `qp_gs_`, `laby_gs_`).
