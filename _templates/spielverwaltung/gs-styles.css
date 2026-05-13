@@ -17,13 +17,19 @@
    → Unten die passende Variante einfach einkommentieren / löschen.
    ──────────────────────────────────────────────────────────────── */
 
-/* ── Screen-Positionierung ───────────────────────────────────────── */
+/* ── Screen-Positionierung (Vollbild-Overlay wie Risiko-Quiz) ────── */
 #game-selector {
+  position: fixed;
+  inset: 0;
+  /* Variante A: */ background: var(--bg-body);     /* Leiterspiel-Stil: Gradient-Hintergrund */
+  /* Variante B: background: var(--bg-primary); */   /* Labyrinth-Stil:   --bg-primary */
+  z-index: 600;
   align-items: center;
   justify-content: center;
-  overflow-y: auto;
   padding: 2rem;
 }
+/* Hinweis: display:none/flex kommt vom .screen / .screen.active Mechanismus —
+   position:fixed übernimmt die Positionierung, .screen steuert die Sichtbarkeit. */
 
 /* ── Container-Karte ─────────────────────────────────────────────── */
 .gs-container {

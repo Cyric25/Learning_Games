@@ -915,11 +915,14 @@ Zwei Varianten je nach CSS-Variable-Schema des Spiels:
 - **Variante B** (`--bg-card`, `--bg-secondary`, `--border-card`) → Labyrinth-Stil
 
 ```css
-/* Screen: zentriert, scrollbar */
-#game-selector { align-items:center; justify-content:center; overflow-y:auto; padding:2rem; }
+/* Screen: Vollbild-Overlay (wie Risiko-Quiz admin.css) */
+/* display:none/flex kommt vom .screen/.screen.active Mechanismus */
+#game-selector { position:fixed; inset:0; background:var(--bg-primary); z-index:600; align-items:center; justify-content:center; padding:2rem; }
+/* Leiterspiel-Stil: background:var(--bg-body) statt --bg-primary */
 
-/* Container-Karte */
-.gs-container  { width:100%; max-width:640px; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:18px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+/* Container-Karte — bg-secondary (Panel), bg-card (Einträge), wie Risiko-Quiz */
+/* Variante A (Leiterspiel): --bg-sidebar ≈ --bg-secondary, --bg-field ≈ --bg-card */
+.gs-container  { width:100%; max-width:640px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:18px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
 
 /* Header mit Trennlinie */
 .gs-header     { display:flex; align-items:center; justify-content:space-between; padding:1.2rem 1.5rem; border-bottom:1px solid var(--border); }
@@ -935,8 +938,9 @@ Zwei Varianten je nach CSS-Variable-Schema des Spiels:
 .gs-empty      { color:var(--text-secondary); font-style:italic; }
 
 /* Spielkarte */
-.gs-game-card  { display:flex; align-items:center; gap:1rem; background:var(--bg-field); border:1.5px solid var(--border); border-radius:12px; padding:0.9rem 1.2rem; cursor:pointer; transition:border-color .2s,background .2s; }
-.gs-game-card:hover { border-color:var(--accent); background:var(--bg-field-hover); }
+.gs-game-card  { display:flex; align-items:center; gap:1rem; background:var(--bg-card); border:1.5px solid var(--border); border-radius:12px; padding:0.9rem 1.2rem; cursor:pointer; transition:border-color .2s,background .2s; }
+/* Variante A: background:var(--bg-field); hover: var(--bg-field-hover) */
+.gs-game-card:hover { border-color:var(--accent); background:var(--bg-card-hover); }
 .gs-game-code  { font-size:1.3rem; font-weight:800; font-family:'Consolas','SF Mono',monospace; letter-spacing:0.15em; color:var(--accent); min-width:5ch; }
 .gs-game-info  { flex:1; min-width:0; }
 .gs-game-title { font-weight:600; font-size:1rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

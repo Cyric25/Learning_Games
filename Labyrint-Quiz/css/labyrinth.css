@@ -94,16 +94,19 @@ body.dark {
 
 /* ── Spielwähler ──────────────────────────────────────────────────── */
 #game-selector {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  z-index: 600;
   align-items: center;
   justify-content: center;
-  overflow-y: auto;
   padding: 2rem;
 }
 
 .gs-container {
   width: 100%;
   max-width: 640px;
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-card);
   border-radius: 18px;
   overflow: hidden;
@@ -139,7 +142,7 @@ body.dark {
 .gs-game-list { display:flex; flex-direction:column; gap:0.5rem; max-height:50vh; overflow-y:auto; }
 .gs-empty { color:var(--text-secondary); font-style:italic; }
 .gs-game-card {
-  display:flex; align-items:center; gap:1rem; background:var(--bg-secondary);
+  display:flex; align-items:center; gap:1rem; background:var(--bg-card);
   border:1.5px solid var(--border-card); border-radius:12px; padding:0.9rem 1.2rem;
   cursor:pointer; transition:border-color 0.2s, background 0.2s;
 }

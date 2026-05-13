@@ -1253,10 +1253,13 @@ body {
 
 /* ── Spielwähler ─────────────────────────────────────────── */
 #game-selector {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-body);
+  z-index: 600;
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  overflow-y: auto;
 }
 
 .gs-container {
