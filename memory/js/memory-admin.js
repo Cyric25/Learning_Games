@@ -176,6 +176,13 @@ function buildSideEditor(side, data, idx) {
   '</div>';
 }
 
+function stripMathDelimiters(s) {
+  s = (s || '').trim();
+  if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
+  if (s.startsWith('$') && s.endsWith('$') && s.length > 2) return s.slice(1, -1).trim();
+  return s;
+}
+
 function renderPreview(side, data, idx) {
   const el = document.getElementById('preview-' + idx + '-' + side);
   if (!el) return;
@@ -183,7 +190,7 @@ function renderPreview(side, data, idx) {
 
   if (data.type === 'formula' && data.content) {
     try {
-      katex.render(data.content, el, { throwOnError: false, displayMode: false });
+      katex.render(stripMathDelimiters(data.content), el, { throwOnError: false, displayMode: false });
     } catch {
       el.textContent = data.content;
     }

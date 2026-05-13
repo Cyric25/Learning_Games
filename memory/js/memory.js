@@ -154,10 +154,17 @@ function renderBoard() {
   });
 }
 
+function stripMathDelimiters(s) {
+  s = (s || '').trim();
+  if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
+  if (s.startsWith('$') && s.endsWith('$') && s.length > 2) return s.slice(1, -1).trim();
+  return s;
+}
+
 function renderCardContent(el, card) {
   if (card.type === 'formula') {
     try {
-      katex.render(card.content, el, { throwOnError: false, displayMode: false });
+      katex.render(stripMathDelimiters(card.content), el, { throwOnError: false, displayMode: false });
     } catch {
       el.textContent = card.content;
     }

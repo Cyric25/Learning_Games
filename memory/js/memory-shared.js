@@ -162,8 +162,8 @@ const MemoryMDParser = {
 
           if (typeA && contentA && typeB && contentB) {
             const pair = MemoryModel.createPair(
-              { type: typeA, content: contentA },
-              { type: typeB, content: contentB },
+              { type: typeA, content: typeA === 'formula' ? this._stripMathDelimiters(contentA) : contentA },
+              { type: typeB, content: typeB === 'formula' ? this._stripMathDelimiters(contentB) : contentB },
               Math.max(1, Math.min(3, difficulty))
             );
             currentCat.pairs.push(pair);
@@ -173,6 +173,13 @@ const MemoryMDParser = {
     }
 
     return categories;
+  },
+
+  _stripMathDelimiters(s) {
+    s = s.trim();
+    if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
+    if (s.startsWith('$') && s.endsWith('$') && s.length > 2) return s.slice(1, -1).trim();
+    return s;
   },
 
   _normalizeType(t) {
