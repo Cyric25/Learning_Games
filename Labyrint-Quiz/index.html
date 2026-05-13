@@ -9,35 +9,39 @@
 </head>
 <body>
 
-  <!-- ── Join Screen ────────────────────────────────────────── -->
-  <div class="screen active" id="join-screen">
-    <div class="setup-card join-card">
-      <div class="setup-header">
-        <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
-        <button class="header-btn" id="btn-theme-join" onclick="toggleTheme()">🌙 Darkmode</button>
+  <!-- ── Spielwähler ───────────────────────────────────────────── -->
+  <div class="screen active" id="game-selector">
+    <div class="gs-container">
+      <div class="gs-header">
+        <div class="gs-title">🏰 Labyrinth-Quiz</div>
+        <div style="display:flex;gap:8px;">
+          <a href="../spiele.html" class="header-btn">&#8592; Übersicht</a>
+          <button class="header-btn" id="btn-theme-join" onclick="toggleTheme()">🌙 Darkmode</button>
+        </div>
       </div>
-      <div class="setup-title">
-        <h1>🏰 Labyrinth-Quiz</h1>
-        <p>Spiel beitreten oder neues Spiel erstellen</p>
-      </div>
+      <div class="gs-body">
 
-      <div class="join-section">
-        <h3>Mit Code beitreten</h3>
-        <p class="join-hint">Gib den Code deiner Lehrkraft ein</p>
-        <input class="join-code-input" id="join-code" type="text" maxlength="6"
-          placeholder="CODE" autocomplete="off" autocapitalize="characters"
-          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-          onkeydown="if(event.key==='Enter') joinWithCode()">
-        <div class="join-error" id="join-error"></div>
-        <button class="btn-join-code" onclick="joinWithCode()">Beitreten ▶</button>
-      </div>
+        <!-- Schüler: Beitreten -->
+        <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
+        <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
+        <div class="gs-join-row">
+          <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+            onkeydown="if(event.key==='Enter')joinAsStudent()">
+          <button class="btn-join-student" onclick="joinAsStudent()">Beitreten →</button>
+        </div>
+        <div class="gs-join-error" id="gs-join-error"></div>
 
-      <div class="join-divider"><span>oder</span></div>
+        <div class="gs-divider"></div>
 
-      <div class="join-section">
-        <h3>Als Spielleiter</h3>
-        <p class="join-hint">Neues Spiel einrichten und Spielcode generieren</p>
-        <button class="btn-new-game" onclick="showSetup()">+ Neues Spiel erstellen</button>
+        <!-- Lehrkraft: Spiele verwalten -->
+        <h2 class="gs-section-title">Als Lehrkraft</h2>
+        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+        <div id="gs-game-list" class="gs-game-list"></div>
+        <div style="margin-top:1.2rem;">
+          <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+        </div>
+
       </div>
     </div>
   </div>
@@ -46,7 +50,7 @@
   <div class="screen" id="setup-screen">
     <div class="setup-card">
       <div class="setup-header">
-        <button class="header-btn" onclick="showScreen('join-screen')">&#8592; Zurück</button>
+        <button class="header-btn" onclick="resetToSelector()">&#8592; Zurück</button>
         <div class="setup-header-btns">
           <a href="admin.html" class="header-btn">Fragen</a>
           <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
@@ -56,6 +60,11 @@
       <div class="setup-title">
         <h1>🏰 Labyrinth-Quiz</h1>
         <p>Teams steuern ihr Gerät selbst – würfeln, navigieren, Symbole sammeln!</p>
+      </div>
+
+      <div class="setup-section">
+        <h3>Spieltitel (optional)</h3>
+        <input type="text" id="setup-game-title" class="setup-title-input" placeholder="z.B. Biologie 3BT" maxlength="60">
       </div>
 
       <div class="setup-section" id="category-section" style="display:none;">
@@ -155,7 +164,7 @@
         <tbody id="result-ranking-body"></tbody>
       </table>
       <div class="result-actions">
-        <button class="btn-result btn-result-primary" onclick="location.reload()">Neues Spiel</button>
+        <button class="btn-result btn-result-primary" onclick="resetToSelector()">← Spielübersicht</button>
         <a href="../spiele.html" class="btn-result btn-result-secondary">Zur Übersicht</a>
       </div>
     </div>
@@ -163,7 +172,7 @@
 
   <script src="js/maze.js"></script>
   <script src="js/renderer.js"></script>
-  <script src="js/labyrinth.js"></script>
+  <script src="js/labyrinth.js?v=2"></script>
   <script>
     function copyCode(el) {
       const code = el.textContent;

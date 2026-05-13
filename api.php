@@ -415,6 +415,27 @@ if ($key === 'labyrinth-sse') {
     exit;
 }
 
+// ── Labyrinth Games Registry: ?f=labyrinth-games ─────────────────
+if ($key === 'labyrinth-games') {
+    $lDir = __DIR__ . '/Labyrint-Quiz/data/games';
+    if (!is_dir($lDir)) mkdir($lDir, 0755, true);
+    $registryPath = $lDir . '/index.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        cleanupExpiredGames($lDir);
+        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        file_put_contents($registryPath, $body, LOCK_EX) !== false
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    }
+    exit;
+}
+
 // ── Labyrinth Per-Game: ?f=labyrinth-game&code=XXXX ──────────────
 if ($key === 'labyrinth-game') {
     $code = strtoupper(trim($_GET['code'] ?? ''));
@@ -432,11 +453,45 @@ if ($key === 'labyrinth-game') {
         if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
             http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
         }
-        file_put_contents($lPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
+        $ok = file_put_contents($lPath, $body, LOCK_EX) !== false;
+        if ($ok) {
+            $registryPath = $lDir . '/index.json';
+            $retries = 3;
+            while ($retries-- > 0) {
+                $fp = fopen($registryPath, 'c+');
+                if (!$fp) break;
+                if (flock($fp, LOCK_EX)) {
+                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
+                    $gameData = json_decode($body, true);
+                    $registry[$code] = [
+                        'title'     => $gameData['meta']['title'] ?? 'Labyrinth-Quiz',
+                        'status'    => $gameData['phase'] ?? 'setup',
+                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
+                        'updatedAt' => date('c'),
+                    ];
+                    ftruncate($fp, 0); rewind($fp);
+                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+                    break;
+                }
+                fclose($fp); usleep(50000);
+            }
+        }
+        $ok ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         if (file_exists($lPath)) @unlink($lPath);
+        $registryPath = $lDir . '/index.json';
+        if (file_exists($registryPath)) {
+            $fp = fopen($registryPath, 'c+');
+            if ($fp && flock($fp, LOCK_EX)) {
+                $registry = json_decode(stream_get_contents($fp), true) ?: [];
+                unset($registry[$code]);
+                ftruncate($fp, 0); rewind($fp);
+                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+            }
+        }
         echo json_encode(['ok' => true]);
     }
     exit;

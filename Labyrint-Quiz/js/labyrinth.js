@@ -13,7 +13,12 @@ const GameSync = {
   hasServer() { return location.protocol !== 'file:'; },
   _url(s, code) {
     const base = location.pathname.includes('/Labyrint-Quiz/') ? '../api.php' : './api.php';
+    if (s === 'games') return base + '?f=labyrinth-games';
     return base + '?f=labyrinth-' + s + (code ? '&code=' + encodeURIComponent(code) : '');
+  },
+  generateCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
   },
   async load(code) {
     if (this.hasServer()) {
@@ -25,6 +30,26 @@ const GameSync = {
     try { localStorage.setItem('lab_' + code, JSON.stringify(state)); } catch {}
     if (!this.hasServer()) return;
     try { await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state) }); } catch {}
+  },
+  async loadGamesRegistry() {
+    if (this.hasServer()) {
+      try { const r = await fetch(this._url('games')); if (r.ok) return await r.json(); } catch {}
+    }
+    const reg = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('lab_')) {
+        const code = k.slice(4);
+        try { const d = JSON.parse(localStorage.getItem(k)); if (d && d.meta) reg[code] = { title: d.meta.title || 'Labyrinth-Quiz', status: d.phase || 'setup', updatedAt: d.meta.createdAt || '' }; } catch {}
+      }
+    }
+    return reg;
+  },
+  async deleteGame(code) {
+    localStorage.removeItem('lab_' + code.toUpperCase());
+    if (this.hasServer()) {
+      try { await fetch(this._url('game', code.toUpperCase()), { method: 'DELETE' }); } catch {}
+    }
   },
   subscribe(code, cb) {
     this.unsubscribe();
@@ -58,7 +83,9 @@ let renderer = null;
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   await loadQuestions();
-  buildSetupUI();
+  const urlCode = new URLSearchParams(location.search).get('code');
+  if (urlCode) await _gsEnter(urlCode.toUpperCase());
+  else showGameSelector();
 });
 
 // ── Fragen laden ──────────────────────────────────────────────────
@@ -93,24 +120,119 @@ function convertRQtoLabyrinth(rqData) {
   return fragen;
 }
 
-// ── Join Screen ───────────────────────────────────────────────────
-function showSetup() {
-  showScreen('setup-screen');
-  buildSetupUI();
+// ── Spielwähler ───────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-async function joinWithCode() {
-  const input = document.getElementById('join-code');
-  const code = (input?.value || '').trim().toUpperCase();
-  const errEl = document.getElementById('join-error');
-  errEl.textContent = '';
+function showGameSelector() {
+  showScreen('game-selector');
+  const list = document.getElementById('gs-game-list');
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  GameSync.loadGamesRegistry().then(registry => {
+    const entries = Object.entries(registry);
+    if (entries.length === 0) { list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden.</p>'; return; }
+    entries.sort((a, b) => (b[1].updatedAt || b[1].createdAt || '').localeCompare(a[1].updatedAt || a[1].createdAt || ''));
+    list.innerHTML = entries.map(([code, info]) => {
+      const statusLabel = { playing: '🟢 Läuft', rolling: '🟢 Läuft', finished: '🏁 Beendet' }[info.status] || '⚙ Setup';
+      const date = info.updatedAt ? new Date(info.updatedAt).toLocaleDateString('de-AT', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+      const ts = info.updatedAt || info.createdAt;
+      let expiryHint = '';
+      if (ts) { const rem = 24*3600000 - (Date.now() - new Date(ts).getTime()); if (rem > 0) { const h = Math.floor(rem/3600000), m = Math.floor((rem%3600000)/60000); expiryHint = ` · ${h}h ${m}m übrig`; } }
+      return `<div class="gs-game-card" onclick="window._gsEnter('${code}')">
+        <div class="gs-game-code">${code}</div>
+        <div class="gs-game-info">
+          <div class="gs-game-title">${escapeHtml(info.title || 'Labyrinth-Quiz')}</div>
+          <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
+        </div>
+        <div class="gs-game-actions">
+          <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
 
-  if (!code || code.length < 4) { errEl.textContent = 'Bitte einen 4-stelligen Code eingeben.'; return; }
-
-  const state = await GameSync.load(code);
-  if (!state?.meta) { errEl.textContent = `Spiel "${code}" nicht gefunden.`; return; }
-
+function joinAsStudent() {
+  const input = document.getElementById('gs-code-input');
+  const errEl = document.getElementById('gs-join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (errEl) errEl.textContent = '';
+  if (!code || code.length < 4) { if (errEl) errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
   window.location.href = 'play.html?code=' + code;
+}
+
+async function createNewGame() {
+  const code = GameSync.generateCode();
+  gameCode = code;
+  window.gameCode = code;
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  const skeleton = {
+    meta: { gameCode: code, title: 'Labyrinth-Quiz', createdAt: new Date().toISOString() },
+    phase: 'setup', teams: [], seed: 0, config: {}, symbols: [], doors: [], usedQuestionIds: [], activeQuestion: null
+  };
+  await GameSync.save(code, skeleton);
+  showScreen('setup-screen');
+  buildSetupUI();
+  const t = document.getElementById('setup-game-title'); if (t) t.value = '';
+  showCodeBanner();
+}
+
+async function _gsEnter(code) {
+  const state = await GameSync.load(code);
+  if (!state?.meta) { alert('Spiel "' + code + '" nicht gefunden.'); showGameSelector(); return; }
+  gameCode = code;
+  window.gameCode = code;
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  gameState = state;
+  if ((state.phase === 'playing' || state.phase === 'rolling') && state.seed && state.config?.teamCount) {
+    activeCategories = new Set(state.config.kategorien || []);
+    const gen = new MazeGenerator(16, 16, state.seed);
+    const mazeResult = gen.generate({ doorCount: 14, teamCount: state.config.teamCount });
+    localGrid = mazeResult.grid;
+    applyStateToGrid(localGrid, state.symbols || [], state.doors || []);
+    showScreen('game-screen');
+    showGameCode();
+    const canvas = document.getElementById('maze-canvas');
+    renderer = new MazeRenderer(canvas);
+    renderer.setMaze(mazeResult);
+    renderBoard();
+    GameSync.subscribe(code, applyRemoteState);
+  } else {
+    showScreen('setup-screen');
+    buildSetupUI();
+    const t = document.getElementById('setup-game-title'); if (t) t.value = state.meta.title || '';
+    showCodeBanner();
+  }
+}
+
+async function _gsDelete(code) {
+  if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
+  await GameSync.deleteGame(code);
+  showGameSelector();
+}
+
+window._gsEnter = _gsEnter;
+window._gsDelete = _gsDelete;
+
+function showCodeBanner() {
+  if (!gameCode) return;
+  const existing = document.getElementById('code-banner');
+  if (existing) { existing.querySelector('.code-val').textContent = gameCode; return; }
+  const b = document.createElement('div');
+  b.id = 'code-banner';
+  b.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-card,#1e1b4b);color:var(--text-primary,#fff);border-radius:12px;padding:10px 16px;font-size:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;border:1px solid var(--border-card,rgba(255,255,255,0.15));';
+  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">' + gameCode + '</strong><a href="play.html?code=' + gameCode + '" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Link ↗</a>';
+  document.body.appendChild(b);
+}
+
+function resetToSelector() {
+  GameSync.unsubscribe();
+  gameCode = null; window.gameCode = null;
+  gameState = null; localGrid = null; renderer = null;
+  window.history.replaceState({}, '', 'index.html');
+  const banner = document.getElementById('code-banner'); if (banner) banner.remove();
+  showGameSelector();
 }
 
 // ── Setup UI ──────────────────────────────────────────────────────
@@ -305,13 +427,13 @@ async function startGame() {
   // Place symbols deterministically
   const symbols = placeTeamSymbols(mazeResult.grid, teams, _cfg.symbolsPerTeam, seed);
 
-  // Generate game code
-  gameCode = Math.random().toString(36).substr(2, 4).toUpperCase().replace(/[^A-Z0-9]/g, 'X').padEnd(4,'A');
-  window.gameCode = gameCode; // expose for index.html snippet
+  // Use code already set by createNewGame (or generate one if not set)
+  if (!gameCode) { gameCode = GameSync.generateCode(); window.gameCode = gameCode; }
+  const title = document.getElementById('setup-game-title')?.value.trim() || 'Labyrinth-Quiz';
 
   // Build server state
   const state = {
-    meta: { createdAt: new Date().toISOString() },
+    meta: { gameCode, title, createdAt: new Date().toISOString() },
     seed, config, teams,
     currentTeamIdx: 0,
     phase: 'rolling',
@@ -476,7 +598,7 @@ function showResult() {
 
 // ── Helper ────────────────────────────────────────────────────────
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id)?.classList.add('active'); }
-function confirmQuit() { if (confirm('Spiel wirklich beenden?')) { GameSync.unsubscribe(); showScreen('setup-screen'); } }
+function confirmQuit() { if (confirm('Spiel wirklich beenden?')) resetToSelector(); }
 function updateThemeBtnText() {
   const d = document.body.classList.contains('dark');
   ['btn-theme','btn-theme-game','btn-theme-join'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d ? '☀️ Lightmode' : '🌙 Darkmode'; });
