@@ -80,8 +80,7 @@
     /* ── Header ── */
     .page-header {
       text-align: center;
-      padding: clamp(0.5rem, 1.5vh, 1.5rem) 0 clamp(0.3rem, 0.8vh, 0.8rem);
-      position: relative;
+      padding: clamp(0.3rem, 0.8vh, 0.8rem) 0 clamp(0.3rem, 0.8vh, 0.8rem);
       flex-shrink: 0;
     }
 
@@ -100,14 +99,18 @@
       font-size: clamp(0.85rem, 1.3vw, 1.2rem);
     }
 
-    /* ── Header-Buttons oben rechts ── */
+    /* ── Top Bar (Buttons-Zeile) ── */
+    .top-bar {
+      display: flex;
+      justify-content: flex-end;
+      padding: clamp(0.5rem, 1vh, 0.8rem) 0;
+    }
+
     .header-controls {
-      position: absolute;
-      top: clamp(0.5rem, 1.5vh, 1.5rem);
-      right: 0;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .header-btn {
@@ -479,13 +482,11 @@
       /* Karten-Banner kleiner */
       .card-banner { height: 110px; font-size: 3rem; }
 
-      /* Header: Controls nicht mehr absolut über dem Titel */
-      .page-header { text-align: left; padding-top: clamp(0.5rem, 1.5vh, 1rem); }
-      .page-header h1 { font-size: clamp(1.4rem, 5vw, 2rem); text-align: center; }
-      .page-header p { text-align: center; font-size: 0.85rem; }
+      .page-header { padding-top: clamp(0.3rem, 0.8vh, 0.8rem); }
+      .page-header h1 { font-size: clamp(1.4rem, 5vw, 2rem); }
+      .page-header p { font-size: 0.85rem; }
+      .top-bar { padding: 0.4rem 0; }
       .header-controls {
-        position: static;
-        display: flex;
         justify-content: flex-end;
         margin-bottom: 0.5rem;
       }
@@ -518,7 +519,8 @@
 <!-- ── Seite ──────────────────────────────────────────────── -->
 <div class="page-wrap">
 
-  <header class="page-header">
+  <!-- Buttons-Zeile (eigene Zeile, überlagert Titel nicht) -->
+  <div class="top-bar">
     <div class="header-controls">
       <!-- Lehrermodus Login (nur sichtbar wenn nicht im Lehrermodus) -->
       <button class="header-btn" id="footer-lp-link" onclick="openPasswordModal()">
@@ -549,6 +551,9 @@
         <span id="theme-label">Darkmode</span>
       </button>
     </div>
+  </div>
+
+  <header class="page-header">
     <h1>🎮 Unterrichts<span>spiele</span></h1>
     <p>Interaktive Lernspiele für den Unterricht – auf der digitalen Tafel</p>
   </header>
@@ -786,9 +791,7 @@
 
   </div>
 
-  <footer>
-    <span>Unterrichtsspiele – offline nutzbar, keine externen Abhängigkeiten</span>
-  </footer>
+  <footer></footer>
 
 </div>
 
