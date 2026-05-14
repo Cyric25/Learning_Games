@@ -12,67 +12,136 @@ Fertige Templates zum Kopieren — Platzhalter `Xxx`/`xxx`/`PREFIX` durch den Sp
 | `spielverwaltung/index-selector.html` | HTML-Block Spielwähler-Screen | index.html-Stil (kein Card, full-screen zentriert) |
 | `spielverwaltung/gs-styles.css` | Alle `.gs-*` CSS-Regeln (kanonisch) | Für beide Selector-Varianten |
 | `spielverwaltung/XxxStorage.js` | Storage-Objekt mit API + localStorage-Fallback | Immer |
-| `spielverwaltung/game-manager.js` | Spielwähler-JS (createNewGame, _gsEnter, _gsDelete, …) | Immer |
+| `spielverwaltung/game-manager.js` | Spielwähler-JS (createNewGame, _gsEnter, _gsDelete, copyCode, …) | Immer |
+
+### Setup-Flow (3 Screens: Setup → Kategorien → Lobby)
+
+| Datei | Inhalt | Wann verwenden |
+|-------|--------|----------------|
+| `spielverwaltung/setup-screen.html` | HTML-Block Setup-Screen (Teams + Einstellungen) | Screen 2 im Setup-Flow |
+| `spielverwaltung/setup-screen.css` | CSS für Setup + Category + Lobby Screen | Immer |
+| `spielverwaltung/lobby-screen.html` | HTML-Block Lobby "Bereit!" | Screen 3, wenn Spielverwaltung aktiv |
 
 ### Kategorieauswahl (zentrale Fragendatenbank)
 
-| Datei | Inhalt |
-|-------|--------|
-| `spielverwaltung/cat-selector.html` | HTML-Block für Setup-Screen (Akkordeon-Kategorieliste) |
-| `spielverwaltung/cat-selector.js` | JS: buildCategoryUI, toggleAllCategories, updateCategoryInfo, … |
-| `spielverwaltung/cat-selector.css` | CSS: Akkordeon-Gruppen + Blatt-Items (Variante A + B) |
+| Datei | Inhalt | Wann verwenden |
+|-------|--------|----------------|
+| `spielverwaltung/cat-selector.html` | HTML-Block Kategorie-Screen (Akkordeon-Liste) | Screen zwischen Setup + Lobby |
+| `spielverwaltung/cat-selector.js` | JS: buildCategoryUI, toggleAllCategories, updateCatSelectInfo | Immer wenn zentrale DB genutzt |
+| `spielverwaltung/cat-selector.css` | CSS: Akkordeon-Gruppen + Blatt-Items (Variante A + B) | Immer wenn zentrale DB genutzt |
+
+---
+
+## Screen-Ablauf (vollständig)
+
+```
+#game-selector     ← Spielwähler (gs-selector.html / index-selector.html)
+        ↓
+#setup-screen      ← Teams & Einstellungen (setup-screen.html)
+        ↓
+#category-screen   ← Kategorieauswahl (cat-selector.html)  [nur mit Fragendatenbank]
+        ↓
+#lobby-screen      ← "Bereit!" + Spielcode (lobby-screen.html)  [nur mit Spielverwaltung]
+        ↓
+#game-screen       ← Spielfeld (spielspezifisch)
+```
+
+Screens ohne Spielverwaltung (z.B. QuizPfad):
+```
+#setup-screen → #category-screen → #game-screen
+```
 
 ---
 
 ## Checkliste: Neues Spiel mit Spielverwaltung
 
-1. **HTML**: Spielwähler-HTML als ersten `.screen.active` einfügen
-   - admin.html-Stil → `gs-selector.html`
-   - index.html-Stil → `index-selector.html`
-2. **CSS**: `gs-styles.css` in die Spiel-CSS-Datei kopieren — Variante A oder B wählen (Kommentare im File)
-3. **JS**: `XxxStorage.js` + `game-manager.js` in die Spiellogik-JS kopieren
-4. **Suchen & Ersetzen**:
-   - `Xxx` → PascalCase Spielname (z.B. `Leiterspiel`)
-   - `xxx` / `PREFIX` → Kleinbuchstaben-Prefix für localStorage + API (z.B. `ls-` / `ls_`)
-   - Spielname im Template-Text (Titel, Labels)
-5. **api.php**: Neuen Block für `PREFIX-games`, `PREFIX-game`, `PREFIX-sse` nach dem `ls-`-Block einfügen
-6. **CLAUDE.md** `## Spielverwaltung` → Tabelle um neues Spiel ergänzen
+1. **HTML**: Spielwähler als ersten `.screen.active` einfügen
+   - Kein Card-Wrapper → `index-selector.html`
+   - Mit Card-Wrapper → `gs-selector.html`
+2. **HTML**: Setup-Screen einfügen → `setup-screen.html`
+3. **HTML**: Kategorie-Screen einfügen → `cat-selector.html`
+4. **HTML**: Lobby-Screen einfügen → `lobby-screen.html`
+5. **CSS**: `gs-styles.css` + `setup-screen.css` + `cat-selector.css` in Spiel-CSS kopieren
+   - Variante A (Leiterspiel: `--bg-sidebar`/`--bg-field`/`--border`) oder
+   - Variante B (Labyrinth: `--bg-secondary`/`--bg-card`/`--border-card`) wählen
+   - `--bg-primary` in `:root` + `body.dark` definieren (flache Farbe, kein Gradient)
+6. **JS**: `XxxStorage.js` + `game-manager.js` + `cat-selector.js` in Spiellogik-JS kopieren
+7. **Suchen & Ersetzen**:
+   - `XxxStorage` → Name des Storage-Objekts (z.B. `LsStorage`)
+   - `PREFIX` → Kleinbuchstaben-API-Prefix (z.B. `ls-`)
+   - `PREFIX_gs_` → localStorage-Key-Prefix (z.B. `ls_gs_`)
+   - `'Spielname'` → tatsächlicher Spieltitel
+   - `selectedCategoryIds` → konsistent im ganzen JS (oder eigener Name)
+   - `updateCatSelectInfo()` → spielspezifische Zähllogik eintragen
+   - `_countLeafQ()` → Option A/B/C wählen (Kommentar im Template)
+8. **api.php**: Neuen Block für `PREFIX-games`, `PREFIX-game`, `PREFIX-sse` einfügen
+9. **CLAUDE.md** → `## Spielverwaltung` Tabelle um neues Spiel ergänzen
+
+---
 
 ## Checkliste: Kategorieauswahl einbauen
 
-Für Spiele, die die **zentrale Fragendatenbank** (`data/questions.json`) nutzen:
+Für Spiele die die **zentrale Fragendatenbank** (`data/questions.json`) nutzen:
 
-1. **HTML**: `cat-selector.html` in den `setup-card` / `setup-section`-Bereich einfügen
-2. **CSS**: `cat-selector.css` in die Spiel-CSS-Datei kopieren — Variante A oder B:
-   - Variante A (Leiterspiel): `--bg-sidebar`, `--bg-field`, `--border`
-   - Variante B (Labyrinth): `--bg-secondary`, `--bg-card`, `--border-card`
-3. **JS**: `cat-selector.js` in die Spiellogik-JS-Datei kopieren
-4. **Variablen im Spiellogik-JS** sicherstellen:
+1. **HTML**: `cat-selector.html` als eigenen `.screen` einfügen (nicht mehr als `<section>` im Setup-Screen)
+2. **CSS**: `cat-selector.css` kopieren — Variante wählen:
+   - Variante A (Leiterspiel): `--bg-sidebar`/`--bg-field`/`--border`
+   - Variante B (Labyrinth): `--bg-secondary`/`--bg-card`/`--border-card`
+3. **JS**: `cat-selector.js` kopieren, dann anpassen:
+   - `selectedCategoryIds` → ggf. umbenenn auf spielinternen Namen
+   - `_countLeafQ()` → Option im Kommentar wählen (A: cat.questions.length, B: fragenBank, C: allQuestions)
+   - `updateCatSelectInfo()` → spielspezifische Fragenbank-Abfrage eintragen
+4. **rawCategories befüllen**: `rawCategories = questionsJson.categories;`
+5. **Aufruf**: `buildCategoryUI()` in `proceedToCategories()` aufrufen (nicht beim Laden)
+6. **Filterung beim Spielstart**: `fragen.filter(q => selectedCategoryIds.has(q.kategorie))` o.ä.
+7. **Speichern**: `activeCategoryIds: [...selectedCategoryIds]` im Spielstand mitspeichern
+
+---
+
+## Checkliste: Lobby-Screen einbauen
+
+Für Spiele **mit Spielverwaltung** (Spielcode vorhanden):
+
+1. **HTML**: `lobby-screen.html` einfügen (nach `#category-screen`, vor `#game-screen`)
+2. **CSS**: Lobby-Styles sind in `setup-screen.css` enthalten — keine extra Datei
+3. **JS** in `game-manager.js`:
+   - `showLobbyScreen(summaryText)` aufrufen statt direkt zu `#game-screen` zu wechseln
+   - `startGame()` als window-Funktion exportieren: `window.startGame = startGame`
+4. **Beispiel-Aufruf** (in `proceedFromCategories()` o.ä.):
    ```js
-   let rawCategories    = [];          // questions.json .categories (unverändert)
-   let allQuestions     = [];          // flach, .kategorieId = Blatt-Kategorie-ID
-   let activeCategories = new Set();   // wird von buildCategoryUI() befüllt
+   const n = teams.length;
+   const q = activeFragenBank.length;
+   showLobbyScreen(n + ' Teams · ' + selectedCategoryIds.size + ' Kategorien · ' + q + ' Fragen');
    ```
-5. **rawCategories befüllen**: `rawCategories = questionsJson.categories;`
-6. **buildCategoryUI()** aufrufen, nachdem Fragen geladen wurden
-7. **Feldname prüfen**: `allQuestions[i].kategorieId` — ggf. in `updateCategoryInfo()` anpassen
 
 ---
 
 ## Wichtige Regeln
 
 ### Spielverwaltung
-- `createNewGame` **muss** als `async function createNewGame()` deklariert werden (nicht als `window.xxx = ...`)
+- `createNewGame` **muss** als `async function createNewGame()` deklariert werden (nicht `window.xxx = ...`)
   → Function Declarations werden gehoisted, Assignments nicht.
 - `_gsEnter` / `_gsDelete` als reguläre Declarations definieren, danach manuell exportieren:
-  `window._gsEnter = _gsEnter;`
-- Bei Spielen mit lokalem State (z.B. Maze-Grid, SVG-Board): In `_gsEnter()` den State aus dem
-  gespeicherten Spielstand wiederherstellen.
+  `window._gsEnter = _gsEnter;` (nach den Declarations, vor DOMContentLoaded)
+- Bei Spielen mit lokalem State (Maze-Grid, SVG-Board): State in `_gsEnter()` aus Spielstand wiederherstellen.
 
 ### Kategorieauswahl
 - `rawCategories` enthält die **rohe** Hierarchie aus questions.json — nicht die konvertierte Flat-Liste.
-  Die Konvertierung (`convertRQ…()`) liefert `allQuestions`; `rawCategories` wird separat gesetzt.
-- Die `activeCategories`-Set enthält **Blatt-Kategorie-IDs** (tiefste Ebene).
-  Beim Spielstart Fragen filtern: `allQuestions.filter(q => activeCategories.has(q.kategorieId))`.
-- Beim Speichern des Spielstands `activeCategoryIds: [...activeCategories]` mitspeichern,
+  Die Konvertierung (`convertRQ…()`) liefert die spielspezifische Fragenbank; `rawCategories` separat setzen.
+- `selectedCategoryIds` enthält **Blatt-Kategorie-IDs** (tiefste Ebene mit eigenen Fragen).
+- Beim Speichern des Spielstands `activeCategoryIds: [...selectedCategoryIds]` mitspeichern,
   damit beim Laden eines laufenden Spiels die Kategorien wiederhergestellt werden können.
+
+### CSS-Varianten (light-first vs dark-first)
+- **Light-first** (Leiterspiel, Labyrinth, QuizPfad, neue Spiele):
+  Default-Werte in `setup-screen.css` sind light-freundlich (`rgba(0,0,0,…)`)
+  → `body.dark`-Overrides am Ende aktivieren dark mode
+- **Dark-first** (Risiko-Quiz Stil):
+  Default-Werte sind dark-freundlich (`rgba(255,255,255,…)`)
+  → `body.light`-Overrides für light mode hinzufügen
+  → Im Template mit `← DARK-FIRST` markierte Stellen tauschen
+
+### copyCode
+- In `game-manager.js` enthalten, manuell auf window exportiert: `window.copyCode = copyCode`
+- Verwendet `navigator.clipboard` (HTTPS / localhost) mit `execCommand`-Fallback
+- onclick-Verwendung: `onclick="copyCode(this)"` auf dem Element das den Code als Text enthält

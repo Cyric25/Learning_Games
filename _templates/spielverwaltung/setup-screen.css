@@ -1,35 +1,35 @@
-/* ── Setup Screen CSS (Template) — Risiko-Quiz Stil ─────────────────
-   Styles für #setup-screen und alle Setup-Elemente.
-   Passt zu setup-screen.html + cat-selector.html (standalone).
+/* ── Setup Screen CSS (Template) — Light-First Stil ─────────────────
+   Styles für #setup-screen, #category-screen, #lobby-screen und alle
+   Setup-Elemente (Settings-Rows, Param-Btns, Team-Items, Buttons).
+
+   BASIERT AUF: Risiko-Quiz Setup-UI-Pattern (SETUP-UI-ANALYSE.md)
+   REFERENZ-IMPLEMENTIERUNG: Leiterspiel-quiz/css/leiterspiel.css
 
    EINBINDEN:
-     Diesen Block in die Spiel-CSS-Datei kopieren.
+     Diesen Block in die Spiel-CSS-Datei kopieren (nach den
+     CSS-Variablen, vor den Game-Screen-Styles).
      cat-selector.css separat einbinden (Akkordeon-Styles).
 
-   VORAUSSETZUNG in Spiel-CSS:
-     --bg-primary muss definiert sein (flache Farbe, kein Gradient):
-       :root  { --bg-primary: #fdfaf8; }     ← cream / light
-       .dark  { --bg-primary: #16213e; }     ← navy  / dark
+   VORAUSSETZUNGEN in Spiel-CSS:
+     --bg-primary  = flache Hintergrundfarbe (KEIN Gradient!):
+       :root       { --bg-primary: #fdfaf8; }   ← cream (light-first)
+       body.dark   { --bg-primary: #16213e; }   ← navy  (dark)
+     --accent, --text-primary, --text-secondary, --border, --success, --danger
 
-   HINWEIS Inputs im Light-Mode:
-     rgba(255,255,255,0.07) funktioniert auf dunklem Hintergrund.
-     Für Light-Mode: body.light .settings-* Overrides am Ende beachten.
-   ────────────────────────────────────────────────────────────────── */
+   VARIANTEN:
+     Light-First (Leiterspiel, Labyrinth, QuizPfad — neue Spiele):
+       → Default-Werte unten sind light-freundlich (rgba(0,0,0,…))
+       → body.dark-Overrides am Ende aktivieren dark mode
 
-/* ── Setup Screen Container ───────────────────────────────────────── */
+     Dark-First (Risiko-Quiz Stil):
+       → Default = dark-Werte (rgba(255,255,255,…)) verwenden
+       → body.light Overrides = light-Werte
+       → Markierte Stellen mit "← DARK-FIRST" tauschen
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Setup-Screen + Category-Screen Container ─────────────────────── */
 /* Vollbild, kein Card-Wrapper — direkt auf --bg-primary */
-#setup-screen {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-primary);
-  z-index: 490;
-  flex-direction: column;
-  align-items: center;
-  overflow-y: auto;
-  padding: 2rem;
-}
-
-/* Kategorie-Screen (separater Schritt nach setup-screen) */
+#setup-screen,
 #category-screen {
   position: fixed;
   inset: 0;
@@ -41,18 +41,17 @@
   padding: 2rem;
 }
 
+/* Kategorie-Screen Innen-Container */
 .cat-screen-container {
   width: 100%;
   max-width: 600px;
   display: flex;
   flex-direction: column;
 }
-
 .cat-screen-header {
   text-align: center;
   margin-bottom: 1.5rem;
 }
-
 .cat-screen-title {
   color: var(--accent);
   font-size: 2rem;
@@ -72,25 +71,22 @@
   border-bottom: 2px solid var(--border);
 }
 
-/* ── Settings Row ─────────────────────────────────────────────────── */
+/* ── Settings Row (Light-First Default) ───────────────────────────── */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.03);        /* ← DARK-FIRST: rgba(255,255,255,0.05) */
   border-radius: 12px;
   padding: 0.9rem 1.2rem;
   margin-bottom: 0.6rem;
   border: 2px solid transparent;
   transition: border-color 0.2s;
 }
-
-.settings-row-clickable {
-  cursor: pointer;
-}
+.settings-row-clickable { cursor: pointer; }
 .settings-row-clickable:hover {
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(0,0,0,0.08);      /* ← DARK-FIRST: rgba(255,255,255,0.1) */
 }
 
 .settings-row-title {
@@ -119,7 +115,7 @@
   padding: 0.4rem 0.6rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.04);        /* ← DARK-FIRST: rgba(255,255,255,0.07) */
   color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 700;
@@ -135,7 +131,7 @@
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.04);        /* ← DARK-FIRST: rgba(255,255,255,0.07) */
   color: var(--text-primary);
   font-size: 0.95rem;
   font-family: inherit;
@@ -148,7 +144,7 @@
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.04);        /* ← DARK-FIRST: rgba(255,255,255,0.07) */
   color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
@@ -170,7 +166,7 @@
   padding: 0.4rem 0.9rem;
   border-radius: 8px;
   border: 2px solid var(--border);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.03);        /* ← DARK-FIRST: rgba(255,255,255,0.05) */
   color: var(--text-primary);
   font-size: 0.9rem;
   font-weight: 600;
@@ -178,27 +174,24 @@
   transition: all 0.15s;
   font-family: inherit;
 }
-.param-btn:hover { border-color: var(--accent); }
-.param-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
+.param-btn:hover  { border-color: var(--accent); }
+.param-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* ── Team Select Items ────────────────────────────────────────────── */
 .team-select-item {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.03);        /* ← DARK-FIRST: rgba(255,255,255,0.05) */
   border: 2px solid var(--border);
   border-radius: 10px;
   padding: 0.8rem 1rem;
   margin-bottom: 0.6rem;
   transition: border-color 0.2s;
 }
+.team-select-item.active { border-color: var(--success); }
 
-/* .team-select-item--stacked: zweizeilig (z.B. mit Tier-Picker) */
+/* Gestapelte Variante (z.B. mit Tier-Picker oder Symbolen) */
 .team-select-item--stacked {
   flex-direction: column;
   align-items: stretch;
@@ -210,8 +203,7 @@
   gap: 0.8rem;
 }
 
-.team-select-item.active { border-color: var(--success); }
-
+/* Farbpunkt neben Team-Name */
 .team-select-dot {
   width: 20px;
   height: 20px;
@@ -220,9 +212,10 @@
   flex-shrink: 0;
 }
 
+/* Team-Name Eingabefeld */
 .team-name-input {
   flex: 1;
-  background: rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.04);        /* ← DARK-FIRST: rgba(255,255,255,0.07) */
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
@@ -233,7 +226,7 @@
   transition: border-color 0.2s;
   font-family: inherit;
 }
-.team-name-input:focus { border-color: rgba(255,255,255,0.4); }
+.team-name-input:focus { border-color: var(--accent); }
 
 /* ── Setup Buttons ────────────────────────────────────────────────── */
 .setup-btn {
@@ -251,14 +244,11 @@
   display: inline-flex;
   align-items: center;
 }
-.setup-btn:hover {
-  transform: scale(1.04);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
+.setup-btn:hover  { transform: scale(1.04); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
 .setup-btn:active { transform: scale(0.97); }
 
 .setup-btn-ghost {
-  background: rgba(255,255,255,0.07) !important;
+  background: #fff !important;         /* ← DARK-FIRST: var(--bg-card) !important */
   border: 1px solid var(--border) !important;
   color: var(--text-primary) !important;
 }
@@ -282,12 +272,12 @@
   margin-bottom: 0.5rem;
 }
 
-/* ── Btn-sm (Alle / Keine in Kategorieauswahl) ────────────────────── */
+/* Btn-sm (z.B. "Alle" / "Keine" in Kategorieauswahl) */
 .btn-sm {
   padding: 0.3rem 0.9rem;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.03);        /* ← DARK-FIRST: rgba(255,255,255,0.05) */
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-family: inherit;
@@ -296,22 +286,95 @@
 }
 .btn-sm:hover { border-color: var(--accent); color: var(--text-primary); }
 
-/* ── Light-Mode Overrides ─────────────────────────────────────────── */
-/* Für Spiele mit body.light (Risiko-Quiz Stil) */
-body.light .settings-row        { background: rgba(0,0,0,0.03); }
-body.light .settings-row-clickable:hover { border-color: rgba(0,0,0,0.08); }
-body.light .team-select-item    { background: rgba(0,0,0,0.03); }
-body.light .param-btn           { background: rgba(0,0,0,0.03); }
-body.light .settings-number,
-body.light .settings-text-input,
-body.light .settings-select     { background: rgba(0,0,0,0.04); }
-body.light .team-name-input     { background: rgba(0,0,0,0.04); }
-body.light .team-name-input:focus { border-color: var(--accent); }
-body.light .setup-btn-ghost     { background: #fff !important; }
-body.light .btn-sm              { background: rgba(0,0,0,0.03); }
+/* ── Lobby Screen (#lobby-screen) — Screen 3 "Bereit!" ───────────── */
+/* Dunkles Overlay über allem (z-index 600), unabhängig vom Spieltheme */
+#lobby-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,30,0.95);
+  z-index: 600;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
 
-/* Für Spiele mit body.dark (Leiterspiel / Labyrinth Stil) */
-body.dark .settings-row        { background: rgba(255,255,255,0.05); }
-body.dark .team-select-item    { background: rgba(255,255,255,0.05); }
-body.dark .param-btn           { background: rgba(255,255,255,0.05); }
-body.dark .setup-btn-ghost     { background: rgba(255,255,255,0.07) !important; }
+.lobby-title {
+  color: var(--accent);
+  font-size: clamp(2rem,5vw,3rem);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.lobby-summary {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+}
+.lobby-code-box {
+  background: var(--bg-card, #0f3460);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  padding: 0.8rem 2rem;
+  cursor: pointer;
+  margin: 1rem 0;
+  transition: opacity 0.2s;
+  display: inline-block;
+}
+.lobby-code-box:hover { opacity: 0.85; }
+.lobby-code-label {
+  color: var(--text-secondary, #a8a8b3);
+  font-size: 0.85rem;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.lobby-code-value {
+  color: var(--accent);
+  font-size: clamp(1.6rem,4vw,2.5rem);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  font-family: monospace;
+}
+.lobby-hint {
+  color: var(--text-secondary, #a8a8b3);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+.lobby-back-link {
+  color: var(--text-secondary, #a8a8b3);
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  display: inline-block;
+  text-decoration: none;
+}
+.lobby-back-link:hover { color: var(--text-primary, #fff); }
+
+/* ── Dark-Mode Overrides (für light-first Spiele: body.dark) ──────── */
+body.dark .settings-row              { background: rgba(255,255,255,0.05); }
+body.dark .settings-row-clickable:hover { border-color: rgba(255,255,255,0.1); }
+body.dark .team-select-item          { background: rgba(255,255,255,0.05); }
+body.dark .param-btn                 { background: rgba(255,255,255,0.05); }
+body.dark .settings-number,
+body.dark .settings-text-input,
+body.dark .settings-select           { background: rgba(255,255,255,0.07); }
+body.dark .team-name-input           { background: rgba(255,255,255,0.07); }
+body.dark .team-name-input:focus     { border-color: rgba(255,255,255,0.4); }
+body.dark .setup-btn-ghost           { background: rgba(255,255,255,0.07) !important; }
+body.dark .btn-sm                    { background: rgba(255,255,255,0.05); }
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+/* Settings-Zeilen bei kleinen Viewports untereinander */
+@media (max-width: 540px) {
+  #setup-screen,
+  #category-screen { padding: 1.2rem; }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+  .settings-number,
+  .settings-text-input,
+  .settings-select   { width: 100%; }
+}

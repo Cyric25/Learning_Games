@@ -1,0 +1,54 @@
+<!-- ── Lobby Screen ("Bereit!") — Screen 3 im Setup-Ablauf ───────────
+     Wird eingeblendet nach Teams & Einstellungen.
+     Zeigt Spielcode, Zusammenfassung und "Spiel starten"-Button.
+
+     SCREEN-ABLAUF:
+       #game-selector → #setup-screen → #category-screen → #lobby-screen → #game-screen
+
+     VORAUSSETZUNGEN:
+       setup-screen.css  → #lobby-screen Styles
+       game-manager.js   → showLobbyScreen(), copyCode(), startGame()
+
+     ANPASSEN:
+       startGame()        → spielspezifische Startfunktion
+       resetToSelector()  → Funktion die zurück zum Spielwähler geht
+       #lobby-summary     → wird per showLobbyScreen(summaryText) befüllt
+       #lobby-code-val    → wird per showLobbyScreen() mit dem Spielcode befüllt
+
+     BEFÜLLEN PER JS (in game-manager.js showLobbyScreen()):
+       document.getElementById('lobby-code-val').textContent = code;
+       document.getElementById('lobby-summary').textContent = '4 Teams · 3 Kategorien · 120 Fragen';
+
+     CSS:
+       #lobby-screen hat z-index:600 und rgba(10,10,30,0.95) Hintergrund
+       → funktioniert als dunkles Overlay über allen anderen Screens
+       → unabhängig vom Spiel-Theme (immer dunkel)
+     ─────────────────────────────────────────────────────────────────── -->
+
+<div class="screen" id="lobby-screen">
+
+  <div class="lobby-title">Bereit!</div>
+
+  <p class="lobby-summary" id="lobby-summary">
+    Teams · Kategorien
+  </p>
+
+  <!-- Spielcode-Box: Klick kopiert den Code in die Zwischenablage -->
+  <div class="lobby-code-box" onclick="copyCode(this.querySelector('.lobby-code-value'))">
+    <span class="lobby-code-label">Spielcode</span>
+    <span class="lobby-code-value" id="lobby-code-val">----</span>
+  </div>
+
+  <p class="lobby-hint">
+    Spieler können jetzt mit diesem Code beitreten.
+  </p>
+
+  <!-- Grüner Start-Button -->
+  <button class="setup-btn" style="background:var(--success);" onclick="startGame()">
+    &#9658; Spiel starten
+  </button>
+
+  <!-- Zurück-Link (kein Button — nicht so prominent) -->
+  <a class="lobby-back-link" onclick="resetToSelector()">&#8592; Zurück</a>
+
+</div>
