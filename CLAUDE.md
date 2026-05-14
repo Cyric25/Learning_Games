@@ -319,11 +319,29 @@ async function loadQuestions() {
 ```
 
 ### Kategorieauswahl im Setup (Standard-Pattern)
-Jedes Spiel, das die zentrale DB nutzt, bietet im Setup-Screen eine **Kategorieauswahl** an:
-- Alle Kategorien (Blatt-Ebenen) werden als Toggle-Buttons angezeigt
-- "Alle auswählen" / "Keine" Buttons verfügbar
-- Nur Fragen aus gewählten Kategorien werden im Spiel verwendet
-- Kategorien erhalten automatisch Icons und Farben aus einer festen Palette
+Jedes Spiel, das die zentrale DB nutzt, bietet im Setup-Screen eine **Kategorieauswahl** an.
+Fertige Kopiervorlage: `_templates/spielverwaltung/cat-selector.html/.js/.css`
+
+**Verhalten:**
+- Oberkategorien (Top-Level aus `questions.json`) standardmäßig **eingeklappt**
+- Klick auf Oberkategorie → klappt auf und zeigt Unterkategorien
+- Unterkategorien einzeln an/ab-wählbar (Blatt-Ebenen)
+- Gruppen-Checkbox im Header → alle Unterkategorien der Gruppe an/aus
+- „Alle" / „Keine" Buttons für Gesamt-Toggle
+- Info-Zeile zeigt Anzahl Fragen + Kategorien; wird rot bei 0 Fragen
+
+**JS-Voraussetzungen im Spiellogik-JS:**
+```js
+let rawCategories    = [];          // questions.json .categories (Hierarchie, unverändert)
+let allQuestions     = [];          // flach konvertiert, jede Frage mit .kategorieId
+let activeCategories = new Set();   // gewählte Blatt-Kategorie-IDs
+```
+`rawCategories` direkt aus `questionsJson.categories` befüllen (keine Konvertierung nötig).
+`allQuestions` via spielspezifische `convertRQ…()`-Funktion; `.kategorieId` muss die Blatt-ID sein.
+
+**CSS-Variablen:** Variante A (Leiterspiel: `--bg-sidebar`/`--bg-field`/`--border`) und
+Variante B (Labyrinth: `--bg-secondary`/`--bg-card`/`--border-card`) — im CSS mit
+`← Var-A` / `← Var-B` markiert.
 
 ---
 
@@ -715,10 +733,14 @@ Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspie
 **Kopiervorlagen** für neue Spiele in `_templates/spielverwaltung/`:
 | Datei | Inhalt |
 |-------|--------|
-| `gs-selector.html` | HTML-Block Spielwähler-Screen |
-| `gs-styles.css` | Alle `.gs-*` CSS-Regeln (kanonisch) |
+| `gs-selector.html` | HTML-Block Spielwähler-Screen (admin.html-Stil, mit Card-Wrapper) |
+| `index-selector.html` | HTML-Block Spielwähler-Screen (index.html-Stil, kein Card-Wrapper) |
+| `gs-styles.css` | Alle `.gs-*` CSS-Regeln (kanonisch, Variante A + B) |
 | `XxxStorage.js` | Storage-Objekt mit API + localStorage-Fallback |
 | `game-manager.js` | Spielwähler-JS (createNewGame, _gsEnter, _gsDelete, …) |
+| `cat-selector.html` | HTML-Block Kategorieauswahl (Setup-Screen) |
+| `cat-selector.js` | Kategorieauswahl-JS (buildCategoryUI, toggleAllCategories, …) |
+| `cat-selector.css` | Kategorieauswahl-CSS (Akkordeon, Variante A + B) |
 
 → `_templates/README.md` erklärt die Checkliste und Regeln für die Integration.
 
