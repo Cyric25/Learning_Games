@@ -486,7 +486,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   if (code) {
-    document.getElementById('code-input').value = code.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+    const cleaned = code.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
+    document.getElementById('code-input').value = cleaned;
+    if (cleaned.length === 4) {
+      loadFragenBank().then(() => joinGame());
+      return;
+    }
   }
   loadFragenBank();
 });
