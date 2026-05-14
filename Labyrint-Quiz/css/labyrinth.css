@@ -373,14 +373,11 @@ body.dark {
 }
 .btn-sm:hover { border-color:var(--accent); color:var(--text-primary); }
 
-/* Hierarchical category list */
+/* Hierarchical category list — kein max-height, Setup-Screen scrollt selbst */
 .cat-select-list {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  max-height: 320px;
-  overflow-y: auto;
-  padding-right: 0.3rem;
 }
 
 /* Accordion group (non-leaf) */
