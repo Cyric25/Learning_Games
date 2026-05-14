@@ -439,6 +439,37 @@
       color: #a8a8b3;
     }
 
+    /* ── Kategorie-Abschnitte ── */
+    .games-section {
+      margin-bottom: clamp(1.2rem, 2.5vw, 2.5rem);
+    }
+
+    .games-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: clamp(0.7rem, 1.5vw, 1.2rem);
+    }
+
+    .section-title {
+      font-size: clamp(0.9rem, 1.4vw, 1.2rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--tag-color);
+    }
+
+    .section-line {
+      flex: 1;
+      height: 2px;
+      background: var(--card-border);
+      border-radius: 2px;
+    }
+
     @media (max-width: 600px) {
       .games-grid { grid-template-columns: 1fr; }
 
@@ -523,205 +554,236 @@
   </header>
 
   <div class="content-box">
-    <div class="games-grid">
 
-      <!-- Stadt Land Fluss -->
-      <div class="game-card" data-game="slf">
-        <button class="game-toggle" onclick="toggleGameVisibility('slf')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
-          <span class="card-emoji">🗺️</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Stadt Land Fluss</div>
-          <div class="card-desc">
-            Klassisches Wortspiel für die ganze Klasse. Buchstabe ziehen, Kategorien befüllen,
-            Punkte sammeln. Mit anpassbaren Kategorien und Timer.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Wortspiel</span>
-            <span class="tag">Klassenspiel</span>
-            <span class="tag">Kategorien</span>
-            <span class="tag">Timer</span>
-          </div>
-          <div class="card-actions">
-            <a href="stadt-land-fluss/index.html" class="btn btn-play">▶ Spielen</a>
-          </div>
-        </div>
+    <!-- ── Lernen ───────────────────────────────────────────── -->
+    <div class="games-section">
+      <div class="section-header">
+        <span class="section-title">📖 Lernen</span>
+        <div class="section-line"></div>
       </div>
+      <div class="games-grid">
 
-      <!-- Risiko-Quiz -->
-      <div class="game-card" data-game="risiko">
-        <button class="game-toggle" onclick="toggleGameVisibility('risiko')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #e94560, #0f3460);">
-          <span class="card-emoji">🎯</span>
+        <!-- Lernkarten -->
+        <div class="game-card" data-game="lernkarten">
+          <button class="game-toggle" onclick="toggleGameVisibility('lernkarten')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
+            <span class="card-emoji">📚</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Lernkarten</div>
+            <div class="card-desc">
+              ANKI-System: Karteikarten mit intelligentem Wiederholungsalgorithmus (SM-2) –
+              aus Memory-Paaren und dem Fragenpool.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Einzelspieler</span>
+              <span class="tag">Spaced Repetition</span>
+              <span class="tag">Memory-Paare</span>
+              <span class="tag">Fragenpool</span>
+            </div>
+            <div class="card-actions">
+              <a href="lernkarten/index.html" class="btn btn-play">&#9654; Lernen</a>
+            </div>
+          </div>
         </div>
-        <div class="card-body">
-          <div class="card-title">Risiko-Quiz</div>
-          <div class="card-desc">
-            Jeopardy-ähnliches Teamquiz. Teams setzen ihren Punktestand ein, um Fragen aus
-            Kategorien zu beantworten. Richtig = Punkte dazu, Falsch = Punkte weg.
+
+        <!-- Memory -->
+        <div class="game-card" data-game="memory">
+          <button class="game-toggle" onclick="toggleGameVisibility('memory')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #9b59b6, #3498db);">
+            <span class="card-emoji">🧠</span>
           </div>
-          <div class="card-tags">
-            <span class="tag">Quiz</span>
-            <span class="tag">Teams</span>
-            <span class="tag">Kategorien</span>
-            <span class="tag">Timer</span>
-            <span class="tag">MC + Offen</span>
-          </div>
-          <div class="card-actions" style="flex-wrap:wrap;">
-            <a href="risiko-quiz/index.html"    class="btn btn-play">🎮 Spielen</a>
-            <a href="risiko-quiz/practice.html" class="btn btn-play" style="background:linear-gradient(135deg,#2ecc71,#27ae60);">📚 Üben</a>
+          <div class="card-body">
+            <div class="card-title">Memory</div>
+            <div class="card-desc">
+              Paare finden mit Text, Formeln und Bildern. Kategorien wählen,
+              Schwierigkeit einstellen, Highscore knacken.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Singleplayer</span>
+              <span class="tag">Formeln</span>
+              <span class="tag">Bilder</span>
+              <span class="tag">Kategorien</span>
+            </div>
+            <div class="card-actions">
+              <a href="memory/index.html" class="btn btn-play">▶ Spielen</a>
+              <a href="memory/admin.html" class="btn btn-admin teacher-only">⚙ Paare</a>
+            </div>
           </div>
         </div>
+
       </div>
-
-      <!-- QuizPfad -->
-      <div class="game-card" data-game="quizpfad">
-        <button class="game-toggle" onclick="toggleGameVisibility('quizpfad')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #f4a261, #e76f51);">
-          <span class="card-emoji">🎲</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">QuizPfad</div>
-          <div class="card-desc">
-            Lineares Brettspiel: Beantworte Fragen, rücke auf dem Spielfeld vor und erreiche
-            als erstes Team das Ziel. Mit Bonusfeldern, Joker und Teamduell.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Brettspiel</span>
-            <span class="tag">Teams</span>
-            <span class="tag">Quiz</span>
-            <span class="tag">Bonusfelder</span>
-          </div>
-          <div class="card-actions">
-            <a href="quizpfad/index.html" class="btn btn-play">▶ Spielen</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Memory -->
-      <div class="game-card" data-game="memory">
-        <button class="game-toggle" onclick="toggleGameVisibility('memory')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #9b59b6, #3498db);">
-          <span class="card-emoji">🧠</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Memory</div>
-          <div class="card-desc">
-            Paare finden mit Text, Formeln und Bildern. Kategorien wählen,
-            Schwierigkeit einstellen, Highscore knacken.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Singleplayer</span>
-            <span class="tag">Formeln</span>
-            <span class="tag">Bilder</span>
-            <span class="tag">Kategorien</span>
-          </div>
-          <div class="card-actions">
-            <a href="memory/index.html" class="btn btn-play">▶ Spielen</a>
-            <a href="memory/admin.html" class="btn btn-admin teacher-only">⚙ Paare</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Escape Room -->
-      <div class="game-card" data-game="escape">
-        <button class="game-toggle" onclick="toggleGameVisibility('escape')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #0a0a2e, #1a1a3e);">
-          <span class="card-emoji">🔐</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Escape Room</div>
-          <div class="card-desc">
-            Pädagogisches Escape-Room-Spiel: Löst Rätsel Raum für Raum,
-            sammelt Code-Ziffern und knackt den Tresor. Mehrere Spiele, Timer, Rangliste.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Teams</span>
-            <span class="tag">Rätsel</span>
-            <span class="tag">Codes</span>
-            <span class="tag">Timer</span>
-          </div>
-          <div class="card-actions">
-            <a href="escape-room/index.html" class="btn btn-play">▶ Spielen</a>
-            <a href="escape-room/index.html?admin=true" class="btn btn-admin teacher-only">⚙ Admin</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Schlangen & Leitern -->
-      <div class="game-card" data-game="leiterspiel">
-        <button class="game-toggle" onclick="toggleGameVisibility('leiterspiel')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
-          <span class="card-emoji">🐍</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Schlangen &amp; Leitern</div>
-          <div class="card-desc">
-            Klassisches Brettspiel mit Wissensfragen: Würfeln, Fragen beantworten,
-            Leitern hochklettern und Schlangen ausweichen. Bis zu 10 Gruppen mit Tierfiguren.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Brettspiel</span>
-            <span class="tag">Quiz</span>
-            <span class="tag">Gruppen</span>
-            <span class="tag">Timer</span>
-          </div>
-          <div class="card-actions">
-            <a href="Leiterspiel-quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Lernkarten -->
-      <div class="game-card" data-game="lernkarten">
-        <button class="game-toggle" onclick="toggleGameVisibility('lernkarten')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
-          <span class="card-emoji">📚</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Lernkarten</div>
-          <div class="card-desc">
-            ANKI-System: Karteikarten mit intelligentem Wiederholungsalgorithmus (SM-2) –
-            aus Memory-Paaren und dem Fragenpool.
-          </div>
-          <div class="card-tags">
-            <span class="tag">Einzelspieler</span>
-            <span class="tag">Spaced Repetition</span>
-            <span class="tag">Memory-Paare</span>
-            <span class="tag">Fragenpool</span>
-          </div>
-          <div class="card-actions">
-            <a href="lernkarten/index.html" class="btn btn-play">&#9654; Lernen</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Labyrinth-Quiz -->
-      <div class="game-card" data-game="labyrinth">
-        <button class="game-toggle" onclick="toggleGameVisibility('labyrinth')" title="Sichtbarkeit umschalten"></button>
-        <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
-          <span class="card-emoji">🏰</span>
-        </div>
-        <div class="card-body">
-          <div class="card-title">Labyrinth-Quiz</div>
-          <div class="card-desc">
-            Navigiere mit deiner Gruppe durch ein zufällig generiertes Labyrinth,
-            sammle Symbole durch richtige Antworten und erreiche als Erste das Ziel!
-          </div>
-          <div class="card-tags">
-            <span class="tag">Brettspiel</span>
-            <span class="tag">Teams</span>
-            <span class="tag">Labyrinth</span>
-            <span class="tag">Quiz</span>
-          </div>
-          <div class="card-actions">
-            <a href="Labyrint-Quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
-          </div>
-        </div>
-      </div>
-
     </div>
+
+    <!-- ── Quizspiele ────────────────────────────────────────── -->
+    <div class="games-section">
+      <div class="section-header">
+        <span class="section-title">🎯 Quizspiele</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="games-grid">
+
+        <!-- Schlangen & Leitern -->
+        <div class="game-card" data-game="leiterspiel">
+          <button class="game-toggle" onclick="toggleGameVisibility('leiterspiel')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
+            <span class="card-emoji">🐍</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Schlangen &amp; Leitern</div>
+            <div class="card-desc">
+              Klassisches Brettspiel mit Wissensfragen: Würfeln, Fragen beantworten,
+              Leitern hochklettern und Schlangen ausweichen. Bis zu 10 Gruppen mit Tierfiguren.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Brettspiel</span>
+              <span class="tag">Quiz</span>
+              <span class="tag">Gruppen</span>
+              <span class="tag">Timer</span>
+            </div>
+            <div class="card-actions">
+              <a href="Leiterspiel-quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Labyrinth-Quiz -->
+        <div class="game-card" data-game="labyrinth">
+          <button class="game-toggle" onclick="toggleGameVisibility('labyrinth')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #7c3aed, #4f46e5);">
+            <span class="card-emoji">🏰</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Labyrinth-Quiz</div>
+            <div class="card-desc">
+              Navigiere mit deiner Gruppe durch ein zufällig generiertes Labyrinth,
+              sammle Symbole durch richtige Antworten und erreiche als Erste das Ziel!
+            </div>
+            <div class="card-tags">
+              <span class="tag">Brettspiel</span>
+              <span class="tag">Teams</span>
+              <span class="tag">Labyrinth</span>
+              <span class="tag">Quiz</span>
+            </div>
+            <div class="card-actions">
+              <a href="Labyrint-Quiz/index.html" class="btn btn-play">&#9654; Spielen</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- QuizPfad -->
+        <div class="game-card" data-game="quizpfad">
+          <button class="game-toggle" onclick="toggleGameVisibility('quizpfad')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #f4a261, #e76f51);">
+            <span class="card-emoji">🎲</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">QuizPfad</div>
+            <div class="card-desc">
+              Lineares Brettspiel: Beantworte Fragen, rücke auf dem Spielfeld vor und erreiche
+              als erstes Team das Ziel. Mit Bonusfeldern, Joker und Teamduell.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Brettspiel</span>
+              <span class="tag">Teams</span>
+              <span class="tag">Quiz</span>
+              <span class="tag">Bonusfelder</span>
+            </div>
+            <div class="card-actions">
+              <a href="quizpfad/index.html" class="btn btn-play">▶ Spielen</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risiko-Quiz -->
+        <div class="game-card" data-game="risiko">
+          <button class="game-toggle" onclick="toggleGameVisibility('risiko')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #e94560, #0f3460);">
+            <span class="card-emoji">🎯</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Risiko-Quiz</div>
+            <div class="card-desc">
+              Jeopardy-ähnliches Teamquiz. Teams setzen ihren Punktestand ein, um Fragen aus
+              Kategorien zu beantworten. Richtig = Punkte dazu, Falsch = Punkte weg.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Quiz</span>
+              <span class="tag">Teams</span>
+              <span class="tag">Kategorien</span>
+              <span class="tag">Timer</span>
+              <span class="tag">MC + Offen</span>
+            </div>
+            <div class="card-actions" style="flex-wrap:wrap;">
+              <a href="risiko-quiz/index.html"    class="btn btn-play">🎮 Spielen</a>
+              <a href="risiko-quiz/practice.html" class="btn btn-play" style="background:linear-gradient(135deg,#2ecc71,#27ae60);">📚 Üben</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Escape Room -->
+        <div class="game-card" data-game="escape">
+          <button class="game-toggle" onclick="toggleGameVisibility('escape')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #0a0a2e, #1a1a3e);">
+            <span class="card-emoji">🔐</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Escape Room</div>
+            <div class="card-desc">
+              Pädagogisches Escape-Room-Spiel: Löst Rätsel Raum für Raum,
+              sammelt Code-Ziffern und knackt den Tresor. Mehrere Spiele, Timer, Rangliste.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Teams</span>
+              <span class="tag">Rätsel</span>
+              <span class="tag">Codes</span>
+              <span class="tag">Timer</span>
+            </div>
+            <div class="card-actions">
+              <a href="escape-room/index.html" class="btn btn-play">▶ Spielen</a>
+              <a href="escape-room/index.html?admin=true" class="btn btn-admin teacher-only">⚙ Admin</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Allgemein ──────────────────────────────────────────── -->
+    <div class="games-section">
+      <div class="section-header">
+        <span class="section-title">🌍 Allgemein</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="games-grid">
+
+        <!-- Stadt Land Fluss -->
+        <div class="game-card" data-game="slf">
+          <button class="game-toggle" onclick="toggleGameVisibility('slf')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #f7971e, #E34F20);">
+            <span class="card-emoji">🗺️</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Stadt Land Fluss</div>
+            <div class="card-desc">
+              Klassisches Wortspiel für die ganze Klasse. Buchstabe ziehen, Kategorien befüllen,
+              Punkte sammeln. Mit anpassbaren Kategorien und Timer.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Wortspiel</span>
+              <span class="tag">Klassenspiel</span>
+              <span class="tag">Kategorien</span>
+              <span class="tag">Timer</span>
+            </div>
+            <div class="card-actions">
+              <a href="stadt-land-fluss/index.html" class="btn btn-play">▶ Spielen</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <footer>
