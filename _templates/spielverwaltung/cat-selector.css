@@ -1,0 +1,151 @@
+/* ── Kategorie-Selektor CSS (Template) ────────────────────────────────
+   Akkordeon-Hierarchie für die Kategorieauswahl im Setup-Screen.
+
+   EINBINDEN:
+     Diesen Block in die Spiel-CSS-Datei kopieren (nach den allgemeinen
+     Setup-Styles, vor den Game-Screen-Styles).
+
+   CSS-VARIABLEN — zwei Varianten je nach Spiel:
+
+     Variante A  (Leiterspiel: --bg-sidebar / --bg-field / --border)
+     Variante B  (Labyrinth:   --bg-secondary / --bg-card / --border-card)
+
+   Variante-A-Stellen sind mit  "← Var-A"  markiert.
+   Variante-B-Stellen sind mit  "← Var-B"  markiert.
+   Stellen ohne Markierung funktionieren mit beiden Varianten.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Aktions-Buttons (Alle / Keine) ──────────────────────────────── */
+.cat-select-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+
+/* ── Scrollbare Liste ─────────────────────────────────────────────── */
+.cat-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.3rem;
+}
+
+/* ── Akkordeon-Gruppe (Oberkategorie) ─────────────────────────────── */
+.cat-group-wrap {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-card);   /* Var-B: --border-card | Var-A: --border */
+}
+
+.cat-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--bg-secondary);        /* Var-B: --bg-secondary | Var-A: --bg-sidebar */
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.cat-group-header:hover {
+  background: var(--accent-light);
+}
+
+/* Pfeil dreht sich beim Auf-/Zuklappen */
+.cat-group-chevron {
+  font-size: 0.65rem;
+  color: var(--accent);
+  width: 14px;
+  text-align: center;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.cat-group-header.collapsed .cat-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.cat-group-icon  { font-size: 1rem; flex-shrink: 0; }
+.cat-group-name  { flex: 1; font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
+.cat-group-count { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+
+/* Gruppen-Checkbox (alle darunter an/aus) */
+.cat-group-toggle { display: flex; align-items: center; cursor: pointer; }
+.cat-group-cb {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Kinder-Container — .hidden blendet ihn aus */
+.cat-group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg-card);             /* Var-B: --bg-card | Var-A: --bg-field */
+}
+.cat-group-children.hidden {
+  display: none;
+}
+
+/* ── Blatt-Kategorie (Unterkategorie, auswählbar) ─────────────────── */
+.cat-select-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  border: 2px solid var(--border);        /* Var-B: --border | Var-A: --border */
+  background: var(--bg-card);             /* Var-B: --bg-card | Var-A: --bg-field */
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.cat-select-item:hover {
+  border-color: var(--accent);
+}
+.cat-select-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.cat-select-icon  { font-size: 1rem; flex-shrink: 0; }
+.cat-select-name  { flex: 1; font-size: 0.83rem; font-weight: 600; color: var(--text-primary); }
+.cat-select-count { font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
+
+/* Häkchen-Box rechts */
+.cat-select-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-card);   /* Var-B: --border-card | Var-A: --border */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.cat-select-item.selected .cat-select-check {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ── Info-Zeile ("24 Fragen aus 3 Kategorien") ────────────────────── */
+.cat-select-info {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.cat-select-info.warning {
+  color: var(--danger);
+  font-weight: 600;
+  font-style: normal;
+}

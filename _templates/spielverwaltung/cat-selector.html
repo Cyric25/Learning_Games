@@ -1,0 +1,43 @@
+<!-- ── Kategorieauswahl (Setup-Screen) ────────────────────────────────
+     Akkordeon-Hierarchie: Oberkategorien eingeklappt, Unterkategorien
+     per Klick aufklappen und einzeln auswählen.
+
+     EINBINDEN:
+       1. Diesen Block in den setup-card / setup-screen einfügen.
+       2. cat-selector.js einbinden (Funktionen: buildCategoryUI,
+          toggleAllCategories, updateCategoryInfo, _buildCatNode, …)
+       3. cat-selector.css einbinden (oder in Spiel-CSS kopieren).
+
+     VORAUSSETZUNGEN im Spiellogik-JS:
+       let rawCategories = [];     // aus questions.json .categories (hierarchisch)
+       let allQuestions  = [];     // flaches Array, jede Frage mit .kategorieId
+       let activeCategories = new Set();  // gewählte Blatt-Kategorie-IDs
+
+       rawCategories wird befüllt durch:
+         rawCategories = questionsJson.categories;   // direkt aus questions.json
+
+       allQuestions wird befüllt durch die spielspezifische convertRQ…()-Funktion,
+       welche die categories-Hierarchie flach macht und .kategorieId setzt.
+
+     ANPASSEN:
+       "Kategorien auswählen"  → Abschnittstitel (optional ändern)
+       updateCategoryInfo()    → Infotext anpassen falls andere Feldnamen
+     ──────────────────────────────────────────────────────────────────── -->
+
+<div class="setup-section" id="category-section" style="display:none;">
+  <h3>Kategorien auswählen</h3>
+
+  <div class="cat-select-actions">
+    <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
+    <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+  </div>
+
+  <!-- Wird per buildCategoryUI() befüllt:
+       - Oberkategorie  → .cat-group-wrap (eingeklappt per default)
+       - Unterkategorie → .cat-select-item (auswählbar)
+  -->
+  <div class="cat-select-list" id="cat-select-list"></div>
+
+  <!-- Zeigt z.B. "24 Fragen aus 3 Kategorien" -->
+  <div class="cat-select-info" id="cat-select-info"></div>
+</div>
