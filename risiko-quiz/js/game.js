@@ -20,6 +20,12 @@ let stealTeamsRemaining = [];  // team IDs die noch nicht versucht haben
 let stealCurrentTeamId = null; // Team das gerade antwortet
 let stealOriginalTeamId = null;
 
+// Zeitablauf-Flag: offene Frage → Antwort nie anzeigen
+let openQuestionTimerExpired = false;
+
+// Zell-Auswahl durch Schüler (polling zwischen Fragen)
+let cellActionInterval = null;
+
 // Team-Action-Poll (für view.html Interaktivität)
 let teamActionPollInterval = null;
 let sseSubscription = null;
@@ -558,6 +564,7 @@ function startGame() {
 
   renderBoard();
   renderTeamBar();
+  startCellActionPoll();
 
   if (GameModel.isGameFinished(gameData)) {
     showEndScreen();
@@ -926,21 +933,20 @@ function timerExpired() {
   playTimerSound();
   const q = GameModel.findQuestion(gameData, currentQuestionId);
   if (q) {
-    // Bei MC: korrekte Option hervorheben, gewählte Option als richtig/falsch markieren
     if (q.type === 'mc') {
+      // MC: korrekte Option hervorheben
       document.querySelectorAll('.mc-option').forEach((btn, i) => {
         btn.classList.remove('mc-selected-pending', 'correct', 'wrong');
         if (i === q.correctIndex) btn.classList.add('correct');
         else if (i === selectedMcIndex && i !== q.correctIndex) btn.classList.add('wrong');
       });
-    }
-    // Antwort anzeigen (bei Klau-Modus + offener Frage erst nach Steal-Phase)
-    const showNow = q.type !== 'open' || !gameData.meta.settings.stealMode;
-    if (showNow) {
       const revealEl = document.getElementById('modal-answer-reveal');
       revealEl.textContent = '⏱ Zeit! Antwort: ' + q.answer;
       revealEl.style.display = 'block';
       if (gameData.liveQuestion) gameData.liveQuestion.answer = q.answer || '';
+    } else {
+      // Offene Frage: Antwort NICHT anzeigen – auch nicht wenn „Lösung anzeigen" aktiv
+      openQuestionTimerExpired = true;
     }
   }
   stopTeamActionPoll();
@@ -1087,13 +1093,13 @@ function resolveQuestion(correct) {
     }
   }
 
-  // Antwort für Spieler setzen (sichtbar bis Spielleiter "Weiter" klickt)
-  if (gameData.liveQuestion && q?.answer && !gameData.liveQuestion.answer) {
+  // Antwort für Spieler setzen – nicht bei timer-abgelaufener offener Frage
+  if (gameData.liveQuestion && q?.answer && !gameData.liveQuestion.answer && !openQuestionTimerExpired) {
     gameData.liveQuestion.answer = q.answer;
   }
 
-  // Antwort-Reveal auf Spielleiter-Bildschirm (optional, via Einstellung)
-  if (gameData.meta.settings.showCorrectAnswer) {
+  // Antwort-Reveal auf Spielleiter-Bildschirm – nicht bei timer-abgelaufener offener Frage
+  if (gameData.meta.settings.showCorrectAnswer && !openQuestionTimerExpired) {
     const revealEl = document.getElementById('modal-answer-reveal');
     revealEl.textContent = '✓ Antwort: ' + (q?.answer || '');
     revealEl.style.display = 'block';
@@ -1128,14 +1134,15 @@ function startStealPhase(originalTeamId) {
   document.getElementById('btn-steal-skip').style.display = '';
 
   // liveQuestion für view.html aktualisieren
+  // Bestehende Kandidaten (frühes Melden während Timer) bewahren
   if (gameData.liveQuestion) {
     gameData.liveQuestion.stealPhase = true;
-    gameData.liveQuestion.stealCandidates = [];
+    if (!gameData.liveQuestion.stealCandidates) gameData.liveQuestion.stealCandidates = [];
     gameData.liveQuestion.stealPickedTeam = null;
   }
 
   renderStealButtons();
-  renderStealCandidates([]);
+  renderStealCandidates(gameData.liveQuestion?.stealCandidates || []);
   document.getElementById('modal-steal-section').style.display = '';
 
   // Poll neu starten um Kandidaten aus view.html zu empfangen
@@ -1185,7 +1192,10 @@ function renderStealCandidates(candidates) {
     const btn = document.createElement('button');
     btn.className = 'steal-team-btn steal-candidate-btn';
     btn.style.setProperty('--steal-color', team.color);
-    btn.innerHTML = `<span class="steal-dot" style="background:${team.color};"></span>${pos + 1}. 🙋 ${escHtml(teamName || team.name)}`;
+    // Erster (= schnellster) Kandidat wird hervorgehoben
+    const prefix = pos === 0 ? '🥇 ' : `${pos + 1}. `;
+    btn.innerHTML = `<span class="steal-dot" style="background:${team.color};"></span>${prefix}🙋 ${escHtml(teamName || team.name)}`;
+    if (pos === 0) btn.style.fontSize = '1.1em';
     btn.addEventListener('click', () => stealTeamClick(id));
     container.appendChild(btn);
   });
@@ -1297,12 +1307,12 @@ function endStealPhase() {
   document.getElementById('btn-correct').style.display = 'none';
   document.getElementById('btn-wrong').style.display = 'none';
 
-  // Antwort nach Steal-Phase: immer für Spieler setzen, optional öffentlich anzeigen
+  // Antwort nach Steal-Phase – nicht bei timer-abgelaufener offener Frage
   const _q = GameModel.findQuestion(gameData, currentQuestionId);
-  if (gameData.liveQuestion && _q?.answer) {
+  if (gameData.liveQuestion && _q?.answer && !openQuestionTimerExpired) {
     gameData.liveQuestion.answer = _q.answer;
   }
-  if (gameData.meta.settings.showCorrectAnswer && _q) {
+  if (gameData.meta.settings.showCorrectAnswer && _q && !openQuestionTimerExpired) {
     const revealEl = document.getElementById('modal-answer-reveal');
     if (revealEl.style.display === 'none') {
       revealEl.textContent = '✓ Antwort: ' + (_q.answer || '');
@@ -1322,11 +1332,12 @@ function endStealPhase() {
 }
 
 function closeModal() {
-  // Steal-State zurücksetzen
+  // Steal-State + Zeitablauf-Flag zurücksetzen
   stealPhase = false;
   stealCurrentTeamId = null;
   stealTeamsRemaining = [];
   stealOriginalTeamId = null;
+  openQuestionTimerExpired = false;
   stopTeamActionPoll();
   document.getElementById('modal-steal-section').style.display = 'none';
 
@@ -1447,6 +1458,13 @@ function handleTeamAction(gs) {
     return;
   }
 
+  // Klau-Kandidaten VOR der Steal-Phase synchronisieren (frühes Melden während Timer)
+  if (!stealPhase && gameData.meta.settings?.stealMode && lq.stealCandidates?.length > 0) {
+    if (gameData.liveQuestion) {
+      gameData.liveQuestion.stealCandidates = [...lq.stealCandidates];
+    }
+  }
+
   // Klau-Kandidaten aktualisieren (während Steal-Phase)
   if (stealPhase && lq.stealCandidates) {
     const prevLen = gameData.liveQuestion?.stealCandidates?.length || 0;
@@ -1469,6 +1487,34 @@ function stopTeamActionPoll() {
     clearInterval(teamActionPollInterval);
     teamActionPollInterval = null;
   }
+}
+
+// ── Schüler-Zell-Auswahl (polling zwischen Fragen) ────────────
+function startCellActionPoll() {
+  clearInterval(cellActionInterval);
+  cellActionInterval = setInterval(() => {
+    if (currentQuestionId || stealPhase) return; // Frage offen → skip
+    StorageManager.loadGameState().then(gs => {
+      if (!gs?.pendingCellAction || currentQuestionId || stealPhase) return;
+      const action = gs.pendingCellAction;
+      const currentTeam = GameModel.getCurrentTeam(gameData);
+      if (!currentTeam || action.teamId != currentTeam.id) {
+        gameData.pendingCellAction = null; autosave(); return;
+      }
+      const slot = gameData.boardSlots?.[action.slotIdx];
+      if (!slot) { gameData.pendingCellAction = null; autosave(); return; }
+      gameData.pendingCellAction = null;
+      autosave();
+      const allQ = applyQuestionFilter(getSlotQuestionsForDiff(slot, action.diff));
+      const unplayed = allQ.filter(q => !GameModel.isQuestionPlayed(gameData, q.id));
+      if (unplayed.length === 0) return;
+      const key = GameModel.cellKey(slot, action.diff);
+      const selectedId = gameData.session?.selectedQuestions?.[key];
+      const pick = (selectedId && unplayed.find(q => q.id === selectedId))
+        || unplayed[Math.floor(Math.random() * unplayed.length)];
+      openQuestion(slot, pick.id);
+    }).catch(() => {});
+  }, 600);
 }
 
 // ── Timer display ─────────────────────────────────────────────

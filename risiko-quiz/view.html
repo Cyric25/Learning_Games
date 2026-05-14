@@ -7,7 +7,10 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
   <link rel="stylesheet" href="css/game.css">
   <style>
-    .board-cell { cursor: default !important; pointer-events: none; }
+    .board-cell { cursor: default; pointer-events: none; }
+    /* Wählbare Zellen für aktives Team */
+    .board-cell.sq-selectable { cursor: pointer !important; pointer-events: auto !important; }
+    .board-cell.sq-selectable:hover { transform: scale(1.06); box-shadow: 0 0 22px rgba(255,255,255,0.35); z-index: 5; }
 
     /* ── Fragen-Overlay ─────────────────────────────────── */
     #student-question {
@@ -118,6 +121,26 @@
 
     #team-bar { padding-bottom: 2rem; }
 
+    /* ── Spielende-Screen ──────────────────────────────── */
+    #screen-end {
+      display: none; position: fixed; inset: 0;
+      background: var(--bg-primary); z-index: 500;
+      flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem; gap: 1rem; text-align: center;
+    }
+    #screen-end.active { display: flex; }
+    #view-ranking-list { list-style: none; width: 100%; max-width: 560px; margin: 0; padding: 0; }
+
+    /* ── Tafelmodus (Zuschauer) – kompakteres Layout für Großdisplay ── */
+    body.spectator-view .vq-role-banner { padding: 0.2rem 0.6rem; }
+    body.spectator-view #header { padding: 0.3rem 0.8rem; min-height: 44px; }
+    body.spectator-view #game-title { font-size: 1.2rem; }
+    body.spectator-view #team-bar { min-height: 50px; padding: 0.3rem 0.6rem; padding-bottom: 2rem; }
+    body.spectator-view .team-card { padding: 0.2rem 0.5rem; }
+    body.spectator-view .team-card .team-name { font-size: 0.82rem; }
+    body.spectator-view .team-card .team-score { font-size: 1rem; min-width: 2.5rem; }
+    body.spectator-view .team-card .team-color-dot { width: 14px; height: 14px; }
+
     /* ── Board: Spieler-Perspektive ─────────────────────── */
     .board-cell.sq-locked { opacity: 0.35; background: var(--locked,#1e1e30) !important; }
     .board-cell.sq-locked .cell-value { color: var(--played-text,#555577); }
@@ -218,6 +241,14 @@
     Klicke auf dein Team.
   </p>
   <div class="vq-team-list" id="team-list"></div>
+</div>
+
+<!-- ──── SCREEN: Spielende / Ranking ─────────────────────────── -->
+<div id="screen-end">
+  <h2 style="font-size:clamp(1.8rem,4vw,2.8rem);color:var(--warning);margin:0;">🏆 Spiel beendet!</h2>
+  <p id="view-end-subtitle" style="color:var(--text-secondary);font-size:clamp(0.9rem,1.5vw,1.1rem);margin:0;"></p>
+  <ul id="view-ranking-list"></ul>
+  <button class="vq-btn" onclick="switchTeam()" style="margin-top:0.5rem;">← Zurück</button>
 </div>
 
 <!-- ──── SCREEN 3: Spielansicht ──────────────────────────────── -->
@@ -342,7 +373,7 @@ function onGameStateUpdate(gs) {
     document.getElementById('poll-dot').classList.remove('err');
 
     if (!gs?.meta) { myTeamId = null; showNoGame('Warte auf Spielstart…'); return; }
-    if (gs.status === 'finished') { myTeamId = null; showNoGame('Das Spiel ist beendet.'); return; }
+    if (gs.status === 'finished') { showEndScreen(gs); return; }
 
     if (myTeamId !== null && myTeamId !== 'spectator') {
       if (!gs.teams?.find(t => t.id === myTeamId)) myTeamId = null;
@@ -389,6 +420,7 @@ async function poll() {
 function showScreen(name) {
   document.getElementById('screen-no-game').classList.toggle('active',    name === 'no-game');
   document.getElementById('screen-team-select').classList.toggle('active', name === 'team-select');
+  document.getElementById('screen-end').classList.toggle('active',         name === 'end');
   document.getElementById('game-container').classList.toggle('active',    name === 'game');
 }
 
@@ -435,18 +467,21 @@ function showTeamSelect(gs) {
 
 function joinTeam(team, gs) {
   myTeamId = team.id;
+  document.body.classList.remove('spectator-view');
   if (gs.status === 'running') showGame(gs);
   else showNoGame(`✓ ${team.name} – Warte auf Spielstart…`);
 }
 
 function joinSpectator(gs) {
   myTeamId = 'spectator';
+  document.body.classList.add('spectator-view');
   if (gs.status === 'running') showGame(gs);
   else showNoGame('Zuschauer – Warte auf Spielstart…');
 }
 
 function switchTeam() {
   myTeamId = null;
+  document.body.classList.remove('spectator-view');
   if (viewData) showTeamSelect(viewData);
   else showScreen('team-select');
 }
@@ -495,13 +530,21 @@ function renderBoard(gs) {
   const myTeam = (myTeamId && myTeamId !== 'spectator')
     ? gs.teams?.find(t => t.id === myTeamId) : null;
 
+  // Schüler-Frageauswahl: Zellen klickbar wenn aktives Team dran und kein Auftrag offen
+  const lq = gs.liveQuestion;
+  const hasLiveQ = lq && lq.id && !lq.resolved;
+  const hasPendingAction = gs.pendingCellAction?.teamId === myTeamId;
+  const activeTeam = GameModel.getActiveTeams(gs)[gs.currentTeamIndex];
+  const isMyActiveTurn = !hasLiveQ && !hasPendingAction
+    && myTeamId && myTeamId !== 'spectator' && activeTeam?.id === myTeamId;
+
   slots.forEach(slot => {
     const h = document.createElement('div');
     h.className = 'category-header'; h.textContent = slot.displayName || '';
     board.appendChild(h);
   });
   diffs.forEach(diff => {
-    slots.forEach(slot => {
+    slots.forEach((slot, si) => {
       const cell = document.createElement('div');
       cell.className = 'board-cell'; cell.dataset.diff = diff;
       const isPlayed = GameModel.isCellPlayed(gs, slot, diff);
@@ -515,8 +558,15 @@ function renderBoard(gs) {
           if (team) { const dot = document.createElement('div'); dot.className = 'cell-team-marker'; dot.style.background = team.color; cell.appendChild(dot); }
         }
       } else if (myTeam) {
-        if (myTeam.score >= diff) cell.classList.add('sq-available');
-        else                      cell.classList.add('sq-locked');
+        if (myTeam.score >= diff) {
+          cell.classList.add('sq-available');
+          if (isMyActiveTurn) {
+            cell.classList.add('sq-selectable');
+            cell.addEventListener('click', () => selectCell(si, diff));
+          }
+        } else {
+          cell.classList.add('sq-locked');
+        }
       }
       const v = document.createElement('span'); v.className = 'cell-value'; v.textContent = diff;
       cell.appendChild(v); board.appendChild(cell);
@@ -639,8 +689,22 @@ function updateActionButtons(gs, q, lq) {
       btn.style.display = ''; btn.disabled = true; btn.textContent = '✋ Gemeldet!';
     } else { document.getElementById('btn-sq-ich-weiss-es').style.display = 'none'; }
   } else {
-    document.getElementById('btn-sq-ich-weiss-es').style.display = 'none';
     document.getElementById('steal-picked-banner').style.display = 'none';
+    // Frühes Melden: Klauen-Button auch VOR der Steal-Phase zeigen
+    const canEarlyRaise = !isMyTurn && settings.stealMode && q.type !== 'mc'
+      && GameModel.canTeamSteal(myTeam) && myTeamId !== activeTeamId;
+    if (canEarlyRaise) {
+      const alreadyRaised = hasRaisedHand || (lq.stealCandidates || []).some(c => c.teamId == myTeamId);
+      const btn = document.getElementById('btn-sq-ich-weiss-es');
+      btn.style.display = '';
+      if (alreadyRaised) {
+        btn.disabled = true; btn.textContent = '✋ Gemeldet!';
+      } else {
+        btn.disabled = false; btn.textContent = '🙋 Ich weiß es!';
+      }
+    } else {
+      document.getElementById('btn-sq-ich-weiss-es').style.display = 'none';
+    }
   }
 }
 
@@ -660,6 +724,35 @@ function showSQAnswer(q, lq) {
 function hideSQ() {
   lastLiveQId = null; hasRaisedHand = false; clearInterval(sqTimerInt);
   document.getElementById('student-question').classList.remove('open');
+}
+
+function showEndScreen(gs) {
+  showScreen('end');
+  const stats = GameModel.getStats(gs);
+  const subtitle = document.getElementById('view-end-subtitle');
+  if (subtitle) subtitle.textContent = `${stats.playedQuestions} von ${stats.totalQuestions} Fragen gespielt`;
+  const list = document.getElementById('view-ranking-list');
+  if (!list) return;
+  list.innerHTML = '';
+  stats.ranking.forEach((team, i) => {
+    const li = document.createElement('li');
+    li.style.cssText = [
+      'display:flex;align-items:center;gap:1rem;',
+      `background:${i===0?'var(--bg-card)':'var(--bg-secondary)'};`,
+      'border-radius:12px;',
+      `padding:${i===0?'1.1rem':'0.85rem'} 1.5rem;`,
+      'margin-bottom:0.5rem;',
+      `font-size:${i===0?'1.6rem':'1.2rem'};font-weight:700;`,
+      i===0?'border:2px solid var(--warning);':''
+    ].join('');
+    li.innerHTML = `
+      <span style="min-width:2rem;color:var(--text-secondary);">${i+1}.</span>
+      <span style="width:20px;height:20px;border-radius:50%;background:${team.color};flex-shrink:0;"></span>
+      <span style="flex:1;">${esc(team.name)}</span>
+      <span style="font-variant-numeric:tabular-nums;color:var(--warning);">${team.score}</span>
+    `;
+    list.appendChild(li);
+  });
 }
 
 // ── Team-Aktionen ────────────────────────────────────────────────
@@ -714,6 +807,18 @@ async function pressIchWeissEs() {
     }
     hasRaisedHand = true; btn.textContent = '✋ Gemeldet!';
   } catch { btn.disabled = false; }
+}
+
+async function selectCell(slotIdx, diff) {
+  if (!myTeamId || myTeamId === 'spectator') return;
+  try {
+    const gs = await StorageManager.loadGameState();
+    if (!gs || gs.liveQuestion?.id || gs.pendingCellAction) return;
+    const activeTeam = GameModel.getActiveTeams(gs)[gs.currentTeamIndex];
+    if (!activeTeam || activeTeam.id !== myTeamId) return;
+    gs.pendingCellAction = { slotIdx, diff, teamId: myTeamId, timestamp: Date.now() };
+    await StorageManager.saveGameState(gs);
+  } catch {}
 }
 
 // ── Timer ────────────────────────────────────────────────────────
