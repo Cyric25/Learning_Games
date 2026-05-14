@@ -1,9 +1,12 @@
 /* ── Kategorie-Selektor CSS (Template) ────────────────────────────────
-   Akkordeon-Hierarchie für die Kategorieauswahl im Setup-Screen.
+   Akkordeon-Hierarchie für den eigenständigen #category-screen.
+   Screen-Level-Styles (#category-screen, .cat-screen-container, …)
+   kommen aus setup-screen.css — diese Datei enthält nur die
+   Akkordeon- und Listen-Styles.
 
    EINBINDEN:
-     Diesen Block in die Spiel-CSS-Datei kopieren (nach den allgemeinen
-     Setup-Styles, vor den Game-Screen-Styles).
+     Diesen Block in die Spiel-CSS-Datei kopieren (nach setup-screen.css /
+     den allgemeinen Setup-Styles, vor den Game-Screen-Styles).
 
    CSS-VARIABLEN — zwei Varianten je nach Spiel:
 

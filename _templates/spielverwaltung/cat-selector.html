@@ -1,43 +1,64 @@
-<!-- ── Kategorieauswahl (Setup-Screen) ────────────────────────────────
-     Akkordeon-Hierarchie: Oberkategorien eingeklappt, Unterkategorien
-     per Klick aufklappen und einzeln auswählen.
+<!-- ── Kategorie-Screen (Kategorieauswahl) — Risiko-Quiz Stil ──────────
+     Vollbild direkt auf --bg-primary, KEIN Card-Wrapper.
+     Schritt 3 im Ablauf: nach dem Setup-Screen, vor dem Spiel-Screen.
 
-     EINBINDEN:
-       1. Diesen Block in den setup-card / setup-screen einfügen.
-       2. cat-selector.js einbinden (Funktionen: buildCategoryUI,
-          toggleAllCategories, updateCategoryInfo, _buildCatNode, …)
-       3. cat-selector.css einbinden (oder in Spiel-CSS kopieren).
-
-     VORAUSSETZUNGEN im Spiellogik-JS:
-       let rawCategories = [];     // aus questions.json .categories (hierarchisch)
-       let allQuestions  = [];     // flaches Array, jede Frage mit .kategorieId
-       let activeCategories = new Set();  // gewählte Blatt-Kategorie-IDs
-
-       rawCategories wird befüllt durch:
-         rawCategories = questionsJson.categories;   // direkt aus questions.json
-
-       allQuestions wird befüllt durch die spielspezifische convertRQ…()-Funktion,
-       welche die categories-Hierarchie flach macht und .kategorieId setzt.
+     SCREEN-ABLAUF:
+       #game-selector → #setup-screen → #category-screen → #game-screen
 
      ANPASSEN:
-       "Kategorien auswählen"  → Abschnittstitel (optional ändern)
-       updateCategoryInfo()    → Infotext anpassen falls andere Feldnamen
+       "Kategorien auswählen"   → Titel je nach Spiel (optional)
+       proceedFromCategories()  → Funktion die Kategorien validiert + Spiel startet
+       showScreen('setup-screen') → Funktion um zurück zu gehen
+
+     JS-VORAUSSETZUNGEN (in Spiellogik-JS):
+       let rawCategories    = [];          // questions.json .categories (Hierarchie, unverändert)
+       let allQuestions     = [];          // flach konvertiert, jede Frage mit .kategorieId
+       let activeCategories = new Set();   // gewählte Blatt-Kategorie-IDs
+
+       rawCategories befüllen:
+         rawCategories = questionsJson.categories;
+
+       allQuestions befüllen:
+         Über spielspezifische convertRQ…()-Funktion, die .kategorieId setzt.
+
+       buildCategoryUI() aufrufen nachdem Fragen geladen wurden (z.B. in proceedToCategories()).
+
+     CSS-VARIABLEN (in Spiel-CSS nötig):
+       --bg-primary    ← Hintergrund der Setup-Screens (flach, nicht Gradient!)
+       --accent        ← Primärfarbe
+       --text-primary, --text-secondary, --border, --success, --danger
      ──────────────────────────────────────────────────────────────────── -->
 
-<div class="setup-section" id="category-section" style="display:none;">
-  <h3>Kategorien auswählen</h3>
+<div class="screen" id="category-screen">
 
-  <div class="cat-select-actions">
-    <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
-    <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+  <div class="cat-screen-container">
+
+    <div class="cat-screen-header">
+      <h2 class="cat-screen-title">Kategorien auswählen</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;">
+        Wähle die Themengebiete für dieses Spiel.
+      </p>
+    </div>
+
+    <!-- Alle / Keine Buttons -->
+    <div class="cat-select-actions">
+      <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
+      <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+    </div>
+
+    <!-- Wird per buildCategoryUI() befüllt:
+         - Oberkategorie  → .cat-group-wrap (eingeklappt per default)
+         - Unterkategorie → .cat-select-item (auswählbar)
+    -->
+    <div class="cat-select-list" id="cat-select-list"></div>
+
+    <!-- Zeigt z.B. "24 Fragen aus 3 Kategorien" -->
+    <div class="cat-select-info" id="cat-select-info"></div>
+
+    <div class="setup-actions">
+      <button class="setup-btn" onclick="proceedFromCategories()">Spiel starten ▶</button>
+      <button class="setup-btn setup-btn-ghost" onclick="showScreen('setup-screen')">← Zurück</button>
+    </div>
+
   </div>
-
-  <!-- Wird per buildCategoryUI() befüllt:
-       - Oberkategorie  → .cat-group-wrap (eingeklappt per default)
-       - Unterkategorie → .cat-select-item (auswählbar)
-  -->
-  <div class="cat-select-list" id="cat-select-list"></div>
-
-  <!-- Zeigt z.B. "24 Fragen aus 3 Kategorien" -->
-  <div class="cat-select-info" id="cat-select-info"></div>
 </div>

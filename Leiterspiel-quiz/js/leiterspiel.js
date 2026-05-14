@@ -165,6 +165,10 @@ const POINTS = { leicht: 10, mittel: 20, schwer: 30 };
 
 const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
+const TEAM_COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#e91e63','#00bcd4','#8bc34a'];
+
+const CAT_ICONS = ['📚','🔬','🌍','⚡','🎯','🏛️','🧮','🌿','⚗️','🎨','🏃','💡','🔭','🎵','📊','🌊','🧩','🦋','🌺','🚀'];
+
 // Fields that have ladders or snakes (cannot be bonus)
 const LADDER_SNAKE_FIELDS = new Set([
   ...Object.keys(LADDERS).map(Number),
@@ -175,6 +179,7 @@ const LADDER_SNAKE_FIELDS = new Set([
 
 // ── State ────────────────────────────────────────────────────
 let fragenBank = null;
+let rawCategories = [];
 let selectedCategoryIds = new Set();
 let activeFragenBank = null;
 
@@ -239,8 +244,8 @@ async function loadFragen() {
   }
 
   if (rqData) {
+    rawCategories = rqData.categories || [];
     fragenBank = convertRQtoLeiterspiel(rqData);
-    renderCategorySelector();
     return;
   }
 
@@ -309,68 +314,146 @@ function convertRQtoLeiterspiel(rqData) {
   return { kategorien, fragen };
 }
 
-// ── Category Selector ────────────────────────────────────────
-function renderCategorySelector() {
-  if (!fragenBank || !fragenBank.kategorien.length) return;
-
-  document.getElementById('category-section').style.display = '';
+// ── Category Selector (Akkordeon-Hierarchie) ─────────────────
+function buildCategoryUI() {
+  if (!rawCategories.length) return;
   const list = document.getElementById('cat-select-list');
+  if (!list) return;
   list.innerHTML = '';
-
   selectedCategoryIds.clear();
-  fragenBank.kategorien.forEach(k => selectedCategoryIds.add(k.id));
 
-  fragenBank.kategorien.forEach(kat => {
-    const qCount = fragenBank.fragen.filter(q => q.kategorie === kat.id).length;
-    const item = document.createElement('div');
-    item.className = 'cat-select-item selected';
-    item.dataset.catId = kat.id;
-    item.innerHTML =
-      '<span class="cat-select-icon">' + kat.icon + '</span>' +
-      '<span class="cat-select-name">' + kat.name + '</span>' +
-      '<span class="cat-select-count">' + qCount + ' Fragen</span>' +
-      '<div class="cat-select-check">✓</div>';
-    item.onclick = () => {
-      if (selectedCategoryIds.has(kat.id)) {
-        selectedCategoryIds.delete(kat.id);
-        item.classList.remove('selected');
-      } else {
-        selectedCategoryIds.add(kat.id);
-        item.classList.add('selected');
-      }
-      updateCatSelectInfo();
-    };
-    list.appendChild(item);
-  });
+  function collectLeaves(cat) {
+    if (cat.questions && cat.questions.length > 0) return [cat.id];
+    return (cat.subcategories || []).flatMap(s => collectLeaves(s));
+  }
+  rawCategories.forEach(cat => collectLeaves(cat).forEach(id => selectedCategoryIds.add(id)));
 
+  rawCategories.forEach((cat, i) => _buildCatNode(list, cat, CAT_ICONS[i % CAT_ICONS.length]));
   updateCatSelectInfo();
 }
 
-function toggleAllCategories(selectAll) {
-  const items = document.querySelectorAll('.cat-select-item');
-  selectedCategoryIds.clear();
-  items.forEach(item => {
-    if (selectAll) {
-      selectedCategoryIds.add(item.dataset.catId);
-      item.classList.add('selected');
-    } else {
-      item.classList.remove('selected');
-    }
+function _buildCatNode(container, cat, icon, depth) {
+  depth = depth || 0;
+  const subs = cat.subcategories || [];
+  const hasQ = cat.questions && cat.questions.length > 0;
+  if (!hasQ && !subs.length) return;
+
+  const qCount = _countLeafQ(cat);
+
+  if (hasQ) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const item = document.createElement('div');
+    item.className = 'cat-select-item' + (sel ? ' selected' : '');
+    item.dataset.catId = cat.id;
+    item.innerHTML =
+      '<span class="cat-select-icon">' + (icon || '📁') + '</span>' +
+      '<span class="cat-select-name">' + cat.name + '</span>' +
+      '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
+      '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
+    item.onclick = () => {
+      const on = !selectedCategoryIds.has(cat.id);
+      if (on) { selectedCategoryIds.add(cat.id); item.classList.add('selected'); item.querySelector('.cat-select-check').textContent = '✓'; }
+      else     { selectedCategoryIds.delete(cat.id); item.classList.remove('selected'); item.querySelector('.cat-select-check').textContent = ''; }
+      _syncGroupHeader(container.closest('.cat-group-wrap'));
+      updateCatSelectInfo();
+    };
+    container.appendChild(item);
+    return;
+  }
+
+  const allLeaves = [];
+  (function collect(c) {
+    if (c.questions && c.questions.length > 0) allLeaves.push(c.id);
+    (c.subcategories || []).forEach(s => collect(s));
+  })(cat);
+  const allSel = allLeaves.every(id => selectedCategoryIds.has(id));
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cat-group-wrap';
+
+  const header = document.createElement('div');
+  header.className = 'cat-group-header collapsed';
+  header.innerHTML =
+    '<span class="cat-group-chevron">▶</span>' +
+    '<span class="cat-group-icon">' + icon + '</span>' +
+    '<span class="cat-group-name">' + cat.name + '</span>' +
+    '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
+    '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
+    '</label>';
+
+  const children = document.createElement('div');
+  children.className = 'cat-group-children hidden';
+
+  header.addEventListener('click', () => {
+    const collapsed = header.classList.contains('collapsed');
+    header.classList.toggle('collapsed', !collapsed);
+    children.classList.toggle('hidden', !collapsed);
   });
+
+  const cb = header.querySelector('.cat-group-cb');
+  cb.addEventListener('change', () => {
+    const on = cb.checked;
+    allLeaves.forEach(id => { if (on) selectedCategoryIds.add(id); else selectedCategoryIds.delete(id); });
+    children.querySelectorAll('.cat-select-item').forEach(item => {
+      item.classList.toggle('selected', on);
+      item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+    });
+    children.querySelectorAll('.cat-group-cb').forEach(gcb => gcb.checked = on);
+    updateCatSelectInfo();
+  });
+
+  wrap.appendChild(header);
+  wrap.appendChild(children);
+  container.appendChild(wrap);
+  subs.forEach(sub => _buildCatNode(children, sub, icon, depth + 1));
+}
+
+function _countLeafQ(cat) {
+  if (cat.questions && cat.questions.length > 0)
+    return fragenBank ? fragenBank.fragen.filter(q => q.kategorie === cat.id).length : cat.questions.length;
+  return (cat.subcategories || []).reduce((sum, s) => sum + _countLeafQ(s), 0);
+}
+
+function _syncGroupHeader(wrap) {
+  if (!wrap) return;
+  const cb = wrap.querySelector(':scope > .cat-group-header .cat-group-cb');
+  if (!cb) return;
+  const items = wrap.querySelectorAll('.cat-select-item');
+  cb.checked = items.length > 0 && [...items].every(i => i.classList.contains('selected'));
+  const parentChildren = wrap.parentElement;
+  if (parentChildren && parentChildren.classList.contains('cat-group-children'))
+    _syncGroupHeader(parentChildren.closest('.cat-group-wrap'));
+}
+
+function toggleAllCategories(on) {
+  selectedCategoryIds.clear();
+  document.querySelectorAll('#cat-select-list .cat-select-item').forEach(item => {
+    item.classList.toggle('selected', on);
+    item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+    if (on) selectedCategoryIds.add(item.dataset.catId);
+  });
+  document.querySelectorAll('#cat-select-list .cat-group-cb').forEach(cb => cb.checked = on);
   updateCatSelectInfo();
 }
 
 function updateCatSelectInfo() {
-  const total = fragenBank.kategorien.length;
-  const selected = selectedCategoryIds.size;
-  const qCount = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length;
-  document.getElementById('cat-select-info').textContent =
-    selected + ' von ' + total + ' Kategorien gewählt (' + qCount + ' Fragen)';
+  const el = document.getElementById('cat-select-info');
+  if (!el) return;
+  const qCount = fragenBank ? fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length : 0;
+  if (selectedCategoryIds.size === 0 || qCount === 0) {
+    el.className = 'cat-select-info warning';
+    el.textContent = 'Keine Kategorie ausgewählt!';
+  } else {
+    el.className = 'cat-select-info';
+    el.textContent = qCount + ' Fragen aus ' + selectedCategoryIds.size + ' Kategorien';
+  }
 }
 
 // ── Setup Screen ─────────────────────────────────────────────
 function renderModeSelector() {
   const row = document.getElementById('mode-row');
+  if (!row) return;
   row.innerHTML = '';
   const modes = [
     { id: 'class', label: '👨‍🏫 Klassenspiel' },
@@ -378,10 +461,10 @@ function renderModeSelector() {
   ];
   modes.forEach(m => {
     const btn = document.createElement('button');
-    btn.className = 'mode-btn' + (m.id === 'class' ? ' selected' : '');
+    btn.className = 'param-btn' + (m.id === 'class' ? ' active' : '');
     btn.textContent = m.label;
-    btn.onclick = () => selectMode(m.id);
     btn.dataset.mode = m.id;
+    btn.onclick = () => selectMode(m.id);
     row.appendChild(btn);
   });
   gameState.singlePlayerMode = false;
@@ -389,72 +472,93 @@ function renderModeSelector() {
 
 function selectMode(modeId) {
   gameState.singlePlayerMode = (modeId === 'solo');
-  document.querySelectorAll('.mode-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.mode === modeId);
+  document.querySelectorAll('#mode-row .param-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === modeId);
   });
   const showMulti = !gameState.singlePlayerMode;
-  document.getElementById('team-count-section').style.display = showMulti ? '' : 'none';
-  document.getElementById('btn-admin').style.display = showMulti ? '' : 'none';
+  const teamCountWrap = document.getElementById('team-count-row-wrap');
+  if (teamCountWrap) teamCountWrap.style.display = showMulti ? '' : 'none';
   if (gameState.singlePlayerMode) {
-    renderTeamConfigList(1);
+    renderTeamSelectList(1);
   } else {
-    renderTeamCountSelector(4);
+    const n = getSelectedTeamCount() || 4;
+    renderTeamSelectList(n);
   }
+}
+
+function getSelectedTeamCount() {
+  const active = document.querySelector('#team-count-row .param-btn.active');
+  return active ? parseInt(active.dataset.count) : 4;
 }
 
 function renderTeamCountSelector(defaultCount) {
   const row = document.getElementById('team-count-row');
+  if (!row) return;
   row.innerHTML = '';
   for (let i = 2; i <= 10; i++) {
     const btn = document.createElement('button');
-    btn.className = 'team-count-btn' + (i === defaultCount ? ' selected' : '');
+    btn.className = 'param-btn' + (i === defaultCount ? ' active' : '');
     btn.textContent = i;
+    btn.dataset.count = i;
     btn.onclick = () => {
-      document.querySelectorAll('.team-count-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      renderTeamConfigList(i);
+      document.querySelectorAll('#team-count-row .param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTeamSelectList(i);
     };
     row.appendChild(btn);
   }
-  renderTeamConfigList(defaultCount);
+  renderTeamSelectList(defaultCount);
 }
 
-function renderTeamConfigList(count) {
-  const list = document.getElementById('team-config-list');
+function renderTeamSelectList(count) {
+  const list = document.getElementById('team-select-list');
+  if (!list) return;
   list.innerHTML = '';
-  const takenAnimals = new Set();
 
   for (let i = 0; i < count; i++) {
-    const row = document.createElement('div');
-    row.className = 'team-config-row';
-    row.dataset.index = i;
+    const color = TEAM_COLORS[i % TEAM_COLORS.length];
+    const wrap = document.createElement('div');
+    wrap.className = 'team-select-item team-select-item--stacked';
+    wrap.dataset.index = i;
+
+    const mainRow = document.createElement('div');
+    mainRow.className = 'team-select-main-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'team-select-dot';
+    dot.style.background = color;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'team-name-input';
+    input.id = 'team-name-' + i;
+    input.placeholder = 'Gruppe ' + (i + 1);
+    input.value = 'Gruppe ' + (i + 1);
 
     const display = document.createElement('span');
     display.className = 'team-animal-display';
     display.id = 'animal-display-' + i;
     display.textContent = '❓';
 
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Gruppe ' + (i + 1);
-    input.value = 'Gruppe ' + (i + 1);
-    input.id = 'team-name-' + i;
+    mainRow.appendChild(dot);
+    mainRow.appendChild(input);
+    mainRow.appendChild(display);
 
-    const pickerWrap = document.createElement('div');
-    pickerWrap.className = 'animal-picker';
-    pickerWrap.id = 'animal-picker-' + i;
+    const picker = document.createElement('div');
+    picker.className = 'animal-picker';
+    picker.id = 'animal-picker-' + i;
 
-    row.appendChild(display);
-    row.appendChild(input);
-    row.appendChild(pickerWrap);
-    list.appendChild(row);
+    wrap.appendChild(mainRow);
+    wrap.appendChild(picker);
+    list.appendChild(wrap);
   }
 
-  // Render pickers after all rows exist
   for (let i = 0; i < count; i++) {
     renderAnimalPicker(i, count);
   }
 }
+
+function renderTeamConfigList(count) { renderTeamSelectList(count); }
 
 function renderAnimalPicker(teamIdx, teamCount) {
   const picker = document.getElementById('animal-picker-' + teamIdx);
@@ -485,7 +589,7 @@ function selectAnimal(teamIdx, animalId) {
   display.dataset.animalId = animalId;
 
   // Re-render all pickers to update taken state
-  const count = document.querySelectorAll('.team-config-row').length;
+  const count = document.querySelectorAll('#team-select-list .team-select-item').length;
   for (let i = 0; i < count; i++) {
     renderAnimalPicker(i, count);
   }
@@ -504,55 +608,56 @@ function getTeamAnimal(teamIdx) {
   return d ? d.dataset.animalId || null : null;
 }
 
-// ── Proceed to Game ──────────────────────────────────────────
-function proceedToGame() {
+// ── Proceed to Categories (validates teams, shows category screen) ──
+function proceedToCategories() {
   const errorEl = document.getElementById('setup-error');
   errorEl.textContent = '';
 
-  // Collect teams
-  const rows = document.querySelectorAll('.team-config-row');
-  const teams = [];
-  for (let i = 0; i < rows.length; i++) {
-    const name = document.getElementById('team-name-' + i).value.trim() || ('Gruppe ' + (i + 1));
+  const count = gameState.singlePlayerMode ? 1 : getSelectedTeamCount();
+  for (let i = 0; i < count; i++) {
     const animalId = getTeamAnimal(i);
     if (!animalId) {
       errorEl.textContent = 'Bitte für jede Gruppe ein Tier auswählen!';
       return;
     }
-    const animal = ANIMALS.find(a => a.id === animalId);
-    teams.push({
-      name: name,
-      animal: animalId,
-      emoji: animal.emoji,
-      position: 1,
-      score: 0,
-      correctCount: 0,
-      wrongCount: 0,
-      diceRollForOrder: null
-    });
   }
 
-  // Check unique animals
-  const animalIds = teams.map(t => t.animal);
+  const animalIds = [];
+  for (let i = 0; i < count; i++) animalIds.push(getTeamAnimal(i));
   if (new Set(animalIds).size !== animalIds.length) {
     errorEl.textContent = 'Jede Gruppe braucht ein anderes Tier!';
     return;
   }
 
-  // Check categories
+  buildCategoryUI();
+  showScreen('category-screen');
+}
+
+// ── Proceed to Game (from category screen) ───────────────────
+function proceedFromCategories() {
   if (selectedCategoryIds.size === 0) {
-    errorEl.textContent = 'Bitte mindestens eine Kategorie auswählen!';
+    updateCatSelectInfo();
     return;
   }
 
-  // Filter questions
   activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
   if (activeFragenBank.length < 10) {
-    errorEl.textContent = 'Zu wenige Fragen (' + activeFragenBank.length + '). Mindestens 10 benötigt.';
+    const el = document.getElementById('cat-select-info');
+    if (el) { el.className = 'cat-select-info warning'; el.textContent = 'Zu wenige Fragen (' + activeFragenBank.length + '). Mindestens 10 benötigt.'; }
     return;
   }
 
-  // Generate board
+  // Collect teams from setup screen inputs
+  const count = gameState.singlePlayerMode ? 1 : getSelectedTeamCount();
+  const teams = [];
+  for (let i = 0; i < count; i++) {
+    const nameEl = document.getElementById('team-name-' + i);
+    const name = (nameEl ? nameEl.value.trim() : '') || ('Gruppe ' + (i + 1));
+    const animalId = getTeamAnimal(i);
+    const animal = ANIMALS.find(a => a.id === animalId);
+    teams.push({ name, animal: animalId, emoji: animal ? animal.emoji : '❓', position: 1, score: 0, correctCount: 0, wrongCount: 0, diceRollForOrder: null });
+  }
+
   gameState.teams = teams;
   gameState.usedQuestionIds = new Set();
   gameState.pendingDice = null;
@@ -560,11 +665,10 @@ function proceedToGame() {
   gameState.activeCategoryIds = [...selectedCategoryIds];
   generateBoard();
 
-  // Use existing code (set by createNewGame or enterGame), update title from input
   const code = LsStorage.getCode();
   const titleInput = document.getElementById('setup-game-title');
   const title = (titleInput && titleInput.value.trim()) || 'Schlangen & Leitern';
-  gameState.meta = { gameCode: code, title: title, createdAt: gameState.meta.createdAt || new Date().toISOString() };
+  gameState.meta = { gameCode: code, title, createdAt: gameState.meta.createdAt || new Date().toISOString() };
 
   if (gameState.singlePlayerMode) {
     gameState.turnOrder = [0];
@@ -1674,7 +1778,7 @@ async function showGameSelector() {
         <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
       </div>
       <div class="gs-game-actions">
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
       </div>
     </div>`;
   }).join('');

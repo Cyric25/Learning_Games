@@ -1,0 +1,126 @@
+<!-- ── Setup Screen (Teams & Einstellungen) — Risiko-Quiz Stil ────────
+     Vollbild direkt auf --bg-primary, KEIN Card-Wrapper.
+     Schritt 2 im Ablauf: nach dem Spielwähler (game-selector),
+     vor dem Kategorie-Screen (category-screen).
+
+     SCREEN-ABLAUF:
+       #game-selector → #setup-screen → #category-screen → #game-screen
+
+     ANPASSEN:
+       "Teams & Einstellungen" → Titel je nach Spiel
+       Settings-Rows          → spielspezifische Einstellungen einfügen/entfernen
+       proceedToCategories()  → Funktion die zum Kategorie-Screen wechselt
+       resetToSelector()      → Funktion die zum Spielwähler zurückgeht
+
+     TEAM-LISTE:
+       #team-select-list wird per renderTeamSelectList() befüllt.
+       Jede Zeile = .team-select-item mit Farbpunkt + Namensfeld.
+       Spielspezifische Erweiterungen (Tier-Picker, Symbole) können als
+       zweite Zeile (.team-select-item--stacked) angehängt werden.
+
+     CSS-VARIABLEN (in Spiel-CSS nötig):
+       --bg-primary    ← Hintergrund der Setup-Screens (flach, nicht Gradient!)
+       --accent        ← Primärfarbe
+       --text-primary, --text-secondary, --border, --success, --danger
+       Eingaben:       rgba(255,255,255,0.07) dark / rgba(0,0,0,0.04) light
+     ──────────────────────────────────────────────────────────────────── -->
+
+<div class="screen" id="setup-screen">
+
+  <!-- Spielcode-Banner (nur wenn Spielverwaltung aktiv — via showCodeBannerInline()) -->
+  <div id="setup-code-banner" style="display:none; text-align:center; margin-bottom:1rem;
+    padding:0.6rem 1.2rem; background:rgba(255,255,255,0.05); border-radius:12px;
+    border:2px solid var(--accent); max-width:520px; width:100%;">
+    <span style="color:var(--text-secondary);font-size:0.85rem;">Spielcode:</span>
+    <span style="color:var(--accent);font-size:1.4rem;font-weight:800;letter-spacing:0.15em;
+      margin-left:0.5rem;cursor:pointer;" onclick="copyCode(this)" id="setup-code-value"></span>
+    <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.5rem;">(klicken zum Kopieren)</span>
+  </div>
+
+  <h2 style="color:var(--accent);font-size:2rem;margin-bottom:0.5rem;text-align:center;">
+    Teams &amp; Einstellungen
+  </h2>
+  <p style="color:var(--text-secondary);margin-bottom:1.5rem;text-align:center;max-width:520px;">
+    Teams konfigurieren und Spiel einstellen.
+  </p>
+
+  <div style="max-width:520px;width:100%;">
+
+    <!-- ── Team-Liste (per JS gerendert) ──────────────────────── -->
+    <div id="team-select-list" style="margin-bottom:1.5rem;"></div>
+
+    <!-- ── Spieleinstellungen ─────────────────────────────────── -->
+    <div style="margin-bottom:1.5rem;">
+      <div class="settings-section-label">⚙ Spieleinstellungen</div>
+
+      <!-- Spieltitel (optional) -->
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">📝 Spieltitel</div>
+          <div class="settings-row-desc">Optionaler Name für diese Runde</div>
+        </div>
+        <input type="text" id="setup-game-title" placeholder="z.B. Klasse 3BT" maxlength="60"
+          class="settings-text-input">
+      </div>
+
+      <!-- Param-Buttons (Modus-Wahl / Anzahl) — wird per JS in die .param-row gerendert -->
+      <div class="settings-row" id="mode-row-wrap">
+        <div>
+          <div class="settings-row-title">🎮 Spielmodus</div>
+        </div>
+        <div class="param-row" id="mode-row"></div>
+      </div>
+
+      <div class="settings-row" id="team-count-row-wrap">
+        <div>
+          <div class="settings-row-title">👥 Anzahl Teams</div>
+        </div>
+        <div class="param-row" id="team-count-row"></div>
+      </div>
+
+      <!-- Checkbox-Toggle -->
+      <label class="settings-row settings-row-clickable">
+        <input type="checkbox" class="settings-checkbox" id="ts-example-toggle">
+        <div>
+          <div class="settings-row-title">⚡ Option</div>
+          <div class="settings-row-desc">Beschreibung der Option</div>
+        </div>
+      </label>
+
+      <!-- Number-Input -->
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">⏱ Timer</div>
+          <div class="settings-row-desc">Sekunden pro Frage</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <input type="number" id="ts-timer-seconds" min="5" max="120" step="5"
+            class="settings-number">
+          <span style="color:var(--text-secondary);font-size:0.9rem;">Sek.</span>
+        </div>
+      </div>
+
+      <!-- Select -->
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">🎯 Fragentyp</div>
+          <div class="settings-row-desc">Welche Fragetypen gespielt werden</div>
+        </div>
+        <select id="ts-question-filter" class="settings-select">
+          <option value="all">Alle Fragen</option>
+          <option value="mc">Nur Multiple Choice</option>
+          <option value="open">Nur Offen</option>
+        </select>
+      </div>
+
+    </div><!-- /settings -->
+
+    <div class="setup-error" id="setup-error"></div>
+
+    <div class="setup-actions">
+      <button class="setup-btn" onclick="proceedToCategories()">Weiter &#9658;</button>
+      <button class="setup-btn setup-btn-ghost" onclick="resetToSelector()">&#8592; Zurück</button>
+    </div>
+
+  </div>
+</div>
