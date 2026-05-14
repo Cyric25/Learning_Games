@@ -120,6 +120,25 @@ function convertRQtoLabyrinth(rqData) {
   return fragen;
 }
 
+// ── copyCode ──────────────────────────────────────────────────────
+function copyCode(el) {
+  if (!el) return;
+  const code = el.textContent.trim();
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const orig = el.textContent;
+    el.textContent = '✓ Kopiert!';
+    setTimeout(() => { el.textContent = orig; }, 1200);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+window.copyCode = copyCode;
+
 // ── Spielwähler ───────────────────────────────────────────────────
 function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -128,10 +147,10 @@ function escapeHtml(s) {
 function showGameSelector() {
   showScreen('game-selector');
   const list = document.getElementById('gs-game-list');
-  list.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">Lade Spiele…</p>';
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
   GameSync.loadGamesRegistry().then(registry => {
     const entries = Object.entries(registry);
-    if (entries.length === 0) { list.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">Noch keine Spiele vorhanden.</p>'; return; }
+    if (entries.length === 0) { list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden.</p>'; return; }
     entries.sort((a, b) => (b[1].updatedAt || b[1].createdAt || '').localeCompare(a[1].updatedAt || a[1].createdAt || ''));
     list.innerHTML = entries.map(([code, info]) => {
       const statusLabel = { playing: '🟢 Läuft', rolling: '🟢 Läuft', finished: '🏁 Beendet' }[info.status] || '⚙ Setup';
@@ -146,7 +165,7 @@ function showGameSelector() {
           <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
         </div>
         <div class="gs-game-actions">
-          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+          <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
         </div>
       </div>`;
     }).join('');
@@ -237,146 +256,226 @@ function resetToSelector() {
 
 // ── Setup UI ──────────────────────────────────────────────────────
 function buildSetupUI() {
-  buildCategoryUI(); buildTeamCountUI(); buildTeamConfigUI(); buildSymbolsUI(); buildTimerUI();
+  buildTeamCountUI();
+  renderTeamSelectList(_cfg.teamCount);
+  buildSymbolsUI();
+  buildTimerUI();
 }
 
 const CAT_ICONS = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯','📚','🏛️','🎨','⚡'];
 
+// ── Team-Liste (neue Template-Darstellung) ──────────────────────────
+function renderTeamSelectList(count) {
+  const list = document.getElementById('team-select-list');
+  if (!list) return;
+  // Aktuelle Eingabewerte sichern
+  const names = [];
+  list.querySelectorAll('.team-name-input').forEach(inp => names.push(inp.value));
+  list.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const color = TEAM_COLORS[i % TEAM_COLORS.length];
+    const item = document.createElement('div');
+    item.className = 'team-select-item';
+    item.dataset.index = i;
+
+    const dot = document.createElement('span');
+    dot.className = 'team-select-dot';
+    dot.style.background = color;
+
+    const emoji = document.createElement('span');
+    emoji.className = 'team-emoji-badge';
+    emoji.textContent = TEAM_EMOJIS[i] || '🧩';
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'team-name-input';
+    inp.id = 'team-name-' + i;
+    inp.placeholder = DEFAULT_NAMES[i] || ('Gruppe ' + (i + 1));
+    inp.value = names[i] || DEFAULT_NAMES[i] || ('Gruppe ' + (i + 1));
+    inp.maxLength = 20;
+
+    item.appendChild(dot);
+    item.appendChild(emoji);
+    item.appendChild(inp);
+    list.appendChild(item);
+  }
+}
+
+function buildTeamCountUI() {
+  const row = document.getElementById('team-count-row');
+  if (!row) return;
+  row.innerHTML = '';
+  [2,3,4,5,6].forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (n === _cfg.teamCount ? ' active' : '');
+    btn.textContent = n;
+    btn.onclick = () => {
+      _cfg.teamCount = n;
+      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTeamSelectList(n);
+    };
+    row.appendChild(btn);
+  });
+}
+
+// ── Kategorie-Selektor (standalone category-screen) ───────────────
 function buildCategoryUI() {
-  const sec = document.getElementById('category-section');
   const list = document.getElementById('cat-select-list');
-  if (!rawCategories.length) { if (sec) sec.style.display = 'none'; return; }
-  if (sec) sec.style.display = '';
+  if (!list) return;
   list.innerHTML = '';
 
-  // Initialize all leaf categories as active
   activeCategories.clear();
   function collectLeaves(cat) {
-    if (cat.subcategories?.length) { cat.subcategories.forEach(collectLeaves); }
-    else { activeCategories.add(cat.id); }
+    if (cat.questions && cat.questions.length > 0) return [cat.id];
+    return (cat.subcategories || []).flatMap(s => collectLeaves(s));
   }
-  rawCategories.forEach(collectLeaves);
+  rawCategories.forEach(cat => collectLeaves(cat).forEach(id => activeCategories.add(id)));
 
-  rawCategories.forEach((cat, ci) => _buildCatNode(list, cat, CAT_ICONS[ci % CAT_ICONS.length], 0));
+  rawCategories.forEach((cat, ci) => _buildCatNode(list, cat, CAT_ICONS[ci % CAT_ICONS.length]));
   updateCategoryInfo();
 }
 
 function _buildCatNode(container, cat, icon, depth) {
+  depth = depth || 0;
   const subs = cat.subcategories || [];
-  if (!subs.length) {
-    // Leaf category — checkable item
-    const qCount = allQuestions.filter(q => q.kategorieId === cat.id).length;
+  const hasQ = cat.questions && cat.questions.length > 0;
+  if (!hasQ && !subs.length) return;
+
+  const qCount = _countLeafQ(cat);
+
+  if (hasQ) {
+    const sel = activeCategories.has(cat.id);
     const item = document.createElement('div');
-    item.className = 'cat-select-item selected';
+    item.className = 'cat-select-item' + (sel ? ' selected' : '');
     item.dataset.catId = cat.id;
-    if (depth > 0) item.style.marginLeft = (depth * 1.2) + 'rem';
     item.innerHTML =
-      '<span class="cat-select-icon">' + icon + '</span>' +
+      '<span class="cat-select-icon">' + (icon || '📁') + '</span>' +
       '<span class="cat-select-name">' + cat.name + '</span>' +
-      '<span class="cat-select-count">' + qCount + '</span>' +
-      '<div class="cat-select-check">✓</div>';
+      '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
+      '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
     item.onclick = () => {
-      if (activeCategories.has(cat.id)) { activeCategories.delete(cat.id); item.classList.remove('selected'); }
-      else { activeCategories.add(cat.id); item.classList.add('selected'); }
-      _syncGroupHeader(item.closest('.cat-group-wrap'));
+      const on = !activeCategories.has(cat.id);
+      const check = item.querySelector('.cat-select-check');
+      if (on) { activeCategories.add(cat.id); item.classList.add('selected'); check.textContent = '✓'; }
+      else     { activeCategories.delete(cat.id); item.classList.remove('selected'); check.textContent = ''; }
+      _syncGroupHeader(container.closest('.cat-group-wrap'));
       updateCategoryInfo();
     };
     container.appendChild(item);
     return;
   }
 
-  // Non-leaf — accordion group
+  const allLeaves = [];
+  (function collect(c) {
+    if (c.questions && c.questions.length > 0) allLeaves.push(c.id);
+    (c.subcategories || []).forEach(s => collect(s));
+  })(cat);
+  const allSel = allLeaves.every(id => activeCategories.has(id));
+
   const wrap = document.createElement('div');
   wrap.className = 'cat-group-wrap';
 
-  const qTotal = _countLeafQ(cat);
   const header = document.createElement('div');
-  header.className = 'cat-group-header';
+  header.className = 'cat-group-header collapsed';
   header.innerHTML =
-    '<span class="cat-group-chevron">▼</span>' +
+    '<span class="cat-group-chevron">▶</span>' +
     '<span class="cat-group-icon">' + icon + '</span>' +
     '<span class="cat-group-name">' + cat.name + '</span>' +
-    '<span class="cat-group-count">' + qTotal + ' Fragen</span>' +
+    '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
     '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
-      '<input type="checkbox" checked class="cat-group-cb">' +
+      '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
     '</label>';
 
   const children = document.createElement('div');
-  children.className = 'cat-group-children';
-  subs.forEach(s => _buildCatNode(children, s, icon, depth + 1));
+  children.className = 'cat-group-children hidden';
 
-  // Group checkbox toggles all leaves inside
-  header.querySelector('.cat-group-cb').addEventListener('change', e => {
-    const on = e.target.checked;
-    children.querySelectorAll('.cat-select-item').forEach(item => {
-      on ? activeCategories.add(item.dataset.catId) : activeCategories.delete(item.dataset.catId);
-      item.classList.toggle('selected', on);
-    });
-    updateCategoryInfo();
+  header.addEventListener('click', () => {
+    const collapsed = header.classList.contains('collapsed');
+    header.classList.toggle('collapsed', !collapsed);
+    children.classList.toggle('hidden', !collapsed);
   });
 
-  // Header click expands/collapses
-  header.addEventListener('click', e => {
-    if (e.target.closest('label')) return;
-    const collapsed = header.classList.toggle('collapsed');
-    children.classList.toggle('hidden', collapsed);
+  const cb = header.querySelector('.cat-group-cb');
+  cb.addEventListener('change', () => {
+    const on = cb.checked;
+    allLeaves.forEach(id => { if (on) activeCategories.add(id); else activeCategories.delete(id); });
+    children.querySelectorAll('.cat-select-item').forEach(item => {
+      item.classList.toggle('selected', on);
+      item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+    });
+    children.querySelectorAll('.cat-group-cb').forEach(gcb => gcb.checked = on);
+    updateCategoryInfo();
   });
 
   wrap.appendChild(header);
   wrap.appendChild(children);
   container.appendChild(wrap);
+  subs.forEach(sub => _buildCatNode(children, sub, icon, depth + 1));
 }
 
 function _countLeafQ(cat) {
-  if (!cat.subcategories?.length) return allQuestions.filter(q => q.kategorieId === cat.id).length;
+  if (cat.questions && cat.questions.length > 0)
+    return allQuestions.filter(q => q.kategorieId === cat.id).length;
   return (cat.subcategories || []).reduce((s, c) => s + _countLeafQ(c), 0);
 }
 
 function _syncGroupHeader(wrap) {
   if (!wrap) return;
-  const items = [...wrap.querySelectorAll('.cat-select-item')];
-  const allSel = items.length > 0 && items.every(i => i.classList.contains('selected'));
-  const cb = wrap.querySelector('.cat-group-cb');
-  if (cb) cb.checked = allSel;
-  const parentWrap = wrap.parentElement?.closest('.cat-group-wrap');
-  if (parentWrap) _syncGroupHeader(parentWrap);
+  const cb = wrap.querySelector(':scope > .cat-group-header .cat-group-cb');
+  if (!cb) return;
+  const items = wrap.querySelectorAll('.cat-select-item');
+  cb.checked = items.length > 0 && [...items].every(i => i.classList.contains('selected'));
+  const parentChildren = wrap.parentElement;
+  if (parentChildren && parentChildren.classList.contains('cat-group-children'))
+    _syncGroupHeader(parentChildren.closest('.cat-group-wrap'));
 }
 
 function toggleAllCategories(on) {
+  activeCategories.clear();
   document.querySelectorAll('#cat-select-list .cat-select-item').forEach(item => {
-    on ? activeCategories.add(item.dataset.catId) : activeCategories.delete(item.dataset.catId);
     item.classList.toggle('selected', on);
+    item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+    if (on) activeCategories.add(item.dataset.catId);
   });
-  document.querySelectorAll('#cat-select-list .cat-group-cb').forEach(cb => { cb.checked = on; });
+  document.querySelectorAll('#cat-select-list .cat-group-cb').forEach(cb => cb.checked = on);
   updateCategoryInfo();
 }
 
 function updateCategoryInfo() {
-  const el = document.getElementById('cat-select-info'); if (!el) return;
+  const el = document.getElementById('cat-select-info');
+  if (!el) return;
   const n = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
-  el.textContent = `${n} Fragen aus ${activeCategories.size} Kategorien`;
+  if (activeCategories.size === 0 || n === 0) {
+    el.className = 'cat-select-info warning';
+    el.textContent = 'Keine Kategorie ausgewählt!';
+  } else {
+    el.className = 'cat-select-info';
+    el.textContent = n + ' Fragen aus ' + activeCategories.size + ' Kategorien';
+  }
 }
 
 let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20 };
 
-function buildTeamCountUI() {
-  const row = document.getElementById('team-count-row'); row.innerHTML = '';
-  [2,3,4,5,6].forEach(n => {
-    const btn = document.createElement('button');
-    btn.className = 'param-btn' + (n === _cfg.teamCount ? ' active' : ''); btn.textContent = n;
-    btn.onclick = () => { _cfg.teamCount = n; row.querySelectorAll('.param-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); buildTeamConfigUI(); };
-    row.appendChild(btn);
-  });
+// ── proceedToCategories (Setup → Category-Screen) ─────────────────
+function proceedToCategories() {
+  const errEl = document.getElementById('setup-error');
+  if (errEl) errEl.textContent = '';
+  buildCategoryUI();
+  showScreen('category-screen');
 }
 
-function buildTeamConfigUI() {
-  const list = document.getElementById('team-config-list'); list.innerHTML = '';
-  for (let i = 0; i < _cfg.teamCount; i++) {
-    const row = document.createElement('div'); row.className = 'team-config-row';
-    const em = document.createElement('span'); em.className = 'team-config-emoji'; em.textContent = TEAM_EMOJIS[i]; em.style.color = TEAM_COLORS[i];
-    const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'team-name-input'; inp.value = DEFAULT_NAMES[i]; inp.maxLength = 20;
-    row.appendChild(em); row.appendChild(inp); list.appendChild(row);
+// ── proceedFromCategories (Category-Screen → Spiel starten) ───────
+function proceedFromCategories() {
+  if (activeCategories.size === 0) { updateCategoryInfo(); return; }
+  const avail = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  const needed = _cfg.teamCount * _cfg.symbolsPerTeam;
+  if (avail < needed) {
+    const el = document.getElementById('cat-select-info');
+    if (el) { el.className = 'cat-select-info warning'; el.textContent = 'Zu wenig Fragen (' + avail + '/' + needed + ').'; }
+    return;
   }
+  startGame();
 }
 
 function buildSymbolsUI() {

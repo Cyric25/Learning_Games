@@ -123,6 +123,25 @@ const LsStorage = {
   }
 };
 
+// ── copyCode ──────────────────────────────────────────────────
+function copyCode(el) {
+  if (!el) return;
+  const code = el.textContent.trim();
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    const orig = el.textContent;
+    el.textContent = '✓ Kopiert!';
+    setTimeout(() => { el.textContent = orig; }, 1200);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+window.copyCode = copyCode;
+
 // ── Spielwähler onclick-Exports ──────────────────────────────
 // window._gsEnter/_gsDelete werden nach den Funktionsdeklarationen gesetzt (s.u.)
 // createNewGame ist eine hoisted function declaration → automatisch window.createNewGame

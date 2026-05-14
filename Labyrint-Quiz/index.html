@@ -49,60 +49,113 @@
 
   <!-- ── Setup Screen ────────────────────────────────────────── -->
   <div class="screen" id="setup-screen">
-    <div class="setup-card">
-      <div class="setup-header">
-        <button class="header-btn" onclick="resetToSelector()">&#8592; Zurück</button>
-        <div class="setup-header-btns">
-          <a href="admin.html" class="header-btn">Fragen</a>
-          <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+
+    <!-- Spielcode-Banner -->
+    <div id="setup-code-banner" style="display:none; text-align:center; margin-bottom:1rem;
+      padding:0.6rem 1.2rem; background:rgba(0,0,0,0.04); border-radius:12px;
+      border:2px solid var(--accent); max-width:520px; width:100%;">
+      <span style="color:var(--text-secondary);font-size:0.85rem;">Spielcode:</span>
+      <span style="color:var(--accent);font-size:1.4rem;font-weight:800;letter-spacing:0.15em;
+        margin-left:0.5rem;cursor:pointer;" onclick="copyCode(this)" id="setup-code-value"></span>
+      <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem;">(klicken zum Kopieren)</span>
+    </div>
+
+    <h2 style="color:var(--accent);font-size:2rem;margin-bottom:0.5rem;text-align:center;">
+      🏰 Teams &amp; Einstellungen
+    </h2>
+    <p style="color:var(--text-secondary);margin-bottom:1.5rem;text-align:center;max-width:520px;">
+      Gruppen konfigurieren und Spiel einstellen.
+    </p>
+
+    <div style="max-width:520px;width:100%;">
+
+      <!-- Gruppen-Liste (per renderTeamSelectList() befüllt) -->
+      <div class="settings-section-label">👥 Gruppen</div>
+      <div id="team-select-list" style="margin:0.8rem 0 1.5rem;"></div>
+
+      <!-- Spieleinstellungen -->
+      <div style="margin-bottom:1.5rem;">
+        <div class="settings-section-label">⚙ Spieleinstellungen</div>
+
+        <!-- Spieltitel -->
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">📝 Spieltitel</div>
+            <div class="settings-row-desc">Optionaler Name für diese Runde</div>
+          </div>
+          <input type="text" id="setup-game-title" placeholder="z.B. Biologie 3BT" maxlength="60"
+            class="settings-text-input">
         </div>
-      </div>
 
-      <div class="setup-title">
-        <h1>🏰 Labyrinth-Quiz</h1>
-        <p>Teams steuern ihr Gerät selbst – würfeln, navigieren, Symbole sammeln!</p>
-      </div>
-
-      <div class="setup-section">
-        <h3>Spieltitel (optional)</h3>
-        <input type="text" id="setup-game-title" class="setup-title-input" placeholder="z.B. Biologie 3BT" maxlength="60">
-      </div>
-
-      <div class="setup-section" id="category-section" style="display:none;">
-        <h3>Kategorien auswählen</h3>
-        <div class="cat-select-actions">
-          <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
-          <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+        <!-- Anzahl Gruppen -->
+        <div class="settings-row" id="team-count-row-wrap">
+          <div>
+            <div class="settings-row-title">👥 Anzahl Gruppen</div>
+          </div>
+          <div class="param-row" id="team-count-row"></div>
         </div>
-        <div class="cat-select-list" id="cat-select-list"></div>
-        <div class="cat-select-info" id="cat-select-info"></div>
-      </div>
 
-      <div class="setup-section">
-        <h3>Anzahl Gruppen</h3>
-        <div class="param-row" id="team-count-row"></div>
-      </div>
+        <!-- Symbole pro Gruppe -->
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">🔮 Symbole pro Gruppe</div>
+            <div class="settings-row-desc">Zu sammelnde Symbole im Labyrinth</div>
+          </div>
+          <div class="param-row" id="symbols-per-team-row"></div>
+        </div>
 
-      <div class="setup-section">
-        <h3>Gruppen konfigurieren</h3>
-        <div class="team-config-list" id="team-config-list"></div>
-      </div>
+        <!-- Zeitlimit -->
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">⏱ Zeitlimit pro Frage</div>
+          </div>
+          <div class="param-row" id="timer-row"></div>
+        </div>
 
-      <div class="setup-section">
-        <h3>Symbole pro Gruppe</h3>
-        <div class="param-row" id="symbols-per-team-row"></div>
-      </div>
+        <!-- Theme Toggle -->
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">🎨 Erscheinungsbild</div>
+          </div>
+          <button class="setup-btn setup-btn-ghost" id="btn-theme" onclick="toggleTheme()" style="padding:0.4rem 0.9rem;font-size:0.9rem;">🌙 Darkmode</button>
+        </div>
 
-      <div class="setup-section">
-        <h3>Zeitlimit pro Frage</h3>
-        <div class="param-row" id="timer-row"></div>
       </div>
 
       <div class="setup-error" id="setup-error"></div>
 
       <div class="setup-actions">
-        <button class="btn-start-game" onclick="startGame()">Spiel starten</button>
+        <button class="setup-btn" onclick="proceedToCategories()">Weiter &#9658;</button>
+        <button class="setup-btn setup-btn-ghost" onclick="resetToSelector()">&#8592; Zurück</button>
       </div>
+
+    </div>
+  </div>
+
+  <!-- ── Category Screen ───────────────────────────────────────── -->
+  <div class="screen" id="category-screen">
+    <div class="cat-screen-container">
+
+      <div class="cat-screen-header">
+        <h2 class="cat-screen-title">Kategorien auswählen</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;">
+          Wähle die Themengebiete für dieses Spiel.
+        </p>
+      </div>
+
+      <div class="cat-select-actions">
+        <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
+        <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+      </div>
+
+      <div class="cat-select-list" id="cat-select-list"></div>
+      <div class="cat-select-info" id="cat-select-info"></div>
+
+      <div class="setup-actions">
+        <button class="setup-btn" onclick="proceedFromCategories()">Spiel starten &#9658;</button>
+        <button class="setup-btn setup-btn-ghost" onclick="showScreen('setup-screen')">&#8592; Zurück</button>
+      </div>
+
     </div>
   </div>
 
@@ -173,16 +226,9 @@
 
   <script src="js/maze.js"></script>
   <script src="js/renderer.js"></script>
-  <script src="js/labyrinth.js?v=2"></script>
+  <script src="js/labyrinth.js?v=3"></script>
   <script>
-    function copyCode(el) {
-      const code = el.textContent;
-      navigator.clipboard.writeText(code).then(() => {
-        const orig = el.textContent; el.textContent = '✓ Kopiert!';
-        setTimeout(() => { el.textContent = orig; }, 1200);
-      }).catch(() => {});
-    }
-    // Also update sidebar hint when code is shown
+    // Update sidebar hint when code is shown (hook into labyrinth.js showGameCode)
     const _origShow = window.showGameCode;
     window.showGameCode = function() {
       if (_origShow) _origShow();
