@@ -204,7 +204,7 @@ async function _gsEnter(code) {
   window.gameCode = code;
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = state;
-  if ((state.phase === 'playing' || state.phase === 'rolling') && state.seed && state.config?.teamCount) {
+  if ((state.phase === 'playing' || state.phase === 'rolling' || state.phase === 'direction' || state.phase === 'question') && state.seed && state.config?.teamCount) {
     activeCategories = new Set(state.config.kategorien || []);
     const gen = new MazeGenerator(16, 16, state.seed);
     const mazeResult = gen.generate({ doorCount: 14, teamCount: state.config.teamCount });
@@ -637,7 +637,7 @@ function renderBoard() {
   // Phase display
   const phaseEl = document.getElementById('phase-display');
   if (phaseEl) {
-    const phaseMap = { rolling:'🎲 Würfeln', moving:`👣 ${gameState.stepsRemaining} Schritt(e)`, question:'❓ Frage', finished:'🏆 Fertig' };
+    const phaseMap = { rolling:'🎲 Würfeln', direction:`🧭 ${gameState.stepsRemaining} Zug${gameState.stepsRemaining !== 1 ? 'züge' : ''}`, question:'❓ Frage', finished:'🏆 Fertig' };
     phaseEl.textContent = phaseMap[gameState.phase] || gameState.phase;
   }
 

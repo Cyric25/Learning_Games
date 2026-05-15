@@ -5,6 +5,12 @@ const TEAM_SYMBOL_ICONS = ['👑', '⚔️', '💎', '🔮', '🗝️', '📜'];
 const TEAM_COLORS = ['#1a3a8f', '#8f1a1a', '#1a6b1a', '#6b1a6b', '#8f5a1a', '#1a6b6b'];
 const TEAM_EMOJIS = ['🛡️', '🐉', '🦉', '🦊', '🧙', '🤖'];
 const DICE_CHARS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const DMAP = {
+  n: { dx: 0, dy: -1, wall: 1, opp: 4 },
+  e: { dx: 1, dy:  0, wall: 2, opp: 8 },
+  s: { dx: 0, dy:  1, wall: 4, opp: 1 },
+  w: { dx:-1, dy:  0, wall: 8, opp: 2 }
+};
 
 // ── GameSync ──────────────────────────────────────────────────────
 const GameSync = {
@@ -233,10 +239,10 @@ function applyState(state) {
   // Mein Zug!
   if (state.phase === 'rolling') {
     showRolling(state);
-  } else if (state.phase === 'moving') {
-    showMoving(state);
-  } else if (state.phase === 'question' && state.activeQuestion?.teamId === myTeamId) {
-    // Frage war bereits lokal gestellt – ignore duplicate SSE
+  } else if (state.phase === 'direction') {
+    showDirectionLocal(state);
+  } else if (state.phase === 'question') {
+    // modal already open locally, no action needed
   }
 }
 
@@ -291,94 +297,124 @@ function rollDice() {
       const newState = JSON.parse(JSON.stringify(remoteState));
       newState.diceValue = result;
       newState.stepsRemaining = result;
-      newState.phase = 'moving';
+      newState.phase = 'direction';
       postState(newState);
-      showMovingLocal(newState);
+      showDirectionLocal(newState);
     }
   }, 70);
 }
 
-// ── Bewegen ───────────────────────────────────────────────────────
-function showMoving(state) { showMovingLocal(state); }
-
-function showMovingLocal(state) {
+// ── Richtung wählen ───────────────────────────────────────────────
+function showDirectionLocal(state) {
   const area = document.getElementById('play-area');
   const myTeam = state.teams[myTeamId];
-  const stepsLeft = state.stepsRemaining;
-  const validMoves = computeValidMoves(state);
+  const movesLeft = state.stepsRemaining;
+  const validDirs = computeValidDirections(state);
 
-  const btnN = validMoves.n ? `<button class="dir-btn dir-n ${validMoves.n.cls}" onclick="doMove(${validMoves.n.x},${validMoves.n.y})">▲</button>` : `<button class="dir-btn dir-n" disabled>▲</button>`;
-  const btnS = validMoves.s ? `<button class="dir-btn dir-s ${validMoves.s.cls}" onclick="doMove(${validMoves.s.x},${validMoves.s.y})">▼</button>` : `<button class="dir-btn dir-s" disabled>▼</button>`;
-  const btnW = validMoves.w ? `<button class="dir-btn dir-w ${validMoves.w.cls}" onclick="doMove(${validMoves.w.x},${validMoves.w.y})">◀</button>` : `<button class="dir-btn dir-w" disabled>◀</button>`;
-  const btnE = validMoves.e ? `<button class="dir-btn dir-e ${validMoves.e.cls}" onclick="doMove(${validMoves.e.x},${validMoves.e.y})">▶</button>` : `<button class="dir-btn dir-e" disabled>▶</button>`;
+  const mkBtn = (dir, arrow) => validDirs[dir]
+    ? `<button class="dir-btn dir-free" onclick="chooseDirection('${dir}')">${arrow}</button>`
+    : `<button class="dir-btn" disabled>${arrow}</button>`;
 
   area.innerHTML = `
     <div class="move-screen">
       <div class="steps-indicator">
         <span class="dice-val">${DICE_CHARS[(state.diceValue||1)-1]}</span>
-        <span class="steps-left">${stepsLeft} Schritt${stepsLeft !== 1 ? 'e' : ''}</span>
+        <span class="steps-left">${movesLeft} Zug${movesLeft !== 1 ? 'züge' : ''}</span>
       </div>
       <div class="dir-grid">
-        <div class="dir-row">${btnN}</div>
-        <div class="dir-row">${btnW}<span class="dir-center">${myTeam.emoji}</span>${btnE}</div>
-        <div class="dir-row">${btnS}</div>
+        <div class="dir-row">${mkBtn('n','▲')}</div>
+        <div class="dir-row">${mkBtn('w','◀')}<span class="dir-center">${myTeam.emoji}</span>${mkBtn('e','▶')}</div>
+        <div class="dir-row">${mkBtn('s','▼')}</div>
       </div>
       <button class="btn-action btn-skip" onclick="skipTurn()">Zug beenden</button>
     </div>`;
 }
 
-function computeValidMoves(state) {
+function computeValidDirections(state) {
   if (!localGrid) return {};
-  const team = state.teams[myTeamId];
-  const { x, y } = team;
-  const DIRS = { n:{dx:0,dy:-1,wall:1}, e:{dx:1,dy:0,wall:2}, s:{dx:0,dy:1,wall:4}, w:{dx:-1,dy:0,wall:8} };
-  const result = {};
-  for (const [key, d] of Object.entries(DIRS)) {
-    const nx = x + d.dx, ny = y + d.dy;
-    if (nx < 0 || nx >= 16 || ny < 0 || ny >= 16) continue;
-    if (localGrid[y][x].walls & d.wall) continue; // wall
+  const { x, y } = state.teams[myTeamId];
+  const valid = {};
+  for (const [key, d] of Object.entries(DMAP)) {
+    if (!(localGrid[y][x].walls & d.wall)) valid[key] = true;
+  }
+  return valid;
+}
+
+function advanceInDirection(dir, state) {
+  const d = DMAP[dir];
+  let cx = state.teams[myTeamId].x;
+  let cy = state.teams[myTeamId].y;
+  const fromWall = d.opp;
+
+  while (true) {
+    if (localGrid[cy][cx].walls & d.wall) break;
+    const nx = cx + d.dx, ny = cy + d.dy;
+    if (nx < 0 || nx >= 16 || ny < 0 || ny >= 16) break;
+
     const closedDoor = (state.doors || []).find(dr => dr.x === nx && dr.y === ny && !dr.open);
-    if (closedDoor) { result[key] = { x: nx, y: ny, cls: 'dir-door', door: closedDoor }; continue; }
+    if (closedDoor) return { stop: 'door', teamX: cx, teamY: cy, doorX: nx, doorY: ny, door: closedDoor };
+
     const cell = localGrid[ny][nx];
     if (cell.type === 'symbol' && cell.symTeamId === myTeamId) {
       const sym = (state.symbols || []).find(s => s.x === nx && s.y === ny && !s.found);
-      if (sym) { result[key] = { x: nx, y: ny, cls: 'dir-sym', sym }; continue; }
+      if (sym) return { stop: 'symbol', teamX: cx, teamY: cy, symX: nx, symY: ny, sym };
     }
-    result[key] = { x: nx, y: ny, cls: 'dir-free' };
+
+    cx = nx; cy = ny;
+
+    let exits = 0;
+    for (const d2 of Object.values(DMAP)) {
+      if (d2.wall === fromWall) continue;
+      if (!(localGrid[cy][cx].walls & d2.wall)) exits++;
+    }
+    if (exits !== 1) break;
   }
-  return result;
+  return { stop: 'moved', teamX: cx, teamY: cy };
 }
 
-function doMove(tx, ty) {
-  if (!remoteState || remoteState.phase !== 'moving') return;
-  const validMoves = computeValidMoves(remoteState);
-  const move = Object.values(validMoves).find(m => m.x === tx && m.y === ty);
-  if (!move) return;
+function chooseDirection(dir) {
+  if (!remoteState || remoteState.phase !== 'direction') return;
+  if (!computeValidDirections(remoteState)[dir]) return;
 
-  if (move.door) {
-    questionContext = { type: 'door', target: { x: tx, y: ty }, door: move.door };
-    showQuestionModal();
-    return;
-  }
-  if (move.sym) {
-    questionContext = { type: 'symbol', target: { x: tx, y: ty }, sym: move.sym };
-    showQuestionModal();
-    return;
-  }
-
-  // Freier Schritt
+  const res = advanceInDirection(dir, remoteState);
   const newState = JSON.parse(JSON.stringify(remoteState));
-  newState.teams[myTeamId].x = tx;
-  newState.teams[myTeamId].y = ty;
+  newState.teams[myTeamId].x = res.teamX;
+  newState.teams[myTeamId].y = res.teamY;
+
+  if (res.stop === 'door') {
+    newState.stepsRemaining = 0;
+    newState.phase = 'question';
+    postState(newState);
+    renderCanvas(newState);
+    questionContext = { type: 'door', target: { x: res.doorX, y: res.doorY }, door: res.door };
+    showQuestionModal();
+    return;
+  }
+
+  if (res.stop === 'symbol') {
+    newState.stepsRemaining = 0;
+    newState.phase = 'question';
+    postState(newState);
+    renderCanvas(newState);
+    questionContext = { type: 'symbol', target: { x: res.symX, y: res.symY }, sym: res.sym };
+    showQuestionModal();
+    return;
+  }
+
+  // Kreuzung oder Sackgasse erreicht
   newState.stepsRemaining--;
   if (newState.stepsRemaining <= 0) {
     newState.phase = 'rolling';
     newState.diceValue = 0;
     newState.stepsRemaining = 0;
     newState.currentTeamIdx = (newState.currentTeamIdx + 1) % newState.teams.length;
+    postState(newState);
+    showWaiting(newState.teams[newState.currentTeamIdx]);
+  } else {
+    newState.phase = 'direction';
+    postState(newState);
+    showDirectionLocal(newState);
   }
-  postState(newState);
-  showMovingLocal(newState);
 }
 
 function skipTurn() {
@@ -491,10 +527,8 @@ function continueAfterQuestion() {
   if (ctx.type === 'door' && wasCorrect) {
     const door = newState.doors.find(d => d.x === ctx.target.x && d.y === ctx.target.y);
     if (door) { door.open = true; door.openedBy = myTeamId; }
-    // Move through door
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
-    newState.stepsRemaining--;
   } else if (ctx.type === 'symbol' && wasCorrect) {
     const sym = newState.symbols.find(s => s.x === ctx.target.x && s.y === ctx.target.y && !s.found);
     if (sym) { sym.found = true; sym.foundBy = myTeamId; }
@@ -502,7 +536,6 @@ function continueAfterQuestion() {
     newState.teams[myTeamId].symbolsFound++;
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
-    newState.stepsRemaining--;
 
     // Check win
     if (newState.teams[myTeamId].symbolsFound >= (newState.config?.symbolsPerTeam || 7)) {
@@ -514,16 +547,11 @@ function continueAfterQuestion() {
     }
   }
 
-  // End turn if no steps left (or wrong answer for door)
-  if (newState.stepsRemaining <= 0 || (ctx.type === 'door' && !wasCorrect)) {
-    if (ctx.type !== 'door' || !wasCorrect) {
-      newState.phase = 'rolling'; newState.diceValue = 0; newState.stepsRemaining = 0;
-      newState.currentTeamIdx = (newState.currentTeamIdx + 1) % newState.teams.length;
-    } else if (newState.stepsRemaining <= 0) {
-      newState.phase = 'rolling'; newState.diceValue = 0; newState.stepsRemaining = 0;
-      newState.currentTeamIdx = (newState.currentTeamIdx + 1) % newState.teams.length;
-    }
-  }
+  // Tür/Symbol trifft → restliche Züge verfallen, Zug endet immer
+  newState.phase = 'rolling';
+  newState.diceValue = 0;
+  newState.stepsRemaining = 0;
+  newState.currentTeamIdx = (newState.currentTeamIdx + 1) % newState.teams.length;
 
   applyStateToGrid(localGrid, newState.symbols || [], newState.doors || []);
   postState(newState);
