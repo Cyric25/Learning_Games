@@ -152,6 +152,8 @@
     .board-field.has-snake    { outline: 2px solid var(--snake); outline-offset: -1px; }
     .board-field.current-field { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f39c12; z-index: 2; }
     .field-number { font-size: .55rem; font-weight: 700; color: rgba(0,0,0,.5); line-height: 1; }
+    .field-bonus-badge { font-size: .7rem; line-height: 1; }
+    .field-special-icon { font-size: .65rem; line-height: 1; }
     .field-pieces { display: flex; flex-wrap: wrap; justify-content: center; font-size: .9rem; }
     .piece { font-size: clamp(.7rem, 2vw, 1.1rem); line-height: 1; }
     .svg-overlay { position: absolute; top: 8px; left: 8px; pointer-events: none; }
@@ -658,6 +660,33 @@ function renderBoard(gs) {
       num.className = 'field-number';
       num.textContent = f;
       div.appendChild(num);
+
+      if (f === 1) {
+        const icon = document.createElement('span');
+        icon.className = 'field-bonus-badge'; icon.textContent = '🏁';
+        div.appendChild(icon);
+      } else if (f === 100) {
+        const icon = document.createElement('span');
+        icon.className = 'field-bonus-badge'; icon.textContent = '🏆';
+        div.appendChild(icon);
+      } else if (field.bonusType) {
+        const icon = document.createElement('span');
+        icon.className = 'field-bonus-badge';
+        icon.textContent = field.bonusType === 'roll_again' ? '🎲' : field.bonusType === 'free_move' ? '🎁' : '🔄';
+        div.appendChild(icon);
+      }
+      if (field.ladderTo) {
+        const icon = document.createElement('span');
+        icon.className = 'field-special-icon'; icon.textContent = '🪜';
+        icon.title = 'Leiter → Feld ' + field.ladderTo;
+        div.appendChild(icon);
+      }
+      if (field.snakeTo) {
+        const icon = document.createElement('span');
+        icon.className = 'field-special-icon'; icon.textContent = '🐍';
+        icon.title = 'Schlange → Feld ' + field.snakeTo;
+        div.appendChild(icon);
+      }
 
       const pieces = document.createElement('div');
       pieces.className = 'field-pieces';
