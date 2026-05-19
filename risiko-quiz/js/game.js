@@ -2,13 +2,30 @@
 
 const TIMER_CIRCUMFERENCE = 326.73; // 2 * Math.PI * 52 (SVG-Kreisring r=52)
 
+// ── Multi-Correct MC Hilfsfunktionen ─────────────────────────────
+// Gibt true zurück wenn alle gewählten Indizes korrekt und vollständig sind
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a, b) => a - b)
+    : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a, b) => a - b);
+  return correct.length === sel.length && correct.every((v, i) => v === sel[i]);
+}
+
+// Gibt Set der korrekten Indizes zurück
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 let gameData = null;
 let timerInterval = null;
 let timerRemaining = 0;
 let currentQuestionId = null;
 let currentSlot = null;
 let modalResolved = false;
-let selectedMcIndex = null;
+let selectedMcIndex = null;   // Single-MC: aktuell gewählter Index (für Rückwärtskompatibilität)
+let selectedMcArr   = [];     // Multi-MC: gewählte Indizes (Array)
 let pendingSlots = [];
 let selectedTeamIds = [];    // für Team-Select-Screen
 
@@ -803,6 +820,7 @@ function openQuestion(slot, questionId) {
   currentSlot = slot;
   modalResolved = false;
   selectedMcIndex = null;
+  selectedMcArr   = [];
 
   // Fill modal
   document.getElementById('modal-category').textContent = slot.displayName;
