@@ -328,6 +328,20 @@ if (typeof GameModel !== 'undefined') {
     GameModel.canTeamSteal = t => (t.score ?? 0) >= 100 && !GameModel.isTeamEliminated(t);
 }
 
+// ── Multi-Correct MC Hilfsfunktionen ────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a, b) => a - b)
+    : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a, b) => a - b);
+  return correct.length === sel.length && correct.every((v, i) => v === sel[i]);
+}
+
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 // ── State ───────────────────────────────────────────────────────
 let viewData    = null;
 let sqTimerInt  = null;
@@ -601,10 +615,14 @@ function updateLiveQuestion(gs) {
   if (lastLiveQId !== lq.id) {
     lastLiveQId = lq.id; hasRaisedHand = false; buildSQ(q, gs, lq);
   }
-  if (lq.selectedMcIndex !== null && lq.selectedMcIndex !== undefined) {
+  // Gelb-Markierung für synchronisierte MC-Auswahl
+  const syncedArr = Array.isArray(lq.selectedMcIndices) && lq.selectedMcIndices.length > 0
+    ? lq.selectedMcIndices
+    : (lq.selectedMcIndex != null ? [lq.selectedMcIndex] : null);
+  if (syncedArr) {
     document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
       if (!el.classList.contains('correct') && !el.classList.contains('wrong'))
-        el.classList.toggle('mc-selected-pending', i === lq.selectedMcIndex);
+        el.classList.toggle('mc-selected-pending', syncedArr.includes(i));
     });
   }
   if (lq.resolved || lq.answer) showSQAnswer(q, lq);
@@ -626,13 +644,40 @@ function buildSQ(q, gs, lq) {
     mcEl.style.display = 'grid';
     const activeTeamId = lq.teamId ?? GameModel.getCurrentTeam(gs)?.id;
     const isMyTurn = myTeamId && myTeamId !== 'spectator' && activeTeamId === myTeamId;
-    q.options.forEach((opt, idx) => {
-      const d = document.createElement('div');
-      d.className = 'sq-mc-opt' + (isMyTurn ? ' clickable' : '');
-      d.textContent = opt;
-      if (isMyTurn) d.addEventListener('click', () => selectMcOption(idx, q, lq));
-      mcEl.appendChild(d);
-    });
+    const isMulti = Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
+
+    if (isMyTurn && isMulti) {
+      // Multi-Correct: Checkboxen + Bestätigen-Button
+      let pendingMultiSel = new Set();
+      q.options.forEach((opt, idx) => {
+        const d = document.createElement('div');
+        d.className = 'sq-mc-opt clickable';
+        d.textContent = opt;
+        d.addEventListener('click', () => {
+          if (pendingMultiSel.has(idx)) { pendingMultiSel.delete(idx); d.classList.remove('mc-selected-pending'); }
+          else { pendingMultiSel.add(idx); d.classList.add('mc-selected-pending'); }
+        });
+        mcEl.appendChild(d);
+      });
+      const confirmDiv = document.createElement('div');
+      confirmDiv.style.cssText = 'grid-column:1/-1;margin-top:0.5rem;';
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'vq-btn';
+      confirmBtn.textContent = '✓ Auswahl bestätigen';
+      confirmBtn.style.cssText = 'width:100%;font-size:clamp(1rem,2vw,1.3rem);';
+      confirmBtn.addEventListener('click', () => selectMcOption([...pendingMultiSel], q, lq));
+      confirmDiv.appendChild(confirmBtn);
+      mcEl.appendChild(confirmDiv);
+    } else {
+      // Single-Correct oder Zuschauer: bisheriges Verhalten
+      q.options.forEach((opt, idx) => {
+        const d = document.createElement('div');
+        d.className = 'sq-mc-opt' + (isMyTurn ? ' clickable' : '');
+        d.textContent = opt;
+        if (isMyTurn) d.addEventListener('click', () => selectMcOption(idx, q, lq));
+        mcEl.appendChild(d);
+      });
+    }
   } else { mcEl.style.display = 'none'; }
 
   ['btn-sq-weiss-nicht','btn-sq-ich-weiss-es','steal-picked-banner','turn-indicator','turn-other'].forEach(id => {
@@ -712,10 +757,14 @@ function updateActionButtons(gs, q, lq) {
 function showSQAnswer(q, lq) {
   clearInterval(sqTimerInt);
   if (q.type === 'mc') {
+    const cs = correctSet(q);
+    const selectedArr = Array.isArray(lq.selectedMcIndices) && lq.selectedMcIndices.length > 0
+      ? lq.selectedMcIndices
+      : (lq.selectedMcIndex != null ? [lq.selectedMcIndex] : []);
     document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
       el.classList.remove('mc-selected-pending', 'clickable'); el.style.cursor = 'default';
-      if (i === q.correctIndex) el.classList.add('correct');
-      else if (i === lq.selectedMcIndex && i !== q.correctIndex) el.classList.add('wrong');
+      if (cs.has(i)) el.classList.add('correct');
+      else if (selectedArr.includes(i)) el.classList.add('wrong');
     });
   }
   if (lq.answer) { const el = document.getElementById('sq-answer'); el.textContent = '✓ Antwort: ' + lq.answer; el.style.display = 'block'; }
@@ -757,23 +806,26 @@ function showEndScreen(gs) {
 }
 
 // ── Team-Aktionen ────────────────────────────────────────────────
-async function selectMcOption(idx, q, lq) {
+async function selectMcOption(idxOrArr, q, lq) {
   if (!myTeamId || myTeamId === 'spectator') return;
+  const selectedArr = Array.isArray(idxOrArr) ? idxOrArr : [idxOrArr];
   try {
     const gs = await StorageManager.loadGameState();
     if (!gs?.liveQuestion || gs.liveQuestion.id !== lq.id) return;
     if (gs.liveQuestion.resolved || gs.liveQuestion.autoResolved) return;
     const activeId = gs.liveQuestion.teamId ?? GameModel.getCurrentTeam(gs)?.id;
     if (activeId !== myTeamId) return;
-    const isCorrect = (idx === q.correctIndex);
-    gs.liveQuestion.selectedMcIndex = idx;
-    gs.liveQuestion.autoResolved    = true;
-    gs.liveQuestion.autoCorrect     = isCorrect;
+    const isCorrect = isMcCorrect(q, selectedArr);
+    gs.liveQuestion.selectedMcIndex   = selectedArr[0] ?? null;
+    gs.liveQuestion.selectedMcIndices = selectedArr;
+    gs.liveQuestion.autoResolved      = true;
+    gs.liveQuestion.autoCorrect       = isCorrect;
     await StorageManager.saveGameState(gs);
+    const cs = correctSet(q);
     document.querySelectorAll('.sq-mc-opt').forEach((el, i) => {
       el.classList.remove('mc-selected-pending', 'clickable'); el.style.cursor = 'default';
-      if (i === q.correctIndex) el.classList.add('correct');
-      else if (i === idx && !isCorrect) el.classList.add('wrong');
+      if (cs.has(i)) el.classList.add('correct');
+      else if (selectedArr.includes(i)) el.classList.add('wrong');
     });
     document.getElementById('turn-indicator').style.display = 'none';
     document.getElementById('turn-other').style.display     = 'none';

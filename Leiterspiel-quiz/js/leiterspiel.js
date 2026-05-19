@@ -1415,17 +1415,55 @@ function askQuestion(questionOverride) {
   const openSection = document.getElementById('q-open-section');
 
   if (question.typ === 'multiple_choice') {
-    // MC answers
+    // MC answers – single or multi-correct
     openSection.style.display = 'none';
     optionsDiv.style.display = '';
     optionsDiv.innerHTML = '';
-    question.antworten.forEach((ans, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'answer-btn';
-      btn.textContent = ans;
-      btn.onclick = () => selectAnswer(btn, idx, question);
-      optionsDiv.appendChild(btn);
-    });
+    const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
+
+    if (!isMulti) {
+      question.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.onclick = () => selectAnswer(btn, idx, question);
+        optionsDiv.appendChild(btn);
+      });
+    } else {
+      // Multi-correct: toggle + confirm
+      const pending = new Set();
+      const allBtns = [];
+      question.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.addEventListener('click', () => {
+          if (questionResolved) return;
+          if (pending.has(idx)) { pending.delete(idx); btn.classList.remove('mc-selected-pending'); }
+          else { pending.add(idx); btn.classList.add('mc-selected-pending'); }
+        });
+        allBtns.push(btn);
+        optionsDiv.appendChild(btn);
+      });
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'answer-btn mc-confirm-btn';
+      confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.addEventListener('click', () => {
+        if (questionResolved) return;
+        clearInterval(timerInterval);
+        const sel = [...pending];
+        const ok = isMcCorrect(question, sel);
+        const cs = correctSet(question);
+        allBtns.forEach(b => b.classList.add('disabled'));
+        confirmBtn.classList.add('disabled');
+        allBtns.forEach((b, i) => {
+          if (cs.has(i)) b.classList.add('correct');
+          else if (pending.has(i)) b.classList.add('wrong');
+        });
+        resolveQuestion(ok);
+      });
+      optionsDiv.appendChild(confirmBtn);
+    }
   } else {
     // Open question
     optionsDiv.style.display = 'none';
@@ -1473,11 +1511,12 @@ function selectAnswer(btn, idx, question) {
   clearInterval(timerInterval);
 
   const correct = idx === question.richtig;
+  const cs = correctSet(question);
   const buttons = document.querySelectorAll('#q-options .answer-btn');
 
   buttons.forEach((b, i) => {
     b.classList.add('disabled');
-    if (i === question.richtig) b.classList.add('correct');
+    if (cs.has(i)) b.classList.add('correct');
     if (i === idx && !correct) b.classList.add('wrong');
   });
 

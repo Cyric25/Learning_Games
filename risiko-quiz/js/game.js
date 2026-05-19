@@ -1496,20 +1496,37 @@ function handleTeamAction(gs) {
 
   // Team hat MC-Antwort auto-ausgewertet (view.html)
   if (lq.autoResolved && !stealPhase && !modalResolved) {
-    selectedMcIndex = lq.selectedMcIndex;
-    if (gameData.liveQuestion) gameData.liveQuestion.selectedMcIndex = lq.selectedMcIndex;
+    // Multi-Correct: selectedMcIndices bevorzugen
+    const incomingArr = Array.isArray(lq.selectedMcIndices) && lq.selectedMcIndices.length > 0
+      ? lq.selectedMcIndices : (lq.selectedMcIndex != null ? [lq.selectedMcIndex] : []);
+    selectedMcArr   = incomingArr;
+    selectedMcIndex = incomingArr[0] ?? null;
+    if (gameData.liveQuestion) {
+      gameData.liveQuestion.selectedMcIndex   = selectedMcIndex;
+      gameData.liveQuestion.selectedMcIndices = incomingArr;
+    }
     stopTeamActionPoll();
     resolveQuestion(lq.autoCorrect);
     return;
   }
 
   // MC-Auswahl vom Team synchronisieren (gelb markieren)
-  if (lq.selectedMcIndex !== null && lq.selectedMcIndex !== selectedMcIndex && !stealPhase) {
-    selectedMcIndex = lq.selectedMcIndex;
-    if (gameData.liveQuestion) gameData.liveQuestion.selectedMcIndex = lq.selectedMcIndex;
-    document.querySelectorAll('.mc-option').forEach((btn, i) => {
+  const incomingMcArr = Array.isArray(lq.selectedMcIndices) && lq.selectedMcIndices.length > 0
+    ? lq.selectedMcIndices : (lq.selectedMcIndex != null ? [lq.selectedMcIndex] : null);
+  const incomingChanged = incomingMcArr && (
+    incomingMcArr.length !== selectedMcArr.length ||
+    incomingMcArr.some((v, i) => v !== selectedMcArr[i])
+  );
+  if (incomingChanged && !stealPhase) {
+    selectedMcArr   = incomingMcArr;
+    selectedMcIndex = incomingMcArr[0] ?? null;
+    if (gameData.liveQuestion) {
+      gameData.liveQuestion.selectedMcIndex   = selectedMcIndex;
+      gameData.liveQuestion.selectedMcIndices = incomingMcArr;
+    }
+    document.querySelectorAll('.mc-option:not(.mc-confirm-btn)').forEach((btn, i) => {
       btn.classList.remove('mc-selected-pending', 'correct', 'wrong');
-      if (i === lq.selectedMcIndex) btn.classList.add('mc-selected-pending');
+      if (incomingMcArr.includes(i)) btn.classList.add('mc-selected-pending');
     });
   }
 

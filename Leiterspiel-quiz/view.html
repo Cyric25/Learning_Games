@@ -345,6 +345,18 @@
 </div>
 
 <script>
+// ── Multi-Correct Helpers ─────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 // ── Constants ────────────────────────────────────────────
 const LADDERS = { 4:14, 9:31, 21:42, 28:84, 51:67 };
 const SNAKES  = { 16:6, 47:26, 62:19, 93:73, 98:87 };
@@ -439,13 +451,18 @@ function convertRQ(rqData) {
     if (node.questions && node.questions.length) {
       node.questions.forEach(q => {
         const sw = q.difficulty<=200?'leicht': q.difficulty<=300?'mittel':'schwer';
-        fragen.push({
+        const isMc = q.type==='mc' && q.options && q.options.length;
+        const frageObj = {
           id: q.id, kategorie: node.id, schwierigkeit: sw,
           frage: q.question||'', erklaerung: q.answer||q.hint||'',
-          typ: (q.type==='mc'&&q.options&&q.options.length)?'multiple_choice':'offen',
-          antworten: q.type==='mc'&&q.options ? q.options.slice() : [],
-          richtig: q.type==='mc' && typeof q.correctIndex==='number' ? q.correctIndex : -1
-        });
+          typ: isMc ? 'multiple_choice' : 'offen',
+          antworten: isMc ? q.options.slice() : [],
+          richtig: isMc && typeof q.correctIndex==='number' ? q.correctIndex : -1
+        };
+        if (isMc && Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
+          frageObj.correctIndices = q.correctIndices.slice();
+        }
+        fragen.push(frageObj);
       });
     }
     (node.subcategories||[]).forEach(s => collect(s));
@@ -884,13 +901,46 @@ function openQuestion(lq, gs) {
   if (q.typ === 'multiple_choice' && q.antworten && q.antworten.length) {
     waitDiv.style.display = 'none';
     optDiv.style.display = '';
-    q.antworten.forEach((ans, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'q-opt-btn' + (isMyTurn ? '' : ' disabled');
-      btn.textContent = ans;
-      if (isMyTurn) btn.addEventListener('click', () => doSelectMcAnswer(idx, q, lq, gs));
-      optDiv.appendChild(btn);
-    });
+    const isMulti = Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
+
+    if (!isMulti) {
+      // Single correct – original behaviour
+      q.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'q-opt-btn' + (isMyTurn ? '' : ' disabled');
+        btn.textContent = ans;
+        if (isMyTurn) btn.addEventListener('click', () => doSelectMcAnswer(idx, q, lq, gs));
+        optDiv.appendChild(btn);
+      });
+    } else {
+      // Multi-correct – toggle + confirm
+      const pending = new Set();
+      const allBtns = [];
+      q.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'q-opt-btn' + (isMyTurn ? '' : ' disabled');
+        btn.textContent = ans;
+        if (isMyTurn) {
+          btn.addEventListener('click', () => {
+            if (qResolved) return;
+            if (pending.has(idx)) { pending.delete(idx); btn.classList.remove('mc-selected-pending'); }
+            else { pending.add(idx); btn.classList.add('mc-selected-pending'); }
+          });
+        }
+        allBtns.push(btn);
+        optDiv.appendChild(btn);
+      });
+      if (isMyTurn) {
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'q-opt-btn mc-confirm-btn';
+        confirmBtn.textContent = '✓ Bestätigen';
+        confirmBtn.addEventListener('click', () => {
+          if (qResolved) return;
+          doSelectMcMultiAnswer([...pending], q, lq, gs);
+        });
+        optDiv.appendChild(confirmBtn);
+      }
+    }
   } else {
     optDiv.style.display = 'none';
     waitDiv.style.display = '';
@@ -932,10 +982,18 @@ function showQResult(lq, gs) {
   const q = lq.question;
   if (q.typ === 'multiple_choice') {
     const btns = document.querySelectorAll('#q-options .q-opt-btn');
+    const cs = correctSet(q);
+    // Determine which indices were selected (single or multi)
+    const selectedSet = new Set();
+    if (lq.selectedMcIndices && lq.selectedMcIndices.length) {
+      lq.selectedMcIndices.forEach(i => selectedSet.add(i));
+    } else if (lq.selectedMcIndex !== null && lq.selectedMcIndex !== undefined) {
+      selectedSet.add(lq.selectedMcIndex);
+    }
     btns.forEach((b, i) => {
       b.classList.add('disabled');
-      if (i === q.richtig) b.classList.add('correct');
-      if (lq.selectedMcIndex !== null && i === lq.selectedMcIndex && !correct) b.classList.add('wrong');
+      if (cs.has(i)) b.classList.add('correct');
+      if (selectedSet.has(i) && !cs.has(i)) b.classList.add('wrong');
     });
   }
 
@@ -1042,10 +1100,11 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
   resEl.textContent = correct ? '✓ Richtig!' : '✗ Falsch!';
   resEl.className = 'q-result ' + (correct ? 'correct' : 'wrong');
   resEl.style.display = '';
+  const cs = correctSet(q);
   const btns = document.querySelectorAll('#q-options .q-opt-btn');
   btns.forEach((b, i) => {
-    if (i === q.richtig) b.classList.add('correct');
-    if (i === idx && !correct) b.classList.add('wrong');
+    if (cs.has(i)) b.classList.add('correct');
+    if (i === idx && !cs.has(i)) b.classList.add('wrong');
   });
   if (q.erklaerung) {
     document.getElementById('q-expl-text').textContent = q.erklaerung;
@@ -1075,6 +1134,89 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
   }
 
   // Advance turn (skip bonus handling – teacher handles locally)
+  freshGs.currentTurnIdx = (freshGs.currentTurnIdx+1) % freshGs.turnOrder.length;
+  freshGs.pendingDice = null;
+  freshGs.liveQuestion = null;
+
+  await LsStorage.save(freshGs);
+  lastGs = freshGs;
+
+  setTimeout(() => {
+    closeQuestion();
+    renderAll(freshGs);
+  }, 1500);
+}
+
+// ── Multi-Correct MC Answer (Student) ─────────────────────
+async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
+  // Disable all buttons immediately
+  document.querySelectorAll('#q-options .q-opt-btn').forEach(b => b.classList.add('disabled'));
+  clearQTimer();
+
+  // Load fresh state to avoid race condition
+  const freshGs = await LsStorage.load(gameCode);
+  if (!freshGs || !freshGs.liveQuestion || freshGs.liveQuestion.id !== lq.id) return;
+  if (freshGs.liveQuestion.resolved) return;
+  if (freshGs.turnOrder[freshGs.currentTurnIdx] !== myTeamIdx) return;
+
+  const correct = isMcCorrect(q, selectedArr);
+  const team = freshGs.teams[myTeamIdx];
+  const field = freshGs.board[team.position];
+
+  if (correct) {
+    team.score += (POINTS[q.schwierigkeit] || POINTS[field.difficulty] || 10);
+    team.correctCount++;
+  } else {
+    team.wrongCount++;
+  }
+
+  freshGs.liveQuestion.selectedMcIndices = selectedArr;
+  freshGs.liveQuestion.selectedMcIndex = null; // multi mode
+  freshGs.liveQuestion.autoCorrect = correct;
+  freshGs.liveQuestion.resolved = true;
+  freshGs.lastAnswerCorrect = correct;
+
+  // Show result in overlay immediately
+  qResolved = true;
+  const resEl = document.getElementById('q-result');
+  resEl.textContent = correct ? '✓ Richtig!' : '✗ Falsch!';
+  resEl.className = 'q-result ' + (correct ? 'correct' : 'wrong');
+  resEl.style.display = '';
+  const cs = correctSet(q);
+  const selSet = new Set(selectedArr);
+  const btns = document.querySelectorAll('#q-options .q-opt-btn');
+  btns.forEach((b, i) => {
+    if (cs.has(i)) b.classList.add('correct');
+    else if (selSet.has(i)) b.classList.add('wrong');
+  });
+  if (q.erklaerung) {
+    document.getElementById('q-expl-text').textContent = q.erklaerung;
+    document.getElementById('q-expl').style.display = '';
+  }
+
+  // Handle movement
+  if (correct) {
+    const newPos = team.position + lq.diceResult;
+    if (newPos <= 100) {
+      team.position = newPos;
+      const f = freshGs.board[newPos];
+      if (f && f.ladderTo) team.position = f.ladderTo;
+      else if (f && f.snakeTo) team.position = f.snakeTo;
+    }
+  }
+
+  // Check for win
+  if (team.position === 100) {
+    freshGs.phase = 'finished';
+    freshGs.liveQuestion = null;
+    freshGs.pendingDice = null;
+    await LsStorage.save(freshGs);
+    lastGs = freshGs;
+    setTimeout(() => { closeQuestion(); renderAll(freshGs); }, 1500);
+    return;
+  }
+
+  // Advance turn
   freshGs.currentTurnIdx = (freshGs.currentTurnIdx+1) % freshGs.turnOrder.length;
   freshGs.pendingDice = null;
   freshGs.liveQuestion = null;
