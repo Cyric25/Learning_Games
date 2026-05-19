@@ -734,7 +734,7 @@
   async function loadMemoryPairs() {
     try { var r = await fetch('../api.php?f=memory-pairs');
           if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
-    try { var r = await fetch('../memory/data/pairs.json');
+    try { var r = await fetch('../data/memory/pairs.json');
           if (r.ok) { var d = await r.json(); if (d && d.categories) return d; } } catch (e) {}
     var c = localStorage.getItem('memory_pairs');
     return c ? JSON.parse(c) : { categories: [] };

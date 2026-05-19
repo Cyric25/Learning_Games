@@ -13,7 +13,7 @@ async function loadData() {
         if (r.ok) { fragenBank = await r.json(); renderAll(); return; }
       } catch (e) { /* fallback */ }
     }
-    const r = await fetch('data/fragen.json');
+    const r = await fetch('../data/quizpfad-fragen.json');
     if (r.ok) { fragenBank = await r.json(); renderAll(); return; }
   } catch (e) { /* ignore */ }
 

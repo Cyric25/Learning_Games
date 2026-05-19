@@ -16,7 +16,7 @@ if ($key === 'sse') {
         echo json_encode(['error' => 'invalid code']);
         exit;
     }
-    $path = __DIR__ . '/risiko-quiz/data/games/' . $code . '.json';
+    $path = __DIR__ . '/data/games/risiko-quiz/' . $code . '.json';
 
     // SSE-Header
     header('Content-Type: text/event-stream; charset=utf-8');
@@ -64,13 +64,13 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
 
-$gamesDir = __DIR__ . '/risiko-quiz/data/games';
+$gamesDir = __DIR__ . '/data/games/risiko-quiz';
 
 // Statische Dateien (Legacy + Questions)
 $files = [
     'questions'    => __DIR__ . '/data/questions.json',
-    'gamestate'    => __DIR__ . '/risiko-quiz/data/gamestate.json',
-    'memory-pairs'     => __DIR__ . '/memory/data/pairs.json',
+    'gamestate'    => __DIR__ . '/data/risiko-gamestate.json',
+    'memory-pairs'     => __DIR__ . '/data/memory/pairs.json',
     'settings'     => __DIR__ . '/data/settings.json',
 ];
 
@@ -233,7 +233,7 @@ if ($key === 'ls-sse') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $lsPath = __DIR__ . '/Leiterspiel-quiz/data/games/' . $code . '.json';
+    $lsPath = __DIR__ . '/data/games/leiterspiel/' . $code . '.json';
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache'); header('Connection: keep-alive');
     header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
@@ -258,7 +258,7 @@ if ($key === 'ls-sse') {
 
 // ── Leiterspiel Games Registry: ?f=ls-games ──────────────────────
 if ($key === 'ls-games') {
-    $lsDir = __DIR__ . '/Leiterspiel-quiz/data/games';
+    $lsDir = __DIR__ . '/data/games/leiterspiel';
     if (!is_dir($lsDir)) mkdir($lsDir, 0755, true);
     $registryPath = $lsDir . '/index.json';
 
@@ -283,7 +283,7 @@ if ($key === 'ls-game') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $lsDir = __DIR__ . '/Leiterspiel-quiz/data/games';
+    $lsDir = __DIR__ . '/data/games/leiterspiel';
     if (!is_dir($lsDir)) mkdir($lsDir, 0755, true);
     $lsPath = $lsDir . '/' . $code . '.json';
 
@@ -340,7 +340,7 @@ if ($key === 'ls-game') {
 
 // ── Escape Room Library: ?f=er-library ───────────────────────────
 if ($key === 'er-library') {
-    $erDir = __DIR__ . '/escape-room/spiele';
+    $erDir = __DIR__ . '/data/escape-room';
     if (!is_dir($erDir)) mkdir($erDir, 0755, true);
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -363,7 +363,7 @@ if ($key === 'er-game') {
         echo json_encode(['error' => 'invalid id']);
         exit;
     }
-    $erDir = __DIR__ . '/escape-room/spiele';
+    $erDir = __DIR__ . '/data/escape-room';
     if (!is_dir($erDir)) mkdir($erDir, 0755, true);
     $path = $erDir . '/' . $id . '.json';
 
@@ -392,7 +392,7 @@ if ($key === 'labyrinth-sse') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $lPath = __DIR__ . '/Labyrint-Quiz/data/games/' . $code . '.json';
+    $lPath = __DIR__ . '/data/games/labyrinth/' . $code . '.json';
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache'); header('Connection: keep-alive');
     header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
@@ -417,7 +417,7 @@ if ($key === 'labyrinth-sse') {
 
 // ── Labyrinth Games Registry: ?f=labyrinth-games ─────────────────
 if ($key === 'labyrinth-games') {
-    $lDir = __DIR__ . '/Labyrint-Quiz/data/games';
+    $lDir = __DIR__ . '/data/games/labyrinth';
     if (!is_dir($lDir)) mkdir($lDir, 0755, true);
     $registryPath = $lDir . '/index.json';
 
@@ -442,7 +442,7 @@ if ($key === 'labyrinth-game') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $lDir  = __DIR__ . '/Labyrint-Quiz/data/games';
+    $lDir  = __DIR__ . '/data/games/labyrinth';
     if (!is_dir($lDir)) mkdir($lDir, 0755, true);
     $lPath = $lDir . '/' . $code . '.json';
 
