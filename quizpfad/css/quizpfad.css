@@ -844,6 +844,25 @@ body {
   opacity: 0.5;
 }
 
+/* Multi-correct: selected-pending state */
+.answer-btn.mc-selected-pending {
+  border-color: var(--accent);
+  background: var(--bg-option-hover);
+  font-weight: 700;
+}
+
+/* Multi-correct: confirm button */
+.answer-btn.mc-confirm-btn {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  text-align: center;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.answer-btn.mc-confirm-btn:hover { opacity: 0.88; }
+.answer-btn.mc-confirm-btn.disabled { opacity: 0.5; }
+
 /* Open question: teacher decides */
 .open-actions {
   display: flex;
