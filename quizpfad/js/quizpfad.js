@@ -1,5 +1,17 @@
 /* quizpfad.js – Spiellogik */
 
+// ── Multi-Correct Helpers ────────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 // ── Constants ────────────────────────────────────────────────
 const FIELD_COUNT = 30;
 const COLS = 6;
@@ -99,17 +111,21 @@ function convertRQtoQuizPfad(rqData) {
         const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
         let typ, antworten, richtig;
 
+        let correctIndices = null;
         if (q.type === 'mc' && q.options && q.options.length > 0) {
           typ = 'multiple_choice';
           antworten = q.options.slice();
           richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
+          if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
+            correctIndices = q.correctIndices.slice();
+          }
         } else {
           typ = 'offen';
           antworten = [];
           richtig = -1;
         }
 
-        fragen.push({
+        const frageObj = {
           id: q.id,
           kategorie: katId,
           schwierigkeit: schwierigkeit,
@@ -118,7 +134,9 @@ function convertRQtoQuizPfad(rqData) {
           antworten: antworten,
           richtig: richtig,
           erklaerung: q.answer || q.hint || ''
-        });
+        };
+        if (correctIndices) frageObj.correctIndices = correctIndices;
+        fragen.push(frageObj);
       });
     }
 
@@ -660,15 +678,59 @@ function showQuestionModal(question, field) {
     // Teacher decides
     openDiv.style.display = 'flex';
   } else {
-    // MC or Wahr/Falsch
+    // MC: Single or Multi-Correct
     optionsDiv.style.display = 'flex';
-    question.antworten.forEach((ans, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'answer-btn';
-      btn.textContent = ans;
-      btn.onclick = () => selectAnswer(btn, i, question);
-      optionsDiv.appendChild(btn);
-    });
+    const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
+
+    if (!isMulti) {
+      // Single correct – original behaviour
+      question.antworten.forEach((ans, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.onclick = () => selectAnswer(btn, i, question);
+        optionsDiv.appendChild(btn);
+      });
+    } else {
+      // Multi correct – toggle + confirm
+      const pending = new Set();
+      const allBtns = [];
+      question.antworten.forEach((ans, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.addEventListener('click', () => {
+          if (pendingQuestionResult && pendingQuestionResult.resolved) return;
+          if (pending.has(i)) { pending.delete(i); btn.classList.remove('mc-selected-pending'); }
+          else { pending.add(i); btn.classList.add('mc-selected-pending'); }
+        });
+        allBtns.push(btn);
+        optionsDiv.appendChild(btn);
+      });
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'answer-btn mc-confirm-btn';
+      confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.addEventListener('click', () => {
+        if (pendingQuestionResult && pendingQuestionResult.resolved) return;
+        const sel = [...pending];
+        const ok = isMcCorrect(question, sel);
+        const cs = correctSet(question);
+
+        // Disable all buttons
+        allBtns.forEach(b => b.classList.add('disabled'));
+        confirmBtn.classList.add('disabled');
+
+        // Mark correct/wrong
+        allBtns.forEach((b, i) => {
+          if (cs.has(i)) b.classList.add('correct');
+          else if (pending.has(i)) b.classList.add('wrong');
+        });
+
+        resolveQuestion(ok);
+      });
+      optionsDiv.appendChild(confirmBtn);
+    }
   }
 
   // Store question for bonus check
@@ -682,15 +744,14 @@ function selectAnswer(btn, selectedIdx, question) {
 
   const correct = selectedIdx === question.richtig;
   const allBtns = document.querySelectorAll('#q-options .answer-btn');
+  const cs = correctSet(question);
 
   // Disable all
   allBtns.forEach(b => b.classList.add('disabled'));
 
   // Mark correct/wrong
   btn.classList.add(correct ? 'correct' : 'wrong');
-  if (!correct) {
-    allBtns[question.richtig].classList.add('correct');
-  }
+  allBtns.forEach((b, i) => { if (cs.has(i)) b.classList.add('correct'); });
 
   resolveQuestion(correct);
 }
@@ -909,21 +970,58 @@ function showDuelQuestion(question, team1Idx, team2Idx, phase) {
     openDiv.style.display = 'flex';
   } else {
     optionsDiv.style.display = 'flex';
-    question.antworten.forEach((ans, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'answer-btn';
-      btn.textContent = ans;
-      btn.onclick = () => {
+    const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
+
+    if (!isMulti) {
+      question.antworten.forEach((ans, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.onclick = () => {
+          if (pendingQuestionResult && pendingQuestionResult.resolved) return;
+          const correct = i === question.richtig;
+          const allBtns = document.querySelectorAll('#q-options .answer-btn');
+          const cs = correctSet(question);
+          allBtns.forEach(b => b.classList.add('disabled'));
+          btn.classList.add(correct ? 'correct' : 'wrong');
+          allBtns.forEach((b, j) => { if (cs.has(j)) b.classList.add('correct'); });
+          resolveDuelAnswer(correct);
+        };
+        optionsDiv.appendChild(btn);
+      });
+    } else {
+      // Multi correct duel
+      const pending = new Set();
+      const allBtns = [];
+      question.antworten.forEach((ans, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = ans;
+        btn.addEventListener('click', () => {
+          if (pendingQuestionResult && pendingQuestionResult.resolved) return;
+          if (pending.has(i)) { pending.delete(i); btn.classList.remove('mc-selected-pending'); }
+          else { pending.add(i); btn.classList.add('mc-selected-pending'); }
+        });
+        allBtns.push(btn);
+        optionsDiv.appendChild(btn);
+      });
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'answer-btn mc-confirm-btn';
+      confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.addEventListener('click', () => {
         if (pendingQuestionResult && pendingQuestionResult.resolved) return;
-        const correct = i === question.richtig;
-        const allBtns = document.querySelectorAll('#q-options .answer-btn');
+        const ok = isMcCorrect(question, [...pending]);
+        const cs = correctSet(question);
         allBtns.forEach(b => b.classList.add('disabled'));
-        btn.classList.add(correct ? 'correct' : 'wrong');
-        if (!correct) allBtns[question.richtig].classList.add('correct');
-        resolveDuelAnswer(correct);
-      };
-      optionsDiv.appendChild(btn);
-    });
+        confirmBtn.classList.add('disabled');
+        allBtns.forEach((b, i) => {
+          if (cs.has(i)) b.classList.add('correct');
+          else if (pending.has(i)) b.classList.add('wrong');
+        });
+        resolveDuelAnswer(ok);
+      });
+      optionsDiv.appendChild(confirmBtn);
+    }
   }
 
   modal.classList.add('open');

@@ -120,6 +120,18 @@ function convertRQtoLabyrinth(rqData) {
   return fragen;
 }
 
+// ── Multi-Correct Hilfsfunktionen ─────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 // ── copyCode ──────────────────────────────────────────────────────
 function copyCode(el) {
   if (!el) return;

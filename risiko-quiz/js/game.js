@@ -838,14 +838,47 @@ function openQuestion(slot, questionId) {
   const mcContainer = document.getElementById('modal-mc-options');
   mcContainer.innerHTML = '';
   if (q.type === 'mc' && q.options.length > 0) {
-    q.options.forEach((opt, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'mc-option';
-      btn.textContent = opt;
-      btn.dataset.idx = i;
-      btn.addEventListener('click', () => selectMcOption(i, q));
-      mcContainer.appendChild(btn);
-    });
+    const isMulti = Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
+    if (isMulti) {
+      // Multi-Correct: Checkbox-Buttons + Bestätigen-Button
+      let pendingMultiSel = new Set();
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'mc-option';
+        btn.dataset.idx = i;
+        btn.textContent = opt;
+        btn.addEventListener('click', () => {
+          if (modalResolved) return;
+          if (pendingMultiSel.has(i)) { pendingMultiSel.delete(i); btn.classList.remove('mc-selected-pending'); }
+          else { pendingMultiSel.add(i); btn.classList.add('mc-selected-pending'); }
+          // Sync zu liveQuestion (Zwischenstand)
+          if (gameData.liveQuestion) {
+            gameData.liveQuestion.selectedMcIndex = [...pendingMultiSel][0] ?? null;
+            autosave();
+          }
+        });
+        mcContainer.appendChild(btn);
+      });
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'mc-option mc-confirm-btn';
+      confirmBtn.textContent = '✓ Auswahl bestätigen';
+      confirmBtn.style.cssText = 'grid-column:1/-1;background:var(--accent);color:#fff;font-weight:700;';
+      confirmBtn.addEventListener('click', () => {
+        if (modalResolved) return;
+        selectMcAnswer([...pendingMultiSel]);
+      });
+      mcContainer.appendChild(confirmBtn);
+    } else {
+      // Single: bisheriges Verhalten
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'mc-option';
+        btn.textContent = opt;
+        btn.dataset.idx = i;
+        btn.addEventListener('click', () => selectMcAnswer(i));
+        mcContainer.appendChild(btn);
+      });
+    }
   }
 
   // Spielleiter-Infobox: Antwort sofort anzeigen (nur in teacher view)
@@ -876,7 +909,8 @@ function openQuestion(slot, questionId) {
     openedAt: Date.now(),
     resolved: false,
     answer: null,
-    selectedMcIndex: null,        // MC-Auswahl durch Team (→ gelb auf allen Screens)
+    selectedMcIndex: null,        // MC-Auswahl (Single): gelb auf allen Screens
+    selectedMcIndices: null,      // MC-Auswahl (Multi): Array mit gewählten Indizes
     stealPhase: false,            // Klau-Modus aktiv?
     stealCandidates: [],          // Teams die "Ich weiß es!" gedrückt haben
     stealPickedTeam: null,        // Vom Spielleiter ausgewähltes Team
@@ -904,22 +938,31 @@ function openQuestion(slot, questionId) {
   document.getElementById('question-modal').classList.add('open');
 }
 
-function selectMcOption(idx) {
+function selectMcAnswer(idxOrArr) {
   if (modalResolved) return;
-  selectedMcIndex = idx;
+  const selectedArr = Array.isArray(idxOrArr) ? idxOrArr : [idxOrArr];
+  const q = GameModel.findQuestion(gameData, currentQuestionId);
+  const isMulti = q && Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
 
-  // Gewählte Option gelb markieren – korrekte/falsche erst nach "Lösung anzeigen"
-  document.querySelectorAll('.mc-option').forEach((btn, i) => {
+  selectedMcArr   = selectedArr;
+  selectedMcIndex = selectedArr[0] ?? null;
+
+  // Gewählte Optionen gelb markieren – korrekte/falsche erst nach Auflösung
+  document.querySelectorAll('.mc-option:not(.mc-confirm-btn)').forEach((btn, i) => {
     btn.classList.remove('correct', 'wrong', 'mc-selected-pending');
-    if (i === idx) btn.classList.add('mc-selected-pending');
+    if (selectedArr.includes(i)) btn.classList.add('mc-selected-pending');
   });
 
-  // Für view.html: gewählte Option syncen (erscheint gelb auf allen Screens)
+  // Für view.html: gewählte Option(en) syncen (erscheint gelb auf allen Screens)
   if (gameData.liveQuestion) {
-    gameData.liveQuestion.selectedMcIndex = idx;
+    gameData.liveQuestion.selectedMcIndex = selectedArr[0] ?? null;
+    if (isMulti) gameData.liveQuestion.selectedMcIndices = selectedArr;
     autosave();
   }
 }
+
+// Alias für Rückwärtskompatibilität
+function selectMcOption(idx) { selectMcAnswer(idx); }
 
 function startTimer() {
   clearInterval(timerInterval);
@@ -952,11 +995,12 @@ function timerExpired() {
   const q = GameModel.findQuestion(gameData, currentQuestionId);
   if (q) {
     if (q.type === 'mc') {
-      // MC: korrekte Option hervorheben
-      document.querySelectorAll('.mc-option').forEach((btn, i) => {
+      // MC: korrekte Option(en) hervorheben
+      const cs = correctSet(q);
+      document.querySelectorAll('.mc-option:not(.mc-confirm-btn)').forEach((btn, i) => {
         btn.classList.remove('mc-selected-pending', 'correct', 'wrong');
-        if (i === q.correctIndex) btn.classList.add('correct');
-        else if (i === selectedMcIndex && i !== q.correctIndex) btn.classList.add('wrong');
+        if (cs.has(i)) btn.classList.add('correct');
+        else if (selectedMcArr.includes(i)) btn.classList.add('wrong');
       });
       const revealEl = document.getElementById('modal-answer-reveal');
       revealEl.textContent = '⏱ Zeit! Antwort: ' + q.answer;
@@ -976,12 +1020,13 @@ function showAnswerForOpen() {
   if (!q) return;
   stopTeamActionPoll();
 
-  // Bei MC: korrekte Option grün, ggf. gewählte falsche Option rot markieren
+  // Bei MC: korrekte Option(en) grün, ggf. gewählte falsche Optionen rot markieren
   if (q.type === 'mc') {
-    document.querySelectorAll('.mc-option').forEach((btn, i) => {
+    const cs = correctSet(q);
+    document.querySelectorAll('.mc-option:not(.mc-confirm-btn)').forEach((btn, i) => {
       btn.classList.remove('mc-selected-pending', 'correct', 'wrong');
-      if (i === q.correctIndex) btn.classList.add('correct');
-      else if (i === selectedMcIndex && i !== q.correctIndex) btn.classList.add('wrong');
+      if (cs.has(i)) btn.classList.add('correct');
+      else if (selectedMcArr.includes(i)) btn.classList.add('wrong');
     });
   }
 
@@ -1077,13 +1122,13 @@ function resolveQuestion(correct) {
     GameModel.markCellPlayed(gameData, currentSlot, q.difficulty);
   }
 
-  // MC: korrekte Antwort grün, gewählte falsche Option rot
+  // MC: korrekte Antwort(en) grün, gewählte falsche Option(en) rot
   if (q && q.type === 'mc') {
-    document.querySelectorAll('.mc-option').forEach((btn, i) => {
+    const cs = correctSet(q);
+    document.querySelectorAll('.mc-option:not(.mc-confirm-btn)').forEach((btn, i) => {
       btn.classList.remove('correct', 'wrong', 'mc-selected-pending');
-      if (i === q.correctIndex) btn.classList.add('correct');
-      else if (selectedMcIndex !== null && i === selectedMcIndex && i !== q.correctIndex)
-        btn.classList.add('wrong');
+      if (cs.has(i)) btn.classList.add('correct');
+      else if (selectedMcArr.includes(i)) btn.classList.add('wrong');
     });
   }
 

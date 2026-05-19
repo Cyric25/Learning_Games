@@ -1,5 +1,17 @@
 /* leiterspiel.js – Schlangen & Leitern mit Wissensfragen */
 
+// ── Multi-Correct Helpers ────────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+
 // ── LsStorage: Server-Sync für Multi-Game ────────────────────
 const LsStorage = {
   _code: null,
@@ -296,19 +308,22 @@ function convertRQtoLeiterspiel(rqData) {
 
       node.questions.forEach(q => {
         const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
-        let typ, antworten, richtig;
+        let typ, antworten, richtig, correctIndices = null;
 
         if (q.type === 'mc' && q.options && q.options.length > 0) {
           typ = 'multiple_choice';
           antworten = q.options.slice();
           richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
+          if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
+            correctIndices = q.correctIndices.slice();
+          }
         } else {
           typ = 'offen';
           antworten = [];
           richtig = -1;
         }
 
-        fragen.push({
+        const frageObj = {
           id: q.id,
           kategorie: katId,
           schwierigkeit: schwierigkeit,
@@ -317,7 +332,9 @@ function convertRQtoLeiterspiel(rqData) {
           antworten: antworten,
           richtig: richtig,
           erklaerung: q.answer || q.hint || ''
-        });
+        };
+        if (correctIndices) frageObj.correctIndices = correctIndices;
+        fragen.push(frageObj);
       });
     }
 

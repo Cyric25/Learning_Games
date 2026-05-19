@@ -428,7 +428,24 @@ function skipTurn() {
   showWaiting(newState.teams[newState.currentTeamIdx]);
 }
 
+// ── Multi-Correct Hilfsfunktionen ─────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.correctIndex ?? 0]);
+}
+function isMultiCorrect(q) {
+  return Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
+}
+
 // ── Frage ─────────────────────────────────────────────────────────
+let _mcPending = new Set(); // aktuelle Multi-Correct Auswahl
+
 function showQuestionModal() {
   const cats = remoteState.config?.kategorien || [...activeCategories];
   const used = new Set(remoteState.usedQuestionIds || []);
@@ -457,10 +474,43 @@ function showQuestionModal() {
   const openSec = document.getElementById('q-open-section');
   if (q.type === 'multiple_choice' && q.options?.length) {
     optEl.style.display = ''; openSec.style.display = 'none'; optEl.innerHTML = '';
-    q.options.forEach((opt, i) => {
-      const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = opt;
-      btn.onclick = () => resolveChoice(i); optEl.appendChild(btn);
-    });
+
+    if (isMultiCorrect(q)) {
+      // Multi-Correct: Toggle-Buttons + Bestätigen-Button
+      _mcPending = new Set();
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn';
+        btn.textContent = opt;
+        btn.dataset.idx = i;
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          if (_mcPending.has(i)) { _mcPending.delete(i); btn.classList.remove('mc-selected'); }
+          else { _mcPending.add(i); btn.classList.add('mc-selected'); }
+          const confirmBtn = document.getElementById('q-mc-confirm');
+          if (confirmBtn) confirmBtn.disabled = _mcPending.size === 0;
+        };
+        optEl.appendChild(btn);
+      });
+      // Hinweis + Bestätigen-Button
+      const hint = document.createElement('div');
+      hint.className = 'mc-multi-hint';
+      hint.textContent = 'Mehrere Antworten möglich – alle auswählen und bestätigen.';
+      optEl.appendChild(hint);
+      const confirmBtn = document.createElement('button');
+      confirmBtn.id = 'q-mc-confirm';
+      confirmBtn.className = 'answer-btn mc-confirm-btn';
+      confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.disabled = true;
+      confirmBtn.onclick = () => resolveMultiChoice();
+      optEl.appendChild(confirmBtn);
+    } else {
+      // Single-Correct: wie bisher
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = opt;
+        btn.onclick = () => resolveChoice(i); optEl.appendChild(btn);
+      });
+    }
   } else {
     optEl.style.display = 'none'; openSec.style.display = '';
     document.getElementById('q-open-answer').textContent = q.answer || '';
@@ -476,12 +526,31 @@ function showQuestionModal() {
 function resolveChoice(idx) {
   clearTimer();
   const q = questionContext.question;
-  const correct = idx === q.correctIndex;
-  document.querySelectorAll('.answer-btn').forEach((btn, i) => {
+  const correct = idx === (q.correctIndex ?? 0);
+  const cs = correctSet(q);
+  document.querySelectorAll('#q-options .answer-btn').forEach((btn, i) => {
     btn.disabled = true;
-    if (i === q.correctIndex) btn.classList.add('correct');
+    if (cs.has(i)) btn.classList.add('correct');
     else if (i === idx && !correct) btn.classList.add('wrong');
   });
+  resolveQuestionResult(correct);
+}
+
+function resolveMultiChoice() {
+  clearTimer();
+  const q = questionContext.question;
+  const selected = [..._mcPending];
+  const correct = isMcCorrect(q, selected);
+  const cs = correctSet(q);
+  document.querySelectorAll('#q-options .answer-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (btn.id === 'q-mc-confirm') { btn.style.display = 'none'; return; }
+    btn.classList.remove('mc-selected');
+    if (cs.has(i)) btn.classList.add('correct');
+    else if (selected.includes(i)) btn.classList.add('wrong');
+  });
+  const hint = document.querySelector('#q-options .mc-multi-hint');
+  if (hint) hint.style.display = 'none';
   resolveQuestionResult(correct);
 }
 

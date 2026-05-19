@@ -116,6 +116,10 @@
     .answer-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(227,79,32,0.10); }
     .answer-btn.correct { background: rgba(22,163,74,0.2); border-color: #16a34a; }
     .answer-btn.wrong { background: rgba(220,38,38,0.2); border-color: #dc2626; }
+    .answer-btn.mc-selected { background: rgba(124,58,237,0.18); border-color: #7c3aed; font-weight: 700; }
+    .mc-multi-hint { grid-column: 1 / -1; font-size: 0.82rem; color: var(--text-secondary); font-style: italic; text-align: center; margin-top: 0.1rem; }
+    .mc-confirm-btn { grid-column: 1 / -1; background: var(--accent); color: var(--bg-primary); font-weight: 700; border-color: var(--accent); margin-top: 0.3rem; }
+    .mc-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; background: var(--bg-primary); color: var(--text-secondary); border-color: var(--border-card); }
     .open-answer-section { display: flex; flex-direction: column; gap: 0.6rem; }
     .btn-show-answer { background: var(--bg-primary); border: 1px solid var(--border-card); border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.95rem; cursor: pointer; color: var(--text-primary); font-family: inherit; }
     .open-answer-text { background: rgba(22,163,74,0.12); border: 1px solid #16a34a; border-radius: 8px; padding: 0.7rem 1rem; color: #16a34a; font-weight: 600; }
