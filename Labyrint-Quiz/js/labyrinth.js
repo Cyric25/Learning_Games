@@ -445,14 +445,26 @@ function toggleAllCategories(on) {
 function updateCategoryInfo() {
   const el = document.getElementById('cat-select-info');
   if (!el) return;
-  const n = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  const aktiv = allQuestions.filter(q => activeCategories.has(q.kategorieId));
+  const n = aktiv.length;
+  const btn = document.querySelector('#category-screen .setup-btn:not(.setup-btn-ghost)');
+
   if (activeCategories.size === 0 || n === 0) {
     el.className = 'cat-select-info warning';
-    el.textContent = 'Keine Kategorie ausgewählt!';
-  } else {
-    el.className = 'cat-select-info';
-    el.textContent = n + ' Fragen aus ' + activeCategories.size + ' Kategorien';
+    el.innerHTML = 'Keine Kategorie ausgewählt!';
+    if (btn) btn.disabled = true;
+    return;
   }
+
+  const ok = n >= 20;
+  if (ok) {
+    el.className = 'cat-select-info';
+    el.textContent = '✅ ' + n + ' Fragen aus ' + activeCategories.size + ' Kategorien';
+  } else {
+    el.className = 'cat-select-info warning';
+    el.textContent = '❌ Nur ' + n + ' Fragen – mindestens 20 benötigt. Bitte mehr Kategorien auswählen.';
+  }
+  if (btn) btn.disabled = !ok;
 }
 
 let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20 };
@@ -469,6 +481,7 @@ function proceedToCategories() {
 function proceedFromCategories() {
   if (activeCategories.size === 0) { updateCategoryInfo(); return; }
   const avail = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  if (avail < 20) { updateCategoryInfo(); return; }
   const needed = _cfg.teamCount * _cfg.symbolsPerTeam;
   if (avail < needed) {
     const el = document.getElementById('cat-select-info');

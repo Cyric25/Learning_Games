@@ -459,14 +459,39 @@ function toggleAllCategories(on) {
 function updateCatSelectInfo() {
   const el = document.getElementById('cat-select-info');
   if (!el) return;
-  const qCount = fragenBank ? fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length : 0;
+  const aktiv = fragenBank ? fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)) : [];
+  const qCount = aktiv.length;
+  const btn = document.querySelector('#category-screen .setup-btn:not(.setup-btn-ghost)');
+
   if (selectedCategoryIds.size === 0 || qCount === 0) {
     el.className = 'cat-select-info warning';
-    el.textContent = 'Keine Kategorie ausgewählt!';
-  } else {
-    el.className = 'cat-select-info';
-    el.textContent = qCount + ' Fragen aus ' + selectedCategoryIds.size + ' Kategorien';
+    el.innerHTML = 'Keine Kategorie ausgewählt!';
+    if (btn) btn.disabled = true;
+    return;
   }
+
+  const counts = { leicht: 0, mittel: 0, schwer: 0 };
+  aktiv.forEach(q => { if (counts[q.schwierigkeit] !== undefined) counts[q.schwierigkeit]++; });
+  const ok = counts.leicht >= 1 && counts.mittel >= 1 && counts.schwer >= 1;
+
+  const icon = s => counts[s] >= 1 ? '✅' : '❌';
+  if (ok) {
+    el.className = 'cat-select-info';
+    el.innerHTML =
+      qCount + ' Fragen aus ' + selectedCategoryIds.size + ' Kategorien<br>' +
+      icon('leicht') + ' Leicht: ' + counts.leicht + '&nbsp;&nbsp;' +
+      icon('mittel') + ' Mittel: ' + counts.mittel + '&nbsp;&nbsp;' +
+      icon('schwer') + ' Schwer: ' + counts.schwer;
+  } else {
+    el.className = 'cat-select-info warning';
+    el.innerHTML =
+      '⚠ Zu wenige Fragen (' + qCount + '). Anforderungen:<br>' +
+      icon('leicht') + ' Leicht: ' + counts.leicht + '&nbsp;&nbsp;' +
+      icon('mittel') + ' Mittel: ' + counts.mittel + '&nbsp;&nbsp;' +
+      icon('schwer') + ' Schwer: ' + counts.schwer + '<br>' +
+      'Mindestens 1 Frage je Schwierigkeit wird benötigt.';
+  }
+  if (btn) btn.disabled = !ok;
 }
 
 // ── Setup Screen ─────────────────────────────────────────────
@@ -660,9 +685,10 @@ function proceedFromCategories() {
   }
 
   activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
-  if (activeFragenBank.length < 10) {
-    const el = document.getElementById('cat-select-info');
-    if (el) { el.className = 'cat-select-info warning'; el.textContent = 'Zu wenige Fragen (' + activeFragenBank.length + '). Mindestens 10 benötigt.'; }
+  const _lsCounts = { leicht: 0, mittel: 0, schwer: 0 };
+  activeFragenBank.forEach(q => { if (_lsCounts[q.schwierigkeit] !== undefined) _lsCounts[q.schwierigkeit]++; });
+  if (_lsCounts.leicht < 1 || _lsCounts.mittel < 1 || _lsCounts.schwer < 1) {
+    updateCatSelectInfo();
     return;
   }
 

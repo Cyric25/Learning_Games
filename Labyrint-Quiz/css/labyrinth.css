@@ -804,6 +804,9 @@ body.dark .modal-difficulty.schwer { background:#7f1d1d; color:#f87171; }
   cursor: pointer;
   text-align: left;
   transition: all 0.15s;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 .answer-btn:hover:not(.locked) { border-color:var(--accent); background:var(--accent-light); }
 .answer-btn.correct { border-color:var(--success); background:#d4edda; color:#155724; }

@@ -112,7 +112,7 @@
     .modal-question { font-size: 1.15rem; font-weight: 600; line-height: 1.5; color: var(--text-primary); }
     .answer-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
     @media (max-width: 400px) { .answer-options { grid-template-columns: 1fr; } }
-    .answer-btn { background: var(--bg-primary); border: 2px solid var(--border-card); border-radius: 10px; padding: 0.75rem 1rem; font-size: 1rem; color: var(--text-primary); cursor: pointer; text-align: left; font-family: inherit; transition: all 0.15s; }
+    .answer-btn { background: var(--bg-primary); border: 2px solid var(--border-card); border-radius: 10px; padding: 0.75rem 1rem; font-size: 1rem; color: var(--text-primary); cursor: pointer; text-align: left; font-family: inherit; transition: all 0.15s; white-space: normal; word-break: break-word; overflow-wrap: break-word; }
     .answer-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(227,79,32,0.10); }
     .answer-btn.correct { background: rgba(22,163,74,0.2); border-color: #16a34a; }
     .answer-btn.wrong { background: rgba(220,38,38,0.2); border-color: #dc2626; }

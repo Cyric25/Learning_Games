@@ -300,7 +300,11 @@
 
     <div id="dm-mc-section" style="display:none;">
       <div class="form-group">
-        <label>Antwortoptionen <span style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <label>Antwortoptionen <span id="dm-mc-correct-hint" style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0.5rem;font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="dm-multi-toggle" style="width:15px;height:15px;accent-color:var(--accent);">
+          <span>Mehrere richtige Antworten möglich</span>
+        </label>
         <div class="mc-options-editor" id="dm-mc-options"></div>
         <button class="btn btn-secondary btn-sm" id="btn-dm-add-mc" style="margin-top:0.5rem;">+ Option</button>
       </div>
@@ -386,7 +390,11 @@
 
     <div id="qm-mc-section" style="display:none;">
       <div class="form-group">
-        <label>Antwortoptionen <span style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <label>Antwortoptionen <span id="qm-mc-correct-hint" style="color:var(--text-secondary);font-size:0.85rem;">(Kreis = korrekte Antwort)</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0.5rem;font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="qm-multi-toggle" style="width:15px;height:15px;accent-color:var(--accent);">
+          <span>Mehrere richtige Antworten möglich</span>
+        </label>
         <div class="mc-options-editor" id="qm-mc-options"></div>
         <button class="btn btn-secondary btn-sm" id="btn-add-mc-option" style="margin-top:0.5rem;">+ Option hinzufügen</button>
       </div>
@@ -839,7 +847,14 @@ function openQuestionModal(catId, subcatId, questionId, subsubcatId, l4catId) {
       document.getElementById('qm-question').value = foundQ.question;
       document.getElementById('qm-answer').value = foundQ.answer;
       document.getElementById('qm-hint').value = foundQ.hint || '';
-      renderMcOptions(foundQ.options, foundQ.correctIndex);
+      const hasMulti = Array.isArray(foundQ.correctIndices) && foundQ.correctIndices.length > 0;
+      if (hasMulti) {
+        setQmMultiMode(true, foundQ.correctIndices);
+        renderMcOptions(foundQ.options || [], null);
+      } else {
+        setQmMultiMode(false);
+        renderMcOptions(foundQ.options || [], foundQ.correctIndex);
+      }
       updateQModalType(foundQ.type);
     }
   } else {
@@ -849,6 +864,7 @@ function openQuestionModal(catId, subcatId, questionId, subsubcatId, l4catId) {
     document.getElementById('qm-question').value = '';
     document.getElementById('qm-answer').value = '';
     document.getElementById('qm-hint').value = '';
+    setQmMultiMode(false);
     renderMcOptions(['', ''], null);
     updateQModalType('open');
   }
@@ -914,31 +930,105 @@ function closeQuestionModal() {
   document.getElementById('q-modal').classList.remove('open');
   editingCatId = editingSubcatId = editingSubsubcatId = editingL4Id = editingQuestionId = null;
 }
+// Multi-mode state for Question Modal
+let qmMultiMode = false;
+let qmCorrectIndices = new Set();
+
 function updateQModalType(type) {
   document.getElementById('qm-open-section').style.display = type === 'open' ? '' : 'none';
   document.getElementById('qm-mc-section').style.display = type === 'mc' ? '' : 'none';
+}
+function setQmMultiMode(active, indicesArr) {
+  qmMultiMode = active;
+  const toggle = document.getElementById('qm-multi-toggle');
+  if (toggle) toggle.checked = active;
+  const hint = document.getElementById('qm-mc-correct-hint');
+  if (hint) hint.textContent = active ? '(Häkchen = korrekte Antworten)' : '(Kreis = korrekte Antwort)';
+  if (active) {
+    qmCorrectIndices = new Set(indicesArr || []);
+  } else {
+    qmCorrectIndices = new Set();
+  }
+}
+function onQmMultiToggleChange() {
+  const wasMulti = qmMultiMode;
+  const newMulti = document.getElementById('qm-multi-toggle').checked;
+  const opts = getMcOptions();
+  if (wasMulti && !newMulti) {
+    // Multi → Single: first selected index
+    const sorted = [...qmCorrectIndices].sort((a, b) => a - b);
+    const first = (sorted[0] !== undefined && sorted[0] < opts.length) ? sorted[0] : 0;
+    setQmMultiMode(false);
+    renderMcOptions(opts, first);
+  } else if (!wasMulti && newMulti) {
+    // Single → Multi: pre-select the current single
+    const cur = getCorrectMcIndex();
+    setQmMultiMode(true, [cur]);
+    renderMcOptions(opts, null);
+  }
 }
 function renderMcOptions(options, correctIndex) {
   const container = document.getElementById('qm-mc-options'); container.innerHTML = '';
   options.forEach((opt, i) => {
     const row = document.createElement('div'); row.className = 'mc-option-row';
-    row.innerHTML = `<input type="radio" name="mc-correct" value="${i}" ${correctIndex === i ? 'checked' : ''}>
-      <input type="text" class="mc-opt-input" value="${escHtml(opt)}" placeholder="Option ${i + 1}" oninput="updateMcAnswerText()">
-      <button class="btn btn-danger btn-sm" onclick="removeMcOption(${i})" ${options.length <= 2 ? 'disabled' : ''}>✕</button>`;
+    if (qmMultiMode) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = i; cb.name = 'mc-correct';
+      cb.checked = qmCorrectIndices.has(i);
+      cb.addEventListener('change', () => {
+        if (cb.checked) qmCorrectIndices.add(i); else qmCorrectIndices.delete(i);
+        updateMcAnswerText();
+      });
+      row.appendChild(cb);
+    } else {
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'mc-correct'; radio.value = i;
+      if (correctIndex === i) radio.checked = true;
+      radio.addEventListener('change', updateMcAnswerText);
+      row.appendChild(radio);
+    }
+    const textIn = document.createElement('input');
+    textIn.type = 'text'; textIn.className = 'mc-opt-input';
+    textIn.value = escHtml(opt); textIn.placeholder = 'Option ' + (i + 1);
+    textIn.addEventListener('input', updateMcAnswerText);
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'btn btn-danger btn-sm';
+    rmBtn.disabled = options.length <= 2;
+    rmBtn.textContent = '✕';
+    rmBtn.addEventListener('click', () => removeMcOption(i));
+    row.appendChild(textIn); row.appendChild(rmBtn);
     container.appendChild(row);
   });
-  container.querySelectorAll('input[type="radio"]').forEach(r => r.addEventListener('change', updateMcAnswerText));
   updateMcAnswerText();
 }
-function addMcOption() { const opts = getMcOptions(); opts.push(''); renderMcOptions(opts, getCorrectMcIndex()); }
+function addMcOption() { const opts = getMcOptions(); opts.push(''); renderMcOptions(opts, qmMultiMode ? null : getCorrectMcIndex()); }
 function removeMcOption(idx) {
   const opts = getMcOptions(); if (opts.length <= 2) return;
-  const wasCorrect = getCorrectMcIndex() === idx; opts.splice(idx, 1);
-  renderMcOptions(opts, wasCorrect ? 0 : getCorrectMcIndex());
+  if (qmMultiMode) {
+    const updated = new Set();
+    qmCorrectIndices.forEach(n => { if (n < idx) updated.add(n); else if (n > idx) updated.add(n - 1); });
+    qmCorrectIndices = updated;
+    if (qmCorrectIndices.size === 0 && opts.length > 1) qmCorrectIndices.add(0);
+    opts.splice(idx, 1);
+    renderMcOptions(opts, null);
+  } else {
+    const wasCorrect = getCorrectMcIndex() === idx; opts.splice(idx, 1);
+    renderMcOptions(opts, wasCorrect ? 0 : getCorrectMcIndex());
+  }
 }
 function getMcOptions() { return [...document.querySelectorAll('#qm-mc-options .mc-opt-input')].map(i => i.value); }
 function getCorrectMcIndex() { const c = document.querySelector('#qm-mc-options input[type="radio"]:checked'); return c ? parseInt(c.value) : 0; }
-function updateMcAnswerText() { const opts = getMcOptions(); document.getElementById('qm-mc-answer-text').value = opts[getCorrectMcIndex()] || ''; }
+function updateMcAnswerText() {
+  const opts = getMcOptions();
+  const answerEl = document.getElementById('qm-mc-answer-text');
+  if (!answerEl) return;
+  if (qmMultiMode) {
+    const sorted = [...qmCorrectIndices].sort((a, b) => a - b);
+    answerEl.value = sorted.map(idx => opts[idx] || '').filter(Boolean).join(', ');
+  } else {
+    answerEl.value = opts[getCorrectMcIndex()] || '';
+  }
+}
 
 function findNodeForSave(catId, subcatId, subsubcatId, l4catId) {
   const cat = questionBank.categories.find(c => c.id === catId); if (!cat) return null;
@@ -963,19 +1053,37 @@ async function saveQuestion() {
   const diff = parseInt(document.getElementById('qm-diff').value);
   const qText = document.getElementById('qm-question').value.trim();
   const hint = document.getElementById('qm-hint').value.trim();
-  let answer = '', options = [], correctIndex = null;
+  let answer = '', options = [], correctIndex = null, correctIndices = undefined;
   if (!qText) { showAlert('qm-alert', 'danger', 'Bitte Fragetext eingeben.'); return; }
   if (!subcatId) { showAlert('qm-alert', 'danger', 'Bitte Unterkategorie wählen.'); return; }
   if (type === 'open') {
     answer = document.getElementById('qm-answer').value.trim();
     if (!answer) { showAlert('qm-alert', 'danger', 'Bitte Antwort eingeben.'); return; }
   } else {
-    options = getMcOptions(); correctIndex = getCorrectMcIndex(); answer = options[correctIndex] || '';
+    options = getMcOptions();
     if (options.length < 2) { showAlert('qm-alert', 'danger', 'Mindestens 2 Optionen erforderlich.'); return; }
-    if (!answer) { showAlert('qm-alert', 'danger', 'Bitte korrekte Antwort markieren und Text eingeben.'); return; }
+    if (qmMultiMode) {
+      // Read current checkbox state fresh
+      const checkedEls = [...document.querySelectorAll('#qm-mc-options input[type="checkbox"]:checked')];
+      const selIndices = checkedEls.map(el => parseInt(el.value)).sort((a, b) => a - b);
+      if (selIndices.length === 0) { showAlert('qm-alert', 'danger', 'Bitte mindestens eine korrekte Antwort markieren.'); return; }
+      correctIndices = selIndices;
+      correctIndex = selIndices[0]; // Abwärtskompatibilität
+      answer = selIndices.map(idx => options[idx]).filter(Boolean).join(', ');
+    } else {
+      correctIndex = getCorrectMcIndex(); answer = options[correctIndex] || '';
+      if (!answer) { showAlert('qm-alert', 'danger', 'Bitte korrekte Antwort markieren und Text eingeben.'); return; }
+    }
   }
   const targetNode = findNodeForSave(catId, subcatId, subsubcatId || null, l4catId || null);
   if (!targetNode) { showAlert('qm-alert', 'danger', 'Zielknoten nicht gefunden.'); return; }
+  // Build the update object
+  function applyQFields(q) {
+    q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer;
+    q.options = options; q.correctIndex = correctIndex; q.hint = hint;
+    if (correctIndices) q.correctIndices = correctIndices;
+    else delete q.correctIndices;
+  }
   if (editingQuestionId) {
     let oldNode = null;
     outer: for (const c of questionBank.categories) {
@@ -985,13 +1093,19 @@ async function saveQuestion() {
       const q = (oldNode.questions || []).find(q => q.id === editingQuestionId);
       if (oldNode !== targetNode) {
         oldNode.questions = (oldNode.questions || []).filter(q => q.id !== editingQuestionId);
-        if (q) { q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint; if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(q); }
-        else { if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint })); }
-      } else { if (q) { q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint; } }
+        if (q) { applyQFields(q); if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(q); }
+        else {
+          const newQ = GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint });
+          if (correctIndices) newQ.correctIndices = correctIndices; else delete newQ.correctIndices;
+          if (!targetNode.questions) targetNode.questions = []; targetNode.questions.push(newQ);
+        }
+      } else { if (q) applyQFields(q); }
     }
   } else {
     if (!targetNode.questions) targetNode.questions = [];
-    targetNode.questions.push(GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint }));
+    const newQ = GameModel.createQuestion({ difficulty: diff, type, question: qText, answer, options, correctIndex, hint });
+    if (correctIndices) newQ.correctIndices = correctIndices; else delete newQ.correctIndices;
+    targetNode.questions.push(newQ);
   }
   await saveQuestionsToServer(); renderCategories(); updateStats(); closeQuestionModal();
 }

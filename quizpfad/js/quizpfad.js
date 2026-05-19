@@ -196,11 +196,29 @@ function toggleAllCategories(selectAll) {
 }
 
 function updateCatSelectInfo() {
+  const el = document.getElementById('cat-select-info');
+  if (!el) return;
   const total = fragenBank.kategorien.length;
   const selected = selectedCategoryIds.size;
   const qCount = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length;
-  document.getElementById('cat-select-info').textContent =
-    selected + ' von ' + total + ' Kategorien gewählt (' + qCount + ' Fragen)';
+  const ok = qCount >= 10;
+  const btn = document.getElementById('btn-start');
+
+  if (selected === 0 || qCount === 0) {
+    el.className = 'cat-select-info warning';
+    el.textContent = 'Keine Kategorie ausgewählt!';
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  if (ok) {
+    el.className = 'cat-select-info';
+    el.textContent = '✅ ' + selected + ' von ' + total + ' Kategorien gewählt (' + qCount + ' Fragen)';
+  } else {
+    el.className = 'cat-select-info warning';
+    el.textContent = '❌ ' + selected + ' Kategorien gewählt, aber nur ' + qCount + ' Fragen – mindestens 10 benötigt.';
+  }
+  if (btn) btn.disabled = !ok;
 }
 
 // ── Setup Screen ─────────────────────────────────────────────
@@ -261,6 +279,12 @@ function startGame() {
     kategorien: fragenBank.kategorien.filter(k => selectedCategoryIds.has(k.id)),
     fragen: fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie))
   };
+
+  if (activeFragenBank.fragen.length < 10) {
+    document.getElementById('setup-error').textContent = 'Mindestens 10 Fragen benötigt – bitte mehr Kategorien auswählen.';
+    updateCatSelectInfo();
+    return;
+  }
 
   // Build teams
   teams = [];

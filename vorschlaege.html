@@ -150,7 +150,22 @@
     /* MC options */
     .mc-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
     .mc-opt-row { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
-    .mc-opt-row input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    .mc-opt-row input[type="radio"],
+    .mc-opt-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    /* Multi-toggle */
+    .multi-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--label-color);
+      margin-bottom: 0.6rem;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .multi-toggle-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
     .mc-opt-row input[type="text"] { margin: 0; }
     .btn-rm {
       background: #dc3545;
@@ -401,7 +416,11 @@
     <!-- Multiple Choice -->
     <div id="section-mc" style="display:none;">
       <div class="form-group">
-        <label>Antwortmöglichkeiten <span class="label-opt">(Kreis = korrekte Antwort)</span></label>
+        <label id="mc-correct-label">Antwortmöglichkeiten <span class="label-opt" id="mc-correct-hint">(Kreis = korrekte Antwort)</span></label>
+        <label class="multi-toggle-label">
+          <input type="checkbox" id="mc-multi-toggle" onchange="onMultiToggleChange()">
+          <span>Mehrere richtige Antworten möglich</span>
+        </label>
         <div class="mc-options" id="mc-options-container"></div>
         <button type="button" class="btn-add-opt" id="btn-add-mc" onclick="addMcOption()">+ Option hinzufügen</button>
       </div>
@@ -590,6 +609,8 @@ function renderStats() {
 // ── Fragetyp-Toggle ────────────────────────────────────────────────
 let mcOptions = ['', '', '', ''];
 let correctMcIdx = 0;
+let correctMcIndices = new Set([0]);
+let mcMultiMode = false;
 
 document.querySelectorAll('input[name="qtype"]').forEach(r => r.addEventListener('change', updateType));
 
@@ -600,16 +621,48 @@ function updateType() {
   if (!isOpen) renderMcOptions();
 }
 
+function onMultiToggleChange() {
+  const wasMulti = mcMultiMode;
+  mcMultiMode = document.getElementById('mc-multi-toggle').checked;
+  if (wasMulti && !mcMultiMode) {
+    // Multi → Single: keep the first selected index
+    const first = [...correctMcIndices].sort((a, b) => a - b)[0] ?? 0;
+    correctMcIdx = first < mcOptions.length ? first : 0;
+    correctMcIndices = new Set();
+  } else if (!wasMulti && mcMultiMode) {
+    // Single → Multi: pre-select the current single index
+    correctMcIndices = new Set([correctMcIdx]);
+  }
+  // Update hint label
+  const hint = document.getElementById('mc-correct-hint');
+  if (hint) hint.textContent = mcMultiMode ? '(Häkchen = korrekte Antworten)' : '(Kreis = korrekte Antwort)';
+  renderMcOptions();
+}
+
 function renderMcOptions() {
   const container = document.getElementById('mc-options-container');
   container.innerHTML = '';
   mcOptions.forEach((opt, i) => {
     const row = document.createElement('div');
     row.className = 'mc-opt-row';
-    const radio = document.createElement('input');
-    radio.type = 'radio'; radio.name = 'mc-correct'; radio.value = i;
-    if (i === correctMcIdx) radio.checked = true;
-    radio.addEventListener('change', () => { correctMcIdx = i; });
+
+    if (mcMultiMode) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = i;
+      cb.checked = correctMcIndices.has(i);
+      cb.addEventListener('change', () => {
+        if (cb.checked) correctMcIndices.add(i);
+        else correctMcIndices.delete(i);
+      });
+      row.appendChild(cb);
+    } else {
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'mc-correct'; radio.value = i;
+      if (i === correctMcIdx) radio.checked = true;
+      radio.addEventListener('change', () => { correctMcIdx = i; });
+      row.appendChild(radio);
+    }
+
     const text = document.createElement('input');
     text.type = 'text'; text.placeholder = 'Option ' + (i + 1);
     text.value = opt; text.maxLength = 200;
@@ -618,7 +671,7 @@ function renderMcOptions() {
     rm.type = 'button'; rm.className = 'btn-rm'; rm.textContent = '✕';
     rm.disabled = mcOptions.length <= 2;
     rm.addEventListener('click', () => removeMcOption(i));
-    row.appendChild(radio); row.appendChild(text); row.appendChild(rm);
+    row.appendChild(text); row.appendChild(rm);
     container.appendChild(row);
   });
 }
@@ -632,8 +685,20 @@ function addMcOption() {
 function removeMcOption(idx) {
   if (mcOptions.length <= 2) return;
   mcOptions.splice(idx, 1);
-  if (correctMcIdx >= mcOptions.length) correctMcIdx = 0;
-  else if (correctMcIdx > idx) correctMcIdx--;
+  if (mcMultiMode) {
+    // Rebuild indices: shift down indices > idx, remove idx
+    const updated = new Set();
+    correctMcIndices.forEach(n => {
+      if (n < idx) updated.add(n);
+      else if (n > idx) updated.add(n - 1);
+      // n === idx: removed
+    });
+    correctMcIndices = updated;
+    if (correctMcIndices.size === 0 && mcOptions.length > 0) correctMcIndices.add(0);
+  } else {
+    if (correctMcIdx >= mcOptions.length) correctMcIdx = 0;
+    else if (correctMcIdx > idx) correctMcIdx--;
+  }
   renderMcOptions();
 }
 
@@ -661,20 +726,30 @@ async function submitSuggestion() {
 
   const difficulty = parseInt(diffVal);
 
-  let answer = '', options = [], correctIndex = null;
+  let answer = '', options = [], correctIndex = null, correctIndices = undefined;
   if (type === 'open') {
     answer = document.getElementById('f-answer').value.trim();
     if (!answer) { showAlert('Bitte gib die korrekte Antwort ein.'); return; }
   } else {
     // Aktuellen Stand der Inputs lesen
     const inputs = [...document.querySelectorAll('#mc-options-container .mc-opt-row input[type="text"]')];
-    const checked = document.querySelector('#mc-options-container input[type="radio"]:checked');
     options = inputs.map(i => i.value.trim());
-    correctIndex = checked ? parseInt(checked.value) : 0;
-    answer = options[correctIndex] || '';
     if (options.length < 2) { showAlert('Mindestens 2 Antwortoptionen erforderlich.'); return; }
     if (options.some(o => !o)) { showAlert('Bitte alle Antwortoptionen ausfüllen.'); return; }
-    if (!answer) { showAlert('Bitte markiere die korrekte Antwort.'); return; }
+    if (mcMultiMode) {
+      // Read checkboxes fresh from DOM
+      const checkedBoxes = [...document.querySelectorAll('#mc-options-container input[type="checkbox"]:checked')];
+      const selectedIndices = checkedBoxes.map(cb => parseInt(cb.value)).sort((a, b) => a - b);
+      if (selectedIndices.length === 0) { showAlert('Bitte mindestens eine korrekte Antwort markieren.'); return; }
+      correctIndices = selectedIndices;
+      correctIndex = selectedIndices[0]; // Abwärtskompatibilität
+      answer = selectedIndices.map(idx => options[idx]).join(', ');
+    } else {
+      const checked = document.querySelector('#mc-options-container input[type="radio"]:checked');
+      correctIndex = checked ? parseInt(checked.value) : 0;
+      answer = options[correctIndex] || '';
+      if (!answer) { showAlert('Bitte markiere die korrekte Antwort.'); return; }
+    }
   }
 
   const draft = {
@@ -686,6 +761,7 @@ async function submitSuggestion() {
     answer,
     options: type === 'mc' ? options : [],
     correctIndex: type === 'mc' ? correctIndex : null,
+    ...(type === 'mc' && correctIndices ? { correctIndices } : {}),
     hint: hint || '',
     suggestedCategory: category || '',
     difficulty
@@ -749,6 +825,12 @@ function resetForm() {
   document.getElementById('form-alert').innerHTML = '';
   mcOptions = ['', '', '', ''];
   correctMcIdx = 0;
+  correctMcIndices = new Set([0]);
+  mcMultiMode = false;
+  const toggle = document.getElementById('mc-multi-toggle');
+  if (toggle) toggle.checked = false;
+  const hint = document.getElementById('mc-correct-hint');
+  if (hint) hint.textContent = '(Kreis = korrekte Antwort)';
 }
 
 function escHtml(str) {
