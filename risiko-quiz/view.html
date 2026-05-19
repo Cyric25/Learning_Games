@@ -580,7 +580,11 @@ function renderBoard(gs) {
             cell.addEventListener('click', () => selectCell(si, diff));
           }
         } else {
-          cell.classList.add('sq-locked');
+          // Nur während des eigenen Zuges als gesperrt anzeigen;
+          // in anderen Zügen sieht das Feld normal aus (kein unnötiges Ausgrauen)
+          if (isMyActiveTurn) {
+            cell.classList.add('sq-locked');
+          }
         }
       }
       const v = document.createElement('span'); v.className = 'cell-value'; v.textContent = diff;
