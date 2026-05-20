@@ -797,21 +797,49 @@ function renderBoard() {
 function renderTeamList() {
   const list = document.getElementById('team-list'); if (!list || !gameState) return;
   list.innerHTML = '';
+  const taken = new Set(gameState.takenTeams || []);
   gameState.teams.forEach((t, i) => {
+    const isTaken = taken.has(t.id);
     const div = document.createElement('div');
     div.className = 'team-item' + (i === gameState.currentTeamIdx ? ' active' : '');
     div.style.borderColor = t.color;
+
     const fig = document.createElement('span'); fig.className = 'team-figure'; fig.textContent = t.emoji;
     const info = document.createElement('div'); info.className = 'team-info';
-    info.innerHTML = `<div class="team-name">${t.name}</div><div class="team-score">${t.score} Pkt</div>`;
+    const connDot = isTaken ? '<span class="team-conn-dot" title="Gerät verbunden">●</span> ' : '';
+    info.innerHTML = `<div class="team-name">${connDot}${t.name}</div><div class="team-score">${t.score} Pkt</div>`;
+
     const bar = document.createElement('div'); bar.className = 'team-sym-bar';
     (gameState.symbols || []).filter(s => s.teamId === t.id).forEach(s => {
       const dot = document.createElement('span'); dot.className = 'team-sym-dot' + (s.found ? ' found' : '');
       dot.style.background = s.found ? t.color : 'rgba(245,230,200,0.25)'; bar.appendChild(dot);
     });
-    info.appendChild(bar); div.appendChild(fig); div.appendChild(info); list.appendChild(div);
+    info.appendChild(bar);
+    div.appendChild(fig);
+    div.appendChild(info);
+
+    if (isTaken) {
+      const kickBtn = document.createElement('button');
+      kickBtn.className = 'team-kick-btn';
+      kickBtn.title = 'Gerät trennen (Team freigeben)';
+      kickBtn.textContent = '✕';
+      kickBtn.onclick = e => { e.stopPropagation(); kickTeam(t.id); };
+      div.appendChild(kickBtn);
+    }
+
+    list.appendChild(div);
   });
 }
+
+async function kickTeam(teamId) {
+  if (!gameState || !gameCode) return;
+  const newState = JSON.parse(JSON.stringify(gameState));
+  newState.takenTeams = (newState.takenTeams || []).filter(id => id !== teamId);
+  gameState = newState;
+  await GameSync.save(gameCode, newState);
+  renderTeamList();
+}
+window.kickTeam = kickTeam;
 
 // ── Game Code anzeigen ────────────────────────────────────────────
 function showGameCode() {
