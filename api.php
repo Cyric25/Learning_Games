@@ -344,7 +344,7 @@ if ($key === 'bs-sse') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $bsPath = __DIR__ . '/data/games/schiffeversenken/' . $code . '.json';
+    $bsPath = __DIR__ . '/schiffeversenken/data/games/' . $code . '.json';
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache'); header('Connection: keep-alive');
     header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
@@ -369,7 +369,7 @@ if ($key === 'bs-sse') {
 
 // ── Schiffeversenken Games Registry: ?f=bs-games ─────────────────
 if ($key === 'bs-games') {
-    $bsDir = __DIR__ . '/data/games/schiffeversenken';
+    $bsDir = __DIR__ . '/schiffeversenken/data/games';
     if (!is_dir($bsDir)) mkdir($bsDir, 0755, true);
     $registryPath = $bsDir . '/index.json';
 
@@ -394,7 +394,7 @@ if ($key === 'bs-game') {
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
     }
-    $bsDir = __DIR__ . '/data/games/schiffeversenken';
+    $bsDir = __DIR__ . '/schiffeversenken/data/games';
     if (!is_dir($bsDir)) mkdir($bsDir, 0755, true);
     $bsPath = $bsDir . '/' . $code . '.json';
 
