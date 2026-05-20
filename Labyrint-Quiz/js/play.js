@@ -145,17 +145,34 @@ function showTeamSelect(state) {
   showScreen('team-select-screen');
   const list = document.getElementById('team-select-list');
   list.innerHTML = '';
+  const taken = new Set(state.takenTeams || []);
   state.teams.forEach(t => {
+    const isTaken = taken.has(t.id);
     const btn = document.createElement('button');
-    btn.className = 'team-select-btn';
+    btn.className = 'team-select-btn' + (isTaken ? ' taken' : '');
     btn.style.borderColor = t.color;
-    btn.innerHTML = `<span class="ts-emoji">${t.emoji}</span><span class="ts-name">${t.name}</span><span class="ts-icon">${t.symbolIcon}</span>`;
-    btn.onclick = () => selectTeam(t.id);
+    btn.disabled = isTaken;
+    btn.innerHTML = `<span class="ts-emoji">${t.emoji}</span><span class="ts-name">${t.name}${isTaken ? ' <span class="ts-taken">belegt</span>' : ''}</span><span class="ts-icon">${t.symbolIcon}</span>`;
+    if (!isTaken) btn.onclick = () => selectTeam(t.id);
     list.appendChild(btn);
   });
 }
 
-function selectTeam(id) {
+async function selectTeam(id) {
+  // Frischen Stand laden um Race-Condition zu vermeiden
+  const fresh = await GameSync.load(gameCode);
+  const taken = new Set(fresh?.takenTeams || []);
+  if (taken.has(id)) {
+    // Zwischenzeitlich belegt – Liste neu aufbauen
+    remoteState = fresh;
+    showTeamSelect(fresh);
+    return;
+  }
+  taken.add(id);
+  const newState = JSON.parse(JSON.stringify(fresh));
+  newState.takenTeams = [...taken];
+  await GameSync.save(gameCode, newState);
+  remoteState = newState;
   myTeamId = id;
   localStorage.setItem('lab_myteam_' + gameCode, id);
   startPlayView();
@@ -573,7 +590,7 @@ function showQuestionModal() {
     optEl.style.display = 'none'; openSec.style.display = '';
     document.getElementById('q-open-answer').textContent = q.answer || '';
     document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-show-answer').style.display = '';
+    document.getElementById('q-show-answer').style.display = 'none';
     document.getElementById('q-open-actions').style.display = 'none';
     const prevWait = document.getElementById('q-teacher-wait');
     if (prevWait) prevWait.remove();

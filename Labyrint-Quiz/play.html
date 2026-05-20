@@ -33,9 +33,12 @@
     #team-select-list { display: flex; flex-direction: column; gap: 0.8rem; width: 100%; max-width: 400px; }
     .team-select-btn { display: flex; align-items: center; gap: 1rem; background: var(--bg-card); border: 2px solid var(--border-card); border-radius: 14px; padding: 1rem 1.4rem; cursor: pointer; transition: border-color 0.2s, background 0.2s; text-align: left; width: 100%; font-family: inherit; }
     .team-select-btn:hover { border-color: var(--accent); background: rgba(227,79,32,0.10); }
+    .team-select-btn.taken { opacity: 0.45; cursor: not-allowed; }
+    .team-select-btn.taken:hover { border-color: var(--border-card); background: var(--bg-card); }
     .ts-emoji { font-size: 2rem; flex-shrink: 0; }
     .ts-name { flex: 1; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
     .ts-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .ts-taken { font-size: 0.8rem; font-weight: 600; color: var(--danger); margin-left: 0.4rem; }
 
     /* ── Play Screen ──────────────────────────────────────────── */
     #play-screen { justify-content: flex-start; }
