@@ -293,8 +293,9 @@ function convertRQtoLeiterspiel(rqData) {
   function collectLeafCategories(node, path, parentIcon) {
     const subs = node.subcategories || [];
     const hasQuestions = node.questions && node.questions.length > 0;
+    const isLeaf = !subs.length;
 
-    if (hasQuestions) {
+    if (hasQuestions && isLeaf) {
       const katId = node.id;
       const katName = path.join(' › ');
       if (!kategorien.find(k => k.id === katId)) {
@@ -336,6 +337,7 @@ function convertRQtoLeiterspiel(rqData) {
         if (correctIndices) frageObj.correctIndices = correctIndices;
         fragen.push(frageObj);
       });
+      return;
     }
 
     subs.forEach(sub => collectLeafCategories(sub, [...path, sub.name], parentIcon));
@@ -359,8 +361,9 @@ function buildCategoryUI() {
   selectedCategoryIds.clear();
 
   function collectLeaves(cat) {
-    if (cat.questions && cat.questions.length > 0) return [cat.id];
-    return (cat.subcategories || []).flatMap(s => collectLeaves(s));
+    const subs = cat.subcategories || [];
+    if (cat.questions && cat.questions.length > 0 && !subs.length) return [cat.id];
+    return subs.flatMap(s => collectLeaves(s));
   }
   rawCategories.forEach(cat => collectLeaves(cat).forEach(id => selectedCategoryIds.add(id)));
 
@@ -376,7 +379,7 @@ function _buildCatNode(container, cat, icon, depth) {
 
   const qCount = _countLeafQ(cat);
 
-  if (hasQ) {
+  if (hasQ && !subs.length) {
     const sel = selectedCategoryIds.has(cat.id);
     const item = document.createElement('div');
     item.className = 'cat-select-item' + (sel ? ' selected' : '');
@@ -399,7 +402,8 @@ function _buildCatNode(container, cat, icon, depth) {
 
   const allLeaves = [];
   (function collect(c) {
-    if (c.questions && c.questions.length > 0) allLeaves.push(c.id);
+    const cSubs = (c.subcategories || []).length > 0;
+    if (c.questions && c.questions.length > 0 && !cSubs) allLeaves.push(c.id);
     (c.subcategories || []).forEach(s => collect(s));
   })(cat);
   const allSel = allLeaves.every(id => selectedCategoryIds.has(id));
@@ -446,9 +450,10 @@ function _buildCatNode(container, cat, icon, depth) {
 }
 
 function _countLeafQ(cat) {
-  if (cat.questions && cat.questions.length > 0)
+  const subs = cat.subcategories || [];
+  if (cat.questions && cat.questions.length > 0 && !subs.length)
     return fragenBank ? fragenBank.fragen.filter(q => q.kategorie === cat.id).length : cat.questions.length;
-  return (cat.subcategories || []).reduce((sum, s) => sum + _countLeafQ(s), 0);
+  return subs.reduce((sum, s) => sum + _countLeafQ(s), 0);
 }
 
 function _syncGroupHeader(wrap) {

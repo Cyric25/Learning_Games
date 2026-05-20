@@ -1,5 +1,83 @@
 /* quizpfad.js – Spiellogik */
 
+// ── QpStorage ────────────────────────────────────────────────
+const QpStorage = {
+  _code: null, _serverOk: null,
+  setCode(c)   { this._code = c ? c.toUpperCase() : null; },
+  getCode()    { return this._code; },
+  generateCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
+  },
+  async checkServer() {
+    if (this._serverOk !== null) return this._serverOk;
+    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    try {
+      await fetch('../api.php?f=qp-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
+      this._serverOk = true;
+    } catch { this._serverOk = false; }
+    return this._serverOk;
+  },
+  _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]};},
+  _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};},
+  async save(gs) {
+    if (!this._code) return;
+    const json = JSON.stringify(this._ser(gs));
+    localStorage.setItem('qp_gs_'+this._code, json);
+    if (await this.checkServer())
+      try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+  },
+  async load(code) {
+    code = (code||this._code||'').toUpperCase();
+    if (!code) return null;
+    if (await this.checkServer())
+      try { const r = await fetch('../api.php?f=qp-game&code='+code); if (r.ok) { const d=await r.json(); if(d&&d.meta) return this._deser(d); } } catch {}
+    const s = localStorage.getItem('qp_gs_'+code);
+    if (s) try { return this._deser(JSON.parse(s)); } catch {}
+    return null;
+  },
+  async loadGamesRegistry() {
+    if (await this.checkServer())
+      try { const r = await fetch('../api.php?f=qp-games'); if (r.ok) return await r.json(); } catch {}
+    const reg = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('qp_gs_')) {
+        const code = k.slice('qp_gs_'.length);
+        try { const d = JSON.parse(localStorage.getItem(k)); if (d&&d.meta) reg[code] = { title: d.meta.title||'QuizPfad', status: d.phase||'setup', updatedAt: d.meta.createdAt||'' }; } catch {}
+      }
+    }
+    return reg;
+  },
+  async deleteGame(code) {
+    localStorage.removeItem('qp_gs_' + code.toUpperCase());
+    if (await this.checkServer())
+      try { await fetch('../api.php?f=qp-game&code='+code, {method:'DELETE'}); } catch {}
+  },
+  subscribe(code, cb) {
+    code = code.toUpperCase();
+    let stopped = false, src = null, timer = null;
+    const startSSE = () => {
+      if (stopped) return;
+      src = new EventSource('../api.php?f=qp-sse&code='+code);
+      src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+      src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
+      src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
+    };
+    const startPoll = () => {
+      if(stopped||timer) return;
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
+      fn(); timer = setInterval(fn, 1000);
+    };
+    const startLocalPoll = () => {
+      if(stopped||timer) return; let last='';
+      timer = setInterval(() => { if(stopped) return; const s=localStorage.getItem('qp_gs_'+code); if(s&&s!==last){last=s;try{const d=JSON.parse(s);if(d&&d.meta)cb(this._deser(d));}catch{}} }, 500);
+    };
+    (async () => { if (await this.checkServer()) startSSE(); else startLocalPoll(); })();
+    return { unsubscribe() { stopped=true; src&&src.close(); timer&&clearInterval(timer); } };
+  }
+};
+
 // ── Multi-Correct Helpers ────────────────────────────────────
 function isMcCorrect(q, selectedArr) {
   const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
@@ -38,12 +116,16 @@ let pendingQuestionResult = null;
 let usedQuestionIds = new Set();
 let duelOpponentIdx = null;
 let selectedCategoryIds = new Set();
-let activeFragenBank = null; // filtered by selected categories
+let activeFragenBank = null;
+let qpLiveQ = null;
+let gameCreatedAt = null;
 
 // ── Init ─────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  renderTeamCountSelector(4);
-  loadFragen();
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadFragen();
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) await _gsEnter(urlCode.toUpperCase());
+  else showGameSelector();
 });
 
 async function loadFragen() {
@@ -81,6 +163,136 @@ async function loadFragen() {
     'Keine Fragen geladen. Bitte Fragen in der zentralen Fragendatenbank anlegen.';
 }
 
+// ── Game Management ───────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildCurrentGameState() {
+  return {
+    meta: { gameCode: QpStorage.getCode() || '', title: 'QuizPfad', createdAt: gameCreatedAt || new Date().toISOString() },
+    phase: gameOver ? 'finished' : (board.length > 0 ? 'playing' : 'setup'),
+    teams, board, currentTeamIdx, round, usedQuestionIds,
+    activeCategoryIds: [...selectedCategoryIds],
+    liveQuestion: qpLiveQ
+  };
+}
+
+async function showGameSelector() {
+  showScreen('game-selector');
+  const list = document.getElementById('gs-game-list');
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  const registry = await QpStorage.loadGamesRegistry();
+  const entries = Object.entries(registry);
+  if (entries.length === 0) { list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden.</p>'; return; }
+  entries.sort((a,b) => (b[1].updatedAt||b[1].createdAt||'').localeCompare(a[1].updatedAt||a[1].createdAt||''));
+  list.innerHTML = entries.map(([code, info]) => {
+    const statusLabel = {playing:'🟢 Läuft', finished:'🏁 Beendet'}[info.status] || '⚙ Setup';
+    const date = info.updatedAt ? new Date(info.updatedAt).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const ts = info.updatedAt||info.createdAt;
+    let expiryHint = '';
+    if (ts) { const rem = 24*3600000-(Date.now()-new Date(ts).getTime()); if(rem>0){const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000); expiryHint=` · ${h}h ${m}m übrig`;} }
+    return `<div class="gs-game-card" onclick="window._gsEnter('${code}')">
+      <div class="gs-game-code">${code}</div>
+      <div class="gs-game-info">
+        <div class="gs-game-title">${escapeHtml(info.title||'QuizPfad')}</div>
+        <div class="gs-game-meta">${statusLabel} · ${date}${expiryHint}</div>
+      </div>
+      <div class="gs-game-actions">
+        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function joinAsStudent() {
+  const input = document.getElementById('gs-code-input');
+  const errEl = document.getElementById('gs-join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (errEl) errEl.textContent = '';
+  if (!code || code.length < 4) { if (errEl) errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+  window.location.href = 'view.html?code=' + code;
+}
+
+async function createNewGame() {
+  const code = QpStorage.generateCode();
+  QpStorage.setCode(code);
+  gameCreatedAt = new Date().toISOString();
+  board = []; teams = []; usedQuestionIds = new Set(); gameOver = false; qpLiveQ = null;
+  await QpStorage.save({
+    meta: { gameCode: code, title: 'QuizPfad', createdAt: gameCreatedAt },
+    phase: 'setup', teams: [], board: [], currentTeamIdx: 0, round: 1,
+    usedQuestionIds: new Set(), activeCategoryIds: [], liveQuestion: null
+  });
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  if (!fragenBank) await loadFragen();
+  renderTeamCountSelector(4);
+  showScreen('setup-screen');
+  showCodeBanner();
+}
+
+async function _gsEnter(code) {
+  QpStorage.setCode(code);
+  const gs = await QpStorage.load(code);
+  if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  gameCreatedAt = gs.meta.createdAt || new Date().toISOString();
+  if (!fragenBank) await loadFragen();
+  if (gs.phase === 'playing' && gs.board && gs.board.length > 0) {
+    teams = gs.teams || [];
+    board = gs.board;
+    currentTeamIdx = gs.currentTeamIdx || 0;
+    round = gs.round || 1;
+    gameOver = false;
+    usedQuestionIds = gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : new Set(gs.usedQuestionIds || []);
+    qpLiveQ = gs.liveQuestion || null;
+    if (gs.activeCategoryIds && gs.activeCategoryIds.length) {
+      selectedCategoryIds = new Set(gs.activeCategoryIds);
+      activeFragenBank = {
+        kategorien: fragenBank ? fragenBank.kategorien.filter(k => selectedCategoryIds.has(k.id)) : [],
+        fragen: fragenBank ? fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)) : []
+      };
+    }
+    showScreen('game-screen');
+    renderBoard();
+    renderSidebar();
+    updateTurnBanner();
+    showCodeBanner();
+  } else if (gs.phase === 'finished') {
+    showGameSelector();
+  } else {
+    renderTeamCountSelector(4);
+    showScreen('setup-screen');
+    showCodeBanner();
+  }
+}
+
+async function _gsDelete(code) {
+  if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
+  await QpStorage.deleteGame(code);
+  showGameSelector();
+}
+window._gsEnter  = _gsEnter;
+window._gsDelete = _gsDelete;
+
+function showCodeBanner() {
+  const code = QpStorage.getCode(); if (!code) return;
+  const existing = document.getElementById('code-banner');
+  if (existing) { existing.querySelector('.code-val').textContent = code; return; }
+  const b = document.createElement('div');
+  b.id = 'code-banner';
+  b.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-sidebar,#fff);color:var(--text-primary,#333);border-radius:12px;padding:10px 16px;font-size:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px;border:1px solid var(--border);';
+  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">'+code+'</strong><a href="view.html?code='+code+'" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Link ↗</a>';
+  document.body.appendChild(b);
+}
+
+function resetToSelector() {
+  QpStorage.setCode(null);
+  window.history.replaceState({}, '', 'index.html');
+  const banner = document.getElementById('code-banner'); if (banner) banner.remove();
+  showGameSelector();
+}
+
 // Convert Risiko-Quiz format → QuizPfad format
 function convertRQtoQuizPfad(rqData) {
   const kategorien = [];
@@ -92,10 +304,9 @@ function convertRQtoQuizPfad(rqData) {
   function collectLeafCategories(node, path, parentIcon) {
     const subs = node.subcategories || [];
     const hasQuestions = node.questions && node.questions.length > 0;
-    const hasChildren = subs.length > 0;
+    const isLeaf = !subs.length;
 
-    // Leaf node: has questions and no deeper subcategories with questions
-    if (hasQuestions) {
+    if (hasQuestions && isLeaf) {
       const katId = node.id;
       const katName = path.join(' › ');
       if (!kategorien.find(k => k.id === katId)) {
@@ -138,6 +349,7 @@ function convertRQtoQuizPfad(rqData) {
         if (correctIndices) frageObj.correctIndices = correctIndices;
         fragen.push(frageObj);
       });
+      return;
     }
 
     subs.forEach(sub => collectLeafCategories(sub, [...path, sub.name], parentIcon));
@@ -332,6 +544,10 @@ function startGame() {
   renderBoard();
   renderSidebar();
   updateTurnBanner();
+
+  qpLiveQ = null;
+  if (!gameCreatedAt) gameCreatedAt = new Date().toISOString();
+  QpStorage.save(buildCurrentGameState());
 }
 
 // ── Board Generation ─────────────────────────────────────────
@@ -736,6 +952,9 @@ function showQuestionModal(question, field) {
   // Store question for bonus check
   pendingQuestionResult = { question, field, resolved: false };
 
+  qpLiveQ = { id: question.id, teamIdx: currentTeamIdx, question, resolved: false, correct: null };
+  QpStorage.save(buildCurrentGameState());
+
   modal.classList.add('open');
 }
 
@@ -786,6 +1005,9 @@ function resolveQuestion(correct) {
   }
 
   document.getElementById('q-continue').classList.add('visible');
+
+  if (qpLiveQ) { qpLiveQ.resolved = true; qpLiveQ.correct = correct; }
+  QpStorage.save(buildCurrentGameState());
 }
 
 function continueAfterQuestion() {
@@ -812,6 +1034,9 @@ function moveTeam(teamIdx, newPos) {
 
   renderBoard();
   renderSidebar();
+
+  qpLiveQ = null;
+  QpStorage.save(buildCurrentGameState());
 
   // Check win
   if (newPos >= FIELD_COUNT - 1) {
@@ -1120,6 +1345,9 @@ function nextTurn() {
   renderBoard();
   renderSidebar();
   updateTurnBanner();
+
+  qpLiveQ = null;
+  QpStorage.save(buildCurrentGameState());
 }
 
 // ── Winner Screen ────────────────────────────────────────────
@@ -1160,6 +1388,8 @@ function showWinner(teamIdx) {
 
   showScreen('winner-screen');
   spawnConfetti();
+
+  QpStorage.save(buildCurrentGameState());
 }
 
 function spawnConfetti() {
@@ -1188,12 +1418,12 @@ function showScreen(id) {
 }
 
 function resetToSetup() {
-  showScreen('setup-screen');
+  resetToSelector();
 }
 
 function confirmQuit() {
   if (confirm('Spiel wirklich beenden?')) {
-    resetToSetup();
+    resetToSelector();
   }
 }
 

@@ -497,6 +497,117 @@ if ($key === 'labyrinth-game') {
     exit;
 }
 
+// ── QuizPfad SSE: ?f=qp-sse&code=XXXX ───────────────────────────
+if ($key === 'qp-sse') {
+    $code = strtoupper(trim($_GET['code'] ?? ''));
+    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
+        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
+    }
+    $qpPath = __DIR__ . '/data/games/quizpfad/' . $code . '.json';
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache'); header('Connection: keep-alive');
+    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
+    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
+    while (ob_get_level()) ob_end_flush();
+    $lastMtime = 0; $start = time();
+    while (true) {
+        if (connection_aborted()) break;
+        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
+        if (file_exists($qpPath)) {
+            clearstatcache(true, $qpPath);
+            $mtime = filemtime($qpPath);
+            if ($mtime > $lastMtime) {
+                $lastMtime = $mtime;
+                echo "data: " . file_get_contents($qpPath) . "\n\n"; @flush();
+            }
+        }
+        usleep(300000);
+    }
+    exit;
+}
+
+// ── QuizPfad Games Registry: ?f=qp-games ─────────────────────────
+if ($key === 'qp-games') {
+    $qpDir = __DIR__ . '/data/games/quizpfad';
+    if (!is_dir($qpDir)) mkdir($qpDir, 0755, true);
+    $registryPath = $qpDir . '/index.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        cleanupExpiredGames($qpDir);
+        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        file_put_contents($registryPath, $body, LOCK_EX) !== false
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    }
+    exit;
+}
+
+// ── QuizPfad Per-Game: ?f=qp-game&code=XXXX ──────────────────────
+if ($key === 'qp-game') {
+    $code = strtoupper(trim($_GET['code'] ?? ''));
+    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
+        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
+    }
+    $qpDir = __DIR__ . '/data/games/quizpfad';
+    if (!is_dir($qpDir)) mkdir($qpDir, 0755, true);
+    $qpPath = $qpDir . '/' . $code . '.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($qpPath) ? file_get_contents($qpPath) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        $ok = file_put_contents($qpPath, $body, LOCK_EX) !== false;
+        if ($ok) {
+            $registryPath = $qpDir . '/index.json';
+            $retries = 3;
+            while ($retries-- > 0) {
+                $fp = fopen($registryPath, 'c+');
+                if (!$fp) break;
+                if (flock($fp, LOCK_EX)) {
+                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
+                    $gameData = json_decode($body, true);
+                    $registry[$code] = [
+                        'title'     => $gameData['meta']['title'] ?? 'QuizPfad',
+                        'status'    => $gameData['phase'] ?? 'setup',
+                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
+                        'updatedAt' => date('c'),
+                    ];
+                    ftruncate($fp, 0); rewind($fp);
+                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+                    break;
+                }
+                fclose($fp); usleep(50000);
+            }
+        }
+        $ok ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        if (file_exists($qpPath)) @unlink($qpPath);
+        $registryPath = $qpDir . '/index.json';
+        if (file_exists($registryPath)) {
+            $fp = fopen($registryPath, 'c+');
+            if ($fp && flock($fp, LOCK_EX)) {
+                $registry = json_decode(stream_get_contents($fp), true) ?: [];
+                unset($registry[$code]);
+                ftruncate($fp, 0); rewind($fp);
+                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+            }
+        }
+        echo json_encode(['ok' => true]);
+    }
+    exit;
+}
+
 // ── Drafts (Schüler-Vorschläge): ?f=drafts ───────────────────────
 if ($key === 'drafts') {
     $draftsPath = __DIR__ . '/data/drafts.json';

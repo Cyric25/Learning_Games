@@ -105,15 +105,16 @@ async function loadQuestions() {
 function convertRQtoLabyrinth(rqData) {
   const fragen = [];
   function walk(cat, path) {
-    if (cat.subcategories?.length) {
-      cat.subcategories.forEach(s => walk(s, path ? `${path} › ${cat.name}` : cat.name));
-    } else {
-      const full = path ? `${path} › ${cat.name}` : cat.name;
+    const full = path ? `${path} › ${cat.name}` : cat.name;
+    const subs = cat.subcategories || [];
+    if (!subs.length) {
       (cat.questions || []).forEach(q => {
         const diff = q.difficulty <= 200 ? 'leicht' : q.difficulty >= 400 ? 'schwer' : 'mittel';
         fragen.push({ ...q, kategorieId: cat.id, kategorieName: full, schwierigkeit: diff,
           type: q.type === 'mc' ? 'multiple_choice' : 'offen' });
       });
+    } else {
+      subs.forEach(s => walk(s, full));
     }
   }
   (rqData.categories || []).forEach(c => walk(c, ''));
@@ -339,8 +340,9 @@ function buildCategoryUI() {
 
   activeCategories.clear();
   function collectLeaves(cat) {
-    if (cat.questions && cat.questions.length > 0) return [cat.id];
-    return (cat.subcategories || []).flatMap(s => collectLeaves(s));
+    const subs = cat.subcategories || [];
+    if (cat.questions && cat.questions.length > 0 && !subs.length) return [cat.id];
+    return subs.flatMap(s => collectLeaves(s));
   }
   rawCategories.forEach(cat => collectLeaves(cat).forEach(id => activeCategories.add(id)));
 
@@ -356,7 +358,7 @@ function _buildCatNode(container, cat, icon, depth) {
 
   const qCount = _countLeafQ(cat);
 
-  if (hasQ) {
+  if (hasQ && !subs.length) {
     const sel = activeCategories.has(cat.id);
     const item = document.createElement('div');
     item.className = 'cat-select-item' + (sel ? ' selected' : '');
@@ -380,7 +382,8 @@ function _buildCatNode(container, cat, icon, depth) {
 
   const allLeaves = [];
   (function collect(c) {
-    if (c.questions && c.questions.length > 0) allLeaves.push(c.id);
+    const cSubs = (c.subcategories || []).length > 0;
+    if (c.questions && c.questions.length > 0 && !cSubs) allLeaves.push(c.id);
     (c.subcategories || []).forEach(s => collect(s));
   })(cat);
   const allSel = allLeaves.every(id => activeCategories.has(id));
@@ -427,9 +430,10 @@ function _buildCatNode(container, cat, icon, depth) {
 }
 
 function _countLeafQ(cat) {
-  if (cat.questions && cat.questions.length > 0)
+  const subs = cat.subcategories || [];
+  if (cat.questions && cat.questions.length > 0 && !subs.length)
     return allQuestions.filter(q => q.kategorieId === cat.id).length;
-  return (cat.subcategories || []).reduce((s, c) => s + _countLeafQ(c), 0);
+  return subs.reduce((s, c) => s + _countLeafQ(c), 0);
 }
 
 function _syncGroupHeader(wrap) {

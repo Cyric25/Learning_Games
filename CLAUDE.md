@@ -33,13 +33,14 @@ Spiele/
       pairs.json                ← Memory-Paare Datenbank
       images/                   ← Hochgeladene Bilder für Karten
   quizpfad/
-    index.html                  ← QuizPfad Spiel (Setup + Board + Modals)
-    admin.html                  ← QuizPfad Fragenverwaltung (Editor + MD-Import)
+    index.html                  ← QuizPfad Spiel (Spielwähler + Setup + Board + Modals)
+    view.html                   ← Schüleransicht (SSE-Live, Code-Beitritt, Mini-Board)
+    admin.html                  ← Verweis auf zentrale Fragendatenbank (admin.html)
     js/
-      quizpfad.js               ← Spiellogik (Board, Teams, Runden, Bonus)
-      quizpfad-admin.js         ← Editor-Logik (Fragen CRUD, MD-Import)
+      quizpfad.js               ← Spiellogik (QpStorage, Board, Teams, Runden, Bonus)
+      quizpfad-admin.js         ← Editor-Logik (Fragen CRUD, MD-Import) — Legacy
     css/
-      quizpfad.css              ← Styles (Brettspiel Classic, responsive)
+      quizpfad.css              ← Styles (Brettspiel Classic, responsive, gs-* Spielwähler)
   escape-room/
     index.html                  ← Escape Room (Admin + Spieler, alles inline) — Lehrkraft-Version
     standalone.html             ← Escape Room (Schüler/Offline, kein Passwort, kein 360°)
@@ -354,7 +355,7 @@ Spiele, die paralleles Spielen unterstützen, verwenden das **Spielverwaltungs-M
 |-------|----------------|----------------|
 | Risiko-Quiz | Ja (admin.html Spielwähler) | view.html via SSE |
 | Leiterspiel-Quiz | Ja (index.html Spielwähler) | view.html via SSE |
-| QuizPfad | Nein — Einzelspiel | — |
+| QuizPfad | Ja (index.html Spielwähler, `qp-` prefix) | view.html via SSE (Zuschauer) |
 | Labyrinth-Quiz | Nein — Einzelspiel | — |
 | Memory | Nein — Singleplayer | — |
 | Escape Room | Nein — eigenes Multi-Team-System | — |
@@ -477,7 +478,9 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 - 30 Felder in Schlangen-Layout (6 Spalten, 5 Zeilen, abwechselnd L→R / R→L)
 - **Zentrale Fragendatenbank** mit Standard-Konvertierung (`convertRQtoQuizPfad()`) — siehe Abschnitt "Zentrale Fragendatenbank"
 - Admin verweist auf zentrale Fragendatenbank (`admin.html`)
-- Kein Multi-Game, kein SSE — reines Einzelspiel im Browser
+- **Spielverwaltung**: `QpStorage` mit `qp-` Prefix, Spielwähler in `index.html`, Schüleransicht `view.html`
+- API-Endpunkte: `qp-games`, `qp-game`, `qp-sse` in `api.php`; Spielstände in `data/games/quizpfad/`
+- Schüleransicht `view.html`: Zuschauerrolle — zeigt Board, aktive Teams, laufende Fragen (kein eigenes Antworten)
 
 ### Bonusfelder
 | Typ | Effekt |
@@ -492,6 +495,26 @@ Typen: `text`, `formula`, `image` (auch `formel`, `bild` als Alias)
 - Standard: Light (Brettspiel Classic, warmes Beige)
 - `body.dark` überschreibt alle CSS-Variablen (warme Brauntöne)
 - Toggle-Script am Ende jeder HTML-Datei als IIFE
+
+---
+
+## Kritisches Muster: True-Leaf-Erkennung in Kategoriehierarchien
+
+**Problem (wiederkehrender Bug)**: Der Risiko-Quiz Admin erlaubt bis zu 4 Ebenen (`createSubSubcategory`, `createLevel4`). Dabei entstehen Knoten mit **sowohl `questions` als auch `subcategories`**. Einfache `if (hasQuestions)`-Checks erkennen solche Knoten als Blatt, obwohl sie auch Unterknoten haben.
+
+**Symptom**: Kategorie-IDs in der Auswahl stimmen nicht mit `kategorieId` in den Fragen überein → manche Kategorien werden nie angezeigt, obwohl Fragen vorhanden sind.
+
+**Regel**: Ein Knoten ist genau dann ein Blatt, wenn `questions.length > 0 && (subcategories || []).length === 0`.
+
+**Alle fünf betroffenen Funktionen** müssen dieselbe Prüfung verwenden:
+```js
+const subs = node.subcategories || [];
+const isLeaf = !subs.length;
+if (hasQuestions && isLeaf) { /* Blatt verarbeiten */ return; }
+subs.forEach(s => walk(s, ...));
+```
+
+Dieses Muster trat in `collectLeafCategories` / `walk` in allen drei Spiele-Konvertierungen auf (Labyrinth, Leiterspiel, QuizPfad) sowie in den dazugehörigen `_buildCatNode`, `allLeaves`, `_countLeafQ` Funktionen.
 
 ---
 
