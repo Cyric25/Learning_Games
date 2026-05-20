@@ -503,6 +503,7 @@ let isRolling = false;
 let qTimerInterval = null;
 let qTimerRemaining = 0;
 let qResolved = false;
+let _closingAfterResult = false;
 
 // ── Init ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -863,8 +864,9 @@ function updateQuestionOverlay(gs) {
 
   if (!lq) {
     if (overlay.classList.contains('open')) {
-      // Question resolved and cleared – show result briefly then close
-      if (!qResolved) closeQuestion();
+      // Close overlay when server clears liveQuestion, but not while
+      // the active student is in their 1.5s result display window.
+      if (!_closingAfterResult) closeQuestion();
     }
     return;
   }
@@ -1100,6 +1102,7 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
 
   // Show result in overlay immediately
   qResolved = true;
+  _closingAfterResult = true;
   const resEl = document.getElementById('q-result');
   resEl.textContent = correct ? '✓ Richtig!' : '✗ Falsch!';
   resEl.className = 'q-result ' + (correct ? 'correct' : 'wrong');
@@ -1133,7 +1136,7 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
     freshGs.pendingDice = null;
     await LsStorage.save(freshGs);
     lastGs = freshGs;
-    setTimeout(() => { closeQuestion(); renderAll(freshGs); }, 1500);
+    setTimeout(() => { _closingAfterResult = false; closeQuestion(); renderAll(freshGs); }, 1500);
     return;
   }
 
@@ -1146,6 +1149,7 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
   lastGs = freshGs;
 
   setTimeout(() => {
+    _closingAfterResult = false;
     closeQuestion();
     renderAll(freshGs);
   }, 1500);
@@ -1182,6 +1186,7 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
 
   // Show result in overlay immediately
   qResolved = true;
+  _closingAfterResult = true;
   const resEl = document.getElementById('q-result');
   resEl.textContent = correct ? '✓ Richtig!' : '✗ Falsch!';
   resEl.className = 'q-result ' + (correct ? 'correct' : 'wrong');
@@ -1216,7 +1221,7 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
     freshGs.pendingDice = null;
     await LsStorage.save(freshGs);
     lastGs = freshGs;
-    setTimeout(() => { closeQuestion(); renderAll(freshGs); }, 1500);
+    setTimeout(() => { _closingAfterResult = false; closeQuestion(); renderAll(freshGs); }, 1500);
     return;
   }
 
@@ -1229,6 +1234,7 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
   lastGs = freshGs;
 
   setTimeout(() => {
+    _closingAfterResult = false;
     closeQuestion();
     renderAll(freshGs);
   }, 1500);

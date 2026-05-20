@@ -1529,6 +1529,7 @@ function selectAnswer(btn, idx, question) {
 }
 
 function showOpenAnswer() {
+  clearInterval(timerInterval);
   document.getElementById('q-show-answer').style.display = 'none';
   document.getElementById('q-open-answer').style.display = '';
   document.getElementById('q-open-actions').style.display = '';
@@ -2037,7 +2038,8 @@ function onSSEUpdate(newGs) {
     const lq = newGs.liveQuestion;
     const lqChanged = lq && lq.id !== _lastSSELiveQId;
 
-    if (lqChanged && !lq.resolved && !questionResolved) {
+    if (lqChanged && !lq.resolved) {
+      questionResolved = false;
       _lastSSELiveQId = lq.id;
       gameState.liveQuestion = lq;
       gameState.usedQuestionIds = newGs.usedQuestionIds;
