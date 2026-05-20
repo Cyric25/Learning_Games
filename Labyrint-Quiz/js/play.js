@@ -515,7 +515,7 @@ function showQuestionModal() {
         correctAnswer = q.options[q.correctIndex ?? 0] || '';
       }
     } else {
-      correctAnswer = q.answer || '';
+      correctAnswer = q.answer || q.hint || '';
     }
 
     _waitingForTeacher = true;
@@ -585,7 +585,7 @@ function showQuestionModal() {
     _waitingForTeacher = true;
     const openState = JSON.parse(JSON.stringify(remoteState));
     openState.activeQuestion = {
-      id: q.id, question: q.question, answer: q.answer || '',
+      id: q.id, question: q.question, answer: q.answer || q.hint || '',
       teamIdx: myTeamId, contextType: questionContext.type,
       target: Object.assign({}, questionContext.target), questionResult: null
     };

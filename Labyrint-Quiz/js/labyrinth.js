@@ -625,14 +625,21 @@ function placeTeamSymbols(grid, teams, perTeam, seed) {
 }
 
 // ── Remote State anwenden ─────────────────────────────────────────
+let _teacherEvalQuestionId = null;
+
 function applyRemoteState(data) {
   if (!data?.meta || !localGrid) return;
   gameState = data;
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
-  if (data.activeQuestion && data.activeQuestion.questionResult === null) {
-    if (!teacherEvalVisible) showTeacherEvalModal(data.activeQuestion);
+  const aq = data.activeQuestion;
+  if (aq && aq.questionResult === null) {
+    if (!teacherEvalVisible) showTeacherEvalModal(aq);
   } else {
-    closeTeacherEvalModal();
+    // Only close if the question we were evaluating is now gone/resolved
+    // Prevents stale SSE messages from closing a freshly opened modal
+    if (!teacherEvalVisible || !aq || aq.id === _teacherEvalQuestionId) {
+      closeTeacherEvalModal();
+    }
   }
   renderBoard();
 }
@@ -648,7 +655,8 @@ function showTeacherEvalModal(aq) {
   if (teamEl) teamEl.textContent = team ? `${team.emoji} ${team.name}` : '';
   if (trigEl) trigEl.textContent = aq.contextType === 'door' ? '🔒 Tür öffnen' : '🔮 Symbol einsammeln';
   if (qEl) qEl.textContent = aq.question;
-  if (aEl) aEl.textContent = aq.answer;
+  if (aEl) aEl.textContent = aq.answer || '–';
+  _teacherEvalQuestionId = aq.id;
   modal.style.display = 'flex';
   teacherEvalVisible = true;
 }
@@ -657,15 +665,22 @@ function closeTeacherEvalModal() {
   const modal = document.getElementById('teacher-eval-modal');
   if (modal) modal.style.display = 'none';
   teacherEvalVisible = false;
+  _teacherEvalQuestionId = null;
 }
 
-function resolveOpenQuestion(correct) {
-  if (!gameState) return;
-  const newState = JSON.parse(JSON.stringify(gameState));
-  if (newState.activeQuestion) newState.activeQuestion.questionResult = correct;
+async function resolveOpenQuestion(correct) {
+  if (!gameCode) return;
+  closeTeacherEvalModal();
+  // Load fresh state to avoid overwriting student's already-advanced state
+  const fresh = await GameSync.load(gameCode);
+  if (!fresh || !fresh.activeQuestion || fresh.activeQuestion.questionResult !== null) {
+    // Student already resolved — nothing to do
+    return;
+  }
+  const newState = JSON.parse(JSON.stringify(fresh));
+  newState.activeQuestion.questionResult = correct;
   gameState = newState;
   GameSync.save(gameCode, newState);
-  closeTeacherEvalModal();
 }
 window.resolveOpenQuestion = resolveOpenQuestion;
 
