@@ -433,7 +433,6 @@ window.addEventListener('resize', () => {
 
 // ── Init ──────────────────────────────────────────────────────────
 (function() {
-  applyTheme();
   const urlCode = new URLSearchParams(window.location.search).get('code');
   if (urlCode) {
     document.getElementById('join-code').value = urlCode;

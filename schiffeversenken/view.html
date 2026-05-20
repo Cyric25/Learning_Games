@@ -799,7 +799,6 @@ window.submitMCAnswer = submitMCAnswer;
 
 // ── Init ──────────────────────────────────────────────────────────
 (async function init() {
-  applyTheme();
   const qData = await loadQuestions();
   allQuestions = flattenQuestions(qData.categories || []);
 
