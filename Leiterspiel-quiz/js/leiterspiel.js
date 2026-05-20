@@ -1531,7 +1531,7 @@ function selectAnswer(btn, idx, question) {
 function showOpenAnswer() {
   clearInterval(timerInterval);
   document.getElementById('q-show-answer').style.display = 'none';
-  document.getElementById('q-open-answer').style.display = '';
+  document.getElementById('q-open-answer').style.display = 'block';
   document.getElementById('q-open-actions').style.display = '';
 }
 
@@ -2055,15 +2055,27 @@ function onSSEUpdate(newGs) {
     }
 
     // React to liveQuestion cleared (student handled movement)
-    if (!lq && gameState.liveQuestion && gameState.liveQuestion.resolved) {
+    if (!lq && _lastSSELiveQId !== null) {
       _lastSSELiveQId = null;
       gameState.liveQuestion = null;
       gameState.currentTurnIdx = newGs.currentTurnIdx;
+      newGs.teams.forEach((t, i) => {
+        if (gameState.teams[i]) {
+          gameState.teams[i].position = t.position;
+          gameState.teams[i].score = t.score;
+          gameState.teams[i].correctCount = t.correctCount;
+          gameState.teams[i].wrongCount = t.wrongCount;
+        }
+      });
       updatePieces();
       updateActiveBanner();
       updateTeamList();
-      const modal = document.getElementById('question-modal');
-      if (modal.classList.contains('open')) modal.classList.remove('open');
+      if (!questionResolved) {
+        // Student answered first — close teacher modal without resolving again
+        const modal = document.getElementById('question-modal');
+        if (modal.classList.contains('open')) modal.classList.remove('open');
+        clearInterval(timerInterval);
+      }
       document.getElementById('dice-display').textContent = '🎲';
       updateDiceButton(true);
     }
