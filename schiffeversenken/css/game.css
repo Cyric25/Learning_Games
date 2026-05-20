@@ -1,20 +1,22 @@
 /* ── Schiffeversenken-Quiz — game.css ──────────────────────────────
-   Dark by default (ozean/nautisch). body.light = helles Override.
+   Dark by default (Standard Dunkelblau). body.light = Orange Override.
    ─────────────────────────────────────────────────────────────── */
 
 :root {
-  --bg-primary:    #0d1b2a;
+  --bg-body:       linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  --bg-primary:    #16213e;
   --bg-secondary:  #1b2d42;
-  --bg-card:       #1e3a5f;
-  --bg-card-hover: #264d7a;
-  --accent:        #4fc3f7;
-  --accent-dark:   #0288d1;
-  --text-primary:  #e8f4f8;
-  --text-secondary:#90caf9;
-  --border:        rgba(79,195,247,0.18);
-  --grid-water:    #0a1628;
-  --grid-water-h:  #122135;
-  --shadow:        0 4px 20px rgba(0,0,0,0.5);
+  --bg-card:       #1a2744;
+  --bg-card-hover: #1a4a80;
+  --accent:        #f7971e;
+  --accent-dark:   #E34F20;
+  --accent-bg:     rgba(247,151,30,.12);
+  --text-primary:  #ffffff;
+  --text-secondary:#a8a8b3;
+  --border:        rgba(255,255,255,0.12);
+  --grid-water:    #0d1b2e;
+  --grid-water-h:  #1a2744;
+  --shadow:        0 4px 20px rgba(0,0,0,0.40);
   --success:       #2ecc71;
   --danger:        #e74c3c;
   --warning:       #f39c12;
@@ -22,18 +24,20 @@
 }
 
 body.light {
-  --bg-primary:    #e3f2fd;
-  --bg-secondary:  #ffffff;
-  --bg-card:       #f0f8ff;
-  --bg-card-hover: #dbeeff;
-  --accent:        #0288d1;
-  --accent-dark:   #01579b;
-  --text-primary:  #1a237e;
-  --text-secondary:#5c6bc0;
-  --border:        rgba(2,136,209,0.2);
-  --grid-water:    #bbdefb;
-  --grid-water-h:  #90caf9;
-  --shadow:        0 4px 20px rgba(2,136,209,0.15);
+  --bg-body:       linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f8f9fa;
+  --bg-card:       #fff3ee;
+  --bg-card-hover: #ffe0d0;
+  --accent:        #E34F20;
+  --accent-dark:   #c73518;
+  --accent-bg:     rgba(227,79,32,.08);
+  --text-primary:  #1e293b;
+  --text-secondary:#64748b;
+  --border:        #e0e0e0;
+  --grid-water:    #fde8dc;
+  --grid-water-h:  #ffe0d0;
+  --shadow:        0 4px 20px rgba(227,79,32,0.15);
   --input-bg:      rgba(0,0,0,0.04);
 }
 
@@ -42,7 +46,7 @@ body.light {
 html, body {
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
-  background: var(--bg-primary);
+  background: var(--bg-body);
   color: var(--text-primary);
   transition: background .2s, color .2s;
 }
@@ -58,18 +62,18 @@ button { cursor: pointer; font-family: inherit; }
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: var(--bg-primary);
+  background: var(--bg-body);
 }
 .screen-full {
   min-height: 100vh;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--bg-body);
 }
 
 /* ── Spielwähler (gs- Pattern) ── */
 #game-selector {
   position: fixed; inset: 0;
-  background: var(--bg-primary);
+  background: var(--bg-body);
   z-index: 600;
   align-items: center;
   justify-content: center;
@@ -231,7 +235,7 @@ button { cursor: pointer; font-family: inherit; }
 .cat-group-count { font-size: .82rem; color: var(--text-secondary); }
 .cat-group-toggle { color: var(--text-secondary); font-size: .85rem; transition: transform .2s; }
 .cat-group-wrap.open .cat-group-toggle { transform: rotate(180deg); }
-.cat-group-children { display: none; padding: .4rem .6rem; background: var(--bg-primary); }
+.cat-group-children { display: none; padding: .4rem .6rem; background: var(--bg-card); }
 .cat-group-wrap.open .cat-group-children { display: flex; flex-direction: column; gap: .3rem; }
 .cat-select-item {
   display: flex; align-items: center; gap: .7rem;
@@ -241,7 +245,7 @@ button { cursor: pointer; font-family: inherit; }
   transition: border-color .2s, background .15s;
 }
 .cat-select-item:hover { border-color: var(--accent); background: var(--bg-card-hover); }
-.cat-select-item.selected { border-color: var(--accent); background: rgba(79,195,247,.08); }
+.cat-select-item.selected { border-color: var(--accent); background: var(--accent-bg); }
 .cat-select-icon { font-size: 1.1rem; }
 .cat-select-name { flex: 1; font-size: .9rem; }
 .cat-select-count { font-size: .8rem; color: var(--text-secondary); }
@@ -283,7 +287,7 @@ button { cursor: pointer; font-family: inherit; }
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 .setup-code-banner {
   text-align: center; padding: .5rem 1rem;
-  background: rgba(79,195,247,.08);
+  background: var(--accent-bg);
   border: 2px solid var(--accent); border-radius: 10px;
   font-size: .85rem; color: var(--text-secondary);
 }
@@ -465,7 +469,7 @@ button { cursor: pointer; font-family: inherit; }
 }
 .modal-result-banner.hit { background: rgba(46,204,113,.15); color: var(--success); }
 .modal-result-banner.miss { background: rgba(231,76,60,.1); color: var(--danger); }
-.modal-result-banner.waiting { background: rgba(79,195,247,.1); color: var(--accent); }
+.modal-result-banner.waiting { background: var(--accent-bg); color: var(--accent); }
 .modal-btns { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
 .btn-modal-correct {
   padding: .7rem 1.5rem; background: var(--success);
@@ -515,3 +519,27 @@ button { cursor: pointer; font-family: inherit; }
   border: 1px solid var(--border);
 }
 .code-val { font-size: 1.2rem; letter-spacing: 2px; font-family: monospace; font-weight: 800; }
+
+/* ── Mobile responsiveness ── */
+@media (max-width: 680px) {
+  .gs-container { border-radius: 14px; }
+  .gs-body { padding: 1rem; }
+  .setup-card { padding: 1rem; }
+  .game-topbar { flex-wrap: wrap; gap: .4rem; padding: .5rem .7rem; }
+  .topbar-btns { gap: .3rem; flex-wrap: wrap; }
+  .topbar-btns .header-btn { padding: 4px 9px; font-size: .78rem; }
+  .grid-cell        { width: 30px; height: 30px; font-size: .6rem; }
+  .grid-cell-header { width: 22px; height: 22px; font-size: .6rem; }
+  .game-right { padding: .7rem .8rem; }
+  .modal-card { padding: 1.3rem; }
+  .modal-question-text { font-size: 1rem; }
+  .mc-option { padding: .55rem .8rem; font-size: .9rem; }
+  .btn-modal-correct, .btn-modal-wrong, .btn-modal-next { padding: .6rem 1.1rem; font-size: .92rem; }
+}
+@media (max-width: 480px) {
+  .grid-cell        { width: 25px; height: 25px; font-size: .52rem; }
+  .grid-cell-header { width: 19px; height: 19px; font-size: .55rem; }
+  .game-topbar-title { font-size: .88rem; }
+  .turn-banner { font-size: .82rem; padding: .4rem .7rem; }
+  .modal-card { padding: 1rem; }
+}
