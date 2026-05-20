@@ -655,14 +655,16 @@ function applyRemoteState(data) {
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
   const aq = data.activeQuestion;
   if (aq && aq.questionResult === null) {
-    if (!teacherEvalVisible) showTeacherEvalModal(aq);
+    // Lehrkraft-Eval-Modal nur für offene Fragen zeigen (nicht für MC)
+    if (aq.needsTeacherEval !== false && !teacherEvalVisible) showTeacherEvalModal(aq);
     updateTeacherQuestionPanel(aq, data);
   } else {
-    // Only close if the question we were evaluating is now gone/resolved
-    if (!teacherEvalVisible || !aq || aq.id === _teacherEvalQuestionId) {
-      closeTeacherEvalModal();
+    if (!teacherEvalVisible || !aq || aq.id === _teacherEvalQuestionId) closeTeacherEvalModal();
+    if (aq && aq.questionResult !== null) {
+      updateTeacherQuestionPanel(aq, data);  // Ergebnis kurz anzeigen
+    } else {
+      clearTeacherQuestionPanel();
     }
-    clearTeacherQuestionPanel();
   }
   renderBoard();
 }
@@ -671,13 +673,35 @@ function updateTeacherQuestionPanel(aq, state) {
   const panel = document.getElementById('teacher-q-panel'); if (!panel) return;
   const team = state.teams?.[aq.teamIdx];
   const contextIcon = aq.contextType === 'door' ? '🔒 Tür' : '🔮 Symbol';
+
+  let contentHtml = '';
+  if (aq.questionResult !== null && aq.questionResult !== undefined) {
+    contentHtml = '<div style="font-size:1rem;font-weight:800;text-align:center;padding:0.35rem;border-radius:8px;margin-top:0.3rem;' +
+      (aq.questionResult
+        ? 'background:rgba(22,163,74,0.12);color:var(--success)'
+        : 'background:rgba(220,38,38,0.10);color:var(--danger)') + '">' +
+      (aq.questionResult ? '✓ Richtig!' : '✗ Falsch!') + '</div>';
+  } else if (aq.options?.length) {
+    // MC: Optionen anzeigen, korrekte hervorheben
+    const correctSet = new Set(aq.correctOptions || []);
+    contentHtml = '<div style="display:flex;flex-direction:column;gap:0.2rem;margin-top:0.3rem;">' +
+      aq.options.map(opt => {
+        const ok = correctSet.has(opt);
+        return '<div style="padding:0.2rem 0.5rem;border-radius:4px;font-size:0.82rem;' +
+          (ok ? 'background:rgba(22,163,74,0.15);color:var(--success);font-weight:700;border:1px solid rgba(22,163,74,0.3)'
+              : 'color:var(--text-secondary)') + '">' + escapeHtml(opt) + '</div>';
+      }).join('') + '</div>';
+  } else if (aq.answer) {
+    contentHtml = '<div class="tqp-a">💡 ' + escapeHtml(aq.answer) + '</div>';
+  }
+
   panel.innerHTML =
     '<div class="tqp-header">' +
       '<span class="tqp-team-badge" style="background:' + (team?.color || '#888') + '">' + (team?.emoji || '') + ' ' + escapeHtml(team?.name || '') + '</span>' +
       '<span class="tqp-ctx">' + contextIcon + '</span>' +
     '</div>' +
     '<div class="tqp-q">' + escapeHtml(aq.question) + '</div>' +
-    (aq.answer ? '<div class="tqp-a">💡 ' + escapeHtml(aq.answer) + '</div>' : '');
+    contentHtml;
   panel.style.display = '';
 }
 

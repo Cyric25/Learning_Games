@@ -584,6 +584,21 @@ function showQuestionModal() {
         btn.onclick = () => resolveChoice(i); optEl.appendChild(btn);
       });
     }
+
+    // Frage für Lehrkraft + Tafelmodus sichtbar machen
+    const correctOpts = isMultiCorrect(q)
+      ? q.correctIndices.map(i => q.options[i])
+      : [q.options[q.correctIndex ?? 0]];
+    const mcAqState = JSON.parse(JSON.stringify(remoteState));
+    mcAqState.activeQuestion = {
+      id: q.id, question: q.question, options: q.options,
+      correctOptions: correctOpts, answer: correctOpts.join(', '),
+      teamIdx: myTeamId, contextType: questionContext.type,
+      target: Object.assign({}, questionContext.target),
+      questionResult: null, needsTeacherEval: false
+    };
+    postState(mcAqState);
+
     startTimer(remoteState.config?.timerSeconds || 0);
 
   } else {
@@ -671,6 +686,14 @@ function resolveQuestionResult(correct) {
   }
   resultEl.style.display = 'block';
   document.getElementById('q-continue').style.display = 'block';
+
+  // MC-Fragen: Ergebnis für Lehrkraft + Tafelmodus veröffentlichen
+  if (remoteState?.activeQuestion?.needsTeacherEval === false &&
+      remoteState.activeQuestion.questionResult === null) {
+    const resState = JSON.parse(JSON.stringify(remoteState));
+    resState.activeQuestion.questionResult = correct;
+    postState(resState);
+  }
 }
 
 function continueAfterQuestion() {

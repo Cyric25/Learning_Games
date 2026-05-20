@@ -335,6 +335,15 @@
     const isNew = aq.id !== _bqLastId;
     _bqLastId = aq.id;
 
+    const optionsHtml = aq.options?.length
+      ? '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-top:0.4rem;">' +
+          aq.options.map(opt =>
+            '<div style="padding:0.3rem 0.7rem;border-radius:6px;font-size:clamp(0.82rem,1.5vw,0.95rem);' +
+            'background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-card);">' +
+            _bEsc(opt) + '</div>'
+          ).join('') + '</div>'
+      : '';
+
     panel.innerHTML =
       '<div class="bqp-active">' +
         '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
@@ -343,6 +352,7 @@
         '</div>' +
         '<div class="bqp-timer-wrap"><div class="bqp-timer-bar" id="bqp-tbar" style="width:100%"></div></div>' +
         '<div class="bqp-question">' + _bEsc(aq.question) + '</div>' +
+        optionsHtml +
       '</div>';
 
     if (isNew && state.config?.timerSeconds) {
