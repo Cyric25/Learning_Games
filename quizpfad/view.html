@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuizPfad – Schüleransicht</title>
+  <title>QuizPfad – Spieleransicht</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
   <style>
     :root {
       --bg-body: #f5e6d3;
       --bg-card: #ffffff;
       --bg-field: #fff8f0;
+      --bg-field-hover: #fff0e0;
       --text-primary: #3d2b1f;
       --text-secondary: #7a6855;
       --text-light: #a89480;
@@ -25,6 +26,7 @@
       --bg-body: #2c1f14;
       --bg-card: #3a2a1c;
       --bg-field: #4a3728;
+      --bg-field-hover: #5a4738;
       --text-primary: #f5e6d3;
       --text-secondary: #c4a882;
       --text-light: #8a7560;
@@ -32,244 +34,107 @@
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg-body);
-      color: var(--text-primary);
-      min-height: 100vh;
-    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-body); color: var(--text-primary); min-height: 100vh; }
 
     .screen { display: none; }
     .screen.active { display: flex; flex-direction: column; min-height: 100vh; }
 
     /* ── Join Screen ── */
-    #screen-join {
-      align-items: center; justify-content: center;
-      padding: 2rem;
-    }
-    .join-card {
-      background: var(--bg-card);
-      border-radius: 20px;
-      padding: 2.5rem;
-      max-width: 420px; width: 100%;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-      text-align: center;
-    }
+    #screen-join { align-items: center; justify-content: center; padding: 2rem; }
+    .join-card { background: var(--bg-card); border-radius: 20px; padding: 2.5rem; max-width: 420px; width: 100%; box-shadow: var(--shadow); border: 1px solid var(--border); text-align: center; }
     .join-title { font-size: 2rem; font-weight: 800; color: var(--accent); margin-bottom: 8px; }
     .join-sub { color: var(--text-secondary); margin-bottom: 2rem; }
-    .join-input {
-      width: 100%; padding: 14px;
-      font-size: 2rem; font-weight: 800;
-      letter-spacing: 8px; text-align: center; text-transform: uppercase;
-      background: var(--bg-field);
-      border: 2px solid var(--border);
-      border-radius: 14px;
-      color: var(--text-primary);
-      font-family: monospace;
-      outline: none;
-      margin-bottom: 12px;
-    }
+    .join-input { width: 100%; padding: 14px; font-size: 2rem; font-weight: 800; letter-spacing: 8px; text-align: center; text-transform: uppercase; background: var(--bg-field); border: 2px solid var(--border); border-radius: 14px; color: var(--text-primary); font-family: monospace; outline: none; margin-bottom: 12px; }
     .join-input:focus { border-color: var(--accent); }
-    .btn-join {
-      width: 100%; padding: 14px;
-      background: linear-gradient(135deg, var(--accent-warm), var(--accent));
-      color: #fff; border: none; border-radius: 14px;
-      font-size: 1.1rem; font-weight: 700; cursor: pointer;
-    }
+    .btn-join { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent-warm), var(--accent)); color: #fff; border: none; border-radius: 14px; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
     .btn-join:hover { opacity: .9; }
     .join-error { color: var(--danger); font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
 
+    /* ── Team Select Screen ── */
+    #screen-team { align-items: center; justify-content: center; padding: 2rem; }
+    .team-select-card { background: var(--bg-card); border-radius: 20px; padding: 2rem; max-width: 480px; width: 100%; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .team-select-title { font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-bottom: 6px; text-align: center; }
+    .team-select-sub { color: var(--text-secondary); font-size: 0.9rem; text-align: center; margin-bottom: 1.5rem; }
+    .team-select-list { display: flex; flex-direction: column; gap: 8px; }
+    .team-select-btn { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 2px solid var(--border); border-radius: 14px; background: var(--bg-field); color: var(--text-primary); font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: left; }
+    .team-select-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--bg-field-hover); }
+    .team-select-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ts-dot { width: 36px; height: 36px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); flex-shrink: 0; }
+    .ts-taken { font-size: 0.75rem; font-weight: 700; color: var(--danger); margin-left: auto; }
+    .team-code-info { text-align: center; margin-top: 1.5rem; font-size: 1.4rem; font-weight: 800; color: var(--accent); letter-spacing: 4px; font-family: monospace; }
+
     /* ── Wait Screen ── */
-    #screen-wait {
-      align-items: center; justify-content: center;
-      padding: 2rem;
-    }
-    .wait-card {
-      background: var(--bg-card);
-      border-radius: 20px;
-      padding: 3rem 2rem;
-      max-width: 460px; width: 100%;
-      text-align: center;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-    }
-    .wait-icon { font-size: 3.5rem; margin-bottom: 1rem; animation: spin 3s linear infinite; }
-    @keyframes spin { 0%,100%{transform:rotate(-10deg)} 50%{transform:rotate(10deg)} }
+    #screen-wait { align-items: center; justify-content: center; padding: 2rem; }
+    .wait-card { background: var(--bg-card); border-radius: 20px; padding: 3rem 2rem; max-width: 460px; width: 100%; text-align: center; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .wait-icon { font-size: 3.5rem; margin-bottom: 1rem; animation: sway 3s linear infinite; }
+    @keyframes sway { 0%,100%{transform:rotate(-10deg)} 50%{transform:rotate(10deg)} }
     .wait-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
     .wait-code { font-size: 2.5rem; font-weight: 900; color: var(--accent); letter-spacing: 6px; font-family: monospace; margin: 1rem 0; }
     .wait-sub { color: var(--text-secondary); font-size: 0.9rem; }
-    .wait-status { margin-top: 1rem; padding: 8px 16px; background: var(--bg-field); border-radius: 10px; font-size: 0.9rem; color: var(--text-light); }
+    .wait-team-badge { display: inline-block; margin: 1rem auto 0; padding: 6px 18px; border-radius: 20px; font-size: 0.95rem; font-weight: 700; color: #fff; }
 
     /* ── Game Screen ── */
     #screen-game { padding: 1rem; gap: 1rem; }
-
-    .game-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 14px;
-      background: var(--bg-card);
-      border-radius: 14px;
-      box-shadow: var(--shadow);
-    }
+    .game-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-card); border-radius: 14px; box-shadow: var(--shadow); }
     .game-code { font-weight: 800; letter-spacing: 2px; color: var(--accent); font-size: 1rem; }
     .game-round { color: var(--text-secondary); font-size: 0.85rem; }
-
-    .active-banner {
-      padding: 10px 16px;
-      border-radius: 12px;
-      font-size: 1rem; font-weight: 700;
-      text-align: center;
-      color: #fff;
-    }
+    .active-banner { padding: 10px 16px; border-radius: 12px; font-size: 1rem; font-weight: 700; text-align: center; color: #fff; }
+    .active-banner.my-turn { animation: myTurnPulse 1.5s ease-in-out infinite; font-size: 1.1rem; }
+    @keyframes myTurnPulse { 0%,100%{opacity:1} 50%{opacity:0.75} }
 
     /* Teams grid */
-    .teams-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 8px;
-    }
-    .team-tile {
-      background: var(--bg-card);
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 12px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .team-tile.active { box-shadow: 0 0 12px rgba(231,111,81,0.3); }
-    .team-dot {
-      width: 34px; height: 34px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; color: #fff;
-      font-size: 0.85rem; flex-shrink: 0;
-      border: 2px solid rgba(255,255,255,0.5);
-    }
+    .teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .team-tile { background: var(--bg-card); border: 2px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s; }
+    .team-tile.active { border-color: var(--accent); box-shadow: 0 0 12px rgba(231,111,81,0.3); }
+    .team-tile.mine { border-color: var(--accent-teal); }
+    .team-dot { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 0.85rem; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.5); }
     .team-info { flex: 1; min-width: 0; }
     .team-name { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .team-pos { font-size: 0.75rem; color: var(--text-light); }
 
     /* Board mini */
-    .board-mini {
-      background: var(--bg-card);
-      border-radius: 14px;
-      padding: 10px;
-      box-shadow: var(--shadow);
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 3px;
-    }
-    .mini-field {
-      aspect-ratio: 1.2;
-      border-radius: 6px;
-      background: var(--bg-field);
-      display: flex; align-items: center; justify-content: center;
-      font-size: clamp(0.7rem, 2vw, 1rem);
-      position: relative;
-      overflow: hidden;
-    }
+    .board-mini { background: var(--bg-card); border-radius: 14px; padding: 10px; box-shadow: var(--shadow); flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+    .mini-field { aspect-ratio: 1.2; border-radius: 6px; background: var(--bg-field); display: flex; align-items: center; justify-content: center; font-size: clamp(0.7rem, 2vw, 1rem); position: relative; overflow: hidden; }
     .mini-field.start-f { background: #2a9d8f; }
-    .mini-field.goal-f  { background: #e76f51; }
-    .mini-pieces {
-      display: flex; flex-wrap: wrap; gap: 1px;
-      position: absolute; top: 1px; left: 1px; right: 1px;
-      justify-content: center;
-    }
-    .mini-piece {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.8);
-    }
+    .mini-field.goal-f { background: #e76f51; }
+    .mini-pieces { display: flex; flex-wrap: wrap; gap: 1px; position: absolute; top: 1px; left: 1px; right: 1px; justify-content: center; }
+    .mini-piece { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.8); }
 
-    /* Question overlay */
-    #question-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 100;
-      align-items: center; justify-content: center;
-      padding: 1rem;
-    }
+    /* ── Question overlay ── */
+    #question-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
     #question-overlay.open { display: flex; }
-    .q-card {
-      background: var(--bg-card);
-      border-radius: 20px;
-      padding: 2rem;
-      max-width: 560px; width: 100%;
-      max-height: 85vh; overflow-y: auto;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    }
-    .q-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 16px;
-    }
-    .q-team-badge {
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.85rem; font-weight: 700;
-      color: #fff;
-    }
-    .q-diff {
-      margin-left: auto;
-      font-size: 0.78rem; padding: 3px 10px;
-      border-radius: 8px;
-      background: var(--bg-field);
-      color: var(--text-light); font-weight: 600;
-    }
-    .q-text {
-      font-size: 1.3rem; font-weight: 700;
-      line-height: 1.4; margin-bottom: 20px;
-    }
+    .q-card { background: var(--bg-card); border-radius: 20px; padding: 2rem; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    .q-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .q-team-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: #fff; }
+    .q-diff { margin-left: auto; font-size: 0.78rem; padding: 3px 10px; border-radius: 8px; background: var(--bg-field); color: var(--text-light); font-weight: 600; }
+    .q-text { font-size: 1.3rem; font-weight: 700; line-height: 1.4; margin-bottom: 20px; }
     .q-options { display: flex; flex-direction: column; gap: 8px; }
-    .q-opt {
-      padding: 12px 16px;
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      background: var(--bg-field);
-      font-size: 0.95rem;
-    }
+    .q-opt { padding: 12px 16px; border: 2px solid var(--border); border-radius: 12px; background: var(--bg-field); font-size: 0.95rem; cursor: pointer; transition: all 0.2s; font-weight: 500; }
+    .q-opt:hover:not(:disabled) { border-color: var(--accent); background: var(--bg-field-hover); }
+    .q-opt.selected { border-color: var(--accent); font-weight: 700; }
     .q-opt.correct { background: rgba(42,157,143,0.15); border-color: var(--success); color: var(--success); font-weight: 700; }
-    .q-opt.wrong   { background: rgba(231,111,81,0.15); border-color: var(--danger); color: var(--danger); }
-
-    .q-result {
-      display: none; text-align: center;
-      font-size: 1.2rem; font-weight: 800;
-      padding: 12px; border-radius: 12px;
-      margin-top: 12px;
-    }
+    .q-opt.wrong { background: rgba(231,111,81,0.15); border-color: var(--danger); color: var(--danger); }
+    .q-opt:disabled { cursor: default; pointer-events: none; }
+    .q-result { display: none; text-align: center; font-size: 1.2rem; font-weight: 800; padding: 12px; border-radius: 12px; margin-top: 12px; }
     .q-result.visible { display: block; }
-    .q-result.ok  { background: rgba(42,157,143,0.15); color: var(--success); }
+    .q-result.ok { background: rgba(42,157,143,0.15); color: var(--success); }
     .q-result.bad { background: rgba(231,111,81,0.15); color: var(--danger); }
+    .q-open-label { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 1rem; font-style: italic; }
+    .q-my-turn-note { background: rgba(42,157,143,0.1); border: 1px solid var(--success); border-radius: 10px; padding: 8px 14px; font-size: 0.85rem; color: var(--success); font-weight: 600; margin-bottom: 12px; text-align: center; }
 
-    .q-open-label {
-      text-align: center; padding: 20px;
-      color: var(--text-secondary);
-      font-size: 1rem; font-style: italic;
-    }
-
-    /* Winner */
-    #screen-winner {
-      align-items: center; justify-content: center;
-      text-align: center; padding: 2rem;
-    }
-    .winner-box {
-      background: var(--bg-card);
-      border-radius: 20px;
-      padding: 3rem 2rem;
-      max-width: 460px; width: 100%;
-      box-shadow: var(--shadow);
-    }
+    /* ── Winner ── */
+    #screen-winner { align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+    .winner-box { background: var(--bg-card); border-radius: 20px; padding: 3rem 2rem; max-width: 460px; width: 100%; box-shadow: var(--shadow); }
     .winner-trophy { font-size: 4rem; margin-bottom: 1rem; }
     .winner-title { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
     .winner-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
-    .btn-rejoin {
-      padding: 12px 28px;
-      background: linear-gradient(135deg, var(--accent-warm), var(--accent));
-      color: #fff; border: none; border-radius: 12px;
-      font-size: 1rem; font-weight: 700; cursor: pointer;
-      margin-top: 1rem;
-    }
+    .btn-rejoin { padding: 12px 28px; background: linear-gradient(135deg, var(--accent-warm), var(--accent)); color: #fff; border: none; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 1rem; }
     .btn-rejoin:hover { opacity: .9; }
+
+    /* ── Kicked overlay ── */
+    .kicked-msg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    .kicked-box { background: var(--bg-card); border-radius: 20px; padding: 2rem; max-width: 360px; text-align: center; }
+    .kicked-box h2 { color: var(--danger); margin-bottom: 0.5rem; }
   </style>
 </head>
 <body>
@@ -278,12 +143,22 @@
   <div class="screen active" id="screen-join">
     <div class="join-card">
       <div class="join-title">🎲 QuizPfad</div>
-      <div class="join-sub">Gib den Code deiner Lehrkraft ein</div>
+      <div class="join-sub">Spieleransicht — Gib den Code deiner Lehrkraft ein</div>
       <input type="text" class="join-input" id="join-input" maxlength="4" placeholder="CODE"
         oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
         onkeydown="if(event.key==='Enter')doJoin()">
       <button class="btn-join" onclick="doJoin()">Beitreten →</button>
       <div class="join-error" id="join-error"></div>
+    </div>
+  </div>
+
+  <!-- ── Team Select Screen ── -->
+  <div class="screen" id="screen-team">
+    <div class="team-select-card">
+      <div class="team-select-title">Team wählen</div>
+      <div class="team-select-sub">Wähle dein Team für das Spiel.</div>
+      <div class="team-select-list" id="team-select-list"></div>
+      <div class="team-code-info" id="team-code-display"></div>
     </div>
   </div>
 
@@ -293,8 +168,8 @@
       <div class="wait-icon">⏳</div>
       <div class="wait-title">Verbunden!</div>
       <div class="wait-code" id="wait-code"></div>
-      <div class="wait-sub">Warte auf den Spielstart durch die Lehrkraft…</div>
-      <div class="wait-status" id="wait-status">Verbinde…</div>
+      <div class="wait-sub">Warte auf den Spielstart…</div>
+      <div id="wait-team-badge"></div>
     </div>
   </div>
 
@@ -302,6 +177,7 @@
   <div class="screen" id="screen-game">
     <div class="game-header">
       <span class="game-code" id="game-code-display"></span>
+      <span id="my-team-label" style="font-size:0.85rem;font-weight:700;"></span>
       <span class="game-round" id="game-round">Runde 1</span>
     </div>
     <div class="active-banner" id="active-banner">—</div>
@@ -327,6 +203,7 @@
         <span class="q-team-badge" id="q-team-badge"></span>
         <span class="q-diff" id="q-diff"></span>
       </div>
+      <div id="q-my-turn-note" class="q-my-turn-note" style="display:none">Du bist dran! Wähle eine Antwort.</div>
       <div class="q-text" id="q-text"></div>
       <div class="q-options" id="q-options"></div>
       <div class="q-open-label" id="q-open-label" style="display:none">Offene Frage – Lehrkraft wertet aus…</div>
@@ -335,7 +212,7 @@
   </div>
 
   <script>
-  // ─── QpStorage (Schüleransicht) ───────────────────────────
+  // ─── QpStorage ────────────────────────────────────────────
   const QpStorage = {
     _code: null, _serverOk: null,
     setCode(c) { this._code = c ? c.toUpperCase() : null; },
@@ -349,7 +226,15 @@
       } catch { this._serverOk = false; }
       return this._serverOk;
     },
+    _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]}; },
     _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}; },
+    async save(gs) {
+      if (!this._code) return;
+      const json = JSON.stringify(this._ser(gs));
+      localStorage.setItem('qp_gs_'+this._code, json);
+      if (await this.checkServer())
+        try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+    },
     async load(code) {
       code = (code||this._code||'').toUpperCase();
       if (!code) return null;
@@ -384,10 +269,13 @@
   };
 
   // ─── State ───────────────────────────────────────────────
-  const FIELD_COUNT = 30;
   const COLS = 6;
   let sub = null;
   let lastLiveQId = null;
+  let myTeamId = null;
+  let remoteState = null;
+  let gameCode = null;
+  let answeredCurrentQ = false;
 
   // ─── Screens ─────────────────────────────────────────────
   function showScreen(id) {
@@ -406,22 +294,97 @@
   }
 
   async function connectToGame(code) {
-    QpStorage.setCode(code);
-    const gs = await QpStorage.load(code);
-    if (!gs) {
-      document.getElementById('join-error').textContent = 'Spiel nicht gefunden.';
+    gameCode = code.toUpperCase();
+    QpStorage.setCode(gameCode);
+    const gs = await QpStorage.load(gameCode);
+    if (!gs) { document.getElementById('join-error').textContent = 'Spiel nicht gefunden.'; return; }
+    remoteState = gs;
+
+    // Auto-reconnect saved team
+    const saved = localStorage.getItem('qp_myteam_' + gameCode);
+    if (saved !== null) {
+      const tid = parseInt(saved, 10);
+      if (gs.teams && gs.teams[tid]) {
+        const taken = new Set(gs.takenTeams || []);
+        if (taken.has(tid)) {
+          // Still taken (ours)
+          myTeamId = tid;
+          startGameView(gs);
+          if (sub) sub.unsubscribe();
+          sub = QpStorage.subscribe(gameCode, applyGameState);
+          return;
+        }
+      }
+      localStorage.removeItem('qp_myteam_' + gameCode);
+    }
+
+    // Show team selection
+    showTeamSelect(gs);
+    if (sub) sub.unsubscribe();
+    sub = QpStorage.subscribe(gameCode, applyGameState);
+  }
+
+  function showTeamSelect(gs) {
+    document.getElementById('team-code-display').textContent = gameCode;
+    const list = document.getElementById('team-select-list');
+    list.innerHTML = '';
+    const taken = new Set(gs.takenTeams || []);
+
+    (gs.teams || []).forEach((t, i) => {
+      const isTaken = taken.has(i);
+      const btn = document.createElement('button');
+      btn.className = 'team-select-btn' + (isTaken ? ' taken' : '');
+      btn.disabled = isTaken;
+      btn.innerHTML = `<div class="ts-dot" style="background:${t.color}"></div>${t.name}${isTaken ? '<span class="ts-taken">belegt</span>' : ''}`;
+      if (!isTaken) btn.onclick = () => selectTeam(i);
+      list.appendChild(btn);
+    });
+    showScreen('screen-team');
+  }
+
+  async function selectTeam(id) {
+    const fresh = (await QpStorage.load(gameCode)) || remoteState;
+    if (!fresh) return;
+    const taken = new Set(fresh.takenTeams || []);
+    if (taken.has(id)) {
+      remoteState = fresh;
+      showTeamSelect(fresh);
       return;
     }
-    document.getElementById('wait-code').textContent = code;
-    showScreen('screen-wait');
-    applyGameState(gs);
+    taken.add(id);
+    const newState = JSON.parse(JSON.stringify(QpStorage._ser(fresh)));
+    newState.takenTeams = [...taken];
+    await QpStorage.save(QpStorage._deser(newState));
+    remoteState = QpStorage._deser(newState);
+    myTeamId = id;
+    localStorage.setItem('qp_myteam_' + gameCode, id);
+    startGameView(remoteState);
+  }
 
-    if (sub) sub.unsubscribe();
-    sub = QpStorage.subscribe(code, applyGameState);
+  function startGameView(gs) {
+    if (gs.phase === 'playing' && gs.board && gs.board.length > 0) {
+      showScreen('screen-game');
+      renderGame(gs);
+    } else {
+      const team = gs.teams && myTeamId !== null ? gs.teams[myTeamId] : null;
+      document.getElementById('wait-code').textContent = gameCode;
+      const badge = document.getElementById('wait-team-badge');
+      if (team) {
+        badge.innerHTML = `<div class="wait-team-badge" style="background:${team.color}">${team.name}</div>`;
+      }
+      showScreen('screen-wait');
+    }
   }
 
   // ─── Apply game state from SSE ────────────────────────────
   function applyGameState(gs) {
+    remoteState = gs;
+
+    // Check if kicked
+    if (myTeamId !== null && Array.isArray(gs.takenTeams) && !gs.takenTeams.includes(myTeamId)) {
+      handleKicked(); return;
+    }
+
     if (gs.phase === 'finished') {
       const winner = (gs.teams || []).reduce((best, t) => t.position > (best ? best.position : -1) ? t : best, null);
       document.getElementById('winner-name').textContent = winner ? winner.name : '';
@@ -435,78 +398,109 @@
       showScreen('screen-game');
       renderGame(gs);
     } else {
-      // Still in setup
-      document.getElementById('wait-status').textContent = 'Spiel wird vorbereitet…';
+      if (myTeamId !== null) startGameView(gs);
+      else if (gs.teams) showTeamSelect(gs);
     }
 
     // Live question
     const lq = gs.liveQuestion;
     if (lq && lq.id !== lastLiveQId) {
       lastLiveQId = lq.id;
+      answeredCurrentQ = false;
       showQuestion(lq, gs.teams || []);
-    } else if (!lq) {
+    } else if (!lq && lastLiveQId !== null) {
       lastLiveQId = null;
-      if (lq === null) closeQuestion();
+      closeQuestion();
     }
 
     if (lq && lq.resolved && lq.id === lastLiveQId) {
-      updateQuestionResult(lq, gs.teams || []);
+      updateQuestionResult(lq);
     }
+  }
+
+  function handleKicked() {
+    closeQuestion();
+    if (sub) { sub.unsubscribe(); sub = null; }
+    localStorage.removeItem('qp_myteam_' + gameCode);
+    myTeamId = null;
+
+    const div = document.createElement('div');
+    div.className = 'kicked-msg';
+    div.innerHTML = '<div class="kicked-box"><h2>Verbindung getrennt</h2><p style="margin:0.5rem 0 1rem">Du wurdest vom Spielleiter entfernt.</p><button class="btn-rejoin" onclick="this.closest(\'.kicked-msg\').remove();backToJoin()">Zurück</button></div>';
+    document.body.appendChild(div);
+
+    setTimeout(async () => {
+      const state = await QpStorage.load(gameCode);
+      if (state && state.teams) {
+        remoteState = state;
+        document.querySelector('.kicked-msg')?.remove();
+        showTeamSelect(state);
+        sub = QpStorage.subscribe(gameCode, applyGameState);
+      }
+    }, 2000);
   }
 
   function renderGame(gs) {
     const teams = gs.teams || [];
     const board = gs.board || [];
     const cur = gs.currentTeamIdx || 0;
+    const fc = gs.fieldCount || board.length;
 
-    // Header
-    document.getElementById('game-code-display').textContent = gs.meta.gameCode || QpStorage.getCode();
+    document.getElementById('game-code-display').textContent = gs.meta.gameCode || gameCode;
     document.getElementById('game-round').textContent = 'Runde ' + (gs.round || 1);
 
-    // Active team banner
+    const myTeam = myTeamId !== null ? teams[myTeamId] : null;
+    const myLbl = document.getElementById('my-team-label');
+    if (myTeam) {
+      myLbl.textContent = '🏷 ' + myTeam.name;
+      myLbl.style.color = myTeam.color;
+    } else {
+      myLbl.textContent = '';
+    }
+
     const active = teams[cur];
     const banner = document.getElementById('active-banner');
     if (active) {
       banner.textContent = active.name + ' ist dran!';
       banner.style.background = active.color;
+      const isMyTurn = myTeamId !== null && cur === myTeamId;
+      banner.className = 'active-banner' + (isMyTurn ? ' my-turn' : '');
     }
 
-    // Teams
     const grid = document.getElementById('teams-grid');
     grid.innerHTML = '';
     teams.forEach((t, i) => {
+      const isActive = i === cur;
+      const isMine = i === myTeamId;
       const div = document.createElement('div');
-      div.className = 'team-tile' + (i === cur ? ' active' : '');
-      div.style.borderColor = i === cur ? t.color : '';
+      div.className = 'team-tile' + (isActive ? ' active' : '') + (isMine ? ' mine' : '');
+      if (isActive) div.style.borderColor = t.color;
       div.innerHTML =
-        '<div class="team-dot" style="background:'+t.color+'">'+(i+1)+'</div>' +
-        '<div class="team-info"><div class="team-name">'+t.name+'</div>' +
-        '<div class="team-pos">Feld '+t.position+'/'+(FIELD_COUNT-1)+'</div></div>';
+        `<div class="team-dot" style="background:${t.color}">${i+1}</div>` +
+        `<div class="team-info"><div class="team-name">${t.name}</div><div class="team-pos">Feld ${t.position}/${fc-1}</div></div>`;
       grid.appendChild(div);
     });
 
     // Mini board
     const mini = document.getElementById('board-mini');
     mini.innerHTML = '';
-    for (let row = 0; row < Math.ceil(FIELD_COUNT / COLS); row++) {
+    for (let row = 0; row < Math.ceil(fc / COLS); row++) {
       const reversed = row % 2 === 1;
       for (let col = 0; col < COLS; col++) {
         const actualCol = reversed ? (COLS - 1 - col) : col;
         const idx = row * COLS + actualCol;
-        if (idx >= FIELD_COUNT) { const e = document.createElement('div'); e.style.visibility='hidden'; mini.appendChild(e); continue; }
+        if (idx >= fc) { const e = document.createElement('div'); e.style.visibility='hidden'; mini.appendChild(e); continue; }
         const field = board[idx];
         const div = document.createElement('div');
         div.className = 'mini-field' + (field.type === 'start' ? ' start-f' : field.type === 'goal' ? ' goal-f' : '');
         if (field.type === 'category') div.style.background = field.color;
         div.textContent = field.icon || '';
-
         const pDiv = document.createElement('div');
         pDiv.className = 'mini-pieces';
         teams.forEach(t => {
           if (t.position === idx) {
             const p = document.createElement('div');
-            p.className = 'mini-piece';
-            p.style.background = t.color;
+            p.className = 'mini-piece'; p.style.background = t.color;
             pDiv.appendChild(p);
           }
         });
@@ -520,14 +514,19 @@
     const overlay = document.getElementById('question-overlay');
     const q = lq.question;
     const team = teams[lq.teamIdx];
+    const isMyTurn = myTeamId !== null && lq.teamIdx === myTeamId;
 
     const badge = document.getElementById('q-team-badge');
     badge.textContent = team ? team.name : '';
     badge.style.background = team ? team.color : '#888';
 
-    document.getElementById('q-cat').textContent = (q.kategorieId || '') ? '' : '';
-    document.getElementById('q-diff').textContent = q.schwierigkeit || '';
+    document.getElementById('q-diff').textContent =
+      (lq.difficulty || q.difficulty || '?') + ' Pkt. · ' +
+      lq.advanceAmount + ' Feld' + (lq.advanceAmount !== 1 ? 'er' : '') + ' bei ✓';
     document.getElementById('q-text').textContent = q.frage || '';
+
+    const myTurnNote = document.getElementById('q-my-turn-note');
+    myTurnNote.style.display = isMyTurn && !lq.resolved ? 'block' : 'none';
 
     const opts = document.getElementById('q-options');
     const openLabel = document.getElementById('q-open-label');
@@ -542,10 +541,15 @@
     } else {
       opts.style.display = 'flex';
       openLabel.style.display = 'none';
+
       (q.antworten || []).forEach((ans, i) => {
-        const div = document.createElement('div');
+        const div = document.createElement('button');
         div.className = 'q-opt';
         div.textContent = ans;
+        div.disabled = !isMyTurn || lq.resolved || answeredCurrentQ;
+        if (isMyTurn && !lq.resolved && !answeredCurrentQ) {
+          div.onclick = () => submitAnswer(i, q, lq, teams);
+        }
         opts.appendChild(div);
       });
     }
@@ -553,28 +557,55 @@
     overlay.classList.add('open');
   }
 
-  function updateQuestionResult(lq, teams) {
-    const q = lq.question;
-    const result = document.getElementById('q-result');
+  async function submitAnswer(idx, q, lq, teams) {
+    if (answeredCurrentQ || lq.resolved) return;
+    answeredCurrentQ = true;
 
-    if (lq.correct === true) {
-      result.className = 'q-result visible ok';
-      result.textContent = '✓ Richtig!';
-    } else if (lq.correct === false) {
-      result.className = 'q-result visible bad';
-      result.textContent = '✗ Falsch!';
+    // Determine correctness
+    let correct;
+    if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
+      correct = q.correctIndices.length === 1 && q.correctIndices[0] === idx;
+    } else {
+      correct = idx === (q.richtig ?? q.correctIndex ?? 0);
     }
 
-    // Mark correct answer if MC
+    // Disable all buttons, mark selected
+    const btns = document.querySelectorAll('#q-options .q-opt');
+    btns.forEach((b, i) => {
+      b.disabled = true;
+      if (i === idx) b.classList.add(correct ? 'correct' : 'wrong');
+    });
+
+    // Save result to game state
+    if (!remoteState) return;
+    const newGs = JSON.parse(JSON.stringify(QpStorage._ser(remoteState)));
+    if (newGs.liveQuestion && newGs.liveQuestion.id === lq.id) {
+      newGs.liveQuestion.resolved = true;
+      newGs.liveQuestion.correct = correct;
+      newGs.liveQuestion.selectedMcIndex = idx;
+      await QpStorage.save(QpStorage._deser(newGs));
+    }
+  }
+
+  function updateQuestionResult(lq) {
+    if (!lq.resolved) return;
+    const result = document.getElementById('q-result');
+    if (lq.correct === true) { result.className = 'q-result visible ok'; result.textContent = '✓ Richtig!'; }
+    else if (lq.correct === false) { result.className = 'q-result visible bad'; result.textContent = '✗ Falsch!'; }
+
+    const q = lq.question;
     if (q.typ !== 'offen') {
-      const opts = document.getElementById('q-options').children;
+      const opts = document.getElementById('q-options').querySelectorAll('.q-opt');
       const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
-        ? new Set(q.correctIndices) : new Set([q.richtig ?? 0]);
-      Array.from(opts).forEach((el, i) => {
+        ? new Set(q.correctIndices) : new Set([q.richtig ?? q.correctIndex ?? 0]);
+      opts.forEach((el, i) => {
+        el.disabled = true;
         if (correct.has(i)) el.classList.add('correct');
-        else if (lq.correct === false) el.classList.add('wrong');
+        else if (i === lq.selectedMcIndex && !lq.correct) el.classList.add('wrong');
       });
     }
+
+    document.getElementById('q-my-turn-note').style.display = 'none';
   }
 
   function closeQuestion() {
@@ -584,6 +615,8 @@
 
   function backToJoin() {
     if (sub) { sub.unsubscribe(); sub = null; }
+    myTeamId = null;
+    if (gameCode) localStorage.removeItem('qp_myteam_' + gameCode);
     showScreen('screen-join');
   }
 
