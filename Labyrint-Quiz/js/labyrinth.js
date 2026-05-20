@@ -79,6 +79,7 @@ let gameCode = null;
 let localGrid = null;   // regeneriert aus seed
 let gameState = null;   // vom Server
 let renderer = null;
+let teacherEvalVisible = false;
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -628,8 +629,45 @@ function applyRemoteState(data) {
   if (!data?.meta || !localGrid) return;
   gameState = data;
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
+  if (data.activeQuestion && data.activeQuestion.questionResult === null) {
+    if (!teacherEvalVisible) showTeacherEvalModal(data.activeQuestion);
+  } else {
+    closeTeacherEvalModal();
+  }
   renderBoard();
 }
+
+function showTeacherEvalModal(aq) {
+  const modal = document.getElementById('teacher-eval-modal');
+  if (!modal) return;
+  const team = gameState?.teams?.[aq.teamIdx];
+  const teamEl = document.getElementById('te-team');
+  const trigEl = document.getElementById('te-trigger');
+  const qEl = document.getElementById('te-question');
+  const aEl = document.getElementById('te-answer');
+  if (teamEl) teamEl.textContent = team ? `${team.emoji} ${team.name}` : '';
+  if (trigEl) trigEl.textContent = aq.contextType === 'door' ? '🔒 Tür öffnen' : '🔮 Symbol einsammeln';
+  if (qEl) qEl.textContent = aq.question;
+  if (aEl) aEl.textContent = aq.answer;
+  modal.style.display = 'flex';
+  teacherEvalVisible = true;
+}
+
+function closeTeacherEvalModal() {
+  const modal = document.getElementById('teacher-eval-modal');
+  if (modal) modal.style.display = 'none';
+  teacherEvalVisible = false;
+}
+
+function resolveOpenQuestion(correct) {
+  if (!gameState) return;
+  const newState = JSON.parse(JSON.stringify(gameState));
+  if (newState.activeQuestion) newState.activeQuestion.questionResult = correct;
+  gameState = newState;
+  GameSync.save(gameCode, newState);
+  closeTeacherEvalModal();
+}
+window.resolveOpenQuestion = resolveOpenQuestion;
 
 function applyStateToGrid(grid, symbols, doors) {
   for (let y = 0; y < 16; y++)

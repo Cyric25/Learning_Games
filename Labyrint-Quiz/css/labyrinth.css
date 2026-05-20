@@ -452,6 +452,25 @@ body.dark .param-btn { background: rgba(255,255,255,0.05); }
 .cat-select-info.warning { color: var(--danger); font-weight: 600; font-style: normal; }
 
 
+/* ── Active Team Banner ───────────────────────────────────────────── */
+.active-team-banner {
+  padding: 0.35rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  min-height: 1.6em;
+  text-align: center;
+}
+
+/* ── Controls Hint ────────────────────────────────────────────────── */
+.controls-hint {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 0.8rem;
+}
+
 /* ── Game Screen ─────────────────────────────────────────────────── */
 #game-screen {
   flex-direction: row;
@@ -459,6 +478,28 @@ body.dark .param-btn { background: rgba(255,255,255,0.05); }
   background: #111827; /* dark bg around canvas */
 }
 body.dark #game-screen { background: #090c14; }
+
+/* ── Light Mode Game Screen Overrides ─────────────────────────────── */
+body:not(.dark) #game-screen        { background: #c8b49c; }
+body:not(.dark) .board-header h2    { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.55); }
+body:not(.dark) .board-header .header-btn { background: rgba(255,255,255,0.88); color: var(--text-primary); border-color: rgba(0,0,0,0.18); }
+body:not(.dark) .sidebar            { background: rgba(255,255,255,0.90); border-left: 1px solid var(--border-card); }
+body:not(.dark) .controls-hint      { color: var(--text-secondary); }
+body:not(.dark) .sidebar h3         { color: var(--accent); }
+body:not(.dark) .team-item          { background: rgba(0,0,0,0.05); }
+body:not(.dark) .team-item.active   { background: rgba(227,79,32,0.10); border-color: var(--accent); }
+body:not(.dark) .team-name          { color: var(--text-primary); }
+body:not(.dark) .team-score         { color: var(--accent); }
+body:not(.dark) .sidebar-legend     { border-top-color: var(--border-card); }
+body:not(.dark) .legend-item        { color: var(--text-secondary); }
+body:not(.dark) .phase-display      { color: var(--accent); }
+body:not(.dark) .game-code-display  { background: rgba(227,79,32,0.10); border-color: rgba(227,79,32,0.30); }
+body:not(.dark) .gc-label           { color: var(--accent); }
+body:not(.dark) .gc-value           { color: var(--text-primary); }
+body:not(.dark) .gc-link            { color: var(--accent); }
+body:not(.dark) .hint-small         { color: var(--text-secondary); }
+body:not(.dark) .hint-small strong  { color: var(--accent); }
+body:not(.dark) #maze-canvas        { border-color: var(--border-card); box-shadow: 0 0 30px rgba(0,0,0,0.25); }
 
 /* ── Board Area ──────────────────────────────────────────────────── */
 .board-area {

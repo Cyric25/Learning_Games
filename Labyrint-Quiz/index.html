@@ -224,6 +224,26 @@
     </div>
   </div>
 
+  <!-- ── Teacher Open-Question Eval Modal ──────────────────── -->
+  <div id="teacher-eval-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(3px);z-index:300;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:var(--bg-card);border:2px solid var(--border-card);border-radius:16px;padding:1.5rem;width:min(540px,95vw);max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+        <span id="te-team" style="font-size:1rem;font-weight:700;color:var(--text-primary);"></span>
+        <span id="te-trigger" style="font-size:0.85rem;font-weight:600;padding:0.2rem 0.6rem;border-radius:6px;background:rgba(220,38,38,0.12);color:#dc2626;"></span>
+      </div>
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Offene Frage – Bewertung durch Lehrkraft</div>
+      <div id="te-question" style="font-size:1.15rem;font-weight:600;color:var(--text-primary);line-height:1.5;border:1px solid var(--border-card);border-radius:8px;padding:0.8rem 1rem;background:var(--bg-primary);"></div>
+      <div style="border-radius:8px;padding:0.8rem 1rem;background:rgba(22,163,74,0.10);border:1px solid #16a34a;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#16a34a;margin-bottom:0.3rem;">Musterlösung</div>
+        <div id="te-answer" style="font-size:1rem;font-weight:600;color:#16a34a;"></div>
+      </div>
+      <div style="display:flex;gap:0.8rem;">
+        <button onclick="resolveOpenQuestion(true)" style="flex:1;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:0.9rem;font-size:1.1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">✓ Richtig</button>
+        <button onclick="resolveOpenQuestion(false)" style="flex:1;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:0.9rem;font-size:1.1rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">✗ Falsch</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/maze.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/labyrinth.js?v=3"></script>

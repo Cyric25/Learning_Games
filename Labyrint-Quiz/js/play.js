@@ -63,6 +63,7 @@ let questionContext = null;
 let timerInterval = null;
 let diceAnimId = null;
 let _ignoreNextUpdate = false; // verhindert Echo beim eigenen POST
+let _waitingForTeacher = false; // warten auf Lehrkraft-Bewertung (offene Frage)
 let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -197,6 +198,15 @@ function applyStateToGrid(grid, symbols, doors) {
 
 function onRemoteUpdate(data) {
   if (_ignoreNextUpdate) { _ignoreNextUpdate = false; return; }
+  // Teacher has evaluated an open question we're waiting on
+  if (_waitingForTeacher && data.activeQuestion?.questionResult !== null &&
+      data.activeQuestion?.questionResult !== undefined) {
+    _waitingForTeacher = false;
+    remoteState = data;
+    clearTimer();
+    resolveQuestionResult(data.activeQuestion.questionResult);
+    return;
+  }
   remoteState = data;
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
   renderCanvas(data);
@@ -468,6 +478,7 @@ function showQuestionModal() {
   document.getElementById('q-text').textContent = q.question;
   document.getElementById('q-result').textContent = '';
   document.getElementById('q-result').className = 'modal-result';
+  document.getElementById('q-result').style.display = 'none';
   document.getElementById('q-continue').style.display = 'none';
 
   const optEl = document.getElementById('q-options');
@@ -517,6 +528,24 @@ function showQuestionModal() {
     document.getElementById('q-open-answer').style.display = 'none';
     document.getElementById('q-show-answer').style.display = '';
     document.getElementById('q-open-actions').style.display = 'none';
+    // Remove previous waiting message if any
+    const prevWait = document.getElementById('q-teacher-wait');
+    if (prevWait) prevWait.remove();
+    // Show "waiting for teacher" instead of Richtig/Falsch buttons
+    const waitEl = document.createElement('div');
+    waitEl.id = 'q-teacher-wait';
+    waitEl.style.cssText = 'text-align:center;padding:0.5rem 0;color:var(--text-secondary);font-style:italic;font-size:0.9rem;';
+    waitEl.textContent = '⏳ Lehrkraft bewertet…';
+    openSec.appendChild(waitEl);
+    // Post activeQuestion to state so teacher board can evaluate
+    _waitingForTeacher = true;
+    const openState = JSON.parse(JSON.stringify(remoteState));
+    openState.activeQuestion = {
+      id: q.id, question: q.question, answer: q.answer || '',
+      teamIdx: myTeamId, contextType: questionContext.type,
+      target: Object.assign({}, questionContext.target), questionResult: null
+    };
+    postState(openState);
   }
 
   startTimer(remoteState.config?.timerSeconds || 0);
@@ -563,6 +592,7 @@ function showOpenAnswer() {
 function resolveOpen(correct) { clearTimer(); resolveQuestionResult(correct); }
 
 function resolveQuestionResult(correct) {
+  _waitingForTeacher = false;
   const ctx = questionContext;
   const resultEl = document.getElementById('q-result');
   const myTeam = remoteState.teams[myTeamId];
@@ -577,7 +607,8 @@ function resolveQuestionResult(correct) {
   } else {
     resultEl.textContent = '✗ Leider falsch.'; resultEl.className = 'modal-result result-wrong';
   }
-  document.getElementById('q-continue').style.display = '';
+  resultEl.style.display = 'block';
+  document.getElementById('q-continue').style.display = 'block';
 }
 
 function continueAfterQuestion() {
@@ -589,6 +620,7 @@ function continueAfterQuestion() {
   const wasCorrect = document.getElementById('q-result').classList.contains('result-correct');
 
   const newState = JSON.parse(JSON.stringify(remoteState));
+  newState.activeQuestion = null;
   const used = new Set(newState.usedQuestionIds || []);
   if (ctx.question) used.add(ctx.question.id);
   newState.usedQuestionIds = [...used];
