@@ -235,8 +235,9 @@ async function _gsEnter(code) {
   gameState = state;
   if ((state.phase === 'playing' || state.phase === 'rolling' || state.phase === 'direction' || state.phase === 'question') && state.seed && state.config?.teamCount) {
     activeCategories = new Set(state.config.kategorien || []);
-    const gen = new MazeGenerator(16, 16, state.seed);
-    const mazeResult = gen.generate({ doorCount: 14, teamCount: state.config.teamCount });
+    const _sz = state.config?.mazeSize || 16;
+    const gen = new MazeGenerator(_sz, _sz, state.seed);
+    const mazeResult = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[_sz]||10, teamCount: state.config.teamCount });
     localGrid = mazeResult.grid;
     applyStateToGrid(localGrid, state.symbols || [], state.doors || []);
     showScreen('game-screen');
@@ -290,8 +291,34 @@ function resetToSelector() {
 function buildSetupUI() {
   buildTeamCountUI();
   renderTeamSelectList(_cfg.teamCount);
+  buildMazeSizeUI();
+  buildSymbolModeUI();
   buildSymbolsUI();
   buildTimerUI();
+}
+
+function buildMazeSizeUI() {
+  const row = document.getElementById('maze-size-row'); if (!row) return;
+  row.innerHTML = '';
+  [{ label: 'Klein (10×10)', v: 10 }, { label: 'Mittel (12×12)', v: 12 }, { label: 'Groß (16×16)', v: 16 }].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (opt.v === _cfg.mazeSize ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => { _cfg.mazeSize = opt.v; row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+    row.appendChild(btn);
+  });
+}
+
+function buildSymbolModeUI() {
+  const row = document.getElementById('symbol-mode-row'); if (!row) return;
+  row.innerHTML = '';
+  [{ label: '🔮 Eigene', v: false }, { label: '🌐 Alle', v: true }].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (opt.v === _cfg.allSymbols ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => { _cfg.allSymbols = opt.v; row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+    row.appendChild(btn);
+  });
 }
 
 const CAT_ICONS = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯','📚','🏛️','🎨','⚡'];
@@ -502,7 +529,7 @@ function updateCategoryInfo() {
   if (btn) btn.disabled = !ok;
 }
 
-let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20 };
+let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false };
 
 // ── proceedToCategories (Setup → Category-Screen) ─────────────────
 function proceedToCategories() {
@@ -583,15 +610,17 @@ async function startGame() {
   }
 
   const seed = Date.now() & 0x7fffffff;
-  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories] };
+  const size = _cfg.mazeSize || 12;
+  const doorCount = ({ 10: 8, 12: 10, 16: 14 })[size] || 10;
+  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols };
 
   // Generate maze deterministically
-  const gen = new MazeGenerator(16, 16, seed);
-  const mazeResult = gen.generate({ doorCount: 14, teamCount: _cfg.teamCount });
+  const gen = new MazeGenerator(size, size, seed);
+  const mazeResult = gen.generate({ doorCount, teamCount: _cfg.teamCount });
   mazeResult.startPositions.forEach((pos, i) => { if (teams[i]) { teams[i].x = pos.x; teams[i].y = pos.y; } });
 
   // Place symbols deterministically
-  const symbols = placeTeamSymbols(mazeResult.grid, teams, _cfg.symbolsPerTeam, seed);
+  const symbols = placeTeamSymbols(mazeResult.grid, teams, _cfg.symbolsPerTeam, seed, size);
 
   // Use code already set by createNewGame (or generate one if not set)
   if (!gameCode) { gameCode = GameSync.generateCode(); window.gameCode = gameCode; }
@@ -629,12 +658,16 @@ async function startGame() {
 }
 
 // ── Symbol-Platzierung (deterministisch via seed) ─────────────────
-function placeTeamSymbols(grid, teams, perTeam, seed) {
-  const W = 16, H = 16, symbols = [];
+function placeTeamSymbols(grid, teams, perTeam, seed, size) {
+  const W = size || grid[0]?.length || 16;
+  const H = size || grid.length || 16;
+  const exR = ({ 10: 2, 12: 3, 16: 4 })[W] || 3;   // Ausschlussradius um Startfelder
+  const minDist = ({ 10: 2, 12: 2, 16: 3 })[W] || 2; // Mindestabstand zwischen Symbolen
+  const symbols = [];
   const excluded = new Set();
   teams.forEach(t => {
-    for (let dy = -4; dy <= 4; dy++)
-      for (let dx = -4; dx <= 4; dx++) {
+    for (let dy = -exR; dy <= exR; dy++)
+      for (let dx = -exR; dx <= exR; dx++) {
         const nx = t.x + dx, ny = t.y + dy;
         if (nx >= 0 && nx < W && ny >= 0 && ny < H) excluded.add(`${nx},${ny}`);
       }
@@ -651,7 +684,7 @@ function placeTeamSymbols(grid, teams, perTeam, seed) {
     for (const cell of cells) {
       if (placed >= perTeam) break;
       if (symbols.some(s => s.x === cell.x && s.y === cell.y)) continue;
-      if (symbols.filter(s => s.teamId === ti).some(s => Math.abs(s.x - cell.x) + Math.abs(s.y - cell.y) < 3)) continue;
+      if (symbols.filter(s => s.teamId === ti).some(s => Math.abs(s.x - cell.x) + Math.abs(s.y - cell.y) < minDist)) continue;
       symbols.push({ id: `sym-${ti}-${placed}`, teamId: ti, x: cell.x, y: cell.y, found: false, foundBy: null });
       grid[cell.y][cell.x].type = 'symbol';
       grid[cell.y][cell.x].symTeamId = ti;
@@ -767,8 +800,9 @@ async function resolveOpenQuestion(correct) {
 window.resolveOpenQuestion = resolveOpenQuestion;
 
 function applyStateToGrid(grid, symbols, doors) {
-  for (let y = 0; y < 16; y++)
-    for (let x = 0; x < 16; x++)
+  const H = grid.length, W = grid[0]?.length || H;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
       if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
   symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
   doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });

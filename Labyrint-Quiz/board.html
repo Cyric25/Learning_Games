@@ -271,8 +271,9 @@
   function buildBoardGrid(state) {
     const { seed, config, symbols, doors } = state;
     if (!seed || !config?.teamCount) return;
-    const gen = new MazeGenerator(16, 16, seed);
-    const result = gen.generate({ doorCount: 14, teamCount: config.teamCount });
+    const sz = config.mazeSize || 16;
+    const gen = new MazeGenerator(sz, sz, seed);
+    const result = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[sz]||14, teamCount: config.teamCount });
     boardLocalGrid = result.grid;
     applyGridState(boardLocalGrid, symbols || [], doors || []);
     const canvas = document.getElementById('board-canvas');
@@ -281,8 +282,9 @@
   }
 
   function applyGridState(grid, symbols, doors) {
-    for (let y = 0; y < 16; y++)
-      for (let x = 0; x < 16; x++)
+    const H = grid.length, W = grid[0]?.length || H;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
         if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
     symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
     doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });

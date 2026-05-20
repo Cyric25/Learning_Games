@@ -95,8 +95,10 @@
     /* ── My Turn: Roll ────────────────────────────────────────── */
     .turn-screen { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; text-align: center; }
     .turn-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
-    .dice-display { font-size: clamp(3rem, 12vw, 5rem); line-height: 1; cursor: pointer; user-select: none; transition: transform 0.1s; }
-    .dice-display.rolling { animation: diceShake 0.08s infinite alternate; }
+    .dice-pair { display: flex; gap: 0.3rem; justify-content: center; align-items: center; }
+    .dice-pair.rolling .dice-display { animation: diceShake 0.08s infinite alternate; }
+    .dice-display { font-size: clamp(2.2rem, 9vw, 3.8rem); line-height: 1; user-select: none; }
+    .dice-val { font-size: 1.4rem; letter-spacing: 0.1em; }
     @keyframes diceShake { 0%{transform:rotate(-8deg) scale(0.93)} 100%{transform:rotate(8deg) scale(1.07)} }
     .btn-roll { font-size: 1rem; padding: 0.7rem 1.5rem; }
 

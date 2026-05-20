@@ -205,8 +205,9 @@ function startPlayView() {
 function buildLocalGrid() {
   if (!remoteState) return;
   const { seed, config, teams, symbols, doors } = remoteState;
-  const gen = new MazeGenerator(16, 16, seed);
-  const result = gen.generate({ doorCount: 14, teamCount: config.teamCount });
+  const sz = config.mazeSize || 16;
+  const gen = new MazeGenerator(sz, sz, seed);
+  const result = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[sz]||14, teamCount: config.teamCount });
   localGrid = result.grid;
 
   // Apply stored symbols + doors
@@ -221,8 +222,9 @@ function buildLocalGrid() {
 }
 
 function applyStateToGrid(grid, symbols, doors) {
-  for (let y = 0; y < 16; y++)
-    for (let x = 0; x < 16; x++)
+  const H = grid.length, W = grid[0]?.length || H;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
       if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
   symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
   doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });
@@ -356,27 +358,38 @@ function showRolling(state) {
   area.innerHTML = `
     <div class="turn-screen">
       <div class="turn-title">Dein Zug, ${myTeam.name}!</div>
-      <div class="dice-display" id="dice-display">🎲</div>
+      <div class="dice-pair">
+        <div class="dice-display" id="dice-1">🎲</div>
+        <div class="dice-display" id="dice-2">🎲</div>
+      </div>
       <button class="btn-action btn-roll" id="btn-roll-play" onclick="rollDice()">Würfeln</button>
     </div>`;
 }
 
 function rollDice() {
   const btn = document.getElementById('btn-roll-play'); if (btn) btn.disabled = true;
-  const disp = document.getElementById('dice-display'); if (!disp) return;
-  disp.classList.add('rolling');
+  const d1el = document.getElementById('dice-1');
+  const d2el = document.getElementById('dice-2');
+  const pair = document.querySelector('.dice-pair');
+  if (!pair) return;
+  pair.classList.add('rolling');
   let frames = 0;
   diceAnimId = setInterval(() => {
     frames++;
-    disp.textContent = DICE_CHARS[Math.floor(Math.random() * 6)];
+    if (d1el) d1el.textContent = DICE_CHARS[Math.floor(Math.random() * 6)];
+    if (d2el) d2el.textContent = DICE_CHARS[Math.floor(Math.random() * 6)];
     if (frames >= 20) {
       clearInterval(diceAnimId); diceAnimId = null;
-      const result = Math.floor(Math.random() * 6) + 1;
-      disp.textContent = DICE_CHARS[result - 1]; disp.classList.remove('rolling');
+      pair.classList.remove('rolling');
+      const r1 = Math.floor(Math.random() * 6) + 1;
+      const r2 = Math.floor(Math.random() * 6) + 1;
+      if (d1el) d1el.textContent = DICE_CHARS[r1 - 1];
+      if (d2el) d2el.textContent = DICE_CHARS[r2 - 1];
 
       const newState = JSON.parse(JSON.stringify(remoteState));
-      newState.diceValue = result;
-      newState.stepsRemaining = result;
+      newState.diceValue = r1 + r2;
+      newState.diceValues = [r1, r2];
+      newState.stepsRemaining = r1 + r2;
       newState.phase = 'direction';
       postState(newState);
       showDirectionLocal(newState);
@@ -395,10 +408,13 @@ function showDirectionLocal(state) {
     ? `<button class="dir-btn dir-free" onclick="chooseDirection('${dir}')">${arrow}</button>`
     : `<button class="dir-btn" disabled>${arrow}</button>`;
 
+  const dv = state.diceValues;
+  const diceStr = dv ? (DICE_CHARS[dv[0]-1] + ' ' + DICE_CHARS[dv[1]-1]) : DICE_CHARS[(state.diceValue||1)-1];
+
   area.innerHTML = `
     <div class="move-screen">
       <div class="steps-indicator">
-        <span class="dice-val">${DICE_CHARS[(state.diceValue||1)-1]}</span>
+        <span class="dice-val">${diceStr}</span>
         <span class="steps-left">${movesLeft} Zug${movesLeft !== 1 ? 'züge' : ''}</span>
       </div>
       <div class="dir-grid">
@@ -425,17 +441,20 @@ function advanceInDirection(dir, state) {
   let cx = state.teams[myTeamId].x;
   let cy = state.teams[myTeamId].y;
   const fromWall = d.opp;
+  const W = localGrid[0]?.length || 16;
+  const H = localGrid.length || 16;
+  const allSymMode = state.config?.allSymbols;
 
   while (true) {
     if (localGrid[cy][cx].walls & d.wall) break;
     const nx = cx + d.dx, ny = cy + d.dy;
-    if (nx < 0 || nx >= 16 || ny < 0 || ny >= 16) break;
+    if (nx < 0 || nx >= W || ny < 0 || ny >= H) break;
 
     const closedDoor = (state.doors || []).find(dr => dr.x === nx && dr.y === ny && !dr.open);
     if (closedDoor) return { stop: 'door', teamX: cx, teamY: cy, doorX: nx, doorY: ny, door: closedDoor };
 
     const cell = localGrid[ny][nx];
-    if (cell.type === 'symbol' && cell.symTeamId === myTeamId) {
+    if (cell.type === 'symbol' && (allSymMode || cell.symTeamId === myTeamId)) {
       const sym = (state.symbols || []).find(s => s.x === nx && s.y === ny && !s.found);
       if (sym) return { stop: 'symbol', teamX: cx, teamY: cy, symX: nx, symY: ny, sym };
     }
