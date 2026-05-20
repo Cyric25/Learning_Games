@@ -140,6 +140,41 @@
     .spec-correct { background: rgba(22,163,74,0.15); color: #16a34a; }
     .spec-wrong { background: rgba(220,38,38,0.15); color: #dc2626; }
 
+    /* ── Handy-Ansicht: Karte oben, Steuerung unten ─────────── */
+    @media (max-width: 640px) {
+      #play-screen {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      /* Karte: nimmt allen verfügbaren Platz oberhalb der Steuerung */
+      .play-canvas-col {
+        flex: 1 1 0;
+        min-height: 0;
+        width: 100%;
+      }
+      /* Steuerung: schmal, unten, volle Breite */
+      .play-sidebar {
+        width: 100%;
+        flex: 0 0 auto;
+        max-height: 44vh;
+        min-height: 160px;
+        border-left: none;
+        border-top: 1px solid var(--border-card);
+        overflow-y: auto;
+      }
+      /* Header horizontal um Höhe zu sparen */
+      .play-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 0.8rem;
+      }
+      .move-screen  { gap: 0.5rem; }
+      .turn-screen  { gap: 0.5rem; }
+      .wait-screen  { gap: 0.5rem; }
+      .dir-btn      { width: clamp(46px, 12vw, 58px); height: clamp(46px, 12vw, 58px); }
+    }
+
     /* ── Question Modal ───────────────────────────────────────── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
     .modal-overlay.active { display: flex; }
