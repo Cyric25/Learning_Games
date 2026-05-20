@@ -242,7 +242,14 @@ function applyState(state) {
   if (state.phase === 'finished') { showFinished(state); return; }
 
   if (!isMyTurn) {
-    showWaiting(team);
+    const aq = state.activeQuestion;
+    if (aq && aq.questionResult === null) {
+      showSpectatorQuestion(aq, state.teams[aq.teamIdx]);
+    } else if (aq && aq.questionResult !== null && aq.questionResult !== undefined) {
+      showSpectatorResult(aq, state.teams[aq.teamIdx]);
+    } else {
+      showWaiting(team);
+    }
     return;
   }
 
@@ -483,7 +490,46 @@ function showQuestionModal() {
 
   const optEl = document.getElementById('q-options');
   const openSec = document.getElementById('q-open-section');
-  if (q.type === 'multiple_choice' && q.options?.length) {
+
+  if (questionContext.type === 'door') {
+    // TÜRFRAGE: nur Lehrkraft bewertet — Spieler sieht nur den Fragetext
+    optEl.style.display = 'none';
+    openSec.style.display = '';
+    document.getElementById('q-open-answer').style.display = 'none';
+    document.getElementById('q-show-answer').style.display = 'none';
+    document.getElementById('q-open-actions').style.display = 'none';
+    const prevWait = document.getElementById('q-teacher-wait');
+    if (prevWait) prevWait.remove();
+    const waitEl = document.createElement('div');
+    waitEl.id = 'q-teacher-wait';
+    waitEl.style.cssText = 'text-align:center;padding:0.5rem 0;color:var(--text-secondary);font-style:italic;font-size:0.9rem;';
+    waitEl.textContent = '⏳ Lehrkraft bewertet…';
+    openSec.appendChild(waitEl);
+
+    // Korrekte Antwort für das Lehrkraft-Modal bestimmen
+    let correctAnswer = '';
+    if (q.type === 'multiple_choice' && q.options?.length) {
+      if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
+        correctAnswer = q.correctIndices.map(i => q.options[i]).join(', ');
+      } else {
+        correctAnswer = q.options[q.correctIndex ?? 0] || '';
+      }
+    } else {
+      correctAnswer = q.answer || '';
+    }
+
+    _waitingForTeacher = true;
+    const aqState = JSON.parse(JSON.stringify(remoteState));
+    aqState.activeQuestion = {
+      id: q.id, question: q.question, answer: correctAnswer,
+      teamIdx: myTeamId, contextType: 'door',
+      target: Object.assign({}, questionContext.target), questionResult: null
+    };
+    postState(aqState);
+    startTimer(0); // kein Timer für lehrkraft-bewertete Türfragen
+
+  } else if (q.type === 'multiple_choice' && q.options?.length) {
+    // SYMBOLFRAGE + MC: Spieler antwortet selbst
     optEl.style.display = ''; openSec.style.display = 'none'; optEl.innerHTML = '';
 
     if (isMultiCorrect(q)) {
@@ -503,7 +549,6 @@ function showQuestionModal() {
         };
         optEl.appendChild(btn);
       });
-      // Hinweis + Bestätigen-Button
       const hint = document.createElement('div');
       hint.className = 'mc-multi-hint';
       hint.textContent = 'Mehrere Antworten möglich – alle auswählen und bestätigen.';
@@ -516,28 +561,27 @@ function showQuestionModal() {
       confirmBtn.onclick = () => resolveMultiChoice();
       optEl.appendChild(confirmBtn);
     } else {
-      // Single-Correct: wie bisher
       q.options.forEach((opt, i) => {
         const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = opt;
         btn.onclick = () => resolveChoice(i); optEl.appendChild(btn);
       });
     }
+    startTimer(remoteState.config?.timerSeconds || 0);
+
   } else {
+    // SYMBOLFRAGE + OFFEN: Lehrkraft bewertet
     optEl.style.display = 'none'; openSec.style.display = '';
     document.getElementById('q-open-answer').textContent = q.answer || '';
     document.getElementById('q-open-answer').style.display = 'none';
     document.getElementById('q-show-answer').style.display = '';
     document.getElementById('q-open-actions').style.display = 'none';
-    // Remove previous waiting message if any
     const prevWait = document.getElementById('q-teacher-wait');
     if (prevWait) prevWait.remove();
-    // Show "waiting for teacher" instead of Richtig/Falsch buttons
     const waitEl = document.createElement('div');
     waitEl.id = 'q-teacher-wait';
     waitEl.style.cssText = 'text-align:center;padding:0.5rem 0;color:var(--text-secondary);font-style:italic;font-size:0.9rem;';
     waitEl.textContent = '⏳ Lehrkraft bewertet…';
     openSec.appendChild(waitEl);
-    // Post activeQuestion to state so teacher board can evaluate
     _waitingForTeacher = true;
     const openState = JSON.parse(JSON.stringify(remoteState));
     openState.activeQuestion = {
@@ -546,9 +590,9 @@ function showQuestionModal() {
       target: Object.assign({}, questionContext.target), questionResult: null
     };
     postState(openState);
+    startTimer(remoteState.config?.timerSeconds || 0);
   }
 
-  startTimer(remoteState.config?.timerSeconds || 0);
   modal.classList.add('active');
 }
 
@@ -706,6 +750,37 @@ function postState(newState) {
   applyStateToGrid(localGrid, newState.symbols || [], newState.doors || []);
   renderCanvas(newState);
   GameSync.save(gameCode, newState);
+}
+
+// ── Zuschauer-Fragenansicht ───────────────────────────────────────
+function showSpectatorQuestion(aq, activeTeam) {
+  const area = document.getElementById('play-area');
+  const contextIcon = aq.contextType === 'door' ? '🔒' : '🔮';
+  const contextLabel = aq.contextType === 'door' ? 'Tür öffnen' : 'Symbol einsammeln';
+  area.innerHTML = `
+    <div class="spec-q-screen">
+      <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
+      <div class="spec-q-context">${contextIcon} ${contextLabel}</div>
+      <div class="spec-q-text">${_escHtml(aq.question)}</div>
+      <div class="spec-q-wait">⏳ Lehrkraft bewertet…</div>
+    </div>`;
+}
+
+function showSpectatorResult(aq, activeTeam) {
+  const area = document.getElementById('play-area');
+  const correct = aq.questionResult;
+  area.innerHTML = `
+    <div class="spec-q-screen">
+      <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
+      <div class="spec-q-text">${_escHtml(aq.question)}</div>
+      <div class="spec-q-result ${correct ? 'spec-correct' : 'spec-wrong'}">
+        ${correct ? '✓ Richtig!' : '✗ Falsch!'}
+      </div>
+    </div>`;
+}
+
+function _escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── Helper ────────────────────────────────────────────────────────

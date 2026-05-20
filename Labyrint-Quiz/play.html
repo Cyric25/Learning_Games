@@ -96,6 +96,16 @@
     .rank-row { padding: 0.5rem 1rem; border-radius: 8px; background: var(--bg-card); font-size: 1rem; color: var(--text-primary); text-align: left; }
     .rank-row.rank-me { background: rgba(227,79,32,0.12); border: 1px solid var(--accent); font-weight: 700; }
 
+    /* ── Spectator Question View ─────────────────────────────── */
+    .spec-q-screen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; padding: 1rem; max-width: 420px; width: 100%; }
+    .spec-q-team { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+    .spec-q-context { font-size: 0.82rem; font-weight: 700; padding: 0.3rem 0.9rem; border-radius: 20px; background: rgba(220,38,38,0.12); color: #dc2626; }
+    .spec-q-text { font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-primary); background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; padding: 1rem 1.2rem; width: 100%; box-sizing: border-box; }
+    .spec-q-wait { color: var(--text-secondary); font-style: italic; font-size: 0.9rem; }
+    .spec-q-result { font-size: 1.2rem; font-weight: 700; padding: 0.7rem 1.5rem; border-radius: 10px; }
+    .spec-correct { background: rgba(22,163,74,0.15); color: #16a34a; }
+    .spec-wrong { background: rgba(220,38,38,0.15); color: #dc2626; }
+
     /* ── Question Modal ───────────────────────────────────────── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
     .modal-overlay.active { display: flex; }
