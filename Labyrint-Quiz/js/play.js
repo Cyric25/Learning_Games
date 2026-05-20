@@ -181,8 +181,8 @@ async function selectTeam(id) {
 
 // ── Spielansicht starten ──────────────────────────────────────────
 function startPlayView() {
-  buildLocalGrid();
   showScreen('play-screen');
+  buildLocalGrid();
   renderCanvas(remoteState);
   applyState(remoteState);
   GameSync.subscribe(gameCode, onRemoteUpdate);

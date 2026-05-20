@@ -247,9 +247,9 @@
     if (!state?.meta) { if (err) err.textContent = 'Spiel "' + code + '" nicht gefunden.'; return; }
     boardCode = code;
     boardState = state;
-    buildBoardGrid(state);
     document.getElementById('btb-code').textContent = code;
     showBoardScreen('bs-board');
+    buildBoardGrid(state);
     applyBoardState(state);
     BoardSync.subscribe(code, applyBoardState);
   }
@@ -343,7 +343,6 @@
         '</div>' +
         '<div class="bqp-timer-wrap"><div class="bqp-timer-bar" id="bqp-tbar" style="width:100%"></div></div>' +
         '<div class="bqp-question">' + _bEsc(aq.question) + '</div>' +
-        (aq.answer ? '<div class="bqp-answer"><div class="bqp-answer-label">Musterlösung</div><div class="bqp-answer-text">' + _bEsc(aq.answer) + '</div></div>' : '') +
       '</div>';
 
     if (isNew && state.config?.timerSeconds) {
