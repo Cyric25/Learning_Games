@@ -724,6 +724,152 @@ Ein Raum wechselt in den 360°-Modus wenn `backgroundType: "360"` gesetzt ist.
 
 ---
 
+## Exklusiver Team-Beitritt
+
+**Zweck:** Jedes Team kann nur von einem Gerät gleichzeitig gewählt werden. Spielleiter kann Spieler entfernen (z.B. nach Fenster-Schließen), sodass das Team wieder verfügbar wird. Spieler wird dabei automatisch zur Teamwahl zurückgeleitet und sein localStorage-Eintrag gelöscht.
+
+**Referenz-Implementierung:** `Labyrint-Quiz/js/play.js` + `Labyrint-Quiz/js/labyrinth.js`
+
+### Spielstand-Feld
+
+```json
+{ "takenTeams": [0, 2] }
+```
+
+Array von Team-IDs (= Array-Indizes `0,1,2,...`). Wird von der **Spieler-Seite** geschrieben, vom **Spielleiter** zum Kick bearbeitet.
+
+---
+
+### Spieler-Seite
+
+**`selectTeam(id)` — mit Race-Condition-Schutz:**
+```js
+async function selectTeam(id) {
+  // Frischen Stand laden; remoteState als Fallback wenn Load fehlschlägt
+  const fresh = (await GameSync.load(gameCode)) || remoteState;
+  if (!fresh) return;
+  const taken = new Set(fresh.takenTeams || []);
+  if (taken.has(id)) { remoteState = fresh; showTeamSelect(fresh); return; }
+  taken.add(id);
+  const newState = JSON.parse(JSON.stringify(fresh));
+  newState.takenTeams = [...taken];
+  await GameSync.save(gameCode, newState);
+  remoteState = newState;
+  myTeamId = id;
+  localStorage.setItem('SPIEL_myteam_' + gameCode, id);
+  startPlayView();
+}
+```
+
+**Kick-Erkennung in `onRemoteUpdate` — ganz am Anfang, vor allen anderen Checks:**
+```js
+if (myTeamId !== null && Array.isArray(data.takenTeams) &&
+    !data.takenTeams.includes(myTeamId)) {
+  handleKicked(); return;
+}
+```
+Nur wenn `Array.isArray(data.takenTeams)` → alte Spielstände ohne das Feld lösen keinen falschen Kick aus.
+
+**`handleKicked()`:**
+```js
+function handleKicked() {
+  clearTimer();
+  document.getElementById('question-modal')?.classList.remove('active');
+  GameSync.unsubscribe();
+  localStorage.removeItem('SPIEL_myteam_' + gameCode);  // eigenes LS löschen
+  myTeamId = null;
+  // Kurze Meldung, dann zurück zur Teamwahl
+  setTimeout(async () => {
+    const state = await GameSync.load(gameCode);
+    if (state?.meta) { remoteState = state; showTeamSelect(state); }
+    else showScreen('join-screen');
+  }, 1500);
+}
+```
+
+**`showTeamSelect(state)` — belegte Teams deaktiviert:**
+```js
+function showTeamSelect(state) {
+  showScreen('team-select-screen');
+  const taken = new Set(state.takenTeams || []);
+  state.teams.forEach(t => {
+    const isTaken = taken.has(t.id);
+    const btn = document.createElement('button');
+    btn.className = 'team-select-btn' + (isTaken ? ' taken' : '');
+    btn.disabled = isTaken;
+    btn.innerHTML = `${t.emoji} ${t.name}${isTaken ? ' <span class="ts-taken">belegt</span>' : ''}`;
+    if (!isTaken) btn.onclick = () => selectTeam(t.id);
+    list.appendChild(btn);
+  });
+}
+```
+
+**Auto-Wiederverbindung in `joinGame()` — gespeicherte Teamwahl aus localStorage:**
+```js
+const saved = localStorage.getItem('SPIEL_myteam_' + code);
+if (saved !== null) {
+  const tid = parseInt(saved, 10);
+  if (state.teams[tid]) { myTeamId = tid; startPlayView(); return; }
+}
+showTeamSelect(state);
+```
+
+---
+
+### Spielleiter-Seite
+
+**`renderTeamList()` — Verbindungsanzeige + Kick-Button:**
+```js
+const taken = new Set(gameState.takenTeams || []);
+gameState.teams.forEach(t => {
+  const isTaken = taken.has(t.id);
+  const connDot = isTaken ? '<span class="team-conn-dot" title="Gerät verbunden">●</span> ' : '';
+  // name-Zeile: connDot + t.name
+  if (isTaken) {
+    const kickBtn = document.createElement('button');
+    kickBtn.className = 'team-kick-btn';
+    kickBtn.title = 'Gerät trennen (Team freigeben)';
+    kickBtn.textContent = '✕';
+    kickBtn.onclick = e => { e.stopPropagation(); kickTeam(t.id); };
+    div.appendChild(kickBtn);
+  }
+});
+```
+
+**`kickTeam(teamId)`:**
+```js
+async function kickTeam(teamId) {
+  if (!gameState || !gameCode) return;
+  const newState = JSON.parse(JSON.stringify(gameState));
+  newState.takenTeams = (newState.takenTeams || []).filter(id => id !== teamId);
+  gameState = newState;
+  await GameSync.save(gameCode, newState);
+  renderTeamList();
+}
+window.kickTeam = kickTeam;
+```
+
+---
+
+### CSS-Klassen
+
+**Spieler-Seite (play.html / view.html):**
+```css
+.team-select-btn.taken         { opacity: 0.45; cursor: not-allowed; }
+.team-select-btn.taken:hover   { border-color: var(--border-card); background: var(--bg-card); }
+.ts-taken                      { font-size: 0.8rem; font-weight: 600; color: var(--danger); margin-left: 0.4rem; }
+```
+
+**Spielleiter-Seite (labyrinth.css o.ä.):**
+```css
+.team-conn-dot  { color: #4ade80; font-size: 0.55rem; vertical-align: middle; }
+.team-kick-btn  { background: none; border: 1px solid rgba(220,38,38,0.35); color: rgba(220,38,38,0.6);
+                  border-radius: 4px; width: 20px; height: 20px; padding: 0; cursor: pointer; font-size: 0.65rem; }
+.team-kick-btn:hover { background: rgba(220,38,38,0.15); border-color: #dc2626; color: #dc2626; }
+```
+
+---
+
 ## Leiterspiel-Quiz
 
 ### Architektur
