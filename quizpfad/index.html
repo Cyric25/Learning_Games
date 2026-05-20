@@ -54,7 +54,7 @@
 
       <div class="setup-title">
         <h1>🎲 QuizPfad</h1>
-        <p>Beantworte Fragen, rücke vor, erreiche das Ziel!</p>
+        <p>Wähle Schwierigkeit, rücke vor, erreiche das Ziel!</p>
       </div>
 
       <div class="setup-section">
@@ -92,6 +92,7 @@
         <button class="header-btn" onclick="confirmQuit()">&#8592; Beenden</button>
         <h2>QuizPfad</h2>
         <span class="round-info" id="round-info">Runde 1</span>
+        <a id="btn-board-view" href="#" target="_blank" class="header-btn" style="font-size:0.8rem;">📺 Tafelansicht</a>
         <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
       </div>
       <div class="active-team-banner" id="active-team-banner"></div>
@@ -101,10 +102,16 @@
     <div class="sidebar">
       <h3>Teams</h3>
       <div class="team-list" id="team-list"></div>
+
       <div class="sidebar-actions">
-        <button class="btn-answer" id="btn-answer" onclick="askQuestion()">Frage beantworten</button>
+        <!-- Difficulty Picker -->
+        <div class="diff-picker" id="diff-picker">
+          <div class="diff-picker-label">Schwierigkeit wählen:</div>
+          <div class="diff-btns" id="diff-btns"></div>
+        </div>
         <button class="btn-use-joker" id="btn-joker" onclick="useJoker()" style="display:none;">🃏 Joker einsetzen</button>
       </div>
+
       <div class="sidebar-legend" id="sidebar-legend">
         <h3>Legende</h3>
         <div class="legend-list" id="legend-list"></div>
@@ -162,6 +169,17 @@
 
   <!-- ── Scripts ─────────────────────────────────────────── -->
   <script src="js/quizpfad.js"></script>
+
+  <script>
+  // Update Tafelansicht-Link when code is available
+  (function waitForCode() {
+    var btn = document.getElementById('btn-board-view');
+    setInterval(function() {
+      var code = typeof QpStorage !== 'undefined' ? QpStorage.getCode() : null;
+      if (code && btn) btn.href = 'board.html?code=' + code;
+    }, 1000);
+  })();
+  </script>
 
   <!-- Theme Toggle -->
   <script>

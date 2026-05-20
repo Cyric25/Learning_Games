@@ -81,19 +81,39 @@ const QpStorage = {
 // ── Multi-Correct Helpers ────────────────────────────────────
 function isMcCorrect(q, selectedArr) {
   const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
-    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? 0];
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.correctIndex ?? q.richtig ?? 0];
   const sel = [...selectedArr].sort((a,b)=>a-b);
   return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
 }
 function correctSet(q) {
   return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
-    ? q.correctIndices : [q.correctIndex ?? 0]);
+    ? q.correctIndices : [q.correctIndex ?? q.richtig ?? 0]);
+}
+
+// ── Difficulty System ────────────────────────────────────────
+const DIFFICULTY_FIELDS = {
+  100: [1, 1],
+  200: [1, 2],
+  300: [2, 3],
+  400: [3, 4],
+  500: [4, 5]
+};
+
+const DIFFICULTY_RANGE_LABELS = {
+  100: '1 Feld',
+  200: '1–2 Felder',
+  300: '2–3 Felder',
+  400: '3–4 Felder',
+  500: '4–5 Felder'
+};
+
+function difficultyAdvance(difficulty) {
+  const range = DIFFICULTY_FIELDS[difficulty] || [1, 1];
+  return range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
 }
 
 // ── Constants ────────────────────────────────────────────────
-const FIELD_COUNT = 30;
 const COLS = 6;
-// Colorblind-safe team colors (distinguishable with deuteranopia/protanopia)
 const DEFAULT_COLORS = ['#0077bb','#ee7733','#cc3311','#009988','#aa3377','#ddaa33','#555555','#332288'];
 
 const BONUS_TYPES = [
@@ -108,6 +128,7 @@ const BONUS_TYPES = [
 let fragenBank = null;
 let teams = [];
 let board = [];
+let fieldCount = 30;
 let currentTeamIdx = 0;
 let round = 1;
 let gameOver = false;
@@ -119,6 +140,9 @@ let selectedCategoryIds = new Set();
 let activeFragenBank = null;
 let qpLiveQ = null;
 let gameCreatedAt = null;
+let takenTeams = [];
+let qpSub = null;
+let lastSeenLqId = null;
 
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -129,36 +153,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadFragen() {
-  // Shared question database (Risiko-Quiz format → QuizPfad format)
   let rqData = null;
-
   try {
     if (window.location.protocol !== 'file:') {
       try {
         const r = await fetch('../api.php?f=questions');
         if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
-      } catch (e) { /* fallback */ }
+      } catch {}
     }
     if (!rqData) {
-      try {
-        const r = await fetch('../data/questions.json');
-        if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
-      } catch (e) { /* ignore */ }
+      const r = await fetch('../data/questions.json');
+      if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
     }
-  } catch (e) { /* ignore */ }
-
-  // localStorage fallback (Risiko-Quiz format)
+  } catch {}
   if (!rqData) {
     const ls = localStorage.getItem('rq_questions');
-    if (ls) try { const d = JSON.parse(ls); if (d.categories && d.categories.length) rqData = d; } catch(e) {}
+    if (ls) try { const d = JSON.parse(ls); if (d.categories && d.categories.length) rqData = d; } catch {}
   }
-
   if (rqData) {
     fragenBank = convertRQtoQuizPfad(rqData);
     renderCategorySelector();
     return;
   }
-
   document.getElementById('setup-error').textContent =
     'Keine Fragen geladen. Bitte Fragen in der zentralen Fragendatenbank anlegen.';
 }
@@ -172,8 +188,9 @@ function buildCurrentGameState() {
   return {
     meta: { gameCode: QpStorage.getCode() || '', title: 'QuizPfad', createdAt: gameCreatedAt || new Date().toISOString() },
     phase: gameOver ? 'finished' : (board.length > 0 ? 'playing' : 'setup'),
-    teams, board, currentTeamIdx, round, usedQuestionIds,
+    teams, board, fieldCount, currentTeamIdx, round, usedQuestionIds,
     activeCategoryIds: [...selectedCategoryIds],
+    takenTeams: takenTeams || [],
     liveQuestion: qpLiveQ
   };
 }
@@ -218,11 +235,11 @@ async function createNewGame() {
   const code = QpStorage.generateCode();
   QpStorage.setCode(code);
   gameCreatedAt = new Date().toISOString();
-  board = []; teams = []; usedQuestionIds = new Set(); gameOver = false; qpLiveQ = null;
+  board = []; teams = []; usedQuestionIds = new Set(); gameOver = false; qpLiveQ = null; takenTeams = [];
   await QpStorage.save({
     meta: { gameCode: code, title: 'QuizPfad', createdAt: gameCreatedAt },
-    phase: 'setup', teams: [], board: [], currentTeamIdx: 0, round: 1,
-    usedQuestionIds: new Set(), activeCategoryIds: [], liveQuestion: null
+    phase: 'setup', teams: [], board: [], fieldCount: 30, currentTeamIdx: 0, round: 1,
+    usedQuestionIds: new Set(), activeCategoryIds: [], takenTeams: [], liveQuestion: null
   });
   window.history.replaceState({}, '', 'index.html?code=' + code);
   if (!fragenBank) await loadFragen();
@@ -241,9 +258,11 @@ async function _gsEnter(code) {
   if (gs.phase === 'playing' && gs.board && gs.board.length > 0) {
     teams = gs.teams || [];
     board = gs.board;
+    fieldCount = gs.fieldCount || gs.board.length;
     currentTeamIdx = gs.currentTeamIdx || 0;
     round = gs.round || 1;
     gameOver = false;
+    takenTeams = gs.takenTeams || [];
     usedQuestionIds = gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : new Set(gs.usedQuestionIds || []);
     qpLiveQ = gs.liveQuestion || null;
     if (gs.activeCategoryIds && gs.activeCategoryIds.length) {
@@ -258,6 +277,11 @@ async function _gsEnter(code) {
     renderSidebar();
     updateTurnBanner();
     showCodeBanner();
+    startSSESubscription(code);
+    // Restore open question modal if pending
+    if (qpLiveQ && !qpLiveQ.resolved) {
+      showQuestionModalFromState(qpLiveQ);
+    }
   } else if (gs.phase === 'finished') {
     showGameSelector();
   } else {
@@ -282,22 +306,114 @@ function showCodeBanner() {
   const b = document.createElement('div');
   b.id = 'code-banner';
   b.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-sidebar,#fff);color:var(--text-primary,#333);border-radius:12px;padding:10px 16px;font-size:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px;border:1px solid var(--border);';
-  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">'+code+'</strong><a href="view.html?code='+code+'" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Link ↗</a>';
+  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">'+code+'</strong>' +
+    '<a href="view.html?code='+code+'" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Ansicht ↗</a>' +
+    '<a href="board.html?code='+code+'" target="_blank" style="color:var(--accent-teal,#2a9d8f);font-size:.8rem;text-decoration:none">Tafel ↗</a>';
   document.body.appendChild(b);
 }
 
 function resetToSelector() {
+  if (qpSub) { qpSub.unsubscribe(); qpSub = null; }
   QpStorage.setCode(null);
   window.history.replaceState({}, '', 'index.html');
   const banner = document.getElementById('code-banner'); if (banner) banner.remove();
   showGameSelector();
 }
 
-// Convert Risiko-Quiz format → QuizPfad format
+// ── SSE Subscription ─────────────────────────────────────────
+function startSSESubscription(code) {
+  if (qpSub) qpSub.unsubscribe();
+  qpSub = QpStorage.subscribe(code || QpStorage.getCode(), function onRemoteUpdate(newGs) {
+    if (gameOver) return;
+    if (!newGs || !newGs.teams) return;
+
+    // Sync takenTeams
+    const oldTaken = JSON.stringify(takenTeams);
+    takenTeams = newGs.takenTeams || [];
+    if (JSON.stringify(takenTeams) !== oldTaken) {
+      renderSidebar();
+    }
+
+    const remoteLq = newGs.liveQuestion;
+
+    // Student answered MC question remotely
+    if (remoteLq && remoteLq.resolved && remoteLq.correct !== null) {
+      if (!qpLiveQ || !qpLiveQ.resolved) {
+        // Sync state
+        teams = newGs.teams;
+        usedQuestionIds = newGs.usedQuestionIds;
+        qpLiveQ = remoteLq;
+        applyRemoteAnswer(remoteLq);
+      }
+      return;
+    }
+
+    // Question cleared (nextTurn happened remotely)
+    if (!remoteLq && qpLiveQ && qpLiveQ.resolved) {
+      teams = newGs.teams;
+      board = newGs.board || board;
+      currentTeamIdx = newGs.currentTeamIdx;
+      round = newGs.round;
+      qpLiveQ = null;
+      gameOver = newGs.phase === 'finished';
+      renderBoard();
+      renderSidebar();
+      updateTurnBanner();
+      if (gameOver) {
+        const winner = teams.reduce((b,t,i) => t.position > (b ? teams[b].position : -1) ? i : b, 0);
+        setTimeout(() => showWinner(winner), 600);
+      }
+    }
+  });
+}
+
+function applyRemoteAnswer(lq) {
+  const modal = document.getElementById('question-modal');
+  if (!modal.classList.contains('open')) return;
+
+  if (lq.question.typ !== 'offen') {
+    const allBtns = document.querySelectorAll('#q-options .answer-btn');
+    allBtns.forEach(b => b.classList.add('disabled'));
+    const cs = correctSet(lq.question);
+    allBtns.forEach((b, i) => {
+      if (cs.has(i)) b.classList.add('correct');
+      else if (i === lq.selectedMcIndex && !lq.correct) b.classList.add('wrong');
+    });
+
+    const resultEl = document.getElementById('q-result');
+    resultEl.textContent = lq.correct ? '✓ Richtig!' : '✗ Falsch!';
+    resultEl.className = 'modal-result visible ' + (lq.correct ? 'correct-result' : 'wrong-result');
+
+    const team = teams[lq.teamIdx];
+    if (lq.correct && team) team.correctCount = (team.correctCount || 0) + 1;
+    else if (team) team.wrongCount = (team.wrongCount || 0) + 1;
+
+    const explEl = document.getElementById('q-explanation');
+    if (lq.question.erklaerung) {
+      document.getElementById('q-explanation-text').textContent = lq.question.erklaerung;
+      explEl.classList.add('visible');
+    }
+
+    document.getElementById('q-continue').classList.add('visible');
+    if (pendingQuestionResult) {
+      pendingQuestionResult.resolved = true;
+      pendingQuestionResult.correct = lq.correct;
+    } else {
+      pendingQuestionResult = { question: lq.question, resolved: true, correct: lq.correct, advanceAmount: lq.advanceAmount };
+    }
+
+    setTimeout(() => {
+      if (document.getElementById('question-modal').classList.contains('open')) {
+        continueAfterQuestion();
+      }
+    }, 2500);
+  }
+}
+
+// ── Convert Risiko-Quiz → QuizPfad ────────────────────────────
 function convertRQtoQuizPfad(rqData) {
   const kategorien = [];
   const fragen = [];
-  // Colorblind-safe category colors (Tol's qualitative palette)
   const colors = ['#332288','#88ccee','#44aa99','#117733','#999933','#ddcc77','#cc6677','#882255','#aa4499','#0077bb'];
   let colorIdx = 0;
 
@@ -310,26 +426,19 @@ function convertRQtoQuizPfad(rqData) {
       const katId = node.id;
       const katName = path.join(' › ');
       if (!kategorien.find(k => k.id === katId)) {
-        kategorien.push({
-          id: katId,
-          name: katName,
-          icon: parentIcon || '📚',
-          farbe: colors[colorIdx++ % colors.length]
-        });
+        kategorien.push({ id: katId, name: katName, icon: parentIcon || '📚', farbe: colors[colorIdx++ % colors.length] });
       }
 
       node.questions.forEach(q => {
-        const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
-        let typ, antworten, richtig;
+        const diff = q.difficulty || 100;
+        const schwierigkeit = diff <= 200 ? 'leicht' : diff <= 300 ? 'mittel' : 'schwer';
+        let typ, antworten, richtig, correctIndices = null;
 
-        let correctIndices = null;
         if (q.type === 'mc' && q.options && q.options.length > 0) {
           typ = 'multiple_choice';
           antworten = q.options.slice();
           richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
-          if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
-            correctIndices = q.correctIndices.slice();
-          }
+          if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) correctIndices = q.correctIndices.slice();
         } else {
           typ = 'offen';
           antworten = [];
@@ -339,11 +448,12 @@ function convertRQtoQuizPfad(rqData) {
         const frageObj = {
           id: q.id,
           kategorie: katId,
-          schwierigkeit: schwierigkeit,
+          difficulty: diff,
+          schwierigkeit,
           frage: q.question || '',
-          typ: typ,
-          antworten: antworten,
-          richtig: richtig,
+          typ,
+          antworten,
+          richtig,
           erklaerung: q.answer || q.hint || ''
         };
         if (correctIndices) frageObj.correctIndices = correctIndices;
@@ -358,13 +468,10 @@ function convertRQtoQuizPfad(rqData) {
   const icons = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯'];
   (rqData.categories || []).forEach((cat, i) => {
     const icon = icons[i % icons.length];
-    // If top-level category has no subcategories, treat it as a leaf
     if ((!cat.subcategories || cat.subcategories.length === 0) && cat.questions && cat.questions.length > 0) {
       collectLeafCategories(cat, [cat.name], icon);
     } else {
-      (cat.subcategories || []).forEach(sub => {
-        collectLeafCategories(sub, [cat.name, sub.name], icon);
-      });
+      (cat.subcategories || []).forEach(sub => collectLeafCategories(sub, [cat.name, sub.name], icon));
     }
   });
 
@@ -374,13 +481,10 @@ function convertRQtoQuizPfad(rqData) {
 // ── Category Selector ─────────────────────────────────────────
 function renderCategorySelector() {
   if (!fragenBank || !fragenBank.kategorien.length) return;
-
   const section = document.getElementById('category-section');
   section.style.display = '';
   const list = document.getElementById('cat-select-list');
   list.innerHTML = '';
-
-  // Select all by default
   selectedCategoryIds.clear();
   fragenBank.kategorien.forEach(k => selectedCategoryIds.add(k.id));
 
@@ -396,31 +500,19 @@ function renderCategorySelector() {
       '<span class="cat-select-count">' + qCount + ' Fragen</span>' +
       '<div class="cat-select-check">✓</div>';
     item.onclick = () => {
-      if (selectedCategoryIds.has(kat.id)) {
-        selectedCategoryIds.delete(kat.id);
-        item.classList.remove('selected');
-      } else {
-        selectedCategoryIds.add(kat.id);
-        item.classList.add('selected');
-      }
+      if (selectedCategoryIds.has(kat.id)) { selectedCategoryIds.delete(kat.id); item.classList.remove('selected'); }
+      else { selectedCategoryIds.add(kat.id); item.classList.add('selected'); }
       updateCatSelectInfo();
     };
     list.appendChild(item);
   });
-
   updateCatSelectInfo();
 }
 
 function toggleAllCategories(selectAll) {
-  const items = document.querySelectorAll('.cat-select-item');
-  selectedCategoryIds.clear();
-  items.forEach(item => {
-    if (selectAll) {
-      selectedCategoryIds.add(item.dataset.catId);
-      item.classList.add('selected');
-    } else {
-      item.classList.remove('selected');
-    }
+  document.querySelectorAll('.cat-select-item').forEach(item => {
+    selectedCategoryIds[selectAll ? 'add' : 'delete'](item.dataset.catId);
+    item.classList[selectAll ? 'add' : 'remove']('selected');
   });
   updateCatSelectInfo();
 }
@@ -431,8 +523,12 @@ function updateCatSelectInfo() {
   const total = fragenBank.kategorien.length;
   const selected = selectedCategoryIds.size;
   const qCount = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)).length;
-  const ok = qCount >= 10;
   const btn = document.getElementById('btn-start');
+  const teamCount = document.querySelectorAll('.team-config-row').length || 2;
+  const calcField = calculateFieldCount(
+    fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie)),
+    teamCount
+  );
 
   if (selected === 0 || qCount === 0) {
     el.className = 'cat-select-info warning';
@@ -440,18 +536,40 @@ function updateCatSelectInfo() {
     if (btn) btn.disabled = true;
     return;
   }
-
+  const ok = qCount >= 10;
   if (ok) {
     el.className = 'cat-select-info';
-    el.textContent = '✅ ' + selected + ' von ' + total + ' Kategorien gewählt (' + qCount + ' Fragen)';
+    el.textContent = `✅ ${selected}/${total} Kategorien · ${qCount} Fragen · Pfad: ~${calcField} Felder`;
   } else {
     el.className = 'cat-select-info warning';
-    el.textContent = '❌ ' + selected + ' Kategorien gewählt, aber nur ' + qCount + ' Fragen – mindestens 10 benötigt.';
+    el.textContent = `❌ Nur ${qCount} Fragen – mindestens 10 benötigt.`;
   }
   if (btn) btn.disabled = !ok;
 }
 
 // ── Setup Screen ─────────────────────────────────────────────
+function calculateFieldCount(fragen, numTeams) {
+  const total = fragen.length;
+  const raw = Math.floor(total * 1.5 / Math.max(1, numTeams));
+  return Math.max(12, Math.min(60, Math.round(raw / COLS) * COLS));
+}
+
+function getAvailableDifficulties() {
+  if (!activeFragenBank) return [];
+  const avail = new Set();
+  activeFragenBank.fragen.filter(q => !usedQuestionIds.has(q.id)).forEach(q => avail.add(q.difficulty));
+  return [100, 200, 300, 400, 500].filter(d => avail.has(d));
+}
+
+function pickQuestionByDifficulty(difficulty) {
+  if (!activeFragenBank) return null;
+  const pool = activeFragenBank.fragen.filter(q => q.difficulty === difficulty && !usedQuestionIds.has(q.id));
+  if (!pool.length) return null;
+  const q = pool[Math.floor(Math.random() * pool.length)];
+  usedQuestionIds.add(q.id);
+  return q;
+}
+
 function renderTeamCountSelector(selected) {
   const row = document.getElementById('team-count-row');
   row.innerHTML = '';
@@ -459,10 +577,7 @@ function renderTeamCountSelector(selected) {
     const btn = document.createElement('button');
     btn.className = 'team-count-btn' + (i === selected ? ' selected' : '');
     btn.textContent = i;
-    btn.onclick = () => {
-      renderTeamCountSelector(i);
-      renderTeamConfig(i);
-    };
+    btn.onclick = () => { renderTeamCountSelector(i); renderTeamConfig(i); updateCatSelectInfo(); };
     row.appendChild(btn);
   }
   renderTeamConfig(selected);
@@ -470,15 +585,10 @@ function renderTeamCountSelector(selected) {
 
 function renderTeamConfig(count) {
   const list = document.getElementById('team-config-list');
-  // Preserve existing names/colors
   const existing = [];
-  list.querySelectorAll('.team-config-row').forEach((row, i) => {
-    existing.push({
-      name: row.querySelector('input[type="text"]').value,
-      color: row.querySelector('input[type="color"]').value
-    });
+  list.querySelectorAll('.team-config-row').forEach(row => {
+    existing.push({ name: row.querySelector('input[type="text"]').value, color: row.querySelector('input[type="color"]').value });
   });
-
   list.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const name = (existing[i] && existing[i].name) || ('Team ' + (i + 1));
@@ -495,124 +605,94 @@ function renderTeamConfig(count) {
 
 function startGame() {
   if (!fragenBank || !fragenBank.fragen || fragenBank.fragen.length === 0) {
-    document.getElementById('setup-error').textContent = 'Keine Fragen geladen!';
-    return;
+    document.getElementById('setup-error').textContent = 'Keine Fragen geladen!'; return;
   }
-
   if (selectedCategoryIds.size === 0) {
-    document.getElementById('setup-error').textContent = 'Bitte mindestens eine Kategorie auswählen!';
-    return;
+    document.getElementById('setup-error').textContent = 'Bitte mindestens eine Kategorie auswählen!'; return;
   }
 
-  // Filter fragenBank to selected categories
   activeFragenBank = {
     kategorien: fragenBank.kategorien.filter(k => selectedCategoryIds.has(k.id)),
     fragen: fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie))
   };
 
   if (activeFragenBank.fragen.length < 10) {
-    document.getElementById('setup-error').textContent = 'Mindestens 10 Fragen benötigt – bitte mehr Kategorien auswählen.';
-    updateCatSelectInfo();
-    return;
+    document.getElementById('setup-error').textContent = 'Mindestens 10 Fragen benötigt.'; return;
   }
 
-  // Build teams
   teams = [];
   document.querySelectorAll('.team-config-row').forEach((row, i) => {
     teams.push({
       name: row.querySelector('input[type="text"]').value || ('Team ' + (i + 1)),
       color: row.querySelector('input[type="color"]').value,
-      position: 0, // field index (0 = Start)
-      correctCount: 0,
-      wrongCount: 0,
-      hasJoker: false,
-      jokerUsed: false
+      position: 0, correctCount: 0, wrongCount: 0, hasJoker: false, jokerUsed: false
     });
   });
-
   if (teams.length === 0) return;
 
-  // Build board
-  board = generateBoard();
+  fieldCount = calculateFieldCount(activeFragenBank.fragen, teams.length);
+  board = generateBoard(fieldCount);
   currentTeamIdx = 0;
   round = 1;
   gameOver = false;
   usedQuestionIds.clear();
   duelOpponentIdx = null;
+  takenTeams = [];
+  qpLiveQ = null;
 
   showScreen('game-screen');
   renderBoard();
   renderSidebar();
   updateTurnBanner();
 
-  qpLiveQ = null;
   if (!gameCreatedAt) gameCreatedAt = new Date().toISOString();
   QpStorage.save(buildCurrentGameState());
+  startSSESubscription();
 }
 
 // ── Board Generation ─────────────────────────────────────────
-function generateBoard() {
+function generateBoard(fc) {
   const fields = [];
   const kats = activeFragenBank.kategorien;
   const seed = Date.now();
 
-  // Assign categories cyclically
-  for (let i = 0; i < FIELD_COUNT; i++) {
+  for (let i = 0; i < fc; i++) {
     if (i === 0) {
       fields.push({ type: 'start', label: 'Start', icon: '🏁', color: '#2a9d8f' });
-    } else if (i === FIELD_COUNT - 1) {
+    } else if (i === fc - 1) {
       fields.push({ type: 'goal', label: 'Ziel', icon: '🏆', color: '#e76f51' });
     } else {
       const kat = kats[(i - 1) % kats.length];
-      fields.push({
-        type: 'category',
-        kategorieId: kat.id,
-        label: kat.name,
-        icon: kat.icon,
-        color: kat.farbe,
-        bonus: null
-      });
+      fields.push({ type: 'category', kategorieId: kat.id, label: kat.name, icon: kat.icon, color: kat.farbe, bonus: null });
     }
   }
 
-  // Distribute bonus fields (not on start, goal, or first 2 fields)
   const bonusCandidates = [];
-  for (let i = 3; i < FIELD_COUNT - 2; i++) bonusCandidates.push(i);
+  for (let i = 3; i < fc - 2; i++) bonusCandidates.push(i);
   shuffleArray(bonusCandidates, seed);
 
   const bonusDist = [
-    { type: 'advance', count: 2 },
-    { type: 'setback', count: 2 },
-    { type: 'extra',   count: 2 },
-    { type: 'joker',   count: 2 },
-    { type: 'duel',    count: 2 }
+    { type: 'advance', count: 2 }, { type: 'setback', count: 2 },
+    { type: 'extra',   count: 2 }, { type: 'joker',   count: 2 }, { type: 'duel', count: 2 }
   ];
-
   let idx = 0;
   for (const bd of bonusDist) {
     for (let c = 0; c < bd.count && idx < bonusCandidates.length; c++) {
-      fields[bonusCandidates[idx]].bonus = bd.type;
-      idx++;
+      fields[bonusCandidates[idx]].bonus = bd.type; idx++;
     }
   }
 
-  // Ensure no consecutive setback fields (swap with a non-setback bonus)
-  for (let i = 1; i < FIELD_COUNT; i++) {
+  for (let i = 1; i < fc; i++) {
     if (fields[i].bonus === 'setback' && fields[i - 1].bonus === 'setback') {
-      // Find a non-setback bonus field to swap with
-      for (let j = 3; j < FIELD_COUNT - 2; j++) {
+      for (let j = 3; j < fc - 2; j++) {
         if (j !== i && j !== i - 1 && fields[j].bonus && fields[j].bonus !== 'setback' &&
             (!fields[j - 1] || fields[j - 1].bonus !== 'setback') &&
             (!fields[j + 1] || fields[j + 1].bonus !== 'setback')) {
-          const tmp = fields[i].bonus;
-          fields[i].bonus = fields[j].bonus;
-          fields[j].bonus = tmp;
-          break;
+          const tmp = fields[i].bonus; fields[i].bonus = fields[j].bonus; fields[j].bonus = tmp; break;
         }
       }
     }
   }
-
   return fields;
 }
 
@@ -627,21 +707,18 @@ function shuffleArray(arr, seed) {
 
 // ── Board Rendering ──────────────────────────────────────────
 function renderBoard() {
+  const fc = board.length;
   const grid = document.getElementById('board-grid');
   grid.innerHTML = '';
 
-  for (let row = 0; row < Math.ceil(FIELD_COUNT / COLS); row++) {
+  for (let row = 0; row < Math.ceil(fc / COLS); row++) {
     const reversed = row % 2 === 1;
     for (let col = 0; col < COLS; col++) {
       const actualCol = reversed ? (COLS - 1 - col) : col;
       const fieldIdx = row * COLS + actualCol;
 
-      if (fieldIdx >= FIELD_COUNT) {
-        // Empty placeholder
-        const empty = document.createElement('div');
-        empty.style.visibility = 'hidden';
-        grid.appendChild(empty);
-        continue;
+      if (fieldIdx >= fc) {
+        const empty = document.createElement('div'); empty.style.visibility = 'hidden'; grid.appendChild(empty); continue;
       }
 
       const field = board[fieldIdx];
@@ -652,67 +729,45 @@ function renderBoard() {
       if (field.type === 'start') div.classList.add('start-field');
       if (field.type === 'goal') div.classList.add('goal-field');
       if (field.bonus) div.classList.add('bonus-field');
+      if (field.type === 'category') { div.classList.add('cat-field'); div.style.background = field.color; }
 
-      // Category fields get solid background color
-      if (field.type === 'category') {
-        div.classList.add('cat-field');
-        div.style.background = field.color;
-      }
-
-      // Path connector to next field
-      if (fieldIdx < FIELD_COUNT - 1) {
+      if (fieldIdx < fc - 1) {
         const isEvenRow = row % 2 === 0;
-        if (isEvenRow) {
-          div.classList.add(col < COLS - 1 ? 'connect-right' : 'connect-down');
-        } else {
-          div.classList.add(col > 0 ? 'connect-left' : 'connect-down');
-        }
+        if (isEvenRow) div.classList.add(col < COLS - 1 ? 'connect-right' : 'connect-down');
+        else div.classList.add(col > 0 ? 'connect-left' : 'connect-down');
       }
 
-      // Highlight next 2 fields for active team
-      const activeTeam = teams[currentTeamIdx];
-      if (activeTeam && !gameOver &&
-          (fieldIdx === activeTeam.position + 1 || fieldIdx === activeTeam.position + 2) &&
-          fieldIdx < FIELD_COUNT) {
-        div.classList.add('next-field');
+      // Highlight landing field when active question exists
+      if (qpLiveQ && !qpLiveQ.resolved && !gameOver) {
+        const activeTeam = teams[currentTeamIdx];
+        const landingField = Math.min(activeTeam.position + qpLiveQ.advanceAmount, fc - 1);
+        if (fieldIdx === landingField) div.classList.add('next-field');
       }
 
-      // Field number
       const numEl = document.createElement('div');
       numEl.className = 'field-number';
       numEl.textContent = fieldIdx;
       div.appendChild(numEl);
 
-      // Icon or bonus symbol (large)
       if (field.bonus) {
         const bt = BONUS_TYPES.find(b => b.id === field.bonus);
-        if (bt) {
-          const badge = document.createElement('div');
-          badge.className = 'bonus-badge';
-          badge.textContent = bt.icon;
-          div.appendChild(badge);
-        }
+        if (bt) { const badge = document.createElement('div'); badge.className = 'bonus-badge'; badge.textContent = bt.icon; div.appendChild(badge); }
       }
-
       const iconEl = document.createElement('div');
       iconEl.className = 'field-icon';
       iconEl.textContent = field.icon;
       div.appendChild(iconEl);
 
-      // Team pieces
       const piecesDiv = document.createElement('div');
       piecesDiv.className = 'field-pieces';
       teams.forEach((team, ti) => {
         if (team.position === fieldIdx) {
           const p = document.createElement('div');
-          p.className = 'piece';
-          p.style.background = team.color;
-          p.textContent = ti + 1;
+          p.className = 'piece'; p.style.background = team.color; p.textContent = ti + 1;
           piecesDiv.appendChild(p);
         }
       });
       div.appendChild(piecesDiv);
-
       grid.appendChild(div);
     }
   }
@@ -722,33 +777,27 @@ function renderBoard() {
 function renderSidebar() {
   const list = document.getElementById('team-list');
   list.innerHTML = '';
+  const taken = new Set(takenTeams || []);
+
   teams.forEach((team, i) => {
     const card = document.createElement('div');
     card.className = 'team-card' + (i === currentTeamIdx ? ' active-turn' : '');
 
+    const isTaken = taken.has(i);
+    const connDot = isTaken ? '<span class="team-conn-dot" title="Gerät verbunden">●</span>' : '';
+
     const piece = document.createElement('div');
-    piece.className = 'team-piece';
-    piece.style.background = team.color;
-    piece.textContent = i + 1;
+    piece.className = 'team-piece'; piece.style.background = team.color; piece.textContent = i + 1;
 
     const info = document.createElement('div');
     info.className = 'team-info';
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'team-name';
-    nameEl.textContent = team.name;
-
-    const posEl = document.createElement('div');
-    posEl.className = 'team-pos';
-    posEl.textContent = 'Feld ' + team.position + '/' + (FIELD_COUNT - 1);
-
-    info.appendChild(nameEl);
-    info.appendChild(posEl);
+    info.innerHTML =
+      `<div class="team-name">${connDot}${escapeHtml(team.name)}</div>` +
+      `<div class="team-pos">Feld ${team.position}/${board.length - 1}</div>`;
 
     card.appendChild(piece);
     card.appendChild(info);
 
-    // Joker badge
     if (team.hasJoker || team.jokerUsed) {
       const badges = document.createElement('div');
       badges.className = 'team-badges';
@@ -759,292 +808,255 @@ function renderSidebar() {
       card.appendChild(badges);
     }
 
+    if (isTaken) {
+      const kickBtn = document.createElement('button');
+      kickBtn.className = 'team-kick-btn'; kickBtn.title = 'Gerät trennen';
+      kickBtn.textContent = '✕';
+      kickBtn.onclick = e => { e.stopPropagation(); kickTeam(i); };
+      card.appendChild(kickBtn);
+    }
+
     list.appendChild(card);
   });
 
-  // Joker button visibility
   const jokerBtn = document.getElementById('btn-joker');
   const activeTeam = teams[currentTeamIdx];
   if (activeTeam && activeTeam.hasJoker && !activeTeam.jokerUsed && !gameOver) {
-    jokerBtn.style.display = 'block';
-    jokerBtn.disabled = false;
+    jokerBtn.style.display = 'block'; jokerBtn.disabled = false;
   } else {
     jokerBtn.style.display = 'none';
   }
 
   document.getElementById('round-info').textContent = 'Runde ' + round;
-
-  // Render legend
+  renderDifficultyPicker();
   renderLegend();
 }
 
-function renderLegend() {
-  const list = document.getElementById('legend-list');
-  if (!list || !activeFragenBank) return;
-  list.innerHTML = '';
+// ── Difficulty Picker ────────────────────────────────────────
+function renderDifficultyPicker() {
+  const container = document.getElementById('diff-btns');
+  if (!container) return;
+  container.innerHTML = '';
 
-  activeFragenBank.kategorien.forEach(kat => {
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML =
-      '<div class="legend-color" style="background:' + kat.farbe + ';"></div>' +
-      '<span class="legend-name">' + kat.icon + ' ' + kat.name + '</span>';
-    list.appendChild(item);
+  const avail = getAvailableDifficulties();
+  const blocked = !!qpLiveQ || gameOver;
+
+  [100, 200, 300, 400, 500].forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'diff-btn diff-btn-' + d;
+    btn.disabled = blocked || !avail.includes(d);
+    btn.innerHTML = `<span class="diff-pts">${d}</span><span class="diff-adv">${DIFFICULTY_RANGE_LABELS[d]}</span>`;
+    btn.onclick = () => teacherPicksDifficulty(d);
+    container.appendChild(btn);
   });
 
-  // Bonus legend
-  BONUS_TYPES.forEach(bt => {
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML =
-      '<div class="legend-color" style="background:var(--bg-field);text-align:center;font-size:0.7rem;line-height:16px;">' + bt.icon + '</div>' +
-      '<span class="legend-name">' + bt.name + '</span>';
-    list.appendChild(item);
-  });
+  const allGone = avail.length === 0 && !gameOver;
+  if (allGone) {
+    const msg = document.createElement('div');
+    msg.className = 'diff-exhausted';
+    msg.textContent = '⚠ Keine Fragen mehr verfügbar';
+    container.appendChild(msg);
+  }
+}
+
+function teacherPicksDifficulty(difficulty) {
+  if (gameOver || qpLiveQ) return;
+  const q = pickQuestionByDifficulty(difficulty);
+  if (!q) { renderDifficultyPicker(); return; }
+
+  const advance = difficultyAdvance(difficulty);
+  qpLiveQ = {
+    id: q.id + '_' + Date.now(),
+    teamIdx: currentTeamIdx,
+    difficulty,
+    question: q,
+    advanceAmount: advance,
+    resolved: false,
+    correct: null,
+    selectedMcIndex: null
+  };
+
+  QpStorage.save(buildCurrentGameState());
+  renderDifficultyPicker();
+  showQuestionModalFromState(qpLiveQ);
 }
 
 function updateTurnBanner() {
   const banner = document.getElementById('active-team-banner');
   const team = teams[currentTeamIdx];
+  if (!team) return;
   banner.style.background = team.color;
   banner.style.color = '#fff';
   banner.textContent = team.name + ' ist dran!';
 }
 
-// ── Question Logic ───────────────────────────────────────────
-function askQuestion() {
-  if (gameOver) return;
-
-  const team = teams[currentTeamIdx];
-  const nextPos = Math.min(team.position + 1, FIELD_COUNT - 1);
-  const field = board[nextPos];
-
-  // Get a question for this category
-  const question = pickQuestion(field.kategorieId);
-  if (!question) {
-    // No questions left for this category — skip and move
-    moveTeam(currentTeamIdx, nextPos);
-    return;
-  }
-
-  showQuestionModal(question, field);
+// ── Question Modal ───────────────────────────────────────────
+function showQuestionModalFromState(lq) {
+  showQuestionModal(lq.question, lq);
 }
 
-function pickQuestion(kategorieId) {
-  if (!activeFragenBank || !activeFragenBank.fragen) return null;
-
-  // Filter by category, exclude already used (no question appears twice in a game)
-  let pool = activeFragenBank.fragen.filter(
-    q => q.kategorie === kategorieId && !usedQuestionIds.has(q.id)
-  );
-
-  // If category is exhausted, try any other category that still has questions
-  if (pool.length === 0) {
-    pool = activeFragenBank.fragen.filter(q => !usedQuestionIds.has(q.id));
-  }
-
-  if (pool.length === 0) return null;
-
-  // Random pick
-  const idx = Math.floor(Math.random() * pool.length);
-  const q = pool[idx];
-  usedQuestionIds.add(q.id);
-  return q;
-}
-
-function showQuestionModal(question, field) {
+function showQuestionModal(question, lq) {
   const modal = document.getElementById('question-modal');
-  const kat = activeFragenBank.kategorien.find(k => k.id === question.kategorie);
+  const kat = activeFragenBank ? activeFragenBank.kategorien.find(k => k.id === question.kategorie) : null;
 
   document.getElementById('q-cat-icon').textContent = kat ? kat.icon : '❓';
   document.getElementById('q-cat-name').textContent = kat ? kat.name : '';
-  document.getElementById('q-difficulty').textContent = question.schwierigkeit;
+
+  const advance = lq ? lq.advanceAmount : 1;
+  const diff = lq ? lq.difficulty : question.difficulty;
+  document.getElementById('q-difficulty').textContent =
+    `${diff || '?'} Pkt. · ${advance} Feld${advance !== 1 ? 'er' : ''} bei ✓`;
+
   document.getElementById('q-text').textContent = question.frage;
 
-  // Hint
   const hintEl = document.getElementById('q-hint');
-  if (question.hinweis) {
-    hintEl.textContent = question.hinweis;
-    hintEl.style.display = 'block';
+  if (question.erklaerung && question.typ === 'offen') {
+    hintEl.textContent = ''; hintEl.style.display = 'none';
   } else {
     hintEl.style.display = 'none';
   }
 
-  // Reset result & explanation
   const resultEl = document.getElementById('q-result');
-  resultEl.className = 'modal-result';
-  resultEl.textContent = '';
+  resultEl.className = 'modal-result'; resultEl.textContent = '';
 
   const explEl = document.getElementById('q-explanation');
   explEl.classList.remove('visible');
   document.getElementById('q-explanation-text').textContent = question.erklaerung || '';
-
   document.getElementById('q-continue').classList.remove('visible');
 
-  // Answer options
   const optionsDiv = document.getElementById('q-options');
   const openDiv = document.getElementById('q-open-actions');
-  optionsDiv.innerHTML = '';
-  optionsDiv.style.display = 'none';
-  openDiv.style.display = 'none';
+  optionsDiv.innerHTML = ''; optionsDiv.style.display = 'none'; openDiv.style.display = 'none';
 
-  pendingQuestionResult = null;
+  pendingQuestionResult = { question, lq, resolved: false };
 
   if (question.typ === 'offen') {
-    // Teacher decides
     openDiv.style.display = 'flex';
   } else {
-    // MC: Single or Multi-Correct
     optionsDiv.style.display = 'flex';
     const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
-
     if (!isMulti) {
-      // Single correct – original behaviour
       question.antworten.forEach((ans, i) => {
         const btn = document.createElement('button');
-        btn.className = 'answer-btn';
-        btn.textContent = ans;
+        btn.className = 'answer-btn'; btn.textContent = ans;
         btn.onclick = () => selectAnswer(btn, i, question);
         optionsDiv.appendChild(btn);
       });
     } else {
-      // Multi correct – toggle + confirm
       const pending = new Set();
       const allBtns = [];
       question.antworten.forEach((ans, i) => {
         const btn = document.createElement('button');
-        btn.className = 'answer-btn';
-        btn.textContent = ans;
+        btn.className = 'answer-btn'; btn.textContent = ans;
         btn.addEventListener('click', () => {
           if (pendingQuestionResult && pendingQuestionResult.resolved) return;
           if (pending.has(i)) { pending.delete(i); btn.classList.remove('mc-selected-pending'); }
           else { pending.add(i); btn.classList.add('mc-selected-pending'); }
         });
-        allBtns.push(btn);
-        optionsDiv.appendChild(btn);
+        allBtns.push(btn); optionsDiv.appendChild(btn);
       });
-
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'answer-btn mc-confirm-btn';
-      confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.className = 'answer-btn mc-confirm-btn'; confirmBtn.textContent = '✓ Bestätigen';
       confirmBtn.addEventListener('click', () => {
         if (pendingQuestionResult && pendingQuestionResult.resolved) return;
         const sel = [...pending];
         const ok = isMcCorrect(question, sel);
         const cs = correctSet(question);
-
-        // Disable all buttons
         allBtns.forEach(b => b.classList.add('disabled'));
         confirmBtn.classList.add('disabled');
-
-        // Mark correct/wrong
-        allBtns.forEach((b, i) => {
-          if (cs.has(i)) b.classList.add('correct');
-          else if (pending.has(i)) b.classList.add('wrong');
-        });
-
+        allBtns.forEach((b, i) => { if (cs.has(i)) b.classList.add('correct'); else if (pending.has(i)) b.classList.add('wrong'); });
         resolveQuestion(ok);
       });
       optionsDiv.appendChild(confirmBtn);
     }
   }
 
-  // Store question for bonus check
-  pendingQuestionResult = { question, field, resolved: false };
-
-  qpLiveQ = { id: question.id, teamIdx: currentTeamIdx, question, resolved: false, correct: null };
-  QpStorage.save(buildCurrentGameState());
-
   modal.classList.add('open');
 }
 
 function selectAnswer(btn, selectedIdx, question) {
   if (pendingQuestionResult && pendingQuestionResult.resolved) return;
-
   const correct = selectedIdx === question.richtig;
   const allBtns = document.querySelectorAll('#q-options .answer-btn');
   const cs = correctSet(question);
-
-  // Disable all
   allBtns.forEach(b => b.classList.add('disabled'));
-
-  // Mark correct/wrong
   btn.classList.add(correct ? 'correct' : 'wrong');
   allBtns.forEach((b, i) => { if (cs.has(i)) b.classList.add('correct'); });
-
-  resolveQuestion(correct);
+  resolveQuestion(correct, selectedIdx);
 }
 
 function resolveOpen(correct) {
+  if (pendingQuestionResult && pendingQuestionResult.isDuel) {
+    document.getElementById('q-open-actions').style.display = 'none';
+    resolveDuelAnswer(correct); return;
+  }
   document.getElementById('q-open-actions').style.display = 'none';
   resolveQuestion(correct);
 }
 
-function resolveQuestion(correct) {
+function resolveQuestion(correct, selectedMcIndex) {
   if (!pendingQuestionResult || pendingQuestionResult.resolved) return;
   pendingQuestionResult.resolved = true;
   pendingQuestionResult.correct = correct;
 
   const team = teams[currentTeamIdx];
   const resultEl = document.getElementById('q-result');
+  if (correct) { team.correctCount++; resultEl.textContent = '✓ Richtig!'; resultEl.className = 'modal-result visible correct-result'; }
+  else { team.wrongCount++; resultEl.textContent = '✗ Falsch!'; resultEl.className = 'modal-result visible wrong-result'; }
 
-  if (correct) {
-    team.correctCount++;
-    resultEl.textContent = '✓ Richtig!';
-    resultEl.className = 'modal-result visible correct-result';
-  } else {
-    team.wrongCount++;
-    resultEl.textContent = '✗ Falsch!';
-    resultEl.className = 'modal-result visible wrong-result';
-  }
-
-  // Show explanation
   const explEl = document.getElementById('q-explanation');
-  if (pendingQuestionResult.question.erklaerung) {
-    explEl.classList.add('visible');
-  }
-
+  if (pendingQuestionResult.question.erklaerung) explEl.classList.add('visible');
   document.getElementById('q-continue').classList.add('visible');
 
-  if (qpLiveQ) { qpLiveQ.resolved = true; qpLiveQ.correct = correct; }
+  if (qpLiveQ) {
+    qpLiveQ.resolved = true;
+    qpLiveQ.correct = correct;
+    if (selectedMcIndex !== undefined) qpLiveQ.selectedMcIndex = selectedMcIndex;
+  }
   QpStorage.save(buildCurrentGameState());
 }
 
 function continueAfterQuestion() {
-  document.getElementById('question-modal').classList.remove('open');
+  if (pendingQuestionResult && pendingQuestionResult.isDuel) {
+    document.getElementById('question-modal').classList.remove('open');
+    const winner = pendingQuestionResult.duelWinner;
+    pendingQuestionResult = null;
+    if (winner !== null && winner !== undefined) {
+      const newPos = Math.min(teams[winner].position + 1, board.length - 1);
+      teams[winner].position = newPos;
+      renderBoard(); renderSidebar();
+      if (newPos >= board.length - 1) { setTimeout(() => showWinner(winner), 600); return; }
+    }
+    nextTurn(); return;
+  }
 
+  document.getElementById('question-modal').classList.remove('open');
   if (!pendingQuestionResult) { nextTurn(); return; }
 
   const correct = pendingQuestionResult.correct;
+  const advance = qpLiveQ ? qpLiveQ.advanceAmount : 1;
   const team = teams[currentTeamIdx];
 
   if (correct) {
-    const nextPos = Math.min(team.position + 2, FIELD_COUNT - 1);
+    const nextPos = Math.min(team.position + advance, board.length - 1);
     moveTeam(currentTeamIdx, nextPos);
   } else {
-    // Wrong: team stays, next turn
     nextTurn();
   }
 }
 
 // ── Movement ─────────────────────────────────────────────────
 function moveTeam(teamIdx, newPos) {
-  const team = teams[teamIdx];
-  team.position = newPos;
-
-  renderBoard();
-  renderSidebar();
+  teams[teamIdx].position = newPos;
+  renderBoard(); renderSidebar();
 
   qpLiveQ = null;
   QpStorage.save(buildCurrentGameState());
 
-  // Check win
-  if (newPos >= FIELD_COUNT - 1) {
-    setTimeout(() => showWinner(teamIdx), 600);
-    return;
+  if (newPos >= board.length - 1) {
+    setTimeout(() => showWinner(teamIdx), 600); return;
   }
 
-  // Check bonus on new field
   const field = board[newPos];
   if (field.bonus) {
     pendingBonus = { type: field.bonus, teamIdx };
@@ -1058,44 +1070,31 @@ function moveTeam(teamIdx, newPos) {
 function showBonusModal(bonusType, teamIdx) {
   const bt = BONUS_TYPES.find(b => b.id === bonusType);
   if (!bt) { nextTurn(); return; }
-
   const team = teams[teamIdx];
 
   document.getElementById('bonus-icon').textContent = bt.icon;
   document.getElementById('bonus-title').textContent = bt.name;
   document.getElementById('bonus-desc').textContent = bt.desc;
 
-  // Duel: show team selection
   const duelDiv = document.getElementById('duel-teams');
-  duelDiv.innerHTML = '';
-  duelDiv.style.display = 'none';
-  duelOpponentIdx = null;
+  duelDiv.innerHTML = ''; duelDiv.style.display = 'none'; duelOpponentIdx = null;
 
   if (bonusType === 'duel' && teams.length > 1) {
     duelDiv.style.display = 'flex';
     document.getElementById('bonus-desc').textContent = team.name + ' fordert ein Team zum Duell! Wer gewinnt, rückt 1 Feld vor.';
-
     teams.forEach((t, i) => {
       if (i === teamIdx) return;
       const btn = document.createElement('div');
-      btn.className = 'duel-team';
-      btn.textContent = t.name;
-      btn.style.borderColor = t.color;
-      btn.onclick = () => {
-        duelDiv.querySelectorAll('.duel-team').forEach(d => d.classList.remove('selected'));
-        btn.classList.add('selected');
-        duelOpponentIdx = i;
-      };
+      btn.className = 'duel-team'; btn.textContent = t.name; btn.style.borderColor = t.color;
+      btn.onclick = () => { duelDiv.querySelectorAll('.duel-team').forEach(d => d.classList.remove('selected')); btn.classList.add('selected'); duelOpponentIdx = i; };
       duelDiv.appendChild(btn);
     });
   }
-
   document.getElementById('bonus-modal').classList.add('open');
 }
 
 function continueAfterBonus() {
   document.getElementById('bonus-modal').classList.remove('open');
-
   if (!pendingBonus) { nextTurn(); return; }
 
   const { type, teamIdx } = pendingBonus;
@@ -1103,159 +1102,73 @@ function continueAfterBonus() {
   pendingBonus = null;
 
   switch (type) {
-    case 'advance': {
-      const newPos = Math.min(team.position + 2, FIELD_COUNT - 1);
-      moveTeam(teamIdx, newPos);
-      return; // moveTeam handles next turn
-    }
-    case 'setback': {
-      const newPos = Math.max(team.position - 2, 0);
-      team.position = newPos;
-      renderBoard();
-      renderSidebar();
-      nextTurn();
-      return;
-    }
-    case 'extra': {
-      // Same team goes again — don't advance currentTeamIdx
-      renderBoard();
-      renderSidebar();
-      updateTurnBanner();
-      return;
-    }
-    case 'joker': {
-      if (!team.jokerUsed) {
-        team.hasJoker = true;
-      }
-      renderSidebar();
-      nextTurn();
-      return;
-    }
-    case 'duel': {
-      if (duelOpponentIdx !== null) {
-        startDuel(teamIdx, duelOpponentIdx);
-      } else {
-        nextTurn();
-      }
-      return;
-    }
+    case 'advance': { const newPos = Math.min(team.position + 2, board.length - 1); moveTeam(teamIdx, newPos); return; }
+    case 'setback': { const newPos = Math.max(team.position - 2, 0); team.position = newPos; renderBoard(); renderSidebar(); nextTurn(); return; }
+    case 'extra': { renderBoard(); renderSidebar(); updateTurnBanner(); return; }
+    case 'joker': { if (!team.jokerUsed) team.hasJoker = true; renderSidebar(); nextTurn(); return; }
+    case 'duel': { if (duelOpponentIdx !== null) startDuel(teamIdx, duelOpponentIdx); else nextTurn(); return; }
   }
-
   nextTurn();
 }
 
 function startDuel(team1Idx, team2Idx) {
-  // Pick a question from any category
-  const allKats = activeFragenBank.kategorien.map(k => k.id);
-  const randomKat = allKats[Math.floor(Math.random() * allKats.length)];
-  const question = pickQuestion(randomKat);
-
+  const avail = getAvailableDifficulties();
+  if (!avail.length) { nextTurn(); return; }
+  const randomDiff = avail[Math.floor(Math.random() * avail.length)];
+  const question = pickQuestionByDifficulty(randomDiff);
   if (!question) { nextTurn(); return; }
 
-  // Show duel question — first correct answer wins
-  // For simplicity: show to both, whoever's "turn" it is clicks
-  // We'll show question with a special duel banner
   const field = board[teams[team1Idx].position];
-  pendingQuestionResult = {
-    question, field, resolved: false,
-    isDuel: true, team1Idx, team2Idx,
-    duelPhase: 1 // 1 = team1 answers first
-  };
-
+  pendingQuestionResult = { question, field, resolved: false, isDuel: true, team1Idx, team2Idx, duelPhase: 1 };
   showDuelQuestion(question, team1Idx, team2Idx, 1);
 }
 
 function showDuelQuestion(question, team1Idx, team2Idx, phase) {
   const modal = document.getElementById('question-modal');
   const team = teams[phase === 1 ? team1Idx : team2Idx];
-  const kat = activeFragenBank.kategorien.find(k => k.id === question.kategorie);
 
   document.getElementById('q-cat-icon').textContent = '⚔️';
   document.getElementById('q-cat-name').textContent = 'Duell: ' + team.name;
-  document.getElementById('q-difficulty').textContent = question.schwierigkeit;
+  document.getElementById('q-difficulty').textContent = (question.difficulty || '?') + ' Pkt.';
   document.getElementById('q-text').textContent = question.frage;
   document.getElementById('q-hint').style.display = 'none';
 
   const resultEl = document.getElementById('q-result');
-  resultEl.className = 'modal-result';
-  resultEl.textContent = '';
-
-  const explEl = document.getElementById('q-explanation');
-  explEl.classList.remove('visible');
+  resultEl.className = 'modal-result'; resultEl.textContent = '';
+  document.getElementById('q-explanation').classList.remove('visible');
   document.getElementById('q-explanation-text').textContent = question.erklaerung || '';
   document.getElementById('q-continue').classList.remove('visible');
 
   const optionsDiv = document.getElementById('q-options');
   const openDiv = document.getElementById('q-open-actions');
-  optionsDiv.innerHTML = '';
-  optionsDiv.style.display = 'none';
-  openDiv.style.display = 'none';
+  optionsDiv.innerHTML = ''; optionsDiv.style.display = 'none'; openDiv.style.display = 'none';
 
   if (question.typ === 'offen') {
     openDiv.style.display = 'flex';
   } else {
     optionsDiv.style.display = 'flex';
-    const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
-
-    if (!isMulti) {
-      question.antworten.forEach((ans, i) => {
-        const btn = document.createElement('button');
-        btn.className = 'answer-btn';
-        btn.textContent = ans;
-        btn.onclick = () => {
-          if (pendingQuestionResult && pendingQuestionResult.resolved) return;
-          const correct = i === question.richtig;
-          const allBtns = document.querySelectorAll('#q-options .answer-btn');
-          const cs = correctSet(question);
-          allBtns.forEach(b => b.classList.add('disabled'));
-          btn.classList.add(correct ? 'correct' : 'wrong');
-          allBtns.forEach((b, j) => { if (cs.has(j)) b.classList.add('correct'); });
-          resolveDuelAnswer(correct);
-        };
-        optionsDiv.appendChild(btn);
-      });
-    } else {
-      // Multi correct duel
-      const pending = new Set();
-      const allBtns = [];
-      question.antworten.forEach((ans, i) => {
-        const btn = document.createElement('button');
-        btn.className = 'answer-btn';
-        btn.textContent = ans;
-        btn.addEventListener('click', () => {
-          if (pendingQuestionResult && pendingQuestionResult.resolved) return;
-          if (pending.has(i)) { pending.delete(i); btn.classList.remove('mc-selected-pending'); }
-          else { pending.add(i); btn.classList.add('mc-selected-pending'); }
-        });
-        allBtns.push(btn);
-        optionsDiv.appendChild(btn);
-      });
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'answer-btn mc-confirm-btn';
-      confirmBtn.textContent = '✓ Bestätigen';
-      confirmBtn.addEventListener('click', () => {
+    question.antworten.forEach((ans, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer-btn'; btn.textContent = ans;
+      btn.onclick = () => {
         if (pendingQuestionResult && pendingQuestionResult.resolved) return;
-        const ok = isMcCorrect(question, [...pending]);
+        const correct = i === question.richtig;
+        const allBtns = document.querySelectorAll('#q-options .answer-btn');
         const cs = correctSet(question);
         allBtns.forEach(b => b.classList.add('disabled'));
-        confirmBtn.classList.add('disabled');
-        allBtns.forEach((b, i) => {
-          if (cs.has(i)) b.classList.add('correct');
-          else if (pending.has(i)) b.classList.add('wrong');
-        });
-        resolveDuelAnswer(ok);
-      });
-      optionsDiv.appendChild(confirmBtn);
-    }
+        btn.classList.add(correct ? 'correct' : 'wrong');
+        allBtns.forEach((b, j) => { if (cs.has(j)) b.classList.add('correct'); });
+        resolveDuelAnswer(correct);
+      };
+      optionsDiv.appendChild(btn);
+    });
   }
-
   modal.classList.add('open');
 }
 
 function resolveDuelAnswer(correct) {
   if (!pendingQuestionResult || !pendingQuestionResult.isDuel) return;
   const pr = pendingQuestionResult;
-
   const currentDuelTeam = pr.duelPhase === 1 ? pr.team1Idx : pr.team2Idx;
   const resultEl = document.getElementById('q-result');
 
@@ -1263,132 +1176,115 @@ function resolveDuelAnswer(correct) {
     pr.resolved = true;
     resultEl.textContent = '✓ ' + teams[currentDuelTeam].name + ' gewinnt das Duell!';
     resultEl.className = 'modal-result visible correct-result';
-
-    const explEl = document.getElementById('q-explanation');
-    if (pr.question.erklaerung) explEl.classList.add('visible');
-
-    // Winner moves 1 field forward
+    if (pr.question.erklaerung) document.getElementById('q-explanation').classList.add('visible');
     pr.duelWinner = currentDuelTeam;
     document.getElementById('q-continue').classList.add('visible');
   } else {
     if (pr.duelPhase === 1) {
-      // Team 1 wrong → team 2 gets a chance
-      resultEl.textContent = '✗ Falsch! ' + teams[pr.team2Idx].name + ' darf antworten...';
+      resultEl.textContent = '✗ Falsch! ' + teams[pr.team2Idx].name + ' darf antworten…';
       resultEl.className = 'modal-result visible wrong-result';
-
       pr.duelPhase = 2;
       setTimeout(() => {
         document.getElementById('question-modal').classList.remove('open');
         setTimeout(() => showDuelQuestion(pr.question, pr.team1Idx, pr.team2Idx, 2), 300);
       }, 1500);
     } else {
-      // Both wrong
       pr.resolved = true;
       resultEl.textContent = '✗ Beide Teams falsch!';
       resultEl.className = 'modal-result visible wrong-result';
-      const explEl = document.getElementById('q-explanation');
-      if (pr.question.erklaerung) explEl.classList.add('visible');
+      if (pr.question.erklaerung) document.getElementById('q-explanation').classList.add('visible');
       pr.duelWinner = null;
       document.getElementById('q-continue').classList.add('visible');
     }
   }
 }
 
-// Override continueAfterQuestion for duel
-const _originalContinue = continueAfterQuestion;
-continueAfterQuestion = function () {
-  if (pendingQuestionResult && pendingQuestionResult.isDuel) {
-    document.getElementById('question-modal').classList.remove('open');
-    const winner = pendingQuestionResult.duelWinner;
-    pendingQuestionResult = null;
-
-    if (winner !== null && winner !== undefined) {
-      const newPos = Math.min(teams[winner].position + 1, FIELD_COUNT - 1);
-      // Don't trigger bonus from duel movement
-      teams[winner].position = newPos;
-      renderBoard();
-      renderSidebar();
-
-      if (newPos >= FIELD_COUNT - 1) {
-        setTimeout(() => showWinner(winner), 600);
-        return;
-      }
-    }
-
-    nextTurn();
-    return;
-  }
-
-  _originalContinue();
-};
-
 // ── Joker ────────────────────────────────────────────────────
 function useJoker() {
   const team = teams[currentTeamIdx];
-  if (!team.hasJoker || team.jokerUsed) return;
-
-  team.jokerUsed = true;
-  team.hasJoker = false;
-
-  // Skip question, move forward
-  const nextPos = Math.min(team.position + 1, FIELD_COUNT - 1);
+  if (!team.hasJoker || team.jokerUsed || qpLiveQ) return;
+  team.jokerUsed = true; team.hasJoker = false;
+  const nextPos = Math.min(team.position + 1, board.length - 1);
   moveTeam(currentTeamIdx, nextPos);
 }
 
 // ── Turn Management ──────────────────────────────────────────
 function nextTurn() {
   if (gameOver) return;
-
+  pendingQuestionResult = null;
   currentTeamIdx = (currentTeamIdx + 1) % teams.length;
   if (currentTeamIdx === 0) round++;
-
-  renderBoard();
-  renderSidebar();
-  updateTurnBanner();
-
+  renderBoard(); renderSidebar(); updateTurnBanner();
   qpLiveQ = null;
   QpStorage.save(buildCurrentGameState());
+
+  // Check if all questions exhausted
+  if (getAvailableDifficulties().length === 0) {
+    setTimeout(() => {
+      if (!gameOver) {
+        const winner = teams.reduce((best, t, i) => t.position > teams[best].position ? i : best, 0);
+        showWinner(winner);
+      }
+    }, 500);
+  }
+}
+
+// ── takenTeams Management ────────────────────────────────────
+function kickTeam(teamId) {
+  if (!takenTeams) return;
+  takenTeams = takenTeams.filter(id => id !== teamId);
+  const gs = buildCurrentGameState();
+  QpStorage.save(gs);
+  renderSidebar();
+}
+window.kickTeam = kickTeam;
+
+// ── Legend ───────────────────────────────────────────────────
+function renderLegend() {
+  const list = document.getElementById('legend-list');
+  if (!list || !activeFragenBank) return;
+  list.innerHTML = '';
+  activeFragenBank.kategorien.forEach(kat => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = '<div class="legend-color" style="background:' + kat.farbe + ';"></div><span class="legend-name">' + kat.icon + ' ' + kat.name + '</span>';
+    list.appendChild(item);
+  });
+  BONUS_TYPES.forEach(bt => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = '<div class="legend-color" style="background:var(--bg-field);text-align:center;font-size:0.7rem;line-height:16px;">' + bt.icon + '</div><span class="legend-name">' + bt.name + '</span>';
+    list.appendChild(item);
+  });
 }
 
 // ── Winner Screen ────────────────────────────────────────────
 function showWinner(teamIdx) {
   gameOver = true;
   const team = teams[teamIdx];
-
   document.getElementById('winner-team-name').textContent = team.name;
   document.getElementById('winner-team-name').style.color = team.color;
 
-  // Stats
   const statsDiv = document.getElementById('winner-stats');
   statsDiv.innerHTML = '';
-
-  const allStats = [
-    { value: round, label: 'Runden' },
-    { value: team.correctCount, label: 'Richtige' },
-    { value: team.wrongCount, label: 'Falsche' }
-  ];
-
-  allStats.forEach(s => {
+  [{ value: round, label: 'Runden' }, { value: team.correctCount, label: 'Richtige' }, { value: team.wrongCount, label: 'Falsche' }].forEach(s => {
     const div = document.createElement('div');
     div.className = 'winner-stat';
-    div.innerHTML = '<div class="winner-stat-value">' + s.value + '</div>' +
-                    '<div class="winner-stat-label">' + s.label + '</div>';
+    div.innerHTML = '<div class="winner-stat-value">' + s.value + '</div><div class="winner-stat-label">' + s.label + '</div>';
     statsDiv.appendChild(div);
   });
 
-  // Team ranking by position
   const sorted = [...teams].sort((a, b) => b.position - a.position);
   sorted.forEach((t, i) => {
     const div = document.createElement('div');
     div.className = 'winner-stat';
     div.innerHTML = '<div class="winner-stat-value" style="color:' + t.color + '">' + (i + 1) + '.</div>' +
-                    '<div class="winner-stat-label">' + t.name + ' (Feld ' + t.position + ')</div>';
+                    '<div class="winner-stat-label">' + escapeHtml(t.name) + ' (Feld ' + t.position + ')</div>';
     statsDiv.appendChild(div);
   });
 
   showScreen('winner-screen');
   spawnConfetti();
-
   QpStorage.save(buildCurrentGameState());
 }
 
@@ -1396,7 +1292,6 @@ function spawnConfetti() {
   const container = document.getElementById('confetti-container');
   container.innerHTML = '';
   const colors = ['#e74c3c','#3498db','#2ecc71','#f4a261','#9b59b6','#e76f51','#f39c12','#1abc9c'];
-
   for (let i = 0; i < 60; i++) {
     const c = document.createElement('div');
     c.className = 'confetti';
@@ -1417,23 +1312,8 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
-function resetToSetup() {
-  resetToSelector();
-}
+function resetToSetup() { resetToSelector(); }
 
 function confirmQuit() {
-  if (confirm('Spiel wirklich beenden?')) {
-    resetToSelector();
-  }
+  if (confirm('Spiel wirklich beenden?')) resetToSelector();
 }
-
-// Override resolveOpen for duel mode
-const _originalResolveOpen = resolveOpen;
-resolveOpen = function (correct) {
-  if (pendingQuestionResult && pendingQuestionResult.isDuel) {
-    document.getElementById('q-open-actions').style.display = 'none';
-    resolveDuelAnswer(correct);
-    return;
-  }
-  _originalResolveOpen(correct);
-};
