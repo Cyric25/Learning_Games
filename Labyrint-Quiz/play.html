@@ -40,72 +40,103 @@
     .ts-icon { font-size: 1.5rem; flex-shrink: 0; }
     .ts-taken { font-size: 0.8rem; font-weight: 600; color: var(--danger); margin-left: 0.4rem; }
 
-    /* ── Play Screen ──────────────────────────────────────────── */
-    #play-screen { justify-content: flex-start; }
+    /* ── Play Screen – horizontales Layout ───────────────────── */
+    #play-screen {
+      flex-direction: row;
+      align-items: stretch;
+      height: 100vh;
+      overflow: hidden;
+      min-height: unset;
+    }
 
-    .play-header { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 1rem; background: var(--bg-card); border-bottom: 1px solid var(--border-card); flex-shrink: 0; }
-    #my-team-display { padding: 0.3rem 0.9rem; border-radius: 20px; font-size: 0.95rem; font-weight: 700; color: #fff; }
+    /* Linke Spalte: Karte */
+    .play-canvas-col {
+      flex: 1;
+      min-width: 0;
+      background: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #maze-canvas { display: block; }
+
+    /* Rechte Spalte: Steuerung */
+    .play-sidebar {
+      width: clamp(160px, 24vw, 240px);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border-card);
+      overflow: hidden;
+    }
+
+    .play-header {
+      display: flex; flex-direction: column; gap: 0.35rem;
+      padding: 0.6rem 0.7rem;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-card);
+      flex-shrink: 0;
+    }
+    #my-team-display { padding: 0.25rem 0.7rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; color: #fff; align-self: flex-start; }
     #my-sym-bar { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
-    .my-sym-dot { font-size: 1rem; opacity: 0.35; }
+    .my-sym-dot { font-size: 0.9rem; opacity: 0.35; }
     .my-sym-dot.found { opacity: 1; }
 
-    /* Canvas strip */
-    .play-canvas-wrap { width: 100%; background: #111827; display: flex; justify-content: center; padding: 0.5rem; flex-shrink: 0; }
-    #maze-canvas { display: block; border-radius: 4px; max-height: 40vw; max-width: 100%; }
-
-    #play-area { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box; overflow-y: auto; }
+    #play-area { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 0.7rem; box-sizing: border-box; overflow-y: auto; }
 
     /* ── Waiting ──────────────────────────────────────────────── */
-    .wait-screen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; }
-    .wait-emoji { font-size: 4rem; animation: pulse 2s ease-in-out infinite; }
-    .wait-text { font-size: 1.3rem; font-weight: 600; color: var(--text-secondary); }
+    .wait-screen { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; }
+    .wait-emoji { font-size: 2.5rem; animation: pulse 2s ease-in-out infinite; }
+    .wait-text { font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
     /* ── My Turn: Roll ────────────────────────────────────────── */
-    .turn-screen { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; }
-    .turn-title { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
-    .dice-display { font-size: clamp(5rem,20vw,8rem); line-height: 1; cursor: pointer; user-select: none; transition: transform 0.1s; }
+    .turn-screen { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; text-align: center; }
+    .turn-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
+    .dice-display { font-size: clamp(3rem, 12vw, 5rem); line-height: 1; cursor: pointer; user-select: none; transition: transform 0.1s; }
     .dice-display.rolling { animation: diceShake 0.08s infinite alternate; }
     @keyframes diceShake { 0%{transform:rotate(-8deg) scale(0.93)} 100%{transform:rotate(8deg) scale(1.07)} }
-    .btn-roll { font-size: 1.3rem; padding: 1rem 3rem; }
+    .btn-roll { font-size: 1rem; padding: 0.7rem 1.5rem; }
 
     /* ── My Turn: Move ────────────────────────────────────────── */
-    .move-screen { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
-    .steps-indicator { display: flex; align-items: center; gap: 0.7rem; font-size: 1.5rem; font-weight: 800; color: var(--accent); }
-    .dice-val { font-size: 2.5rem; }
-    .steps-left { font-size: 1.1rem; color: var(--text-secondary); font-weight: 600; }
-    .dir-grid { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
-    .dir-row { display: flex; align-items: center; gap: 0.4rem; }
-    .dir-center { font-size: 2rem; width: 64px; text-align: center; }
-    .dir-btn { width: clamp(56px,15vw,72px); height: clamp(56px,15vw,72px); border-radius: 12px; border: 2px solid var(--border-card); background: var(--bg-card); color: var(--text-primary); font-size: 1.6rem; cursor: pointer; transition: all 0.15s; font-family: inherit; display: flex; align-items: center; justify-content: center; }
+    .move-screen { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+    .steps-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+    .dice-val { font-size: 1.8rem; }
+    .steps-left { font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; }
+    .dir-grid { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+    .dir-row { display: flex; align-items: center; gap: 0.3rem; }
+    .dir-center { font-size: 1.5rem; width: 48px; text-align: center; }
+    .dir-btn { width: clamp(44px, 11vw, 56px); height: clamp(44px, 11vw, 56px); border-radius: 10px; border: 2px solid var(--border-card); background: var(--bg-card); color: var(--text-primary); font-size: 1.3rem; cursor: pointer; transition: all 0.15s; font-family: inherit; display: flex; align-items: center; justify-content: center; }
     .dir-btn:not(:disabled):hover { background: rgba(227,79,32,0.12); border-color: var(--accent); }
     .dir-btn:disabled { opacity: 0.25; cursor: not-allowed; }
     .dir-btn.dir-free { border-color: rgba(227,79,32,0.40); }
     .dir-btn.dir-door { border-color: #dc2626; background: rgba(220,38,38,0.1); }
     .dir-btn.dir-sym { border-color: #7c3aed; background: rgba(124,58,237,0.12); }
-    .btn-skip { background: transparent; border: 1px solid var(--border-card); color: var(--text-secondary); font-size: 0.95rem; padding: 0.6rem 1.5rem; }
+    .btn-skip { background: transparent; border: 1px solid var(--border-card); color: var(--text-secondary); font-size: 0.82rem; padding: 0.5rem 1rem; }
 
     /* ── Generic action button ────────────────────────────────── */
-    .btn-action { background: var(--accent); color: var(--bg-primary); border: none; border-radius: 12px; padding: 0.9rem 2.5rem; font-size: 1.1rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.2s; }
+    .btn-action { background: var(--accent); color: var(--bg-primary); border: none; border-radius: 10px; padding: 0.7rem 1.5rem; font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.2s; }
     .btn-action:hover { opacity: 0.85; }
     .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* ── Finished ─────────────────────────────────────────────── */
-    .finished-screen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; padding: 1rem; }
-    .finished-trophy { font-size: 5rem; }
-    .finished-title { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); }
-    .finished-my-score { font-size: 1rem; color: var(--text-secondary); }
-    .finished-ranking { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; max-width: 360px; }
-    .rank-row { padding: 0.5rem 1rem; border-radius: 8px; background: var(--bg-card); font-size: 1rem; color: var(--text-primary); text-align: left; }
+    .finished-screen { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; padding: 0.6rem; width: 100%; }
+    .finished-trophy { font-size: 3rem; }
+    .finished-title { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
+    .finished-my-score { font-size: 0.82rem; color: var(--text-secondary); }
+    .finished-ranking { display: flex; flex-direction: column; gap: 0.3rem; width: 100%; }
+    .rank-row { padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(255,255,255,0.06); font-size: 0.82rem; color: var(--text-primary); text-align: left; }
     .rank-row.rank-me { background: rgba(227,79,32,0.12); border: 1px solid var(--accent); font-weight: 700; }
 
     /* ── Spectator Question View ─────────────────────────────── */
-    .spec-q-screen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; padding: 1rem; max-width: 420px; width: 100%; }
-    .spec-q-team { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
-    .spec-q-context { font-size: 0.82rem; font-weight: 700; padding: 0.3rem 0.9rem; border-radius: 20px; background: rgba(220,38,38,0.12); color: #dc2626; }
-    .spec-q-text { font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--text-primary); background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; padding: 1rem 1.2rem; width: 100%; box-sizing: border-box; }
-    .spec-q-wait { color: var(--text-secondary); font-style: italic; font-size: 0.9rem; }
-    .spec-q-result { font-size: 1.2rem; font-weight: 700; padding: 0.7rem 1.5rem; border-radius: 10px; }
+    .spec-q-screen { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; padding: 0.5rem; width: 100%; }
+    .spec-q-team { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+    .spec-q-context { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 20px; background: rgba(220,38,38,0.12); color: #dc2626; }
+    .spec-q-text { font-size: 0.9rem; font-weight: 600; line-height: 1.45; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border-card); border-radius: 10px; padding: 0.7rem 0.8rem; width: 100%; box-sizing: border-box; }
+    .spec-q-wait { color: var(--text-secondary); font-style: italic; font-size: 0.8rem; }
+    .spec-q-result { font-size: 1rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 8px; }
     .spec-correct { background: rgba(22,163,74,0.15); color: #16a34a; }
     .spec-wrong { background: rgba(220,38,38,0.15); color: #dc2626; }
 
@@ -170,19 +201,21 @@
 
   <!-- ── Play Screen ────────────────────────────────────────── -->
   <div class="play-screen" id="play-screen">
-    <div class="play-header">
-      <div id="my-team-display">–</div>
-      <div id="my-sym-bar"></div>
-    </div>
-    <!-- Mini-Labyrinth Canvas -->
-    <div class="play-canvas-wrap">
+    <!-- Links: Labyrinth-Karte -->
+    <div class="play-canvas-col">
       <canvas id="maze-canvas"></canvas>
     </div>
-
-    <div id="play-area">
-      <div class="wait-screen">
-        <div class="wait-emoji">⏳</div>
-        <div class="wait-text">Verbinden…</div>
+    <!-- Rechts: Steuerung -->
+    <div class="play-sidebar">
+      <div class="play-header">
+        <div id="my-team-display">–</div>
+        <div id="my-sym-bar"></div>
+      </div>
+      <div id="play-area">
+        <div class="wait-screen">
+          <div class="wait-emoji">⏳</div>
+          <div class="wait-text">Verbinden…</div>
+        </div>
       </div>
     </div>
   </div>
