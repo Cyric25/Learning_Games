@@ -217,6 +217,23 @@
       background: rgba(46,204,113,.1); color: var(--success);
       border-top: 1px solid rgba(46,204,113,.3); flex-shrink: 0;
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .grid-cell     { width: 30px; height: 30px; }
+      .grid-cell-hdr { width: 22px; height: 22px; }
+      .card          { padding: 1.5rem 1rem; }
+      .q-card        { padding: 1.3rem; }
+    }
+    @media (max-width: 420px) {
+      .grid-cell     { width: 26px; height: 26px; font-size: .52rem; }
+      .grid-cell-hdr { width: 19px; height: 19px; font-size: .6rem; }
+      .coord-input   { font-size: 1.1rem; letter-spacing: 3px; max-width: 110px; }
+      .btn-fire      { padding: 8px 14px; font-size: .9rem; }
+      .q-card        { padding: 1rem; }
+      .q-text        { font-size: .97rem; }
+      .mc-opt        { padding: .55rem .8rem; font-size: .9rem; }
+    }
   </style>
 </head>
 <body>
