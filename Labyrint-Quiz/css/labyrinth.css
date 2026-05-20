@@ -1010,3 +1010,38 @@ body.dark .modal-result.wrong   { background:#7f1d1d; color:#f87171; }
   .team-figure-select { width:100%; justify-content:center; }
   .dice-face { width:36px; height:36px; font-size:1.3rem; }
 }
+
+/* ── Timer custom input ───────────────────────────────────────────── */
+.param-input-num {
+  width: 5rem; padding: 0.4rem 0.5rem; border-radius: 8px;
+  border: 2px solid var(--border-card); background: rgba(0,0,0,0.03);
+  color: var(--text-primary); font-size: 0.9rem; font-weight: 600;
+  font-family: inherit; text-align: center; outline: none;
+  transition: border-color 0.15s;
+}
+.param-input-num:focus { border-color: var(--accent); }
+body.dark .param-input-num { background: rgba(255,255,255,0.05); }
+
+/* ── Teacher question panel (sidebar) ───────────────────────────────── */
+#teacher-q-panel {
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-card);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.85rem;
+}
+.tqp-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
+.tqp-team-badge {
+  padding: 0.2rem 0.6rem; border-radius: 6px; color: #fff;
+  font-size: 0.8rem; font-weight: 700;
+}
+.tqp-ctx { font-size: 0.8rem; color: var(--text-secondary); }
+.tqp-q {
+  font-weight: 600; color: var(--text-primary); line-height: 1.4;
+  border: 1px solid var(--border-card); border-radius: 6px;
+  padding: 0.4rem 0.6rem; background: var(--bg-card); margin-bottom: 0.3rem;
+}
+.tqp-a {
+  font-size: 0.8rem; color: var(--success);
+  background: rgba(22,163,74,0.08); border-radius: 6px; padding: 0.3rem 0.5rem;
+}

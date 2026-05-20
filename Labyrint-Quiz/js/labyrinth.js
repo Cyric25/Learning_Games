@@ -230,6 +230,7 @@ async function _gsEnter(code) {
     renderer = new MazeRenderer(canvas);
     renderer.setMaze(mazeResult);
     renderBoard();
+    if (state.activeQuestion?.questionResult === null) updateTeacherQuestionPanel(state.activeQuestion, state);
     GameSync.subscribe(code, applyRemoteState);
   } else {
     showScreen('setup-screen');
@@ -255,7 +256,9 @@ function showCodeBanner() {
   const b = document.createElement('div');
   b.id = 'code-banner';
   b.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:999;background:var(--bg-card,#1e1b4b);color:var(--text-primary,#fff);border-radius:12px;padding:10px 16px;font-size:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;border:1px solid var(--border-card,rgba(255,255,255,0.15));';
-  b.innerHTML = '<span>📱 Schüler:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">' + gameCode + '</strong><a href="play.html?code=' + gameCode + '" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Link ↗</a>';
+  b.innerHTML = '<span>📱 Code:</span><strong class="code-val" style="font-size:1.2rem;letter-spacing:2px">' + gameCode + '</strong>'
+    + '<a href="play.html?code=' + gameCode + '" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Spieler ↗</a>'
+    + '<a href="board.html?code=' + gameCode + '" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none">Tafel ↗</a>';
   document.body.appendChild(b);
 }
 
@@ -520,12 +523,31 @@ function buildSymbolsUI() {
 
 function buildTimerUI() {
   const row = document.getElementById('timer-row'); row.innerHTML = '';
-  [{label:'15s',v:15},{label:'20s',v:20},{label:'30s',v:30},{label:'Kein',v:0}].forEach(opt => {
+  [{label:'10s',v:10},{label:'20s',v:20},{label:'30s',v:30},{label:'45s',v:45},{label:'60s',v:60},{label:'Kein',v:0}].forEach(opt => {
     const btn = document.createElement('button');
     btn.className = 'param-btn' + (opt.v === _cfg.timerSeconds ? ' active' : ''); btn.textContent = opt.label;
-    btn.onclick = () => { _cfg.timerSeconds = opt.v; row.querySelectorAll('.param-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); };
+    btn.onclick = () => {
+      _cfg.timerSeconds = opt.v;
+      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const inp = row.querySelector('.param-input-num');
+      if (inp) inp.value = opt.v || '';
+    };
     row.appendChild(btn);
   });
+  const inp = document.createElement('input');
+  inp.type = 'number'; inp.min = '0'; inp.max = '300'; inp.step = '5';
+  inp.className = 'param-input-num'; inp.placeholder = 'Sek.'; inp.title = 'Beliebige Sekundenzahl';
+  inp.value = _cfg.timerSeconds > 0 ? _cfg.timerSeconds : '';
+  inp.oninput = () => {
+    const v = parseInt(inp.value, 10);
+    _cfg.timerSeconds = isNaN(v) || v < 0 ? 0 : v;
+    row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+    row.querySelectorAll('.param-btn').forEach(b => {
+      if (b.textContent === _cfg.timerSeconds + 's' || (b.textContent === 'Kein' && _cfg.timerSeconds === 0)) b.classList.add('active');
+    });
+  };
+  row.appendChild(inp);
 }
 
 // ── Spiel starten ─────────────────────────────────────────────────
@@ -634,14 +656,35 @@ function applyRemoteState(data) {
   const aq = data.activeQuestion;
   if (aq && aq.questionResult === null) {
     if (!teacherEvalVisible) showTeacherEvalModal(aq);
+    updateTeacherQuestionPanel(aq, data);
   } else {
     // Only close if the question we were evaluating is now gone/resolved
-    // Prevents stale SSE messages from closing a freshly opened modal
     if (!teacherEvalVisible || !aq || aq.id === _teacherEvalQuestionId) {
       closeTeacherEvalModal();
     }
+    clearTeacherQuestionPanel();
   }
   renderBoard();
+}
+
+function updateTeacherQuestionPanel(aq, state) {
+  const panel = document.getElementById('teacher-q-panel'); if (!panel) return;
+  const team = state.teams?.[aq.teamIdx];
+  const contextIcon = aq.contextType === 'door' ? '🔒 Tür' : '🔮 Symbol';
+  panel.innerHTML =
+    '<div class="tqp-header">' +
+      '<span class="tqp-team-badge" style="background:' + (team?.color || '#888') + '">' + (team?.emoji || '') + ' ' + escapeHtml(team?.name || '') + '</span>' +
+      '<span class="tqp-ctx">' + contextIcon + '</span>' +
+    '</div>' +
+    '<div class="tqp-q">' + escapeHtml(aq.question) + '</div>' +
+    (aq.answer ? '<div class="tqp-a">💡 ' + escapeHtml(aq.answer) + '</div>' : '');
+  panel.style.display = '';
+}
+
+function clearTeacherQuestionPanel() {
+  const panel = document.getElementById('teacher-q-panel'); if (!panel) return;
+  panel.style.display = 'none';
+  panel.innerHTML = '';
 }
 
 function showTeacherEvalModal(aq) {
@@ -757,7 +800,14 @@ function showGameCode() {
       ? 'play.html?code=' + gameCode
       : new URL('play.html?code=' + gameCode, location.href).href;
     link.href = playUrl;
-    link.textContent = 'play.html?code=' + gameCode + ' ↗';
+    link.textContent = 'play.html öffnen ↗';
+  }
+  const boardLink = document.getElementById('game-board-link');
+  if (boardLink) {
+    boardLink.href = (location.protocol === 'file:'
+      ? 'board.html?code=' + gameCode
+      : new URL('board.html?code=' + gameCode, location.href).href);
+    boardLink.textContent = 'Tafelansicht ↗';
   }
 }
 

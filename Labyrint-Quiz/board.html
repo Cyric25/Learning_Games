@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Labyrinth-Quiz – Tafelansicht</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+  <link rel="stylesheet" href="css/labyrinth.css">
+  <style>
+    body { overflow: hidden; }
+
+    .board-screen { display:none; width:100%; height:100%; }
+    .board-screen.active { display:flex; }
+
+    /* ── Join screen ─────────────────────────────────────── */
+    #bs-join {
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 1rem; background: var(--bg-primary);
+    }
+    .bj-card {
+      background: var(--bg-card); border: 1px solid var(--border-card);
+      border-radius: 16px; padding: 2rem; width: min(400px,90vw);
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1rem; box-shadow: var(--shadow-lg);
+    }
+    .bj-title { font-size: 2rem; font-weight: 800; color: var(--accent); text-align: center; }
+    .bj-sub   { color: var(--text-secondary); font-size: 0.95rem; }
+    .bj-input {
+      font-size: 2rem; text-align: center; letter-spacing: 0.4em;
+      width: 7em; padding: 0.5em 0.3em; background: var(--bg-secondary);
+      color: var(--text-primary); border: 2px solid var(--border-card);
+      border-radius: 12px; font-family: monospace; font-weight: 700;
+      outline: none; text-transform: uppercase; transition: border-color 0.2s;
+    }
+    .bj-input:focus { border-color: var(--accent); }
+    .bj-btn {
+      padding: 0.7rem 2.5rem; font-size: 1.2rem; font-weight: 700;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 10px; cursor: pointer; font-family: inherit;
+      transition: opacity 0.2s;
+    }
+    .bj-btn:hover { opacity: 0.85; }
+    .bj-error { color: var(--danger); font-size: 0.9rem; min-height: 1.2em; text-align: center; }
+
+    /* ── Board screen ─────────────────────────────────────── */
+    #bs-board { flex-direction: column; background: var(--bg-primary); }
+
+    .board-top-bar {
+      display: flex; align-items: center; gap: 0.7rem;
+      padding: 0.4rem 1rem; background: var(--bg-card);
+      border-bottom: 1px solid var(--border-card); flex-shrink: 0;
+    }
+    .btb-title  { font-size: 1rem; font-weight: 800; color: var(--accent); }
+    .btb-code   { font-family: monospace; font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.1em; }
+    .btb-team   { padding: 0.2rem 0.7rem; border-radius: 6px; color: #fff; font-size: 0.85rem; font-weight: 700; }
+    .btb-phase  { color: var(--text-secondary); font-size: 0.85rem; margin-left: auto; }
+    .btb-btn    {
+      background: none; border: 1px solid var(--border-card);
+      color: var(--text-secondary); border-radius: 6px; padding: 0.2rem 0.6rem;
+      font-size: 0.8rem; cursor: pointer; font-family: inherit;
+    }
+
+    .board-body { flex: 1; display: flex; min-height: 0; }
+
+    /* Canvas column (left 60%) */
+    .board-canvas-col {
+      flex: 3; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 0.5rem; min-width: 0;
+    }
+    .board-canvas-wrap { width: 100%; aspect-ratio: 1; max-height: 100%; }
+    #board-canvas { width: 100%; height: 100%; display: block; }
+
+    /* Right panel (40%) */
+    .board-right-col {
+      flex: 2; display: flex; flex-direction: column;
+      min-width: 0; border-left: 1px solid var(--border-card);
+      background: var(--bg-card);
+    }
+
+    /* Question panel */
+    .board-q-panel {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 1rem; gap: 0.7rem; overflow: hidden;
+    }
+    .bqp-idle {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 0.5rem; color: var(--text-secondary); font-size: 1rem;
+    }
+    .bqp-idle-emoji { font-size: 3rem; }
+    .bqp-active { display: flex; flex-direction: column; gap: 0.7rem; height: 100%; }
+    .bqp-team-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.8rem; border-radius: 8px; color: #fff;
+      font-weight: 700; font-size: 0.95rem; align-self: flex-start;
+    }
+    .bqp-context {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-secondary);
+    }
+    .bqp-question {
+      font-size: clamp(1rem, 2.2vw, 1.6rem); font-weight: 700;
+      color: var(--text-primary); line-height: 1.4;
+      flex: 1; display: flex; align-items: center;
+    }
+    .bqp-answer {
+      background: rgba(22,163,74,0.10); border: 1px solid var(--success);
+      border-radius: 8px; padding: 0.6rem 0.8rem;
+    }
+    .bqp-answer-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--success); margin-bottom: 0.2rem;
+    }
+    .bqp-answer-text { font-size: 0.95rem; color: var(--success); font-weight: 600; }
+    .bqp-result {
+      font-size: 1.4rem; font-weight: 800; text-align: center;
+      padding: 0.6rem; border-radius: 10px;
+    }
+    .bqp-result.correct { background: rgba(22,163,74,0.12); color: var(--success); }
+    .bqp-result.wrong   { background: rgba(220,38,38,0.10); color: var(--danger); }
+
+    /* Timer bar */
+    .bqp-timer-wrap { height: 6px; background: var(--border-card); border-radius: 3px; overflow: hidden; }
+    .bqp-timer-bar  { height: 100%; background: var(--accent); border-radius: 3px; }
+
+    /* Team scores bar (bottom) */
+    .board-teams-bar {
+      padding: 0.5rem 0.8rem; border-top: 1px solid var(--border-card);
+      display: flex; flex-direction: column; gap: 0.3rem;
+      max-height: 220px; overflow-y: auto; flex-shrink: 0;
+    }
+    .bts-team {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.85rem;
+      border: 1.5px solid transparent;
+    }
+    .bts-team.active { border-color: var(--accent); background: var(--accent-light); }
+    .bts-name  { font-weight: 600; flex: 1; color: var(--text-primary); }
+    .bts-score { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+    .bts-syms  { display: flex; gap: 2px; }
+    .bts-sym   { width: 8px; height: 8px; border-radius: 50%; background: var(--border-card); }
+    .bts-sym.found { }
+
+    @media (max-width: 700px) {
+      .board-canvas-col { flex: 1; }
+      .board-right-col  { max-width: 42vw; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Join screen ─────────────────────────────────────────────── -->
+  <div class="board-screen active" id="bs-join">
+    <div class="bj-card">
+      <div class="bj-title">🏰 Labyrinth-Quiz</div>
+      <div class="bj-sub">Tafelansicht – Code eingeben</div>
+      <input class="bj-input" id="bj-code" type="text" maxlength="4" placeholder="CODE"
+        autocomplete="off" spellcheck="false"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+        onkeydown="if(event.key==='Enter')boardJoin()">
+      <button class="bj-btn" onclick="boardJoin()">Verbinden →</button>
+      <div class="bj-error" id="bj-error"></div>
+      <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-top:0.3rem;">← Zurück</a>
+    </div>
+  </div>
+
+  <!-- ── Board screen ────────────────────────────────────────────── -->
+  <div class="board-screen" id="bs-board">
+    <div class="board-top-bar">
+      <span class="btb-title">🏰</span>
+      <span class="btb-code" id="btb-code"></span>
+      <span class="btb-team" id="btb-team"></span>
+      <span class="btb-phase" id="btb-phase"></span>
+      <button class="btb-btn" id="btb-theme-btn" onclick="boardToggleTheme()">🌙</button>
+    </div>
+    <div class="board-body">
+      <div class="board-canvas-col">
+        <div class="board-canvas-wrap">
+          <canvas id="board-canvas"></canvas>
+        </div>
+      </div>
+      <div class="board-right-col">
+        <div class="board-q-panel" id="bq-panel">
+          <div class="bqp-idle"><div class="bqp-idle-emoji">🏰</div><div>Warte auf Spielzug…</div></div>
+        </div>
+        <div class="board-teams-bar" id="board-teams-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/maze.js"></script>
+  <script src="js/renderer.js"></script>
+  <script>
+  // ── board.js ────────────────────────────────────────────────────
+
+  const TEAM_COLORS = ['#1a3a8f','#8f1a1a','#1a6b1a','#6b1a6b','#8f5a1a','#1a6b6b'];
+  const TEAM_EMOJIS = ['🛡️','🐉','🦉','🦊','🧙','🤖'];
+
+  const BoardSync = {
+    _es: null, _poll: null,
+    hasServer() { return location.protocol !== 'file:'; },
+    _url(s, code) {
+      const base = location.pathname.includes('/Labyrint-Quiz/') ? '../api.php' : './api.php';
+      return base + '?f=labyrinth-' + s + (code ? '&code=' + encodeURIComponent(code) : '');
+    },
+    async load(code) {
+      if (this.hasServer()) {
+        try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return d; } } catch {}
+      }
+      try { const s = localStorage.getItem('lab_' + code); return s ? JSON.parse(s) : null; } catch { return null; }
+    },
+    subscribe(code, cb) {
+      this.unsubscribe();
+      if (this.hasServer()) {
+        const es = new EventSource(this._url('sse', code));
+        es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
+        es.addEventListener('reconnect', () => { es.close(); setTimeout(() => this.subscribe(code, cb), 200); });
+        es.onerror = () => { es.close(); this._es = null; this._startPoll(code, cb); };
+        this._es = es;
+      } else { this._startPoll(code, cb); }
+    },
+    _startPoll(code, cb) {
+      if (this._poll) return;
+      this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 1500);
+    },
+    unsubscribe() {
+      if (this._es) { this._es.close(); this._es = null; }
+      if (this._poll) { clearInterval(this._poll); this._poll = null; }
+    }
+  };
+
+  let boardCode = null, boardState = null, boardLocalGrid = null, boardRenderer = null;
+  let boardTimerInterval = null, _bqLastId = null;
+
+  function showBoardScreen(id) {
+    document.querySelectorAll('.board-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  async function boardJoin() {
+    const inp = document.getElementById('bj-code');
+    const err = document.getElementById('bj-error');
+    const code = (inp?.value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (err) err.textContent = '';
+    if (!code || code.length < 4) { if (err) err.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+    const state = await BoardSync.load(code);
+    if (!state?.meta) { if (err) err.textContent = 'Spiel "' + code + '" nicht gefunden.'; return; }
+    boardCode = code;
+    boardState = state;
+    buildBoardGrid(state);
+    document.getElementById('btb-code').textContent = code;
+    showBoardScreen('bs-board');
+    applyBoardState(state);
+    BoardSync.subscribe(code, applyBoardState);
+  }
+
+  function buildBoardGrid(state) {
+    const { seed, config, symbols, doors } = state;
+    if (!seed || !config?.teamCount) return;
+    const gen = new MazeGenerator(16, 16, seed);
+    const result = gen.generate({ doorCount: 14, teamCount: config.teamCount });
+    boardLocalGrid = result.grid;
+    applyGridState(boardLocalGrid, symbols || [], doors || []);
+    const canvas = document.getElementById('board-canvas');
+    boardRenderer = new MazeRenderer(canvas);
+    boardRenderer.setMaze(result);
+  }
+
+  function applyGridState(grid, symbols, doors) {
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 16; x++)
+        if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
+    symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
+    doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });
+  }
+
+  function applyBoardState(state) {
+    boardState = state;
+    if (!boardLocalGrid && state.seed && state.config?.teamCount) buildBoardGrid(state);
+    if (boardLocalGrid) applyGridState(boardLocalGrid, state.symbols || [], state.doors || []);
+
+    if (boardRenderer) {
+      boardRenderer.render({
+        phase: state.phase, teams: state.teams,
+        currentTeamIdx: state.currentTeamIdx,
+        allSymbols: state.symbols || [], doors: state.doors || [],
+        _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
+      });
+    }
+
+    const team = state.teams?.[state.currentTeamIdx];
+    const teamEl = document.getElementById('btb-team');
+    if (teamEl && team) { teamEl.textContent = team.emoji + ' ' + team.name + ' ist dran'; teamEl.style.background = team.color; }
+    else if (teamEl) { teamEl.textContent = ''; teamEl.style.background = 'transparent'; }
+
+    const phaseEl = document.getElementById('btb-phase');
+    if (phaseEl) {
+      const pm = { rolling:'🎲 Würfeln', direction:'🧭 Bewegen', question:'❓ Frage', finished:'🏆 Fertig' };
+      phaseEl.textContent = pm[state.phase] || state.phase;
+    }
+
+    renderBoardQuestion(state);
+    renderBoardTeams(state);
+  }
+
+  function renderBoardQuestion(state) {
+    const panel = document.getElementById('bq-panel'); if (!panel) return;
+    const aq = state.activeQuestion;
+
+    // Result phase: show outcome
+    if (aq && aq.questionResult !== null && aq.questionResult !== undefined) {
+      const team = state.teams?.[aq.teamIdx];
+      panel.innerHTML =
+        '<div class="bqp-active">' +
+          '<div class="bqp-team-badge" style="background:' + (team?.color||'#888') + '">' + (team?.emoji||'') + ' ' + _bEsc(team?.name||'') + '</div>' +
+          '<div class="bqp-question" style="font-size:1.1rem;opacity:0.7">' + _bEsc(aq.question) + '</div>' +
+          '<div class="bqp-result ' + (aq.questionResult ? 'correct' : 'wrong') + '">' + (aq.questionResult ? '✓ Richtig!' : '✗ Falsch!') + '</div>' +
+        '</div>';
+      clearBoardTimer();
+      _bqLastId = null;
+      return;
+    }
+
+    // No active question
+    if (!aq || aq.questionResult !== null) {
+      panel.innerHTML = '<div class="bqp-idle"><div class="bqp-idle-emoji">🏰</div><div>Warte auf Spielzug…</div></div>';
+      clearBoardTimer();
+      _bqLastId = null;
+      return;
+    }
+
+    // Active question
+    const team = state.teams?.[aq.teamIdx];
+    const contextLabel = aq.contextType === 'door' ? '🔒 Tür öffnen' : '🔮 Symbol einsammeln';
+    const isNew = aq.id !== _bqLastId;
+    _bqLastId = aq.id;
+
+    panel.innerHTML =
+      '<div class="bqp-active">' +
+        '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
+          '<div class="bqp-team-badge" style="background:' + (team?.color||'#888') + '">' + (team?.emoji||'') + ' ' + _bEsc(team?.name||'') + '</div>' +
+          '<div class="bqp-context">' + contextLabel + '</div>' +
+        '</div>' +
+        '<div class="bqp-timer-wrap"><div class="bqp-timer-bar" id="bqp-tbar" style="width:100%"></div></div>' +
+        '<div class="bqp-question">' + _bEsc(aq.question) + '</div>' +
+        (aq.answer ? '<div class="bqp-answer"><div class="bqp-answer-label">Musterlösung</div><div class="bqp-answer-text">' + _bEsc(aq.answer) + '</div></div>' : '') +
+      '</div>';
+
+    if (isNew && state.config?.timerSeconds) {
+      startBoardTimer(state.config.timerSeconds);
+    } else if (!state.config?.timerSeconds) {
+      clearBoardTimer();
+    }
+  }
+
+  function startBoardTimer(seconds) {
+    clearBoardTimer();
+    let rem = seconds;
+    boardTimerInterval = setInterval(() => {
+      rem--;
+      const bar = document.getElementById('bqp-tbar');
+      if (bar) bar.style.width = Math.max(0, rem / seconds * 100) + '%';
+      if (rem <= 0) clearBoardTimer();
+    }, 1000);
+  }
+
+  function clearBoardTimer() {
+    if (boardTimerInterval) { clearInterval(boardTimerInterval); boardTimerInterval = null; }
+    const bar = document.getElementById('bqp-tbar');
+    if (bar) bar.style.width = '0%';
+  }
+
+  function renderBoardTeams(state) {
+    const bar = document.getElementById('board-teams-bar'); if (!bar) return;
+    bar.innerHTML = '';
+    (state.teams || []).forEach((t, i) => {
+      const syms = (state.symbols || []).filter(s => s.teamId === i);
+      const div = document.createElement('div');
+      div.className = 'bts-team' + (i === state.currentTeamIdx ? ' active' : '');
+      div.innerHTML =
+        '<span style="font-size:1.1rem">' + t.emoji + '</span>' +
+        '<span class="bts-name">' + t.name + '</span>' +
+        '<span class="bts-score">' + t.score + ' Pkt</span>' +
+        '<div class="bts-syms">' + syms.map(s => '<div class="bts-sym' + (s.found ? ' found' : '') + '" style="' + (s.found ? 'background:' + t.color : '') + '"></div>').join('') + '</div>';
+      bar.appendChild(div);
+    });
+  }
+
+  function _bEsc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Theme ──────────────────────────────────────────────────────────
+  (function () {
+    function apply(dark) {
+      document.body.classList.toggle('dark', dark);
+      const btn = document.getElementById('btb-theme-btn');
+      if (btn) btn.textContent = dark ? '☀️' : '🌙';
+      if (boardRenderer) { boardRenderer.invalidateColors(); if (boardState) applyBoardState(boardState); }
+    }
+    window.boardToggleTheme = function () {
+      const d = !document.body.classList.contains('dark');
+      localStorage.setItem('spiele_theme', d ? 'dark' : 'light');
+      apply(d);
+    };
+    apply(localStorage.getItem('spiele_theme') === 'dark');
+  })();
+
+  // ── URL code → auto-join ───────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    const urlCode = new URLSearchParams(location.search).get('code');
+    if (urlCode) {
+      const inp = document.getElementById('bj-code');
+      if (inp) inp.value = urlCode.toUpperCase();
+      boardJoin();
+    }
+  });
+  </script>
+</body>
+</html>
