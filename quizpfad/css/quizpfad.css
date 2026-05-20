@@ -1198,6 +1198,100 @@ body {
 .gs-join-error { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin-top: 6px; }
 .gs-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
+/* ── Difficulty Picker ───────────────────────────────────── */
+.diff-picker {
+  margin-bottom: 12px;
+}
+
+.diff-picker-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.diff-btns {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.diff-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #fff;
+  font-weight: 700;
+  gap: 2px;
+}
+
+.diff-pts {
+  font-size: clamp(0.85rem, 1.4vw, 1.05rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.diff-adv {
+  font-size: 0.6rem;
+  opacity: 0.85;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.diff-btn-100 { background: #3498db; }
+.diff-btn-100:hover:not(:disabled) { background: #2980b9; }
+
+.diff-btn-200 { background: #2ecc71; }
+.diff-btn-200:hover:not(:disabled) { background: #27ae60; }
+
+.diff-btn-300 { background: #f39c12; }
+.diff-btn-300:hover:not(:disabled) { background: #e67e22; }
+
+.diff-btn-400 { background: #e67e22; }
+.diff-btn-400:hover:not(:disabled) { background: #d35400; }
+
+.diff-btn-500 { background: #e74c3c; }
+.diff-btn-500:hover:not(:disabled) { background: #c0392b; }
+
+.diff-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* ── Team Connection Indicators ──────────────────────────── */
+.team-conn-dot {
+  color: #4ade80;
+  font-size: 0.55rem;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.team-kick-btn {
+  background: none;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: rgba(220, 38, 38, 0.6);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.team-kick-btn:hover {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 900px) {
   #game-screen { flex-direction: column; }
