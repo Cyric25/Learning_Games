@@ -159,9 +159,10 @@ function showTeamSelect(state) {
 }
 
 async function selectTeam(id) {
-  // Frischen Stand laden um Race-Condition zu vermeiden
-  const fresh = await GameSync.load(gameCode);
-  const taken = new Set(fresh?.takenTeams || []);
+  // Frischen Stand laden um Race-Condition zu vermeiden; remoteState als Fallback
+  const fresh = (await GameSync.load(gameCode)) || remoteState;
+  if (!fresh) return;
+  const taken = new Set(fresh.takenTeams || []);
   if (taken.has(id)) {
     // Zwischenzeitlich belegt – Liste neu aufbauen
     remoteState = fresh;
