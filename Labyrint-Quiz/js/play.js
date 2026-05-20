@@ -216,6 +216,14 @@ function applyStateToGrid(grid, symbols, doors) {
 
 function onRemoteUpdate(data) {
   if (_ignoreNextUpdate) { _ignoreNextUpdate = false; return; }
+
+  // Spielleiter hat das Team freigegeben → Spieler zurück zur Teamwahl
+  if (myTeamId !== null && Array.isArray(data.takenTeams) &&
+      !data.takenTeams.includes(myTeamId)) {
+    handleKicked();
+    return;
+  }
+
   // Teacher has evaluated an open question we're waiting on
   if (_waitingForTeacher && data.activeQuestion?.questionResult !== null &&
       data.activeQuestion?.questionResult !== undefined) {
@@ -229,6 +237,29 @@ function onRemoteUpdate(data) {
   applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
   renderCanvas(data);
   applyState(data);
+}
+
+function handleKicked() {
+  clearTimer();
+  document.getElementById('question-modal')?.classList.remove('active');
+  GameSync.unsubscribe();
+  localStorage.removeItem('lab_myteam_' + gameCode);
+  myTeamId = null;
+
+  // Kurze Meldung, dann zurück zur Teamwahl
+  showScreen('play-screen');
+  const area = document.getElementById('play-area');
+  if (area) area.innerHTML =
+    '<div class="wait-screen">' +
+      '<div class="wait-emoji">🚪</div>' +
+      '<div class="wait-text">Vom Spielleiter getrennt…</div>' +
+    '</div>';
+
+  setTimeout(async () => {
+    const state = await GameSync.load(gameCode);
+    if (state?.meta) { remoteState = state; showTeamSelect(state); }
+    else showScreen('join-screen');
+  }, 1500);
 }
 
 function renderCanvas(state) {
