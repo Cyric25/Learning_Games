@@ -53,7 +53,7 @@ if ($key === 'sse') {
             }
         }
 
-        usleep(300000); // 300ms
+        usleep(150000); // 300ms
     }
     exit;
 }
@@ -251,7 +251,7 @@ if ($key === 'ls-sse') {
                 echo "data: " . file_get_contents($lsPath) . "\n\n"; @flush();
             }
         }
-        usleep(300000);
+        usleep(150000);
     }
     exit;
 }
@@ -410,7 +410,7 @@ if ($key === 'labyrinth-sse') {
                 echo "data: " . file_get_contents($lPath) . "\n\n"; @flush();
             }
         }
-        usleep(300000);
+        usleep(150000);
     }
     exit;
 }
@@ -521,7 +521,7 @@ if ($key === 'qp-sse') {
                 echo "data: " . file_get_contents($qpPath) . "\n\n"; @flush();
             }
         }
-        usleep(300000);
+        usleep(150000);
     }
     exit;
 }

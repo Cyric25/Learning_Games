@@ -197,7 +197,7 @@
   const TEAM_EMOJIS = ['🛡️','🐉','🦉','🦊','🧙','🤖'];
 
   const BoardSync = {
-    _es: null, _poll: null,
+    _es: null, _poll: null, _session: 0,
     hasServer() { return location.protocol !== 'file:'; },
     _url(s, code) {
       const base = location.pathname.includes('/Labyrint-Quiz/') ? '../api.php' : './api.php';
@@ -211,19 +211,33 @@
     },
     subscribe(code, cb) {
       this.unsubscribe();
-      if (this.hasServer()) {
+      const sid = ++this._session;
+      const connect = () => {
+        if (this._session !== sid) return;
         const es = new EventSource(this._url('sse', code));
-        es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
-        es.addEventListener('reconnect', () => { es.close(); setTimeout(() => this.subscribe(code, cb), 200); });
-        es.onerror = () => { es.close(); this._es = null; this._startPoll(code, cb); };
         this._es = es;
-      } else { this._startPoll(code, cb); }
+        es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
+        es.addEventListener('reconnect', () => { es.close(); this._es = null; if (this._session === sid) setTimeout(connect, 200); });
+        es.onerror = () => {
+          es.close(); this._es = null;
+          if (this._session !== sid) return;
+          if (!this._poll) this._startPoll(code, cb);
+          setTimeout(() => {
+            if (this._session !== sid) return;
+            if (this._poll) { clearInterval(this._poll); this._poll = null; }
+            connect();
+          }, 2000);
+        };
+      };
+      if (this.hasServer()) connect();
+      else this._startPoll(code, cb);
     },
     _startPoll(code, cb) {
       if (this._poll) return;
-      this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 1500);
+      this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 400);
     },
     unsubscribe() {
+      this._session++;
       if (this._es) { this._es.close(); this._es = null; }
       if (this._poll) { clearInterval(this._poll); this._poll = null; }
     }
