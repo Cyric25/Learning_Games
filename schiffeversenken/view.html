@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Schiffeversenken – Spieler</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+  <style>
+    :root {
+      --bg:       linear-gradient(135deg, #0d1b2a 0%, #1b2d42 100%);
+      --bg-card:  #1e3a5f;
+      --bg-field: #0a1628;
+      --bg-fh:    #122135;
+      --accent:   #4fc3f7;
+      --text:     #e8f4f8;
+      --text-2:   #90caf9;
+      --border:   rgba(79,195,247,0.18);
+      --success:  #2ecc71;
+      --danger:   #e74c3c;
+      --shadow:   0 4px 20px rgba(0,0,0,0.5);
+    }
+    body.light {
+      --bg:       linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+      --bg-card:  #ffffff;
+      --bg-field: #f0f8ff;
+      --bg-fh:    #dbeeff;
+      --accent:   #0288d1;
+      --text:     #1a237e;
+      --text-2:   #5c6bc0;
+      --border:   rgba(2,136,209,0.2);
+      --shadow:   0 4px 20px rgba(2,136,209,0.15);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: flex; }
+    .screen-center {
+      min-height: 100vh; flex-direction: column;
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .screen-full { min-height: 100vh; flex-direction: column; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg-card); border-radius: 20px;
+      padding: 2rem 1.5rem; width: 100%; max-width: 420px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .card h1 { font-size: 2rem; margin-bottom: .5rem; }
+    .card h2 { font-size: 1.4rem; margin-bottom: 1rem; }
+    .card p  { color: var(--text-2); font-size: .95rem; margin-bottom: 1.2rem; }
+
+    /* ── Code Input ── */
+    .code-input {
+      width: 100%; padding: 14px; font-size: 2rem; letter-spacing: 6px;
+      text-align: center; text-transform: uppercase; font-family: monospace; font-weight: 800;
+      border: 2px solid var(--border); border-radius: 12px;
+      background: var(--bg-field); color: var(--text);
+      margin-bottom: 1rem; outline: none; transition: border-color .2s;
+    }
+    .code-input:focus { border-color: var(--accent); }
+    .btn-join {
+      width: 100%; padding: 14px; font-size: 1.1rem; font-weight: 700;
+      background: var(--accent); color: #fff; border: none; border-radius: 12px;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .btn-join:hover { opacity: .85; }
+    .join-error { color: var(--danger); font-size: .9rem; margin-top: 10px; min-height: 20px; }
+
+    /* ── Team Select ── */
+    .team-option {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px; border-radius: 14px;
+      background: var(--bg-field); border: 2px solid var(--border);
+      cursor: pointer; margin-bottom: 10px; text-align: left;
+      transition: border-color .15s, background .15s;
+    }
+    .team-option:hover:not([disabled]) { border-color: var(--accent); background: var(--bg-fh); }
+    .team-option[disabled] { opacity: .45; cursor: not-allowed; }
+    .team-emoji-big { font-size: 1.8rem; }
+    .team-opt-name { font-weight: 700; font-size: 1rem; }
+    .team-taken { font-size: .78rem; color: var(--danger); font-weight: 700; margin-left: .4rem; }
+
+    /* ── Wait Screen ── */
+    #screen-wait .card { gap: 1rem; display: flex; flex-direction: column; align-items: center; }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+
+    /* ── Game Screen ── */
+    #screen-game { flex-direction: column; height: 100dvh; overflow: hidden; }
+    .game-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: var(--bg-card);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .game-header-left { display: flex; align-items: center; gap: 8px; }
+    .team-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .team-name-label { font-weight: 700; font-size: .95rem; }
+    .btn-theme-sm {
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 8px; color: var(--text);
+      font-size: .8rem; cursor: pointer;
+    }
+    .turn-indicator {
+      text-align: center; padding: 6px 12px; font-size: .88rem; font-weight: 600;
+      background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .turn-indicator.my-turn { background: rgba(46,204,113,.1); color: var(--success); }
+    .turn-indicator.waiting { color: var(--text-2); }
+
+    /* ── Grid ── */
+    .grid-area {
+      flex: 1; min-height: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      padding: 6px;
+    }
+    .grid-outer { display: inline-flex; flex-direction: column; gap: 1px; }
+    .grid-row { display: flex; gap: 1px; }
+    .grid-cell-hdr {
+      width: 26px; height: 26px; display: flex;
+      align-items: center; justify-content: center;
+      font-size: .65rem; font-weight: 700; color: var(--text-2); flex-shrink: 0;
+    }
+    .grid-cell {
+      width: 34px; height: 34px; border-radius: 3px;
+      border: 1px solid var(--border); background: var(--bg-field);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .6rem; position: relative; flex-shrink: 0;
+      transition: background .12s, border-color .12s;
+      cursor: default; overflow: hidden;
+    }
+    .grid-cell.own-ship  { border-color: rgba(255,255,255,.3); }
+    .grid-cell.miss::after { content:'◦'; font-size:.95rem; font-weight:700; }
+    .grid-cell.sunk-ship {
+      background-image: repeating-linear-gradient(
+        45deg, transparent, transparent 4px,
+        rgba(0,0,0,.3) 4px, rgba(0,0,0,.3) 8px
+      );
+    }
+    .grid-cell.target-sel {
+      outline: 2px solid var(--accent); outline-offset: 1px;
+    }
+
+    /* ── Shot Input Panel ── */
+    .shot-panel {
+      flex-shrink: 0; padding: 10px 12px;
+      background: var(--bg-card); border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .shot-panel.hidden { display: none; }
+    .shot-input-row { display: flex; gap: 8px; align-items: center; }
+    .coord-input {
+      flex: 1; padding: 10px 14px; font-size: 1.3rem; font-weight: 800;
+      letter-spacing: 4px; text-align: center; text-transform: uppercase;
+      font-family: monospace; background: var(--bg-field);
+      border: 2px solid var(--border); border-radius: 10px;
+      color: var(--text); outline: none; transition: border-color .2s;
+      max-width: 140px;
+    }
+    .coord-input:focus { border-color: var(--accent); }
+    .btn-fire {
+      padding: 10px 20px; font-size: 1rem; font-weight: 700;
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      cursor: pointer; transition: opacity .2s; white-space: nowrap;
+    }
+    .btn-fire:hover { opacity: .85; }
+    .shot-error { font-size: .85rem; color: var(--danger); min-height: 1.2em; }
+
+    /* ── Fragen-Overlay ── */
+    .question-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .question-overlay.hidden { display: none; }
+    .q-card {
+      background: var(--bg-card); border-radius: 18px;
+      padding: 1.8rem; width: 100%; max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.7);
+    }
+    .q-header { font-size: .85rem; color: var(--text-2); margin-bottom: .8rem; }
+    .q-coord { font-family: monospace; font-weight: 800; color: var(--accent); }
+    .q-text { font-size: 1.05rem; line-height: 1.6; margin-bottom: 1rem; }
+    .mc-opts { display: flex; flex-direction: column; gap: .5rem; }
+    .mc-opt {
+      padding: .65rem 1rem; border-radius: 10px;
+      border: 1.5px solid var(--border); background: var(--bg-field);
+      text-align: left; color: var(--text); font-size: .95rem; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .mc-opt:hover:not([disabled]) { border-color: var(--accent); background: var(--bg-fh); }
+    .mc-opt[disabled] { cursor: default; }
+    .mc-opt.opt-correct { border-color: var(--success)!important; background: rgba(46,204,113,.12)!important; color: var(--success)!important; }
+    .mc-opt.opt-wrong   { border-color: var(--danger)!important; background: rgba(231,76,60,.1)!important; color: var(--danger)!important; opacity:.7; }
+    .open-waiting { padding: 1rem; text-align: center; color: var(--text-2); font-size: .9rem; }
+    .q-result {
+      text-align: center; padding: .6rem 1rem; border-radius: 10px;
+      font-weight: 700; margin-top: 1rem;
+    }
+    .q-result.correct { background: rgba(46,204,113,.15); color: var(--success); }
+    .q-result.wrong   { background: rgba(231,76,60,.1); color: var(--danger); }
+    .q-hint { font-size: .82rem; color: var(--text-2); font-style: italic; margin-top: .5rem; }
+
+    /* ── Eliminated / Finished ── */
+    .elim-banner {
+      text-align: center; padding: 1.5rem 1rem;
+      color: var(--danger); font-weight: 700;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0; font-size: 1rem;
+    }
+    .winner-banner {
+      text-align: center; padding: .8rem;
+      font-size: .95rem; font-weight: 700;
+      background: rgba(46,204,113,.1); color: var(--success);
+      border-top: 1px solid rgba(46,204,113,.3); flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Join Screen ────────────────────────────────────────────────── -->
+<div class="screen screen-center active" id="screen-join">
+  <div class="card">
+    <h1>⚓</h1>
+    <h2>Schiffeversenken</h2>
+    <p>Gib den Code deiner Lehrkraft ein.</p>
+    <input type="text" class="code-input" id="join-code-input" maxlength="4" placeholder="CODE"
+      autocomplete="off" spellcheck="false"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')doJoin()">
+    <button class="btn-join" onclick="doJoin()">Beitreten →</button>
+    <div class="join-error" id="join-error"></div>
+  </div>
+  <div style="margin-top:1.5rem;">
+    <a href="index.html" style="color:var(--text-2);font-size:.9rem;text-decoration:none;">← Zur Lehrkraft-Ansicht</a>
+  </div>
+</div>
+
+<!-- ── Team Select ───────────────────────────────────────────────── -->
+<div class="screen screen-center" id="screen-team">
+  <div class="card">
+    <h2>👥 Team wählen</h2>
+    <p id="team-select-sub">Wähle dein Team.</p>
+    <div id="team-list"></div>
+  </div>
+</div>
+
+<!-- ── Wait Screen ───────────────────────────────────────────────── -->
+<div class="screen screen-center" id="screen-wait">
+  <div class="card">
+    <div style="font-size:3rem;" class="pulse">⚓</div>
+    <h2>Warte auf Spielstart…</h2>
+    <p id="wait-sub">Die Lehrkraft startet das Spiel.</p>
+    <div id="wait-team-info" style="margin-top:.5rem;font-size:.9rem;color:var(--text-2);"></div>
+  </div>
+</div>
+
+<!-- ── Game Screen ───────────────────────────────────────────────── -->
+<div class="screen screen-full" id="screen-game">
+  <div class="game-header">
+    <div class="game-header-left">
+      <div class="team-dot" id="my-team-dot"></div>
+      <span class="team-name-label" id="my-team-name">Team</span>
+    </div>
+    <button class="btn-theme-sm" onclick="toggleTheme()" id="view-theme-btn">☀️</button>
+  </div>
+  <div class="turn-indicator waiting" id="turn-indicator">Warte…</div>
+  <div class="grid-area">
+    <div id="player-grid" class="grid-outer"></div>
+  </div>
+  <div class="shot-panel hidden" id="shot-panel">
+    <div class="shot-input-row">
+      <input type="text" class="coord-input" id="coord-input" maxlength="3" placeholder="A1"
+        autocomplete="off" spellcheck="false"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-J0-9]/g,'').slice(0,3)"
+        onkeydown="if(event.key==='Enter')fireShot()">
+      <button class="btn-fire" onclick="fireShot()">💥 Schießen</button>
+    </div>
+    <div class="shot-error" id="shot-error"></div>
+  </div>
+  <div class="elim-banner hidden" id="elim-banner">☠️ Euer Team wurde versenkt!</div>
+  <div class="winner-banner hidden" id="winner-banner"></div>
+</div>
+
+<!-- ── Fragen-Overlay ────────────────────────────────────────────── -->
+<div class="question-overlay hidden" id="q-overlay">
+  <div class="q-card">
+    <div class="q-header">Schuss auf <span class="q-coord" id="q-coord"></span></div>
+    <div class="q-text" id="q-text"></div>
+    <div id="q-mc-opts" class="mc-opts"></div>
+    <div class="open-waiting hidden" id="q-open-wait">📢 Beantworte die Frage mündlich.<br>Der Spielleiter bewertet deinen Schuss.</div>
+    <div id="q-result" class="q-result" style="display:none;"></div>
+    <div id="q-hint" class="q-hint" style="display:none;"></div>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+const TEAM_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b'];
+const TEAM_EMOJIS = ['🔵','🔴','🟢','🟡'];
+const COLS = ['A','B','C','D','E','F','G','H','I','J'];
+const CAT_ICONS = ['📚','🔬','🌍','⚡','🎯','🏛️','🧮','🌿','⚗️','🎨'];
+
+let remoteState = null;
+let myTeamId    = null;
+let gameCode    = null;
+let bsSub       = null;
+let allQuestions = [];
+let submittingShot = false;
+
+// ── Utilities ─────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Fragen laden ──────────────────────────────────────────────────
+async function loadQuestions() {
+  try { const r = await fetch('../api.php?f=questions'); if (r.ok) { const d = await r.json(); if (d && d.categories) return d; } } catch {}
+  try { const r = await fetch('../data/questions.json'); if (r.ok) { const d = await r.json(); if (d && d.categories) return d; } } catch {}
+  const c = localStorage.getItem('rq_questions');
+  return c ? JSON.parse(c) : { categories: [] };
+}
+function flattenQuestions(cats) {
+  const result = [];
+  function walk(cat) {
+    const subs = cat.subcategories || [];
+    const hasQ = (cat.questions||[]).length > 0;
+    if (hasQ && !subs.length) { cat.questions.forEach(q => result.push({...q, kategorieId: cat.id})); return; }
+    subs.forEach(s => walk(s));
+    if (hasQ) cat.questions.forEach(q => result.push({...q, kategorieId: cat.id}));
+  }
+  cats.forEach(c => walk(c));
+  return result;
+}
+
+// ── Join ──────────────────────────────────────────────────────────
+async function doJoin() {
+  const input = document.getElementById('join-code-input');
+  const errEl = document.getElementById('join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  errEl.textContent = '';
+  if (!code || code.length < 4) { errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+  errEl.textContent = 'Verbinde…';
+  gameCode = code;
+  BsStorage.setCode(code);
+  const state = await BsStorage.load(code);
+  if (!state || !state.meta) { errEl.textContent = 'Spiel nicht gefunden. Code prüfen.'; return; }
+  errEl.textContent = '';
+  remoteState = state;
+
+  // Gespeicherte Teamwahl?
+  const saved = localStorage.getItem('bs_myteam_' + code);
+  if (saved !== null) {
+    const tid = parseInt(saved, 10);
+    if (state.teams[tid]) {
+      myTeamId = tid;
+      startGameView();
+      return;
+    }
+  }
+  showTeamSelect(state);
+}
+window.doJoin = doJoin;
+
+// ── Team Select ───────────────────────────────────────────────────
+function showTeamSelect(state) {
+  showScreen('screen-team');
+  const taken = new Set(state.takenTeams || []);
+  const list = document.getElementById('team-list');
+  list.innerHTML = '';
+  state.teams.forEach(t => {
+    const isTaken = taken.has(t.id);
+    const btn = document.createElement('button');
+    btn.className = 'team-option';
+    if (isTaken) btn.setAttribute('disabled', '');
+    btn.innerHTML =
+      `<span class="team-emoji-big">${t.emoji||'👥'}</span>` +
+      `<span class="team-opt-name">${escapeHtml(t.name)}` +
+      (isTaken ? '<span class="team-taken">belegt</span>' : '') +
+      `</span>`;
+    if (!isTaken) btn.onclick = () => selectTeam(t.id, state);
+    list.appendChild(btn);
+  });
+}
+
+async function selectTeam(id, stateHint) {
+  const fresh = (await BsStorage.load(gameCode)) || stateHint;
+  if (!fresh) return;
+  const taken = new Set(fresh.takenTeams || []);
+  if (taken.has(id)) { remoteState = fresh; showTeamSelect(fresh); return; }
+  taken.add(id);
+  const ns = JSON.parse(JSON.stringify(fresh, (k,v) => v instanceof Set ? [...v] : v));
+  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.takenTeams = [...taken];
+  await BsStorage.save(ns);
+  remoteState = ns;
+  myTeamId = id;
+  localStorage.setItem('bs_myteam_' + gameCode, id);
+  startGameView();
+}
+
+function startGameView() {
+  if (remoteState && remoteState.phase === 'setup') {
+    showWaitScreen();
+  } else {
+    showScreen('screen-game');
+    renderGameView();
+  }
+  startSSE();
+}
+
+function showWaitScreen() {
+  showScreen('screen-wait');
+  const myTeam = remoteState && myTeamId !== null ? remoteState.teams[myTeamId] : null;
+  const info = document.getElementById('wait-team-info');
+  if (info && myTeam) info.textContent = `Du spielst als: ${myTeam.emoji} ${myTeam.name}`;
+}
+
+// ── SSE ───────────────────────────────────────────────────────────
+function startSSE() {
+  if (bsSub) bsSub.unsubscribe();
+  bsSub = BsStorage.subscribe(gameCode, onRemoteUpdate);
+}
+
+function onRemoteUpdate(data) {
+  if (!data || !data.meta) return;
+
+  // Kick-Detection
+  if (myTeamId !== null && Array.isArray(data.takenTeams) && !data.takenTeams.includes(myTeamId)) {
+    handleKicked(data);
+    return;
+  }
+
+  remoteState = data;
+
+  if (data.phase === 'setup') { showWaitScreen(); return; }
+  if (data.phase === 'finished') {
+    remoteState = data;
+    renderGameView();
+    return;
+  }
+  if (data.phase === 'playing') {
+    if (document.getElementById('screen-game').classList.contains('active')) {
+      renderGameView();
+    } else {
+      showScreen('screen-game');
+      renderGameView();
+    }
+  }
+}
+
+function handleKicked(data) {
+  clearTimeout(window._kickTimer);
+  if (bsSub) { bsSub.unsubscribe(); bsSub = null; }
+  localStorage.removeItem('bs_myteam_' + gameCode);
+  myTeamId = null;
+  const errEl = document.getElementById('join-error');
+  window._kickTimer = setTimeout(async () => {
+    const state = await BsStorage.load(gameCode);
+    if (state && state.meta) { remoteState = state; showTeamSelect(state); }
+    else showScreen('screen-join');
+  }, 1500);
+  document.getElementById('q-overlay').classList.add('hidden');
+  showScreen('screen-team');
+  const list = document.getElementById('team-list');
+  list.innerHTML = `<div style="color:var(--danger);text-align:center;padding:1rem;">Du wurdest vom Spielleiter getrennt. Wähle erneut ein Team.</div>`;
+}
+
+// ── Game View ─────────────────────────────────────────────────────
+function renderGameView() {
+  if (!remoteState) return;
+  const myTeam = myTeamId !== null ? remoteState.teams[myTeamId] : null;
+
+  // Header
+  if (myTeam) {
+    document.getElementById('my-team-dot').style.background = myTeam.color;
+    document.getElementById('my-team-name').textContent = `${myTeam.emoji} ${myTeam.name}`;
+  }
+
+  // Turn Indicator
+  const indicator = document.getElementById('turn-indicator');
+  const alive = (remoteState.turnOrder||[]).filter(i => !remoteState.teams[i].eliminated);
+  const lq = remoteState.liveQuestion;
+  const isMyTurn = !lq && alive.length > 0 &&
+    alive[remoteState.currentTurnIndex % alive.length] === myTeamId;
+  const iAmElim = myTeam && myTeam.eliminated;
+
+  if (remoteState.phase === 'finished') {
+    indicator.textContent = '🏁 Spiel beendet';
+    indicator.className = 'turn-indicator waiting';
+  } else if (iAmElim) {
+    indicator.textContent = '☠️ Euer Team wurde versenkt';
+    indicator.className = 'turn-indicator waiting';
+  } else if (isMyTurn) {
+    indicator.textContent = '🎯 Du bist dran! Gib eine Koordinate ein.';
+    indicator.className = 'turn-indicator my-turn';
+  } else if (lq) {
+    const shooterTeam = remoteState.teams[lq.teamIdx];
+    indicator.textContent = `${shooterTeam?.emoji||''} ${shooterTeam?.name||''} schießt auf ${lq.coordinate}…`;
+    indicator.className = 'turn-indicator waiting';
+  } else {
+    const nextId = alive.length ? alive[remoteState.currentTurnIndex % alive.length] : null;
+    const nextTeam = nextId !== null ? remoteState.teams[nextId] : null;
+    indicator.textContent = nextTeam ? `${nextTeam.emoji} ${nextTeam.name} ist dran` : '—';
+    indicator.className = 'turn-indicator waiting';
+  }
+
+  // Grid
+  renderPlayerGrid();
+
+  // Shot Panel
+  const shotPanel = document.getElementById('shot-panel');
+  if (isMyTurn && !iAmElim) {
+    shotPanel.classList.remove('hidden');
+  } else {
+    shotPanel.classList.add('hidden');
+    document.getElementById('shot-error').textContent = '';
+  }
+
+  // Eliminated Banner
+  const elimBanner = document.getElementById('elim-banner');
+  elimBanner.classList.toggle('hidden', !iAmElim);
+
+  // Winner / Finished
+  const winnerBanner = document.getElementById('winner-banner');
+  if (remoteState.phase === 'finished') {
+    const winnerId = remoteState.winner;
+    if (winnerId !== null && winnerId !== undefined) {
+      const wt = remoteState.teams[winnerId];
+      winnerBanner.textContent = `🏆 Sieger: ${wt?.emoji||''} ${wt?.name||''}`;
+      winnerBanner.classList.remove('hidden');
+    } else {
+      winnerBanner.classList.add('hidden');
+    }
+  } else {
+    winnerBanner.classList.add('hidden');
+  }
+
+  // Question Overlay
+  if (lq && !lq.resolved) {
+    const isMyShot = lq.teamIdx === myTeamId;
+    if (isMyShot) {
+      showQuestionOverlay(lq);
+    } else {
+      document.getElementById('q-overlay').classList.add('hidden');
+    }
+  } else {
+    if (submittingShot) return;
+    document.getElementById('q-overlay').classList.add('hidden');
+  }
+}
+
+// ── Player Grid ───────────────────────────────────────────────────
+function renderPlayerGrid() {
+  const container = document.getElementById('player-grid');
+  if (!container || !remoteState) return;
+  container.innerHTML = '';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'grid-row';
+  headerRow.appendChild(makeHdrCell(''));
+  COLS.forEach(c => headerRow.appendChild(makeHdrCell(c)));
+  container.appendChild(headerRow);
+
+  for (let row = 1; row <= 10; row++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'grid-row';
+    rowEl.appendChild(makeHdrCell(String(row)));
+    COLS.forEach(col => rowEl.appendChild(makePlayerCell(col, row)));
+    container.appendChild(rowEl);
+  }
+}
+
+function makeHdrCell(text) {
+  const el = document.createElement('div');
+  el.className = 'grid-cell-hdr';
+  el.textContent = text;
+  return el;
+}
+
+function makePlayerCell(col, row) {
+  const key = `${col}${row}`;
+  const cell = document.createElement('div');
+  cell.className = 'grid-cell';
+  const entry = remoteState.grid[key];
+  const myTeam = myTeamId !== null ? remoteState.teams[myTeamId] : null;
+  const lq = remoteState.liveQuestion;
+  const alive = (remoteState.turnOrder||[]).filter(i => !remoteState.teams[i].eliminated);
+  const isMyTurn = !lq && alive.length > 0 &&
+    alive[remoteState.currentTurnIndex % alive.length] === myTeamId;
+
+  if (entry) {
+    const wasShot = entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    const hasShip = entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
+    const shipTeam = hasShip ? remoteState.teams[entry.shipTeamIdx] : null;
+    const shotTeam = wasShot ? remoteState.teams[entry.shotByTeamIdx] : null;
+
+    if (wasShot && hasShip) {
+      // Treffer sichtbar für alle
+      const isSunk = shipTeam && shipTeam.ships.every(s =>
+        !s.coords.includes(key) || s.sunk
+      );
+      cell.style.background = shipTeam.color;
+      cell.style.opacity = isSunk ? '0.55' : '1';
+      if (isSunk) cell.classList.add('sunk-ship');
+      cell.title = `Treffer! ${shipTeam.emoji} ${shipTeam.name}`;
+    } else if (wasShot && !hasShip) {
+      cell.classList.add('miss');
+      cell.style.color = shotTeam?.color || '#888';
+      cell.title = `Miss`;
+    } else if (!wasShot && hasShip && shipTeam && myTeam && shipTeam.id === myTeam.id) {
+      // Nur eigene ungetroffene Schiffe zeigen
+      cell.style.background = myTeam.color;
+      cell.style.opacity = '0.4';
+      cell.classList.add('own-ship');
+      cell.title = 'Eigenes Schiff';
+    }
+  } else if (myTeamId !== null) {
+    // Prüfen ob eigenes Schiff (kein entry = kein Schiff, kein Schuss)
+    const myT = remoteState.teams[myTeamId];
+    if (myT) {
+      const isOwnShip = myT.ships.some(s => s.coords.includes(key));
+      if (isOwnShip) {
+        cell.style.background = myT.color;
+        cell.style.opacity = '0.4';
+        cell.classList.add('own-ship');
+        cell.title = 'Eigenes Schiff';
+      }
+    }
+  }
+
+  // Aktives Ziel
+  if (lq && lq.coordinate === key) {
+    cell.classList.add('target-sel');
+  }
+
+  return cell;
+}
+
+// ── Schuss abfeuern ───────────────────────────────────────────────
+async function fireShot() {
+  if (submittingShot) return;
+  const input = document.getElementById('coord-input');
+  const errEl = document.getElementById('shot-error');
+  errEl.textContent = '';
+  const raw = (input ? input.value : '').trim().toUpperCase();
+
+  // Format validieren
+  const match = raw.match(/^([A-J])(\d{1,2})$/);
+  if (!match) { errEl.textContent = 'Format: A1 bis J10'; return; }
+  const col = match[1];
+  const row = parseInt(match[2]);
+  if (row < 1 || row > 10) { errEl.textContent = 'Zeile 1–10'; return; }
+  const coord = `${col}${row}`;
+
+  // Bereits beschossen?
+  const entry = remoteState.grid[coord];
+  if (entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined) {
+    errEl.textContent = `${coord} wurde bereits beschossen!`; return;
+  }
+
+  // Eigenes Schiff?
+  const myT = remoteState.teams[myTeamId];
+  if (myT && myT.ships.some(s => s.coords.includes(coord))) {
+    errEl.textContent = `${coord} ist ein eigenes Schiff!`; return;
+  }
+
+  submittingShot = true;
+
+  // Zufällige Frage wählen
+  const activeCats = new Set(remoteState.activeCategoryIds || []);
+  const used = remoteState.usedQuestionIds instanceof Set
+    ? remoteState.usedQuestionIds
+    : new Set(remoteState.usedQuestionIds||[]);
+  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && !used.has(q.id));
+  if (!pool.length) pool = allQuestions.filter(q => activeCats.has(q.kategorieId));
+  if (!pool.length) pool = allQuestions;
+  if (!pool.length) { errEl.textContent = 'Keine Fragen verfügbar!'; submittingShot = false; return; }
+  const q = pool[Math.floor(Math.random() * pool.length)];
+
+  // liveQuestion setzen
+  const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
+  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.liveQuestion = {
+    id: `lq-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    teamIdx: myTeamId,
+    coordinate: coord,
+    question: q,
+    selectedMcIndex: null,
+    autoCorrect: null,
+    shotGranted: null,
+    resolved: false
+  };
+  remoteState = ns;
+  await BsStorage.save(ns);
+
+  input.value = '';
+  document.getElementById('shot-panel').classList.add('hidden');
+  showQuestionOverlay(ns.liveQuestion);
+  submittingShot = false;
+}
+window.fireShot = fireShot;
+
+// ── Fragen-Overlay ────────────────────────────────────────────────
+function showQuestionOverlay(lq) {
+  const overlay = document.getElementById('q-overlay');
+  document.getElementById('q-coord').textContent = lq.coordinate;
+  document.getElementById('q-text').textContent = lq.question.question || '';
+
+  const hint = document.getElementById('q-hint');
+  if (lq.question.hint) { hint.textContent = `💡 ${lq.question.hint}`; hint.style.display = ''; }
+  else hint.style.display = 'none';
+
+  const result = document.getElementById('q-result');
+  result.style.display = 'none';
+
+  const isMC = lq.question.type === 'mc' || lq.question.type === 'multiple_choice';
+  const mcOpts = document.getElementById('q-mc-opts');
+  const openWait = document.getElementById('q-open-wait');
+
+  if (isMC && lq.autoCorrect === null) {
+    // MC: noch nicht beantwortet
+    openWait.classList.add('hidden');
+    mcOpts.innerHTML = (lq.question.options||[]).map((opt, i) =>
+      `<button class="mc-opt" onclick="submitMCAnswer(${i})">${escapeHtml(opt)}</button>`
+    ).join('');
+  } else if (isMC && lq.autoCorrect !== null) {
+    // MC: bereits beantwortet, zeige Ergebnis
+    openWait.classList.add('hidden');
+    renderMCResult(lq, mcOpts, result);
+  } else {
+    // Offene Frage
+    mcOpts.innerHTML = '';
+    openWait.classList.remove('hidden');
+  }
+
+  overlay.classList.remove('hidden');
+}
+
+function renderMCResult(lq, mcOpts, result) {
+  mcOpts.innerHTML = (lq.question.options||[]).map((opt, i) => {
+    let cls = 'mc-opt';
+    if (i === lq.question.correctIndex) cls += ' opt-correct';
+    else if (i === lq.selectedMcIndex && !lq.autoCorrect) cls += ' opt-wrong';
+    return `<button class="${cls}" disabled>${escapeHtml(opt)}</button>`;
+  }).join('');
+  result.style.display = '';
+  if (lq.autoCorrect) {
+    result.textContent = '✓ Richtig! Warte auf Spielleiter…';
+    result.className = 'q-result correct';
+  } else {
+    result.textContent = '✗ Falsch — kein Schuss';
+    result.className = 'q-result wrong';
+  }
+}
+
+async function submitMCAnswer(idx) {
+  if (!remoteState || !remoteState.liveQuestion) return;
+  const lq = remoteState.liveQuestion;
+  if (lq.selectedMcIndex !== null) return;
+
+  const correct = idx === lq.question.correctIndex;
+  const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
+  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.liveQuestion.selectedMcIndex = idx;
+  ns.liveQuestion.autoCorrect = correct;
+  remoteState = ns;
+  await BsStorage.save(ns);
+
+  const mcOpts = document.getElementById('q-mc-opts');
+  const result = document.getElementById('q-result');
+  renderMCResult(ns.liveQuestion, mcOpts, result);
+}
+window.submitMCAnswer = submitMCAnswer;
+
+// ── Init ──────────────────────────────────────────────────────────
+(async function init() {
+  applyTheme();
+  const qData = await loadQuestions();
+  allQuestions = flattenQuestions(qData.categories || []);
+
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) {
+    document.getElementById('join-code-input').value = urlCode;
+    await doJoin();
+  }
+})();
+</script>
+
+<!-- ── Theme ─────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  const KEY = 'spiele_theme';
+  function applyTheme() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    document.body.classList.toggle('light', !isDark);
+    const btn = document.getElementById('view-theme-btn');
+    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  }
+  window.applyTheme = applyTheme;
+  window.toggleTheme = function() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    localStorage.setItem(KEY, isDark ? 'light' : 'dark');
+    applyTheme();
+  };
+  applyTheme();
+})();
+</script>
+</body>
+</html>

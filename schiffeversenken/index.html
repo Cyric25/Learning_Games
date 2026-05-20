@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schiffeversenken-Quiz</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+
+<!-- ── Spielwähler ────────────────────────────────────────────────── -->
+<div class="screen active" id="game-selector">
+  <div class="gs-container">
+    <div class="gs-header">
+      <div class="gs-title">⚓ Schiffeversenken-Quiz</div>
+      <div style="display:flex;gap:8px;">
+        <a href="../spiele.html" class="header-btn">← Übersicht</a>
+        <button class="header-btn" id="btn-theme-gs" onclick="toggleTheme()">☀️ Light</button>
+      </div>
+    </div>
+    <div class="gs-body">
+      <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
+      <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
+      <div class="gs-join-row">
+        <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+          onkeydown="if(event.key==='Enter')joinAsStudent()">
+        <button class="btn-join-student" onclick="joinAsStudent()">Beitreten →</button>
+      </div>
+      <div class="gs-join-error" id="gs-join-error"></div>
+      <hr class="gs-divider">
+      <h2 class="gs-section-title">Als Lehrkraft</h2>
+      <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+      <div id="gs-game-list" class="gs-game-list"></div>
+      <div style="margin-top:1.2rem;">
+        <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Setup Screen ───────────────────────────────────────────────── -->
+<div class="screen screen-center" id="setup-screen">
+  <div class="setup-header">
+    <div class="setup-h1">⚓ Schiffeversenken-Quiz</div>
+    <div style="display:flex;gap:8px;">
+      <button class="header-btn" onclick="resetToSelector()">← Spielwähler</button>
+      <button class="header-btn" id="btn-theme-setup" onclick="toggleTheme()">☀️ Light</button>
+    </div>
+  </div>
+
+  <!-- Code Banner -->
+  <div id="setup-code-banner" class="setup-code-banner" style="display:none;width:100%;max-width:680px;">
+    <span>Spielcode:</span>
+    <span class="setup-code-val" onclick="copyCode(this)" id="setup-code-value"></span>
+    <span style="font-size:.75rem;margin-left:.4rem;">(klicken zum Kopieren)</span>
+  </div>
+
+  <!-- Spieltitel -->
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">📝 Spieltitel</div>
+    <input type="text" id="setup-game-title" class="title-input" placeholder="z.B. 3BT – Kapitel 5" maxlength="60">
+  </div>
+
+  <!-- Teams -->
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">👥 Teams (2–4)</div>
+    <div id="team-setup-list"></div>
+    <button class="btn-add-team" id="btn-add-team" onclick="addTeam()">+ Team hinzufügen</button>
+  </div>
+
+  <!-- Kategorien -->
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">📚 Kategorien</div>
+    <div class="cat-toggle-btns">
+      <button class="btn-cat-toggle" onclick="toggleAllCats(true)">Alle</button>
+      <button class="btn-cat-toggle" onclick="toggleAllCats(false)">Keine</button>
+    </div>
+    <div id="cat-select-list" class="cat-select-list">
+      <div style="color:var(--text-secondary);font-style:italic;font-size:.9rem;">Lade Kategorien…</div>
+    </div>
+    <div id="cat-select-info" class="cat-select-info"></div>
+  </div>
+
+  <!-- Start -->
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;padding-bottom:2rem;">
+    <button class="btn-primary" id="btn-start-game" onclick="startGame()">🚢 Spiel starten</button>
+  </div>
+</div>
+
+<!-- ── Game Screen (Spielleiteransicht) ──────────────────────────── -->
+<div class="screen screen-full" id="game-screen">
+  <div class="game-left">
+    <div class="game-topbar">
+      <div class="game-topbar-title" id="game-topbar-title">⚓ Schiffeversenken</div>
+      <div class="topbar-btns">
+        <a href="board.html" target="_blank" id="board-link" class="header-btn">📺 Tafelansicht</a>
+        <button class="header-btn" onclick="resetToSelector()">← Spielwähler</button>
+        <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">☀️ Light</button>
+      </div>
+    </div>
+    <div class="turn-banner" id="turn-banner">Lade Spielstand…</div>
+    <div class="grid-wrapper">
+      <div id="sl-grid" class="grid-outer"></div>
+    </div>
+  </div>
+
+  <div class="game-right">
+    <div>
+      <div class="sidebar-section-title">Teams</div>
+      <div id="team-status-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+    </div>
+    <div style="margin-top:auto;padding-top:.5rem;border-top:1px solid var(--border);">
+      <button class="btn-secondary" style="width:100%;" onclick="confirmEndGame()">🏳 Spiel beenden</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fragen-Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="question-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-team-dot" id="modal-team-dot"></div>
+      <div>
+        <div id="modal-team-name" style="font-weight:700;"></div>
+        <div class="modal-subtitle">schießt auf <span class="modal-coord" id="modal-coord"></span></div>
+      </div>
+    </div>
+    <div class="modal-question-text" id="modal-question"></div>
+    <div id="modal-mc-options" class="mc-options"></div>
+    <div id="modal-hint" class="hint-text" style="display:none;"></div>
+    <div id="modal-result" class="modal-result-banner hidden"></div>
+    <div class="modal-btns" id="modal-btns"></div>
+  </div>
+</div>
+
+<!-- ── Sieger Screen ──────────────────────────────────────────────── -->
+<div class="screen screen-center" id="winner-screen">
+  <div class="winner-trophy">🏆</div>
+  <div class="winner-title">Sieger!</div>
+  <div id="winner-badge" class="winner-team-badge"></div>
+  <div class="winner-sub">Alle anderen Teams wurden versenkt.</div>
+  <button class="btn-primary" onclick="resetToSelector()" style="margin-top:1rem;">Neues Spiel</button>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+// ── Konstanten ────────────────────────────────────────────────────
+const TEAM_COLORS  = ['#3b82f6','#ef4444','#22c55e','#f59e0b'];
+const TEAM_EMOJIS  = ['🔵','🔴','🟢','🟡'];
+const COLS = ['A','B','C','D','E','F','G','H','I','J'];
+const CAT_ICONS = ['📚','🔬','🌍','⚡','🎯','🏛️','🧮','🌿','⚗️','🎨','💡','🦁','🎵','🏔️','🌊'];
+
+// ── State ─────────────────────────────────────────────────────────
+let gameState = null;
+let rawCategories = [];
+let allQuestions  = [];
+let selectedCategoryIds = new Set();
+let bsSub = null;
+let processingShot = false;
+
+// ── Hilfsfunktionen ───────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function copyCode(el) {
+  if (!el) return;
+  const code = el.textContent.trim();
+  navigator.clipboard.writeText(code).then(() => {
+    const orig = el.textContent; el.textContent = '✓ Kopiert!';
+    setTimeout(() => { el.textContent = orig; }, 1200);
+  }).catch(() => {});
+}
+window.copyCode = copyCode;
+
+function coordKey(col, row) { return `${col}${row}`; }
+function parseCoord(key) { return { col: key[0], row: parseInt(key.slice(1)) }; }
+
+// ── Fragen laden ──────────────────────────────────────────────────
+async function loadQuestions() {
+  try { const r = await fetch('../api.php?f=questions'); if (r.ok) { const d = await r.json(); if (d && d.categories) return d; } } catch {}
+  try { const r = await fetch('../data/questions.json'); if (r.ok) { const d = await r.json(); if (d && d.categories) return d; } } catch {}
+  const cached = localStorage.getItem('rq_questions');
+  return cached ? JSON.parse(cached) : { categories: [] };
+}
+
+function flattenQuestions(cats) {
+  const result = [];
+  function walk(cat, ancestorId) {
+    const subs = cat.subcategories || [];
+    const hasQ  = (cat.questions || []).length > 0;
+    const isLeaf = !subs.length;
+    if (hasQ && isLeaf) {
+      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id }));
+      return;
+    }
+    subs.forEach(s => walk(s, cat.id));
+    if (hasQ && !isLeaf) {
+      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id }));
+    }
+  }
+  cats.forEach(c => walk(c, null));
+  return result;
+}
+
+// ── Kategorie-Selektor ────────────────────────────────────────────
+function buildCategoryUI() {
+  if (!rawCategories.length) {
+    document.getElementById('cat-select-list').innerHTML =
+      '<div style="color:var(--text-secondary);font-style:italic;font-size:.9rem;">Keine Kategorien gefunden. Bitte zuerst Fragen im Admin anlegen.</div>';
+    return;
+  }
+  const list = document.getElementById('cat-select-list');
+  list.innerHTML = '';
+  selectedCategoryIds.clear();
+  function collectLeaves(cat) {
+    if ((cat.questions||[]).length > 0) return [cat.id];
+    return (cat.subcategories||[]).flatMap(s => collectLeaves(s));
+  }
+  rawCategories.forEach(cat => collectLeaves(cat).forEach(id => selectedCategoryIds.add(id)));
+
+  function countLeafQ(cat) {
+    const subs = cat.subcategories || [];
+    if ((cat.questions||[]).length > 0 && !subs.length) return (cat.questions||[]).length;
+    return subs.reduce((n,s) => n + countLeafQ(s), 0) + ((cat.questions||[]).length > 0 && subs.length ? (cat.questions||[]).length : 0);
+  }
+
+  rawCategories.forEach((cat, i) => {
+    _buildCatNode(list, cat, CAT_ICONS[i % CAT_ICONS.length]);
+  });
+  updateCatInfo();
+}
+
+function _buildCatNode(container, cat, icon, depth) {
+  depth = depth || 0;
+  const subs = cat.subcategories || [];
+  const hasQ = (cat.questions||[]).length > 0;
+  if (!hasQ && !subs.length) return;
+
+  function countLeafQ(c) {
+    const ss = c.subcategories || [];
+    if ((c.questions||[]).length > 0 && !ss.length) return (c.questions||[]).length;
+    return ss.reduce((n,s) => n + countLeafQ(s), 0) + ((c.questions||[]).length > 0 && ss.length ? (c.questions||[]).length : 0);
+  }
+  const qCount = countLeafQ(cat);
+
+  if (hasQ && !subs.length) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const item = document.createElement('div');
+    item.className = 'cat-select-item' + (sel ? ' selected' : '');
+    item.dataset.catId = cat.id;
+    item.innerHTML =
+      `<span class="cat-select-icon">${icon || '📁'}</span>` +
+      `<span class="cat-select-name">${escapeHtml(cat.name)}</span>` +
+      `<span class="cat-select-count">${qCount} Fr.</span>` +
+      `<div class="cat-select-check">${sel ? '✓' : ''}</div>`;
+    item.onclick = () => {
+      const on = !selectedCategoryIds.has(cat.id);
+      if (on) selectedCategoryIds.add(cat.id); else selectedCategoryIds.delete(cat.id);
+      item.classList.toggle('selected', on);
+      item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+      updateCatInfo();
+    };
+    container.appendChild(item);
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cat-group-wrap';
+  wrap.innerHTML =
+    `<div class="cat-group-header">` +
+    `<span class="cat-group-icon">${icon || '📁'}</span>` +
+    `<span class="cat-group-name">${escapeHtml(cat.name)}</span>` +
+    `<span class="cat-group-count">${qCount} Fr.</span>` +
+    `<span class="cat-group-toggle">▼</span>` +
+    `</div>` +
+    `<div class="cat-group-children"></div>`;
+  wrap.querySelector('.cat-group-header').onclick = () => wrap.classList.toggle('open');
+  const children = wrap.querySelector('.cat-group-children');
+  subs.forEach(s => _buildCatNode(children, s, '📄', depth+1));
+  if (hasQ && subs.length) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const leafItem = document.createElement('div');
+    leafItem.className = 'cat-select-item' + (sel ? ' selected' : '');
+    leafItem.dataset.catId = cat.id;
+    leafItem.innerHTML =
+      `<span class="cat-select-icon">📄</span>` +
+      `<span class="cat-select-name">${escapeHtml(cat.name)} (direkt)</span>` +
+      `<span class="cat-select-count">${(cat.questions||[]).length} Fr.</span>` +
+      `<div class="cat-select-check">${sel ? '✓' : ''}</div>`;
+    leafItem.onclick = () => {
+      const on = !selectedCategoryIds.has(cat.id);
+      if (on) selectedCategoryIds.add(cat.id); else selectedCategoryIds.delete(cat.id);
+      leafItem.classList.toggle('selected', on);
+      leafItem.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+      updateCatInfo();
+    };
+    children.appendChild(leafItem);
+  }
+  container.appendChild(wrap);
+}
+
+function updateCatInfo() {
+  const activeQ = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  const info = document.getElementById('cat-select-info');
+  if (!info) return;
+  if (activeQ.length === 0) {
+    info.textContent = '⚠ Keine Fragen ausgewählt — bitte mindestens eine Kategorie wählen.';
+    info.className = 'cat-select-info warn';
+  } else {
+    info.textContent = `${activeQ.length} Fragen aus ${selectedCategoryIds.size} Kategorie(n)`;
+    info.className = 'cat-select-info';
+  }
+}
+
+function toggleAllCats(on) {
+  function collectLeaves(cat) {
+    if ((cat.questions||[]).length > 0) return [cat.id];
+    return (cat.subcategories||[]).flatMap(s => collectLeaves(s));
+  }
+  if (on) {
+    rawCategories.forEach(c => collectLeaves(c).forEach(id => selectedCategoryIds.add(id)));
+  } else {
+    selectedCategoryIds.clear();
+  }
+  buildCategoryUI();
+}
+window.toggleAllCats = toggleAllCats;
+
+// ── Team Setup ────────────────────────────────────────────────────
+const DEFAULT_TEAMS = [
+  { name: 'Team Blau', color: TEAM_COLORS[0], emoji: TEAM_EMOJIS[0] },
+  { name: 'Team Rot',  color: TEAM_COLORS[1], emoji: TEAM_EMOJIS[1] }
+];
+let setupTeams = DEFAULT_TEAMS.map((t, i) => ({ ...t, id: i }));
+
+function renderTeamSetupList() {
+  const list = document.getElementById('team-setup-list');
+  list.innerHTML = '';
+  setupTeams.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'team-setup-row';
+    row.innerHTML =
+      `<div class="team-color-dot" style="background:${t.color}"></div>` +
+      `<span style="font-size:1.2rem;">${t.emoji}</span>` +
+      `<input type="text" class="team-name-input" value="${escapeHtml(t.name)}" maxlength="30" ` +
+        `oninput="setupTeams[${i}].name=this.value">` +
+      (setupTeams.length > 2
+        ? `<button class="btn-remove-team" onclick="removeTeam(${i})">✕</button>`
+        : '');
+    list.appendChild(row);
+  });
+  document.getElementById('btn-add-team').style.display = setupTeams.length >= 4 ? 'none' : '';
+}
+
+function addTeam() {
+  if (setupTeams.length >= 4) return;
+  const i = setupTeams.length;
+  setupTeams.push({ id: i, name: `Team ${['Grün','Gelb'][i-2]||('Team '+(i+1))}`, color: TEAM_COLORS[i], emoji: TEAM_EMOJIS[i] });
+  renderTeamSetupList();
+}
+window.addTeam = addTeam;
+
+function removeTeam(i) {
+  if (setupTeams.length <= 2) return;
+  setupTeams.splice(i, 1);
+  setupTeams.forEach((t, idx) => { t.id = idx; });
+  renderTeamSetupList();
+}
+window.removeTeam = removeTeam;
+
+// ── Schiff-Platzierung ────────────────────────────────────────────
+function placeShipsForAllTeams(teams) {
+  const occupied = new Set();
+  teams.forEach(team => {
+    team.ships = [];
+    [6, 4, 2].forEach(size => {
+      let placed = false, tries = 0;
+      while (!placed && tries < 500) {
+        tries++;
+        const horiz = Math.random() > 0.5;
+        const maxColIdx = horiz ? (10 - size) : 9;
+        const maxRowIdx = horiz ? 9 : (10 - size);
+        const startCol = Math.floor(Math.random() * (maxColIdx + 1));
+        const startRow = Math.floor(Math.random() * (maxRowIdx + 1));
+        const coords = Array.from({length: size}, (_, k) => {
+          const c = COLS[startCol + (horiz ? k : 0)];
+          const r = startRow + 1 + (horiz ? 0 : k);
+          return `${c}${r}`;
+        });
+        if (coords.every(c => !occupied.has(c))) {
+          coords.forEach(c => occupied.add(c));
+          team.ships.push({ id: `s${team.id}-${size}`, size, coords, sunk: false });
+          placed = true;
+        }
+      }
+    });
+  });
+}
+
+// ── Spielstart ────────────────────────────────────────────────────
+async function startGame() {
+  const activeQ = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  if (activeQ.length === 0) { alert('Bitte mindestens eine Kategorie mit Fragen wählen!'); return; }
+  if (setupTeams.length < 2) { alert('Mindestens 2 Teams benötigt!'); return; }
+
+  const teams = setupTeams.map((t, i) => ({
+    id: i, name: t.name, color: t.color, emoji: t.emoji,
+    ships: [], eliminated: false
+  }));
+  placeShipsForAllTeams(teams);
+
+  const grid = {};
+  teams.forEach(t => {
+    t.ships.forEach(ship => {
+      ship.coords.forEach(coord => {
+        grid[coord] = { shipTeamIdx: t.id, shotByTeamIdx: null };
+      });
+    });
+  });
+
+  const title = document.getElementById('setup-game-title').value.trim() || 'Schiffeversenken';
+  gameState = {
+    meta: { gameCode: BsStorage.getCode(), title, createdAt: new Date().toISOString() },
+    phase: 'playing',
+    teams,
+    takenTeams: [],
+    grid,
+    turnOrder: teams.map(t => t.id),
+    currentTurnIndex: 0,
+    liveQuestion: null,
+    winner: null,
+    activeCategoryIds: [...selectedCategoryIds],
+    usedQuestionIds: new Set()
+  };
+
+  await BsStorage.save(gameState);
+  enterGameScreen();
+}
+window.startGame = startGame;
+
+// ── Game Screen betreten ──────────────────────────────────────────
+function enterGameScreen() {
+  showScreen('game-screen');
+  showCodeBanner();
+  const link = document.getElementById('board-link');
+  if (link) link.href = `board.html?code=${BsStorage.getCode()}`;
+  renderGame();
+  startSSE();
+}
+
+function renderGame() {
+  if (!gameState) return;
+  renderTurnBanner();
+  renderSLGrid();
+  renderTeamStatusList();
+  document.getElementById('game-topbar-title').textContent =
+    `⚓ ${gameState.meta.title||'Schiffeversenken'}`;
+}
+
+// ── Turn Banner ───────────────────────────────────────────────────
+function renderTurnBanner() {
+  const banner = document.getElementById('turn-banner');
+  if (!banner || !gameState) return;
+  if (gameState.phase === 'finished') {
+    banner.textContent = '🏁 Spiel beendet';
+    banner.className = 'turn-banner';
+    return;
+  }
+  if (gameState.liveQuestion) {
+    const t = gameState.teams[gameState.liveQuestion.teamIdx];
+    const coord = gameState.liveQuestion.coordinate;
+    banner.innerHTML = `${t.emoji} <strong>${escapeHtml(t.name)}</strong> schießt auf <strong>${coord}</strong>`;
+    banner.className = 'turn-banner active-turn';
+  } else {
+    const alive = gameState.turnOrder.filter(i => !gameState.teams[i].eliminated);
+    if (!alive.length) { banner.textContent = '—'; return; }
+    const idx = gameState.currentTurnIndex % alive.length;
+    const currentId = alive[idx];
+    const t = gameState.teams[currentId];
+    banner.innerHTML = `${t.emoji} <strong>${escapeHtml(t.name)}</strong> ist dran`;
+    banner.className = 'turn-banner active-turn';
+  }
+}
+
+// ── Spielleiter-Grid (alle Schiffe sichtbar) ──────────────────────
+function renderSLGrid() {
+  const container = document.getElementById('sl-grid');
+  if (!container || !gameState) return;
+  container.innerHTML = '';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'grid-row';
+  headerRow.appendChild(makeHeaderCell(''));
+  COLS.forEach(c => headerRow.appendChild(makeHeaderCell(c)));
+  container.appendChild(headerRow);
+
+  for (let row = 1; row <= 10; row++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'grid-row';
+    rowEl.appendChild(makeHeaderCell(String(row)));
+    COLS.forEach(col => {
+      rowEl.appendChild(makeSLCell(col, row));
+    });
+    container.appendChild(rowEl);
+  }
+}
+
+function makeHeaderCell(text) {
+  const el = document.createElement('div');
+  el.className = 'grid-cell-header';
+  el.textContent = text;
+  return el;
+}
+
+function makeSLCell(col, row) {
+  const key = `${col}${row}`;
+  const cell = document.createElement('div');
+  cell.className = 'grid-cell';
+  const entry = gameState.grid[key];
+
+  if (entry) {
+    const wasShot = entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    const hasShip = entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
+    const shipTeam = hasShip ? gameState.teams[entry.shipTeamIdx] : null;
+    const shotTeam = wasShot ? gameState.teams[entry.shotByTeamIdx] : null;
+
+    if (wasShot && hasShip) {
+      // Treffer: Schiff-Teamfarbe
+      const isSunk = shipTeam && shipTeam.ships.every(s =>
+        !s.coords.includes(key) || s.sunk
+      );
+      cell.style.background = shipTeam.color;
+      cell.style.opacity = isSunk ? '0.55' : '1';
+      if (isSunk) cell.classList.add('sunk-ship');
+      cell.classList.add('ship-hit');
+      cell.title = `Treffer! ${shipTeam.emoji} ${shipTeam.name} (von ${shotTeam?.emoji||''})`;
+    } else if (wasShot && !hasShip) {
+      // Miss: kleiner Kreis in Schützenfarbe
+      cell.classList.add('miss');
+      cell.querySelector ? null : null;
+      cell.style.setProperty('color', shotTeam?.color || '#888');
+      cell.title = `Miss (${shotTeam?.emoji||''} ${shotTeam?.name||''})`;
+    } else if (!wasShot && hasShip) {
+      // Ungetroffenes Schiff: gedimmt in Teamfarbe
+      cell.style.background = shipTeam.color;
+      cell.style.opacity = '0.35';
+      cell.classList.add('ship-intact');
+      cell.title = `${shipTeam.emoji} ${shipTeam.name}`;
+    }
+  }
+
+  // Aktive Koordinate hervorheben
+  if (gameState.liveQuestion && gameState.liveQuestion.coordinate === key) {
+    cell.style.outline = '2px solid var(--accent)';
+    cell.style.outlineOffset = '1px';
+  }
+
+  return cell;
+}
+
+// ── Team-Status Sidebar ───────────────────────────────────────────
+function renderTeamStatusList() {
+  const list = document.getElementById('team-status-list');
+  if (!list || !gameState) return;
+  list.innerHTML = '';
+
+  const alive = gameState.turnOrder.filter(i => !gameState.teams[i].eliminated);
+  const idx = gameState.currentTurnIndex % Math.max(alive.length, 1);
+  const currentId = alive[idx];
+
+  gameState.teams.forEach(team => {
+    const card = document.createElement('div');
+    const isCurrent = !gameState.liveQuestion && team.id === currentId && !team.eliminated;
+    const isTaken = (gameState.takenTeams||[]).includes(team.id);
+    card.className = 'team-status-card' +
+      (isCurrent ? ' current-turn' : '') +
+      (team.eliminated ? ' eliminated' : '');
+
+    const connDot = isTaken ? '<span class="team-conn-dot">●</span>' : '';
+    const kickBtn = isTaken
+      ? `<button class="team-status-kick" title="Team freigeben" onclick="kickTeam(${team.id})">✕</button>`
+      : '';
+
+    card.innerHTML =
+      `<div class="team-status-header">` +
+      `<div class="team-status-dot" style="background:${team.color}"></div>` +
+      `<span class="team-status-name">${connDot}${escapeHtml(team.name)}</span>` +
+      (team.eliminated ? '<span class="team-elim-badge">Versenkt</span>' : '') +
+      kickBtn +
+      `</div>` +
+      `<div class="team-ships-row">${renderShipBadges(team)}</div>`;
+    list.appendChild(card);
+  });
+}
+
+function renderShipBadges(team) {
+  return team.ships.map(ship => {
+    const cells = ship.coords.map(coord => {
+      const entry = gameState.grid[coord];
+      const hit = entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+      const bg = hit ? (ship.sunk ? 'rgba(231,76,60,.3)' : team.color) : team.color;
+      const opacity = hit ? (ship.sunk ? '0.4' : '1') : '0.35';
+      return `<div class="ship-cell" style="background:${bg};opacity:${opacity};"></div>`;
+    }).join('');
+    return `<div class="ship-badge" title="${ship.size} Felder${ship.sunk?' (versenkt)':''}">${cells}</div>`;
+  }).join('');
+}
+
+// ── Kick Team ─────────────────────────────────────────────────────
+async function kickTeam(teamId) {
+  if (!gameState) return;
+  const ns = JSON.parse(JSON.stringify(gameState, (k, v) => v instanceof Set ? [...v] : v));
+  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.takenTeams = (ns.takenTeams||[]).filter(id => id !== teamId);
+  gameState = ns;
+  await BsStorage.save(gameState);
+  renderTeamStatusList();
+}
+window.kickTeam = kickTeam;
+
+// ── SSE / Spielstand-Updates ──────────────────────────────────────
+function startSSE() {
+  if (bsSub) bsSub.unsubscribe();
+  const code = BsStorage.getCode();
+  if (!code) return;
+  bsSub = BsStorage.subscribe(code, onStateUpdate);
+}
+
+function onStateUpdate(newState) {
+  if (!newState || !newState.meta) return;
+  if (!gameState) return;
+
+  const prevLQ = gameState.liveQuestion;
+  gameState = newState;
+
+  renderTeamStatusList();
+  renderTurnBanner();
+  renderSLGrid();
+
+  if (newState.phase === 'finished' && newState.winner !== null) {
+    showWinnerScreen(newState.winner);
+    return;
+  }
+
+  const lq = newState.liveQuestion;
+  if (!lq || lq.resolved) {
+    hideQuestionModal();
+    return;
+  }
+
+  // Neue Frage angekommen (von view.html gesetzt)
+  if (lq && !lq.resolved) {
+    const prevId = prevLQ ? prevLQ.id : null;
+    if (lq.id !== prevId || document.getElementById('question-modal').classList.contains('hidden')) {
+      showQuestionModal(lq);
+    } else if (lq.autoCorrect !== null && lq.autoCorrect !== undefined && !processingShot) {
+      // MC: autoCorrect gesetzt von Spieler → zeige Ergebnis im Modal aktuell
+      updateModalForMCResult(lq);
+    }
+  }
+}
+
+// ── Fragen-Modal ──────────────────────────────────────────────────
+function showQuestionModal(lq) {
+  const modal = document.getElementById('question-modal');
+  const team = gameState.teams[lq.teamIdx];
+  document.getElementById('modal-team-dot').style.background = team.color;
+  document.getElementById('modal-team-name').textContent = `${team.emoji} ${team.name}`;
+  document.getElementById('modal-coord').textContent = lq.coordinate;
+  document.getElementById('modal-question').textContent = lq.question.question || '';
+
+  const hint = document.getElementById('modal-hint');
+  if (lq.question.hint) { hint.textContent = `💡 ${lq.question.hint}`; hint.style.display = ''; }
+  else { hint.style.display = 'none'; }
+
+  const opts = document.getElementById('modal-mc-options');
+  const result = document.getElementById('modal-result');
+  const btns = document.getElementById('modal-btns');
+  result.className = 'modal-result-banner hidden';
+  result.textContent = '';
+
+  const isMC = lq.question.type === 'mc' || lq.question.type === 'multiple_choice';
+
+  if (isMC) {
+    // MC-Frage: Antworten anzeigen
+    opts.innerHTML = (lq.question.options||[]).map((opt, i) => {
+      let cls = 'mc-option';
+      if (lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
+        if (i === lq.question.correctIndex) cls += ' correct';
+        else if (i === lq.selectedMcIndex && !lq.autoCorrect) cls += ' wrong';
+      }
+      return `<div class="${cls}">${escapeHtml(opt)}</div>`;
+    }).join('');
+
+    if (lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
+      updateModalForMCResult(lq);
+    } else {
+      btns.innerHTML = '';
+      result.textContent = `Warte auf Antwort von ${team.emoji} ${team.name}…`;
+      result.className = 'modal-result-banner waiting';
+    }
+  } else {
+    // Offene Frage: Spielleiter entscheidet
+    opts.innerHTML = '';
+    if (lq.question.answer) {
+      result.textContent = `Musterlösung: ${lq.question.answer}`;
+      result.className = 'modal-result-banner waiting';
+    } else {
+      result.className = 'modal-result-banner hidden';
+    }
+    btns.innerHTML =
+      `<button class="btn-modal-correct" onclick="resolveOpen(true)">✓ Richtig — Schuss!</button>` +
+      `<button class="btn-modal-wrong" onclick="resolveOpen(false)">✗ Falsch — kein Schuss</button>`;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function updateModalForMCResult(lq) {
+  const result = document.getElementById('modal-result');
+  const btns = document.getElementById('modal-btns');
+  const opts = document.getElementById('modal-mc-options');
+
+  const iQ = lq.question.correctIndex;
+  opts.querySelectorAll('.mc-option').forEach((el, i) => {
+    el.className = 'mc-option' + (i === iQ ? ' correct' : (i === lq.selectedMcIndex && !lq.autoCorrect ? ' wrong' : ''));
+  });
+
+  if (lq.autoCorrect) {
+    const entry = gameState.grid[lq.coordinate];
+    const isHit = entry && entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
+    result.textContent = isHit ? '💥 Richtig! Treffer!' : '✓ Richtig! — Aber Wasser...';
+    result.className = 'modal-result-banner hit';
+  } else {
+    result.textContent = '✗ Falsch — kein Schuss!';
+    result.className = 'modal-result-banner miss';
+  }
+  btns.innerHTML = `<button class="btn-modal-next" onclick="processMCResult()">Weiter →</button>`;
+}
+
+function hideQuestionModal() {
+  document.getElementById('question-modal').classList.add('hidden');
+}
+
+async function resolveOpen(correct) {
+  if (!gameState || !gameState.liveQuestion || processingShot) return;
+  processingShot = true;
+  const lq = gameState.liveQuestion;
+  const ns = deepCopy(gameState);
+  ns.liveQuestion.shotGranted = correct;
+  ns.liveQuestion.resolved = true;
+  gameState = ns;
+  await BsStorage.save(gameState);
+  await processShot(correct);
+}
+window.resolveOpen = resolveOpen;
+
+async function processMCResult() {
+  if (!gameState || !gameState.liveQuestion || processingShot) return;
+  const correct = gameState.liveQuestion.autoCorrect;
+  processingShot = true;
+  const ns = deepCopy(gameState);
+  ns.liveQuestion.resolved = true;
+  ns.liveQuestion.shotGranted = correct;
+  gameState = ns;
+  await processShot(correct);
+}
+window.processMCResult = processMCResult;
+
+async function processShot(correct) {
+  hideQuestionModal();
+  if (!gameState || !gameState.liveQuestion) { processingShot = false; return; }
+  const lq = gameState.liveQuestion;
+  const ns = deepCopy(gameState);
+
+  if (correct) {
+    // Schuss eintragen
+    const entry = ns.grid[lq.coordinate] || {};
+    entry.shotByTeamIdx = lq.teamIdx;
+    ns.grid[lq.coordinate] = entry;
+
+    // Treffer-Check: Schiff updaten
+    if (entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined) {
+      const victimTeam = ns.teams[entry.shipTeamIdx];
+      victimTeam.ships.forEach(ship => {
+        if (ship.coords.includes(lq.coordinate)) {
+          // Prüfen ob versenkt: alle coords dieses Schiffs beschossen?
+          const sunk = ship.coords.every(c => {
+            const e = ns.grid[c];
+            return e && e.shotByTeamIdx !== null && e.shotByTeamIdx !== undefined;
+          });
+          if (sunk) ship.sunk = true;
+        }
+      });
+      // Team eliminiert wenn alle Schiffe versenkt
+      const allSunk = victimTeam.ships.every(s => s.sunk);
+      if (allSunk) {
+        victimTeam.eliminated = true;
+        ns.turnOrder = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+      }
+    }
+  }
+  // Bei falscher Antwort: kein Schuss → Koordinate bleibt unbeschossen
+
+  // Frage als genutzt markieren
+  ns.usedQuestionIds.add(lq.question.id);
+
+  // Nächste Runde
+  ns.liveQuestion = null;
+  const aliveSorted = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+
+  // Win-Check
+  if (aliveSorted.length <= 1) {
+    ns.phase = 'finished';
+    ns.winner = aliveSorted.length === 1 ? aliveSorted[0] : null;
+    gameState = ns;
+    await BsStorage.save(gameState);
+    renderGame();
+    if (ns.winner !== null) showWinnerScreen(ns.winner);
+    processingShot = false;
+    return;
+  }
+
+  // currentTurnIndex: nächstes Team in turnOrder
+  const prevTeamId = lq.teamIdx;
+  const prevIdxInOrder = aliveSorted.indexOf(prevTeamId);
+  ns.currentTurnIndex = (prevIdxInOrder + 1) % aliveSorted.length;
+
+  gameState = ns;
+  await BsStorage.save(gameState);
+  renderGame();
+  processingShot = false;
+}
+
+function deepCopy(obj) {
+  return JSON.parse(JSON.stringify(obj, (k, v) => v instanceof Set ? [...v] : v),
+    (k, v) => (k === 'usedQuestionIds' ? new Set(v) : v));
+}
+
+// ── Sieger ────────────────────────────────────────────────────────
+function showWinnerScreen(winnerId) {
+  const team = gameState.teams[winnerId];
+  const badge = document.getElementById('winner-badge');
+  badge.style.color = team.color;
+  badge.style.borderColor = team.color;
+  badge.style.background = team.color + '18';
+  badge.innerHTML = `${team.emoji} <span>${escapeHtml(team.name)}</span>`;
+  showScreen('winner-screen');
+}
+
+function confirmEndGame() {
+  if (!confirm('Spiel wirklich beenden?')) return;
+  if (gameState) {
+    const ns = deepCopy(gameState);
+    ns.phase = 'finished';
+    gameState = ns;
+    BsStorage.save(gameState);
+  }
+  resetToSelector();
+}
+window.confirmEndGame = confirmEndGame;
+
+// ── Spielwähler JS (gs- Pattern) ──────────────────────────────────
+async function showGameSelector() {
+  showScreen('game-selector');
+  const list = document.getElementById('gs-game-list');
+  list.innerHTML = '<p class="gs-empty">Lade Spiele…</p>';
+  const registry = await BsStorage.loadGamesRegistry();
+  const entries = Object.entries(registry);
+  if (!entries.length) { list.innerHTML = '<p class="gs-empty">Noch keine Spiele vorhanden.</p>'; return; }
+  entries.sort((a,b) => (b[1].updatedAt||'').localeCompare(a[1].updatedAt||''));
+  list.innerHTML = entries.map(([code, info]) => {
+    const sl = { playing:'🟢 Läuft', finished:'🏁 Beendet' }[info.status] || '⚙ Setup';
+    const date = info.updatedAt
+      ? new Date(info.updatedAt).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : '';
+    const ts = info.updatedAt || info.createdAt;
+    let exp = '';
+    if (ts) { const rem = 24*3600000-(Date.now()-new Date(ts).getTime()); if(rem>0){const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000);exp=` · ${h}h ${m}m übrig`;} }
+    return `<div class="gs-game-card" onclick="window._gsEnter('${code}')">
+      <div class="gs-game-code">${code}</div>
+      <div class="gs-game-info"><div class="gs-game-title">${escapeHtml(info.title||'Spiel')}</div>
+      <div class="gs-game-meta">${sl} · ${date}${exp}</div></div>
+      <div class="gs-game-actions">
+        <button class="gs-btn-delete" onclick="event.stopPropagation();window._gsDelete('${code}')">✕</button>
+      </div></div>`;
+  }).join('');
+}
+
+function joinAsStudent() {
+  const input = document.getElementById('gs-code-input');
+  const errEl = document.getElementById('gs-join-error');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (errEl) errEl.textContent = '';
+  if (!code || code.length < 4) { if (errEl) errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+  window.location.href = 'view.html?code=' + code;
+}
+window.joinAsStudent = joinAsStudent;
+
+async function createNewGame() {
+  const code = BsStorage.generateCode();
+  BsStorage.setCode(code);
+  await BsStorage.save({
+    meta: { gameCode: code, title: 'Schiffeversenken', createdAt: new Date().toISOString() },
+    phase: 'setup', teams: [], takenTeams: [], grid: {},
+    turnOrder: [], currentTurnIndex: 0,
+    liveQuestion: null, winner: null,
+    activeCategoryIds: [], usedQuestionIds: new Set()
+  });
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  setupTeams = DEFAULT_TEAMS.map((t, i) => ({ ...t, id: i }));
+  renderTeamSetupList();
+  buildCategoryUI();
+  showScreen('setup-screen');
+  showCodeBannerInline();
+}
+
+async function _gsEnter(code) {
+  BsStorage.setCode(code);
+  const gs = await BsStorage.load(code);
+  if (!gs) { alert('Spiel nicht gefunden.'); showGameSelector(); return; }
+  window.history.replaceState({}, '', 'index.html?code=' + code);
+  gameState = gs;
+  if (gs.phase === 'playing' || gs.phase === 'finished') {
+    if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    enterGameScreen();
+    if (gs.phase === 'finished' && gs.winner !== null) showWinnerScreen(gs.winner);
+  } else {
+    setupTeams = gs.teams && gs.teams.length
+      ? gs.teams.map((t,i) => ({ id: i, name: t.name, color: t.color||TEAM_COLORS[i], emoji: t.emoji||TEAM_EMOJIS[i] }))
+      : DEFAULT_TEAMS.map((t, i) => ({ ...t, id: i }));
+    if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    renderTeamSetupList();
+    buildCategoryUI();
+    showScreen('setup-screen');
+    showCodeBannerInline();
+  }
+}
+async function _gsDelete(code) {
+  if (!confirm('Spiel ' + code + ' wirklich löschen?')) return;
+  await BsStorage.deleteGame(code);
+  showGameSelector();
+}
+window._gsEnter  = _gsEnter;
+window._gsDelete = _gsDelete;
+
+// ── Code-Banner ───────────────────────────────────────────────────
+function showCodeBanner() {
+  const code = BsStorage.getCode(); if (!code) return;
+  const existing = document.getElementById('code-banner');
+  if (existing) { existing.querySelector('.code-val').textContent = code; return; }
+  const b = document.createElement('div');
+  b.id = 'code-banner';
+  b.innerHTML =
+    '<span>📱 Schüler:</span>' +
+    `<strong class="code-val" style="font-family:monospace;">${code}</strong>` +
+    `<a href="view.html?code=${code}" target="_blank" style="color:var(--accent);font-size:.8rem;text-decoration:none;">Link ↗</a>`;
+  document.body.appendChild(b);
+}
+function showCodeBannerInline() {
+  const code = BsStorage.getCode(); if (!code) return;
+  const banner = document.getElementById('setup-code-banner');
+  const val = document.getElementById('setup-code-value');
+  if (banner) banner.style.display = '';
+  if (val) val.textContent = code;
+}
+
+function resetToSelector() {
+  if (bsSub) { bsSub.unsubscribe(); bsSub = null; }
+  BsStorage.setCode(null);
+  window.history.replaceState({}, '', 'index.html');
+  const banner = document.getElementById('code-banner');
+  if (banner) banner.remove();
+  gameState = null;
+  showGameSelector();
+}
+window.resetToSelector = resetToSelector;
+
+// ── Init ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  applyTheme();
+  renderTeamSetupList();
+  const qData = await loadQuestions();
+  rawCategories = qData.categories || [];
+  allQuestions  = flattenQuestions(rawCategories);
+  buildCategoryUI();
+
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) await _gsEnter(urlCode.toUpperCase());
+  else showGameSelector();
+});
+</script>
+
+<!-- ── Theme Toggle ──────────────────────────────────────────────── -->
+<script>
+(function() {
+  const KEY = 'spiele_theme';
+  function applyTheme() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    document.body.classList.toggle('light', !isDark);
+    ['btn-theme-gs','btn-theme-setup','btn-theme-game'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+    });
+  }
+  window.applyTheme = applyTheme;
+  window.toggleTheme = function() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    localStorage.setItem(KEY, isDark ? 'light' : 'dark');
+    applyTheme();
+  };
+  applyTheme();
+})();
+</script>
+</body>
+</html>

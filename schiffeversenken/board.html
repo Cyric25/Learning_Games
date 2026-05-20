@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schiffeversenken – Tafelansicht</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+  <style>
+    :root {
+      --bg-primary:   #0d1b2a;
+      --bg-secondary: #1b2d42;
+      --bg-card:      #1e3a5f;
+      --accent:       #4fc3f7;
+      --text:         #e8f4f8;
+      --text-2:       #90caf9;
+      --border:       rgba(79,195,247,0.18);
+      --grid-water:   #0a1628;
+      --shadow:       0 4px 20px rgba(0,0,0,0.5);
+      --success:      #2ecc71;
+      --danger:       #e74c3c;
+    }
+    body.light {
+      --bg-primary:   #e3f2fd;
+      --bg-secondary: #ffffff;
+      --bg-card:      #f0f8ff;
+      --accent:       #0288d1;
+      --text:         #1a237e;
+      --text-2:       #5c6bc0;
+      --border:       rgba(2,136,209,0.2);
+      --grid-water:   #bbdefb;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; font-family: system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--text);
+    }
+
+    /* ── Join Screen ── */
+    #screen-join {
+      min-height: 100vh; display: flex;
+      flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+    .join-card {
+      background: var(--bg-secondary); border-radius: 20px;
+      padding: 2.5rem 2rem; width: 100%; max-width: 400px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .join-card h1 { font-size: 2.5rem; margin-bottom: .5rem; }
+    .join-card h2 { font-size: 1.3rem; margin-bottom: .8rem; color: var(--accent); }
+    .join-card p  { color: var(--text-2); font-size: .9rem; margin-bottom: 1.5rem; }
+    .code-input {
+      width: 100%; padding: 14px; font-size: 2rem; font-weight: 800;
+      letter-spacing: 6px; text-align: center; text-transform: uppercase; font-family: monospace;
+      border: 2px solid var(--border); border-radius: 12px;
+      background: var(--bg-card); color: var(--text); margin-bottom: 1rem; outline: none;
+      transition: border-color .2s;
+    }
+    .code-input:focus { border-color: var(--accent); }
+    .btn-join {
+      width: 100%; padding: 14px; font-size: 1.1rem; font-weight: 700;
+      background: var(--accent); color: #fff; border: none; border-radius: 12px;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .btn-join:hover { opacity: .85; }
+    .join-error { color: var(--danger); font-size: .9rem; margin-top: 10px; min-height: 20px; }
+
+    /* ── Board Layout ── */
+    #screen-board {
+      display: none;
+      height: 100vh; overflow: hidden;
+    }
+    #screen-board.active { display: flex; flex-direction: row; }
+
+    /* Left: Grid */
+    .board-left {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 1rem; gap: .7rem; overflow: hidden;
+    }
+    .board-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .board-title {
+      font-size: clamp(1.1rem,2vw,1.5rem);
+      font-weight: 800; color: var(--accent);
+    }
+    .board-btns { display: flex; gap: .5rem; }
+    .board-btn {
+      background: rgba(79,195,247,.1); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 5px 12px;
+      font-size: .82rem; cursor: pointer; transition: border-color .2s;
+    }
+    .board-btn:hover { border-color: var(--accent); }
+    .turn-info {
+      text-align: center; padding: .5rem 1rem; border-radius: 8px;
+      font-size: .95rem; font-weight: 600; flex-shrink: 0;
+      background: var(--bg-secondary); color: var(--text-2);
+    }
+    .turn-info.active { background: rgba(46,204,113,.1); color: var(--success); }
+    .grid-wrapper {
+      flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+    }
+    .grid-outer { display: inline-flex; flex-direction: column; gap: 2px; }
+    .grid-row    { display: flex; gap: 2px; }
+    .cell-hdr {
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700; color: var(--text-2);
+      flex-shrink: 0;
+    }
+    .grid-cell {
+      border-radius: 4px; border: 1px solid var(--border);
+      background: var(--grid-water);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .65rem; position: relative; flex-shrink: 0; overflow: hidden;
+    }
+    .grid-cell.miss::after { content:'◦'; font-size:1.1rem; font-weight:700; opacity:.9; }
+    .grid-cell.sunk {
+      background-image: repeating-linear-gradient(
+        45deg, transparent, transparent 4px,
+        rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px
+      );
+    }
+
+    /* Right: Status Panel */
+    .board-right {
+      width: 220px; flex-shrink: 0;
+      background: var(--bg-secondary); border-left: 1px solid var(--border);
+      padding: 1rem; display: flex; flex-direction: column; gap: 1rem;
+      overflow-y: auto;
+    }
+    @media (max-width: 700px) {
+      #screen-board.active { flex-direction: column; height: auto; overflow: auto; }
+      .board-right { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+    }
+    .status-title {
+      font-size: .75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-2); margin-bottom: .3rem;
+    }
+    .team-status-row {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: .7rem;
+    }
+    .team-status-row.eliminated { opacity: .4; }
+    .ts-header {
+      display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem;
+    }
+    .ts-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .ts-name { font-weight: 600; font-size: .9rem; flex: 1; }
+    .ts-elim { font-size: .72rem; color: var(--danger); font-weight: 700; }
+    .ts-ships { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .ship-badge { display: flex; gap: 2px; }
+    .ship-cell {
+      width: 10px; height: 10px; border-radius: 2px;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .shot-counter {
+      font-size: .78rem; color: var(--text-2); margin-top: .4rem;
+    }
+
+    /* Fullscreen hint */
+    .fs-hint { font-size: .75rem; color: var(--text-2); text-align: center; }
+  </style>
+</head>
+<body>
+
+<!-- ── Join Screen ────────────────────────────────────────────────── -->
+<div id="screen-join">
+  <div class="join-card">
+    <h1>📺</h1>
+    <h2>Tafelansicht</h2>
+    <p>Gib den Spielcode ein, um die Tafelansicht anzuzeigen.</p>
+    <input type="text" class="code-input" id="join-code" maxlength="4" placeholder="CODE"
+      autocomplete="off" spellcheck="false"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')connectBoard()">
+    <button class="btn-join" onclick="connectBoard()">Verbinden →</button>
+    <div class="join-error" id="join-error"></div>
+  </div>
+</div>
+
+<!-- ── Board Screen ───────────────────────────────────────────────── -->
+<div id="screen-board">
+  <div class="board-left">
+    <div class="board-header">
+      <div class="board-title" id="board-title">⚓ Schiffeversenken</div>
+      <div class="board-btns">
+        <button class="board-btn" onclick="toggleFullscreen()">⛶ Vollbild</button>
+        <button class="board-btn" onclick="toggleTheme()">☀️</button>
+      </div>
+    </div>
+    <div class="turn-info" id="turn-info">Verbinde…</div>
+    <div class="grid-wrapper">
+      <div id="board-grid" class="grid-outer"></div>
+    </div>
+  </div>
+  <div class="board-right">
+    <div class="status-title">Teams</div>
+    <div id="team-status"></div>
+    <div class="fs-hint">Schüsse: Treffer = Teamfarbe · Miss = ◦</div>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+const TEAM_COLORS = ['#3b82f6','#ef4444','#22c55e','#f59e0b'];
+const TEAM_EMOJIS = ['🔵','🔴','🟢','🟡'];
+const COLS = ['A','B','C','D','E','F','G','H','I','J'];
+
+let boardState = null;
+let boardCode  = null;
+let boardSub   = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Connect ───────────────────────────────────────────────────────
+async function connectBoard() {
+  const input = document.getElementById('join-code');
+  const errEl = document.getElementById('join-error');
+  const code  = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  errEl.textContent = '';
+  if (!code || code.length < 4) { errEl.textContent = 'Bitte 4-stelligen Code eingeben.'; return; }
+  errEl.textContent = 'Verbinde…';
+  boardCode = code;
+  BsStorage.setCode(code);
+  const state = await BsStorage.load(code);
+  if (!state || !state.meta) { errEl.textContent = 'Spiel nicht gefunden.'; return; }
+  boardState = state;
+  enterBoardScreen();
+  startBoardSSE();
+}
+window.connectBoard = connectBoard;
+
+function enterBoardScreen() {
+  document.getElementById('screen-join').style.display = 'none';
+  const board = document.getElementById('screen-board');
+  board.classList.add('active');
+  renderBoard();
+}
+
+function startBoardSSE() {
+  if (boardSub) boardSub.unsubscribe();
+  boardSub = BsStorage.subscribe(boardCode, function(newState) {
+    if (!newState || !newState.meta) return;
+    boardState = newState;
+    renderBoard();
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderBoard() {
+  if (!boardState) return;
+  document.getElementById('board-title').textContent = `⚓ ${boardState.meta.title||'Schiffeversenken'}`;
+  renderTurnInfo();
+  renderBoardGrid();
+  renderTeamStatus();
+}
+
+function renderTurnInfo() {
+  const el = document.getElementById('turn-info');
+  if (!boardState) return;
+  const lq = boardState.liveQuestion;
+  const alive = (boardState.turnOrder||[]).filter(i => !boardState.teams[i].eliminated);
+
+  if (boardState.phase === 'finished') {
+    const wt = boardState.winner !== null ? boardState.teams[boardState.winner] : null;
+    el.textContent = wt ? `🏆 Sieger: ${wt.emoji} ${wt.name}` : '🏁 Spiel beendet';
+    el.className = 'turn-info active';
+  } else if (lq && !lq.resolved) {
+    const t = boardState.teams[lq.teamIdx];
+    el.textContent = `${t?.emoji||''} ${t?.name||''} schießt auf ${lq.coordinate}…`;
+    el.className = 'turn-info active';
+  } else if (alive.length) {
+    const nextId = alive[boardState.currentTurnIndex % alive.length];
+    const t = boardState.teams[nextId];
+    el.textContent = `${t?.emoji||''} ${t?.name||''} ist dran`;
+    el.className = 'turn-info active';
+  } else {
+    el.textContent = '—';
+    el.className = 'turn-info';
+  }
+}
+
+function renderBoardGrid() {
+  const container = document.getElementById('board-grid');
+  if (!container || !boardState) return;
+
+  // Zellgröße dynamisch berechnen
+  const available = Math.min(
+    document.querySelector('.board-left').clientWidth - 32,
+    document.querySelector('.board-left').clientHeight - 130
+  );
+  const cellSize = Math.floor((available - 28) / 11); // 11 = 10 cols + 1 header
+
+  container.innerHTML = '';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'grid-row';
+  const cornerHdr = document.createElement('div');
+  cornerHdr.className = 'cell-hdr';
+  cornerHdr.style.cssText = `width:${cellSize-4}px;height:${cellSize-4}px;`;
+  headerRow.appendChild(cornerHdr);
+  COLS.forEach(c => {
+    const h = document.createElement('div');
+    h.className = 'cell-hdr';
+    h.textContent = c;
+    h.style.cssText = `width:${cellSize}px;height:${cellSize-4}px;font-size:${Math.max(10,cellSize*.35)}px;`;
+    headerRow.appendChild(h);
+  });
+  container.appendChild(headerRow);
+
+  for (let row = 1; row <= 10; row++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'grid-row';
+    const rh = document.createElement('div');
+    rh.className = 'cell-hdr';
+    rh.textContent = row;
+    rh.style.cssText = `width:${cellSize-4}px;height:${cellSize}px;font-size:${Math.max(10,cellSize*.35)}px;`;
+    rowEl.appendChild(rh);
+    COLS.forEach(col => {
+      rowEl.appendChild(makeBoardCell(col, row, cellSize));
+    });
+    container.appendChild(rowEl);
+  }
+}
+
+function makeBoardCell(col, row, size) {
+  const key = `${col}${row}`;
+  const cell = document.createElement('div');
+  cell.className = 'grid-cell';
+  cell.style.cssText = `width:${size}px;height:${size}px;font-size:${Math.max(8,size*.35)}px;`;
+  const entry = boardState.grid[key];
+  const lq = boardState.liveQuestion;
+
+  if (entry) {
+    const wasShot = entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    const hasShip = entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
+
+    if (wasShot && hasShip) {
+      const shipTeam = boardState.teams[entry.shipTeamIdx];
+      const isSunk = shipTeam && shipTeam.ships.every(s =>
+        !s.coords.includes(key) || s.sunk
+      );
+      cell.style.background = shipTeam.color;
+      cell.style.opacity = isSunk ? '0.55' : '1';
+      if (isSunk) cell.classList.add('sunk');
+    } else if (wasShot && !hasShip) {
+      const shotTeam = boardState.teams[entry.shotByTeamIdx];
+      cell.classList.add('miss');
+      cell.style.color = shotTeam?.color || '#aaa';
+    }
+    // Ungetroffene Schiffe werden auf der Tafelansicht NICHT angezeigt
+  }
+
+  // Aktive Koordinate
+  if (lq && lq.coordinate === key) {
+    cell.style.outline = '2px solid var(--accent)';
+    cell.style.outlineOffset = '1px';
+  }
+
+  return cell;
+}
+
+function renderTeamStatus() {
+  const container = document.getElementById('team-status');
+  if (!container || !boardState) return;
+  container.innerHTML = '';
+
+  const alive = (boardState.turnOrder||[]).filter(i => !boardState.teams[i].eliminated);
+  const currentId = alive.length ? alive[boardState.currentTurnIndex % alive.length] : null;
+
+  boardState.teams.forEach(team => {
+    const card = document.createElement('div');
+    card.className = 'team-status-row' + (team.eliminated ? ' eliminated' : '');
+    if (team.id === currentId && !boardState.liveQuestion && boardState.phase === 'playing') {
+      card.style.borderColor = team.color;
+    }
+
+    const hitsOnTeam = Object.values(boardState.grid).filter(e =>
+      e.shipTeamIdx === team.id && e.shotByTeamIdx !== null && e.shotByTeamIdx !== undefined
+    ).length;
+    const totalCells = team.ships.reduce((n,s) => n + s.size, 0);
+
+    card.innerHTML =
+      `<div class="ts-header">` +
+      `<div class="ts-dot" style="background:${team.color}"></div>` +
+      `<span class="ts-name">${escapeHtml(team.name)}</span>` +
+      (team.eliminated ? '<span class="ts-elim">versenkt</span>' : '') +
+      `</div>` +
+      `<div class="ts-ships">${renderShipBadges(team)}</div>` +
+      `<div class="shot-counter">${hitsOnTeam}/${totalCells} Treffer erhalten</div>`;
+    container.appendChild(card);
+  });
+}
+
+function renderShipBadges(team) {
+  return team.ships.map(ship => {
+    const cells = ship.coords.map(coord => {
+      const entry = boardState.grid[coord];
+      const hit = entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+      const bg = hit ? (ship.sunk ? 'rgba(231,76,60,.4)' : team.color) : team.color;
+      const opacity = hit ? '1' : '0.3';
+      return `<div class="ship-cell" style="background:${bg};opacity:${opacity};"></div>`;
+    }).join('');
+    return `<div class="ship-badge">${cells}</div>`;
+  }).join('');
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.();
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+window.toggleFullscreen = toggleFullscreen;
+
+// ── Resize handler ────────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (boardState) renderBoardGrid(); }, 150);
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+(function() {
+  applyTheme();
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) {
+    document.getElementById('join-code').value = urlCode;
+    connectBoard();
+  }
+})();
+</script>
+
+<!-- ── Theme ─────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  const KEY = 'spiele_theme';
+  function applyTheme() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    document.body.classList.toggle('light', !isDark);
+  }
+  window.applyTheme = applyTheme;
+  window.toggleTheme = function() {
+    const isDark = localStorage.getItem(KEY) !== 'light';
+    localStorage.setItem(KEY, isDark ? 'light' : 'dark');
+    applyTheme();
+    if (boardState) renderBoardGrid();
+  };
+  applyTheme();
+})();
+</script>
+</body>
+</html>

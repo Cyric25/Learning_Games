@@ -1,0 +1,517 @@
+/* ── Schiffeversenken-Quiz — game.css ──────────────────────────────
+   Dark by default (ozean/nautisch). body.light = helles Override.
+   ─────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg-primary:    #0d1b2a;
+  --bg-secondary:  #1b2d42;
+  --bg-card:       #1e3a5f;
+  --bg-card-hover: #264d7a;
+  --accent:        #4fc3f7;
+  --accent-dark:   #0288d1;
+  --text-primary:  #e8f4f8;
+  --text-secondary:#90caf9;
+  --border:        rgba(79,195,247,0.18);
+  --grid-water:    #0a1628;
+  --grid-water-h:  #122135;
+  --shadow:        0 4px 20px rgba(0,0,0,0.5);
+  --success:       #2ecc71;
+  --danger:        #e74c3c;
+  --warning:       #f39c12;
+  --input-bg:      rgba(255,255,255,0.07);
+}
+
+body.light {
+  --bg-primary:    #e3f2fd;
+  --bg-secondary:  #ffffff;
+  --bg-card:       #f0f8ff;
+  --bg-card-hover: #dbeeff;
+  --accent:        #0288d1;
+  --accent-dark:   #01579b;
+  --text-primary:  #1a237e;
+  --text-secondary:#5c6bc0;
+  --border:        rgba(2,136,209,0.2);
+  --grid-water:    #bbdefb;
+  --grid-water-h:  #90caf9;
+  --shadow:        0 4px 20px rgba(2,136,209,0.15);
+  --input-bg:      rgba(0,0,0,0.04);
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background .2s, color .2s;
+}
+a { color: var(--accent); }
+button { cursor: pointer; font-family: inherit; }
+
+/* ── Screens ── */
+.screen { display: none; }
+.screen.active { display: flex; }
+.screen-center {
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--bg-primary);
+}
+.screen-full {
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+/* ── Spielwähler (gs- Pattern) ── */
+#game-selector {
+  position: fixed; inset: 0;
+  background: var(--bg-primary);
+  z-index: 600;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.gs-container {
+  width: 100%; max-width: 640px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.gs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.gs-title {
+  font-size: clamp(1.4rem,3vw,1.9rem);
+  font-weight: 700;
+  color: var(--accent);
+}
+.gs-body { padding: 1.5rem; display: flex; flex-direction: column; }
+.gs-section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
+.gs-subtitle { color: var(--text-secondary); font-size: .9rem; margin-bottom: 1rem; }
+.gs-game-list { display: flex; flex-direction: column; gap: .5rem; max-height: 50vh; overflow-y: auto; }
+.gs-empty { color: var(--text-secondary); font-style: italic; }
+.gs-game-card {
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: .9rem 1.2rem;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.gs-game-card:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+.gs-game-code {
+  font-size: 1.3rem; font-weight: 800;
+  font-family: 'Consolas','SF Mono',monospace;
+  letter-spacing: .15em; color: var(--accent); min-width: 5ch;
+}
+.gs-game-info { flex: 1; min-width: 0; }
+.gs-game-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-game-meta { font-size: .82rem; color: var(--text-secondary); margin-top: .15rem; }
+.gs-game-actions { flex-shrink: 0; }
+.gs-btn-delete {
+  background: none; border: 1px solid var(--border);
+  color: var(--danger); border-radius: 8px; width: 30px; height: 30px;
+}
+.gs-btn-delete:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+.gs-join-row { display: flex; gap: 8px; margin-top: 4px; }
+.gs-code-input {
+  flex: 1; padding: 12px 14px; font-size: 1.4rem; font-weight: 800;
+  letter-spacing: 6px; text-align: center; text-transform: uppercase;
+  background: var(--input-bg); border: 2px solid var(--border);
+  border-radius: 12px; color: var(--text-primary);
+  font-family: monospace; outline: none; transition: border-color .2s;
+}
+.gs-code-input:focus { border-color: var(--accent); }
+.btn-join-student {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 1rem; font-weight: 700; white-space: nowrap;
+  transition: opacity .2s;
+}
+.btn-join-student:hover { opacity: .9; }
+.gs-join-error { color: var(--danger); font-size: .85rem; min-height: 1.2em; margin-top: 6px; }
+.gs-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.btn-start-game {
+  padding: .7rem 1.8rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 1rem; font-weight: 700; transition: opacity .2s;
+}
+.btn-start-game:hover { opacity: .9; }
+
+/* ── Header Buttons ── */
+.header-btn {
+  background: var(--input-bg); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: 8px;
+  padding: 6px 14px; font-size: .85rem;
+  text-decoration: none; transition: border-color .2s;
+}
+.header-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Setup Screen ── */
+#setup-screen {
+  flex-direction: column; align-items: center;
+  padding: 1.5rem 1rem; gap: 1rem; overflow-y: auto;
+}
+.setup-card {
+  width: 100%; max-width: 680px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 1.5rem;
+}
+.setup-card-title {
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--accent); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.setup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; max-width: 680px;
+  padding: .8rem 0;
+}
+.setup-h1 {
+  font-size: clamp(1.4rem,3vw,2rem);
+  font-weight: 800; color: var(--accent);
+}
+
+/* Team setup */
+.team-setup-row {
+  display: flex; align-items: center; gap: .8rem;
+  padding: .7rem .9rem; border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  margin-bottom: .5rem;
+}
+.team-color-dot {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+}
+.team-name-input {
+  flex: 1; background: var(--input-bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); padding: 6px 10px; font-size: .95rem;
+  outline: none; transition: border-color .2s;
+}
+.team-name-input:focus { border-color: var(--accent); }
+.btn-remove-team {
+  background: none; border: 1px solid var(--border);
+  color: var(--danger); border-radius: 6px;
+  width: 28px; height: 28px; font-size: .8rem;
+}
+.btn-remove-team:hover { background: var(--danger); color: #fff; }
+.btn-add-team {
+  padding: .5rem 1.2rem; background: var(--input-bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-secondary); font-size: .9rem; margin-top: .3rem;
+  transition: border-color .2s, color .2s;
+}
+.btn-add-team:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Category selector */
+.cat-select-list { display: flex; flex-direction: column; gap: .4rem; }
+.cat-group-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cat-group-header {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .9rem; cursor: pointer;
+  background: var(--bg-card);
+  transition: background .15s;
+}
+.cat-group-header:hover { background: var(--bg-card-hover); }
+.cat-group-icon { font-size: 1.1rem; }
+.cat-group-name { flex: 1; font-weight: 600; font-size: .95rem; }
+.cat-group-count { font-size: .82rem; color: var(--text-secondary); }
+.cat-group-toggle { color: var(--text-secondary); font-size: .85rem; transition: transform .2s; }
+.cat-group-wrap.open .cat-group-toggle { transform: rotate(180deg); }
+.cat-group-children { display: none; padding: .4rem .6rem; background: var(--bg-primary); }
+.cat-group-wrap.open .cat-group-children { display: flex; flex-direction: column; gap: .3rem; }
+.cat-select-item {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .5rem .8rem; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card); cursor: pointer;
+  transition: border-color .2s, background .15s;
+}
+.cat-select-item:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+.cat-select-item.selected { border-color: var(--accent); background: rgba(79,195,247,.08); }
+.cat-select-icon { font-size: 1.1rem; }
+.cat-select-name { flex: 1; font-size: .9rem; }
+.cat-select-count { font-size: .8rem; color: var(--text-secondary); }
+.cat-select-check {
+  width: 20px; height: 20px; border-radius: 4px;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem; color: var(--accent); font-weight: 700;
+}
+.cat-select-item.selected .cat-select-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cat-select-info {
+  font-size: .85rem; color: var(--text-secondary); margin-top: .5rem;
+  padding: .4rem .8rem; border-radius: 8px; background: var(--input-bg);
+}
+.cat-select-info.warn { color: var(--danger); }
+.cat-toggle-btns { display: flex; gap: .5rem; margin-bottom: .5rem; }
+.btn-cat-toggle {
+  padding: .3rem .9rem; background: var(--input-bg);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text-secondary); font-size: .82rem;
+  transition: border-color .2s, color .2s;
+}
+.btn-cat-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Setup buttons */
+.btn-primary {
+  padding: .8rem 2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 1rem; font-weight: 700; transition: opacity .2s;
+}
+.btn-primary:hover { opacity: .9; }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-secondary {
+  padding: .7rem 1.5rem; background: var(--input-bg);
+  border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: 12px; font-size: .95rem; transition: border-color .2s;
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.setup-code-banner {
+  text-align: center; padding: .5rem 1rem;
+  background: rgba(79,195,247,.08);
+  border: 2px solid var(--accent); border-radius: 10px;
+  font-size: .85rem; color: var(--text-secondary);
+}
+.setup-code-val {
+  color: var(--accent); font-size: 1.3rem;
+  font-weight: 800; letter-spacing: .15em;
+  font-family: monospace; cursor: pointer; margin-left: .5rem;
+}
+.title-input {
+  width: 100%; background: var(--input-bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); padding: 8px 12px; font-size: 1rem;
+  outline: none; transition: border-color .2s;
+}
+.title-input:focus { border-color: var(--accent); }
+
+/* ── Game Screen (Spielleiter) ── */
+#game-screen { flex-direction: row; height: 100vh; overflow: hidden; }
+
+.game-left {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; padding: .8rem;
+  gap: .5rem;
+}
+.game-right {
+  width: 280px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  padding: 1rem; gap: 1rem;
+  overflow-y: auto;
+}
+@media (max-width: 900px) {
+  #game-screen { flex-direction: column; height: auto; overflow: auto; }
+  .game-right { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+}
+
+.game-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-secondary); border-radius: 10px;
+  padding: .6rem 1rem; flex-shrink: 0;
+}
+.game-topbar-title { font-weight: 700; color: var(--accent); font-size: 1rem; }
+.topbar-btns { display: flex; gap: .5rem; }
+
+.turn-banner {
+  text-align: center; padding: .5rem 1rem;
+  border-radius: 8px; font-size: .9rem; font-weight: 600;
+  background: var(--bg-card); flex-shrink: 0;
+}
+.turn-banner.active-turn { background: rgba(46,204,113,.12); color: var(--success); border: 1px solid rgba(46,204,113,.3); }
+
+/* ── Spielfeld-Grid ── */
+.grid-wrapper {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.grid-outer {
+  display: inline-flex; flex-direction: column;
+  gap: 2px;
+  max-width: 100%; max-height: 100%;
+}
+.grid-row { display: flex; gap: 2px; }
+.grid-cell-header {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .72rem; font-weight: 700; color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.grid-cell {
+  width: 38px; height: 38px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--grid-water);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem; position: relative;
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0; cursor: default;
+  overflow: hidden;
+}
+.grid-cell.ship-intact {
+  border-color: rgba(255,255,255,.25);
+}
+.grid-cell.ship-hit {
+  border-color: rgba(255,255,255,.4);
+}
+.grid-cell.miss::after {
+  content: '◦';
+  font-size: 1rem; font-weight: 700;
+  position: absolute;
+  opacity: .9;
+}
+.grid-cell.sunk-ship {
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 4px,
+    rgba(0,0,0,.3) 4px, rgba(0,0,0,.3) 8px
+  );
+}
+
+/* ── Team-Status Sidebar ── */
+.sidebar-section-title {
+  font-size: .8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-secondary); margin-bottom: .5rem;
+}
+.team-status-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: .8rem;
+  transition: border-color .2s;
+}
+.team-status-card.current-turn { border-color: var(--accent); }
+.team-status-card.eliminated { opacity: .45; }
+.team-status-header {
+  display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem;
+}
+.team-status-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.team-status-name { font-weight: 600; font-size: .9rem; flex: 1; }
+.team-status-kick {
+  background: none; border: 1px solid var(--border);
+  color: rgba(220,38,38,.6); border-radius: 4px;
+  width: 20px; height: 20px; padding: 0; font-size: .65rem;
+}
+.team-status-kick:hover { background: rgba(220,38,38,.15); border-color: #dc2626; color: #dc2626; }
+.team-ships-row { display: flex; gap: .3rem; flex-wrap: wrap; }
+.ship-badge {
+  display: flex; gap: 2px; align-items: center;
+}
+.ship-cell {
+  width: 10px; height: 10px; border-radius: 2px;
+  border: 1px solid rgba(255,255,255,.2);
+  transition: background .2s;
+}
+.team-conn-dot { color: #4ade80; font-size: .55rem; vertical-align: middle; margin-right: 2px; }
+.team-elim-badge {
+  font-size: .72rem; color: var(--danger); font-weight: 700;
+  padding: 1px 6px; border: 1px solid var(--danger);
+  border-radius: 10px; margin-left: auto;
+}
+
+/* ── Fragen-Modal (Spielleiter) ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.hidden { display: none; }
+.modal-card {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 18px; padding: 2rem; width: 100%; max-width: 560px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal-header {
+  display: flex; align-items: center; gap: .8rem; margin-bottom: 1.2rem;
+}
+.modal-team-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.modal-subtitle { font-size: .85rem; color: var(--text-secondary); }
+.modal-coord {
+  font-family: monospace; font-size: 1.1rem; font-weight: 700;
+  color: var(--accent); letter-spacing: .1em;
+}
+.modal-question-text {
+  font-size: 1.1rem; line-height: 1.6;
+  color: var(--text-primary); margin-bottom: 1.2rem;
+}
+.mc-options { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1rem; }
+.mc-option {
+  padding: .7rem 1rem; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--bg-card);
+  text-align: left; color: var(--text-primary); font-size: .95rem;
+  transition: border-color .15s;
+}
+.mc-option.correct { border-color: var(--success); background: rgba(46,204,113,.12); color: var(--success); }
+.mc-option.wrong { border-color: var(--danger); background: rgba(231,76,60,.1); color: var(--danger); opacity: .6; }
+.mc-option.selected-correct { border-color: var(--success); background: rgba(46,204,113,.15); }
+.mc-option.selected-wrong { border-color: var(--danger); background: rgba(231,76,60,.12); }
+.modal-result-banner {
+  text-align: center; padding: .6rem 1rem; border-radius: 10px;
+  font-weight: 700; font-size: 1rem; margin-bottom: 1rem;
+}
+.modal-result-banner.hit { background: rgba(46,204,113,.15); color: var(--success); }
+.modal-result-banner.miss { background: rgba(231,76,60,.1); color: var(--danger); }
+.modal-result-banner.waiting { background: rgba(79,195,247,.1); color: var(--accent); }
+.modal-btns { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+.btn-modal-correct {
+  padding: .7rem 1.5rem; background: var(--success);
+  color: #fff; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; transition: opacity .2s;
+}
+.btn-modal-correct:hover { opacity: .85; }
+.btn-modal-wrong {
+  padding: .7rem 1.5rem; background: var(--danger);
+  color: #fff; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; transition: opacity .2s;
+}
+.btn-modal-wrong:hover { opacity: .85; }
+.btn-modal-next {
+  padding: .7rem 2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; transition: opacity .2s;
+}
+.btn-modal-next:hover { opacity: .9; }
+.hint-text {
+  font-size: .82rem; color: var(--text-secondary); font-style: italic;
+  margin-top: .5rem; padding: .4rem .8rem;
+  background: var(--input-bg); border-radius: 6px;
+}
+
+/* ── Winner Screen ── */
+#winner-screen {
+  align-items: center; justify-content: center; text-align: center;
+  gap: 1.5rem; padding: 2rem;
+}
+.winner-trophy { font-size: 5rem; }
+.winner-title { font-size: clamp(1.8rem,4vw,2.8rem); font-weight: 900; }
+.winner-sub { font-size: 1.1rem; color: var(--text-secondary); }
+.winner-team-badge {
+  padding: 1rem 2rem; border-radius: 14px;
+  border: 3px solid; font-size: 1.4rem; font-weight: 800;
+  display: inline-flex; align-items: center; gap: .8rem;
+}
+
+/* ── Code Badge (Spielleiter, fixed bottom-right) ── */
+#code-banner {
+  position: fixed; bottom: 12px; right: 12px; z-index: 999;
+  background: var(--bg-card); color: var(--text-primary);
+  border-radius: 12px; padding: 10px 16px; font-size: .85rem;
+  box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border);
+}
+.code-val { font-size: 1.2rem; letter-spacing: 2px; font-family: monospace; font-weight: 800; }
