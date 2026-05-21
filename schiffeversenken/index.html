@@ -101,6 +101,25 @@
     <div id="cat-select-info" class="cat-select-info"></div>
   </div>
 
+  <!-- Fragentyp -->
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">❓ Fragentyp</div>
+    <div class="qmode-group">
+      <button class="qmode-btn active" data-mode="mixed" onclick="setQuestionMode('mixed')">
+        🔀 Gemischt
+        <span class="qmode-desc">MC + Offene Fragen</span>
+      </button>
+      <button class="qmode-btn" data-mode="mc" onclick="setQuestionMode('mc')">
+        🅰 Nur Multiple Choice
+        <span class="qmode-desc">Schüler spielen selbstständig</span>
+      </button>
+      <button class="qmode-btn" data-mode="open" onclick="setQuestionMode('open')">
+        💬 Nur Offene Fragen
+        <span class="qmode-desc">Spielleiter bewertet immer</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Start -->
   <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;padding-bottom:2rem;">
     <button class="btn-primary" id="btn-start-game" onclick="startGame()">🚢 Spiel starten</button>
@@ -176,6 +195,7 @@ let gameState = null;
 let rawCategories = [];
 let allQuestions  = [];
 let selectedCategoryIds = new Set();
+let questionMode = 'mixed'; // 'mixed' | 'mc' | 'open'
 let bsSub = null;
 let processingShot = false;
 
@@ -393,6 +413,14 @@ function removeTeam(i) {
 }
 window.removeTeam = removeTeam;
 
+// ── Fragentyp ─────────────────────────────────────────────────────
+function setQuestionMode(mode) {
+  questionMode = mode;
+  document.querySelectorAll('.qmode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+}
+window.setQuestionMode = setQuestionMode;
+
 // ── Schiff-Platzierung ────────────────────────────────────────────
 function placeShipsForAllTeams(teams) {
   const occupied = new Set();
@@ -455,6 +483,7 @@ async function startGame() {
     liveQuestion: null,
     winner: null,
     activeCategoryIds: [...selectedCategoryIds],
+    questionMode,
     usedQuestionIds: new Set()
   };
 
@@ -906,6 +935,7 @@ async function _gsEnter(code) {
   gameState = gs;
   if (gs.phase === 'playing' || gs.phase === 'finished') {
     if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    if (gs.questionMode) setQuestionMode(gs.questionMode);
     enterGameScreen();
     if (gs.phase === 'finished' && gs.winner !== null) showWinnerScreen(gs.winner);
   } else {
@@ -913,6 +943,7 @@ async function _gsEnter(code) {
       ? gs.teams.map((t,i) => ({ id: i, name: t.name, color: t.color||TEAM_COLORS[i], emoji: t.emoji||TEAM_EMOJIS[i] }))
       : DEFAULT_TEAMS.map((t, i) => ({ ...t, id: i }));
     if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
+    if (gs.questionMode) setQuestionMode(gs.questionMode);
     renderTeamSetupList();
     buildCategoryUI();
     showScreen('setup-screen');

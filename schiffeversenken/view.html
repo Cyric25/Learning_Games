@@ -734,9 +734,16 @@ async function fireShot() {
   const used = remoteState.usedQuestionIds instanceof Set
     ? remoteState.usedQuestionIds
     : new Set(remoteState.usedQuestionIds||[]);
-  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && !used.has(q.id));
-  if (!pool.length) pool = allQuestions.filter(q => activeCats.has(q.kategorieId));
-  if (!pool.length) pool = allQuestions;
+  const mode = remoteState.questionMode || 'mixed';
+  function matchesMode(q) {
+    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+    if (mode === 'mc')   return isMC;
+    if (mode === 'open') return !isMC;
+    return true;
+  }
+  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && !used.has(q.id) && matchesMode(q));
+  if (!pool.length) pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
+  if (!pool.length) pool = allQuestions.filter(q => matchesMode(q));
   if (!pool.length) { errEl.textContent = 'Keine Fragen verfügbar!'; submittingShot = false; return; }
   const q = pool[Math.floor(Math.random() * pool.length)];
 
