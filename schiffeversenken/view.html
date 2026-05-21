@@ -245,6 +245,23 @@
       border-top: 1px solid rgba(46,204,113,.3); flex-shrink: 0;
     }
 
+    /* ── Solo Setup ── */
+    .solo-divider { border:none; border-top:1px solid var(--border); margin:1.2rem 0 .8rem; }
+    .solo-label { font-size:.85rem; font-weight:600; color:var(--text-2); margin-bottom:.4rem; text-align:left; }
+    .solo-timer-row { display:flex; gap:.3rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .solo-tbtn {
+      padding:.3rem .75rem; font-size:.82rem; font-weight:700;
+      background:var(--bg-field); border:1.5px solid var(--border);
+      border-radius:7px; cursor:pointer; color:var(--text);
+      transition:border-color .15s, background .15s;
+    }
+    .solo-tbtn:hover  { border-color:var(--accent); }
+    .solo-tbtn.active { border-color:var(--accent); background:var(--bg-fh); color:var(--accent); }
+    .btn-back-link {
+      background:none; border:none; color:var(--text-2);
+      font-size:.88rem; cursor:pointer; text-decoration:underline; margin-top:.3rem;
+    }
+
     /* ── Mobile ── */
     @media (max-width: 600px) {
       .grid-cell     { width: 30px; height: 30px; }
@@ -277,9 +294,45 @@
       onkeydown="if(event.key==='Enter')doJoin()">
     <button class="btn-join" onclick="doJoin()">Beitreten →</button>
     <div class="join-error" id="join-error"></div>
+    <hr class="solo-divider">
+    <button onclick="showScreen('screen-solo-setup')"
+      style="width:100%;padding:11px;background:var(--bg-field);border:1.5px solid var(--border);
+        border-radius:12px;color:var(--text-2);font-size:.95rem;font-weight:600;cursor:pointer;
+        transition:border-color .15s,color .15s;"
+      onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-2)'">
+      🎯 Solo üben — ohne Code
+    </button>
   </div>
   <div style="margin-top:1.5rem;">
     <a href="index.html" style="color:var(--text-2);font-size:.9rem;text-decoration:none;">← Zur Lehrkraft-Ansicht</a>
+  </div>
+</div>
+
+<!-- ── Solo Setup ─────────────────────────────────────────────────── -->
+<div class="screen screen-center" id="screen-solo-setup">
+  <div class="card">
+    <h1>🎯</h1>
+    <h2 style="margin-bottom:.3rem;">Solo-Übung</h2>
+    <p>Beantworte Fragen, um versteckte Schiffe zu versenken.</p>
+    <input type="text" id="solo-name-input" placeholder="Dein Name (optional)" maxlength="20"
+      style="width:100%;padding:12px;font-size:1rem;border:2px solid var(--border);border-radius:10px;
+        background:var(--bg-field);color:var(--text);margin-bottom:1rem;
+        outline:none;box-sizing:border-box;transition:border-color .15s;"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--border)'"
+      onkeydown="if(event.key==='Enter')startSolo()">
+    <div class="solo-label">⏱ Timer pro Frage:</div>
+    <div class="solo-timer-row" id="solo-timer-row">
+      <button class="solo-tbtn active" data-sec="0"  onclick="setSoloTimer(0)">Kein Timer</button>
+      <button class="solo-tbtn" data-sec="10" onclick="setSoloTimer(10)">10 s</button>
+      <button class="solo-tbtn" data-sec="20" onclick="setSoloTimer(20)">20 s</button>
+      <button class="solo-tbtn" data-sec="30" onclick="setSoloTimer(30)">30 s</button>
+      <button class="solo-tbtn" data-sec="45" onclick="setSoloTimer(45)">45 s</button>
+    </div>
+    <button class="btn-join" onclick="startSolo()">🚢 Spielen!</button>
+    <br>
+    <button class="btn-back-link" onclick="showScreen('screen-join')">← Zurück</button>
   </div>
 </div>
 
@@ -360,6 +413,8 @@ let bsSub       = null;
 let allQuestions = [];
 let submittingShot = false;
 let mcTimerInterval = null;
+let soloMode = false;
+let soloTimerSeconds = 0;
 
 // ── Utilities ─────────────────────────────────────────────────────
 function escapeHtml(s) {
@@ -785,6 +840,89 @@ async function fireShot() {
 }
 window.fireShot = fireShot;
 
+// ── Zugriff-Helper: Rundenfortschritt ────────────────────────────
+function advanceTurn(ns, lq) {
+  if (ns.soloMode) {
+    // Solo: Sieg wenn alle Gegner-Schiffe versenkt
+    if (!ns.teams.some(t => t.id !== lq.teamIdx && !t.eliminated)) {
+      ns.phase = 'finished'; ns.winner = lq.teamIdx;
+    }
+    // Sonst: immer Spieler dran (currentTurnIndex bleibt 0)
+  } else {
+    const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+    if (alive.length <= 1) {
+      ns.phase = 'finished';
+      ns.winner = alive.length === 1 ? alive[0] : null;
+    } else {
+      const prevIdx = alive.indexOf(lq.teamIdx);
+      ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
+    }
+  }
+}
+
+// ── Solo-Modus ────────────────────────────────────────────────────
+function setSoloTimer(sec) {
+  soloTimerSeconds = sec;
+  document.querySelectorAll('.solo-tbtn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.sec) === sec));
+}
+window.setSoloTimer = setSoloTimer;
+
+async function startSolo() {
+  const name = (document.getElementById('solo-name-input')?.value || '').trim() || 'Spieler';
+
+  const playerTeam = { id: 0, name, color: '#3b82f6', emoji: '🎯', ships: [], eliminated: false };
+  const cpuTeam    = { id: 1, name: 'Versteckte Schiffe', color: '#6b7280', emoji: '🚢', ships: [], eliminated: false };
+
+  const grid = {};
+  const occupied = new Set();
+  [6, 4, 2].forEach(size => {
+    let placed = false, tries = 0;
+    while (!placed && tries < 500) {
+      tries++;
+      const horiz = Math.random() > 0.5;
+      const maxC = horiz ? (10 - size) : 9;
+      const maxR = horiz ? 9 : (10 - size);
+      const sC = Math.floor(Math.random() * (maxC + 1));
+      const sR = Math.floor(Math.random() * (maxR + 1));
+      const coords = Array.from({length: size}, (_, k) => {
+        const c = COLS[sC + (horiz ? k : 0)];
+        const r = sR + 1 + (horiz ? 0 : k);
+        return `${c}${r}`;
+      });
+      if (coords.every(c => !occupied.has(c))) {
+        coords.forEach(c => { occupied.add(c); grid[c] = { shipTeamIdx: 1, shotByTeamIdx: null }; });
+        cpuTeam.ships.push({ id: `cpu-${size}`, size, coords, sunk: false });
+        placed = true;
+      }
+    }
+  });
+
+  const activeCatIds = [...new Set(allQuestions.map(q => q.kategorieId))];
+  soloMode = true;
+  myTeamId = 0;
+  gameCode  = 'SOLO';
+
+  remoteState = {
+    meta: { gameCode: 'SOLO', title: 'Solo-Übung' },
+    phase: 'playing', soloMode: true,
+    teams: [playerTeam, cpuTeam],
+    takenTeams: [0],
+    grid,
+    turnOrder: [0],
+    currentTurnIndex: 0,
+    liveQuestion: null,
+    winner: null,
+    activeCategoryIds: activeCatIds,
+    questionMode: 'mc',
+    mcTimerSeconds: soloTimerSeconds,
+    usedQuestionIds: new Set()
+  };
+  showScreen('screen-game');
+  renderGameView();
+}
+window.startSolo = startSolo;
+
 // ── MC-Timer ──────────────────────────────────────────────────────
 function startMCTimer(totalSec) {
   clearMCTimer();
@@ -822,15 +960,9 @@ async function handleMCTimeout() {
   ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
   ns.liveQuestion = null;
   ns.usedQuestionIds.add(lq.question.id);
-  const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
-  if (alive.length <= 1) {
-    ns.phase = 'finished'; ns.winner = alive.length === 1 ? alive[0] : null;
-  } else {
-    const prevIdx = alive.indexOf(lq.teamIdx);
-    ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
-  }
+  advanceTurn(ns, lq);
   remoteState = ns;
-  BsStorage.save(ns);
+  if (!soloMode) BsStorage.save(ns);
   setTimeout(() => {
     document.getElementById('q-overlay').classList.add('hidden');
     submittingShot = false;
@@ -938,17 +1070,10 @@ async function submitMCAnswer(idx) {
   }
 
   ns.usedQuestionIds.add(lq.question.id);
-  const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
-  if (alive.length <= 1) {
-    ns.phase = 'finished';
-    ns.winner = alive.length === 1 ? alive[0] : null;
-  } else {
-    const prevIdx = alive.indexOf(lq.teamIdx);
-    ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
-  }
+  advanceTurn(ns, lq);
 
   remoteState = ns;
-  BsStorage.save(ns); // fire-and-forget, kein await nötig
+  if (!soloMode) BsStorage.save(ns);
 
   // Overlay nach 1.5s schließen, dann Grid neu rendern
   setTimeout(() => {

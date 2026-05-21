@@ -870,6 +870,88 @@ window.kickTeam = kickTeam;
 
 ---
 
+## Schnelle Client-seitige Synchronisation (Schiffeversenken-Muster)
+
+**Problem:** Klassischer SSE-Flow für MC-Fragen braucht zwei Round-Trips:
+1. Spieler speichert Antwort → Server
+2. Lehrkraft-View empfängt → verarbeitet → speichert → Server
+3. Alle Views empfangen Ergebnis
+
+Bei 300–1000ms Poll-Intervall ergibt das ~1–2s Latenz.
+
+**Lösung: Direkte Client-Verarbeitung**
+
+Für **automatisch auswertbare Aktionen** (MC-Fragen, Timer-Ablauf) verarbeitet die Spieler-View das Ergebnis **lokal** und speichert den Endzustand direkt — ohne Umweg über die Lehrkraft-View.
+
+```
+ALT: view.html → save(autoCorrect) → index.html empfängt → processShot → save(lq=null) → alle Views
+NEU: view.html → processShot lokal → save(lq=null) direkt → alle Views
+```
+
+**Implementierung (Schiffeversenken `view.html`):**
+
+```js
+async function submitMCAnswer(idx) {
+  const lq = remoteState.liveQuestion;
+  const correct = idx === lq.question.correctIndex;
+
+  // 1. Ergebnis sofort visuell anzeigen (kein Warten auf Server)
+  showResult(correct);
+
+  // 2. Vollständige Spiellogik lokal ausführen
+  const ns = deepCopy(remoteState);
+  ns.liveQuestion = null;
+  if (correct) applyShot(ns, lq);         // Grid updaten
+  checkElimination(ns, lq);               // Schiff/Team-Status
+  advanceTurn(ns, lq);                    // Nächster Zug / Sieger
+  ns.usedQuestionIds.add(lq.question.id);
+
+  // 3. Fire-and-forget save — blockiert UI nicht
+  remoteState = ns;
+  BsStorage.save(ns);                      // kein await
+
+  // 4. Kurze Ergebnisanzeige, dann Grid rendern
+  setTimeout(() => { hideOverlay(); renderGameView(); }, 1500);
+}
+```
+
+**Guards:**
+- `submittingShot = true` am Anfang, `false` nach dem Timeout → verhindert Doppelklick
+- `if (submittingShot) return` in `onRemoteUpdate` → verhindert Re-Render während Ergebnisanzeige
+- `if (processingShot) return` in Lehrkraft-View `onStateUpdate` → verhindert State-Override während Verarbeitung
+
+**Poll-Intervall:** 300ms statt 1000ms (in `BsStorage.subscribe → startPoll`)
+
+**Für Lehrkraft-View (offene Fragen):**
+- `onStateUpdate` zeigt Modal nur für offene Fragen (`!isMC`)
+- Offene Fragen laufen weiterhin über Teacher-Round-Trip (nötig, da manuelle Bewertung)
+
+**`advanceTurn(ns, lq)` — Singleplayer-aware:**
+```js
+function advanceTurn(ns, lq) {
+  if (ns.soloMode) {
+    if (!ns.teams.some(t => t.id !== lq.teamIdx && !t.eliminated))
+      { ns.phase = 'finished'; ns.winner = lq.teamIdx; }
+    // sonst: Spieler immer dran (currentTurnIndex = 0)
+  } else {
+    const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+    if (alive.length <= 1) {
+      ns.phase = 'finished'; ns.winner = alive[0] ?? null;
+    } else {
+      const prev = alive.indexOf(lq.teamIdx);
+      ns.currentTurnIndex = ((prev >= 0 ? prev + 1 : ns.currentTurnIndex + 1)) % alive.length;
+    }
+  }
+}
+```
+
+**Wann anwenden:**
+- Immer wenn die Spieleransicht Aktionen direkt und vollständig auswerten kann
+- MC-Fragen, Timer-Ablauf, automatische Regelprüfungen
+- Nicht für: manuelle Lehrkraft-Entscheidungen (offene Fragen, Sonderfälle)
+
+---
+
 ## Leiterspiel-Quiz
 
 ### Architektur
