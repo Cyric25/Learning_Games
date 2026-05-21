@@ -144,6 +144,21 @@
     .grid-cell.target-sel {
       outline: 2px solid var(--accent); outline-offset: 1px;
     }
+    .grid-cell.tappable {
+      cursor: crosshair;
+      border-color: rgba(227,79,32,.35);
+    }
+    .grid-cell.tappable:hover {
+      background: var(--bg-fh);
+      border-color: var(--accent);
+      transform: scale(1.08);
+      z-index: 1;
+    }
+    .grid-cell.tappable:active {
+      transform: scale(.96);
+      background: var(--accent);
+      opacity: .7;
+    }
 
     /* ── Shot Input Panel ── */
     .shot-panel {
@@ -662,8 +677,27 @@ function makePlayerCell(col, row) {
     cell.classList.add('target-sel');
   }
 
+  // Touch/Click-Ziel wenn eigener Zug und Feld gültig
+  if (isMyTurn && !submittingShot) {
+    const alreadyShot = entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    const isOwn = cell.classList.contains('own-ship');
+    if (!alreadyShot && !isOwn) {
+      cell.classList.add('tappable');
+      cell.addEventListener('click', () => tapCell(key));
+    }
+  }
+
   return cell;
 }
+
+// ── Tap auf Zelle ─────────────────────────────────────────────────
+function tapCell(key) {
+  if (submittingShot) return;
+  const input = document.getElementById('coord-input');
+  if (input) input.value = key;
+  fireShot();
+}
+window.tapCell = tapCell;
 
 // ── Schuss abfeuern ───────────────────────────────────────────────
 async function fireShot() {
