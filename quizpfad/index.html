@@ -37,14 +37,16 @@
 
         <div class="gs-divider"></div>
 
-        <h2 class="gs-section-title">Als Lehrkraft</h2>
-        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
-        <div id="gs-game-list" class="gs-game-list"></div>
-        <div class="gs-teacher-action" style="margin-top:1.2rem;">
+        <div class="gs-teacher-action">
+          <h2 class="gs-section-title">Laufende Spiele</h2>
+          <p class="gs-subtitle">Wähle ein bestehendes Spiel oder verwalte Spiele im Lehrermodus.</p>
+          <div id="gs-game-list" class="gs-game-list"></div>
+        </div>
+        <div style="margin-top:1.2rem;">
           <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
         </div>
         <div class="gs-teacher-hint" style="margin-top:0.8rem;text-align:center;">
-          <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Lehrermodus aktivieren</button>
+          <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Spielverwaltung (Lehrermodus)</button>
         </div>
       </div>
     </div>

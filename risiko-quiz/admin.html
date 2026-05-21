@@ -25,16 +25,18 @@
       </div>
     </div>
     <div class="gs-body">
-      <h2 style="font-size:1.3rem;margin:0 0 0.5rem;">Spiel auswählen</h2>
-      <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 1.2rem;">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
-      <div id="gs-game-list" class="gs-game-list">
-        <p style="color:var(--text-secondary);">Lade Spiele...</p>
+      <div class="gs-teacher-action">
+        <h2 style="font-size:1.3rem;margin:0 0 0.5rem;">Laufende Spiele</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 1.2rem;">Wähle ein bestehendes Spiel oder verwalte Spiele im Lehrermodus.</p>
+        <div id="gs-game-list" class="gs-game-list">
+          <p style="color:var(--text-secondary);">Lade Spiele...</p>
+        </div>
       </div>
-      <div class="gs-teacher-action" style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
+      <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
         <button class="btn btn-success btn-lg" id="btn-gs-create">+ Neues Spiel erstellen</button>
       </div>
       <div class="gs-teacher-hint" style="margin-top:0.8rem;">
-        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid var(--border);color:var(--text-secondary);">🔒 Lehrermodus aktivieren</button>
+        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid var(--border);color:var(--text-secondary);">🔒 Spielverwaltung (Lehrermodus)</button>
       </div>
     </div>
   </div>

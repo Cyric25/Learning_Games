@@ -37,19 +37,19 @@
     </button>
     <div id="gs-join-error" style="color:var(--danger);min-height:1.5em;margin-top:0.8rem;font-size:0.95rem;font-weight:600;text-align:center;"></div>
     <div style="margin-top:2.5rem;border-top:1px solid var(--border-card);padding-top:1.5rem;text-align:center;width:100%;max-width:520px;">
-      <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Als Lehrkraft:</p>
-      <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
-      <div class="gs-teacher-action">
-        <button onclick="createNewGame()"
-          style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
-            background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
-            transition:opacity 0.2s;"
-          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-          + Neues Spiel erstellen
-        </button>
+      <div class="gs-teacher-action" style="text-align:center;margin-bottom:0.8rem;">
+        <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Laufende Spiele:</p>
+        <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
       </div>
+      <button onclick="createNewGame()"
+        style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
+          background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
+          transition:opacity 0.2s;"
+        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+        + Neues Spiel erstellen
+      </button>
       <div class="gs-teacher-hint" style="margin-top:0.8rem;">
-        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Lehrermodus aktivieren</button>
+        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Spielverwaltung (Lehrermodus)</button>
       </div>
     </div>
     <div style="margin-top:1.5rem;">
