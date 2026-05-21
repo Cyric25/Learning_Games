@@ -231,20 +231,51 @@ const DOOR_OTHER_DIR = {
   SW: { S: 'W', W: 'S' },
 };
 
-function getDoorOnPassage(doors, x, y, dir) {
+const WALL_BIT = { N: 1, E: 2, S: 4, W: 8 };
+
+// Returns { door, canOpen } or null (no door on this passage).
+// canOpen=false: door blocks but can't be pushed from this side (acts as wall).
+// Correct push direction = approaching FROM the blocked side (neighbor → anchor cell).
+function checkDoorOnPassage(doors, x, y, dir, grid) {
   const d = DMAP[dir];
   const nx = x + d.dx, ny = y + d.dy;
   const DIR_UP = dir.toUpperCase();
   const OPP = { n: 'S', s: 'N', e: 'W', w: 'E' }[dir];
-  return (doors || []).find(dr => {
-    // Current blocked direction depends on angle: 0° → blockedDir, 90° → other dir
+
+  let matchedDoor = null, isNeighborMatch = false;
+  for (const dr of (doors || [])) {
     const isFlipped = (dr.angle || 0) !== 0;
     const curDir = isFlipped
       ? (DOOR_OTHER_DIR[dr.corner]?.[dr.blockedDir] || dr.blockedDir)
       : dr.blockedDir;
-    if (dr.cellX === x  && dr.cellY === y  && curDir === DIR_UP) return true;
-    return dr.cellX === nx && dr.cellY === ny && curDir === OPP;
-  }) || null;
+    if (dr.cellX === x && dr.cellY === y && curDir === DIR_UP) {
+      matchedDoor = dr; isNeighborMatch = false; break;
+    }
+    if (dr.cellX === nx && dr.cellY === ny && curDir === OPP) {
+      matchedDoor = dr; isNeighborMatch = true; break;
+    }
+  }
+  if (!matchedDoor) return null;
+
+  // Only the player approaching FROM the blocked side can push (neighbor match)
+  if (!isNeighborMatch) return { door: matchedDoor, canOpen: false };
+
+  // Check: is the target passage (where door would rotate to) wall-free?
+  if (grid) {
+    const isFlipped = (matchedDoor.angle || 0) !== 0;
+    const targetDir = isFlipped
+      ? matchedDoor.blockedDir
+      : (DOOR_OTHER_DIR[matchedDoor.corner]?.[matchedDoor.blockedDir]);
+    if (targetDir && (grid[matchedDoor.cellY]?.[matchedDoor.cellX]?.walls & WALL_BIT[targetDir]))
+      return { door: matchedDoor, canOpen: false };
+  }
+  return { door: matchedDoor, canOpen: true };
+}
+
+// Backward-compat wrapper for places that just need the door object
+function getDoorOnPassage(doors, x, y, dir, grid) {
+  const r = checkDoorOnPassage(doors, x, y, dir, grid);
+  return (r && r.canOpen) ? r.door : null;
 }
 
 function applyStateToGrid(grid, symbols) {
@@ -456,7 +487,10 @@ function computeValidDirections(state) {
   const { x, y } = state.teams[myTeamId];
   const valid = {};
   for (const [key, d] of Object.entries(DMAP)) {
-    if (!(localGrid[y][x].walls & d.wall)) valid[key] = true;
+    if (localGrid[y][x].walls & d.wall) continue;  // wall blocks
+    const dc = checkDoorOnPassage(state.doors, x, y, key, localGrid);
+    if (dc && !dc.canOpen) continue;  // door stuck from this side
+    valid[key] = true;
   }
   return valid;
 }
@@ -475,8 +509,11 @@ function advanceInDirection(dir, state) {
     const nx = cx + d.dx, ny = cy + d.dy;
     if (nx < 0 || nx >= W || ny < 0 || ny >= H) break;
 
-    const closedDoor = getDoorOnPassage(state.doors, cx, cy, dir);
-    if (closedDoor) return { stop: 'door', teamX: cx, teamY: cy, doorX: nx, doorY: ny, door: closedDoor };
+    const doorCheck = checkDoorOnPassage(state.doors, cx, cy, dir, localGrid);
+    if (doorCheck) {
+      if (!doorCheck.canOpen) break; // stuck door → acts as wall
+      return { stop: 'door', teamX: cx, teamY: cy, doorX: nx, doorY: ny, door: doorCheck.door };
+    }
 
     const cell = localGrid[ny][nx];
     if (cell.type === 'symbol' && (allSymMode || cell.symTeamId === myTeamId)) {
