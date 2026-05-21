@@ -192,7 +192,9 @@ class MazeGenerator {
       if (usedPassages.has(passKey)) continue;
       usedPassages.add(passKey);
 
-      const rotDir = this.rng.nextInt(0, 1) === 0 ? 1 : -1;
+      // rotDir deterministic: ensures door at angle=90 lands on the other passage
+      // dirs[0] → -1 (CCW), dirs[1] → +1 (CW)
+      const rotDir = sideIdx === 0 ? -1 : 1;
 
       doors.push({
         id: 'door-' + doors.length,

@@ -223,15 +223,27 @@ function buildLocalGrid() {
   }
 }
 
+// Maps corner + blockedDir → direction blocked when door is at angle=90
+const DOOR_OTHER_DIR = {
+  NE: { N: 'E', E: 'N' },
+  NW: { W: 'N', N: 'W' },
+  SE: { E: 'S', S: 'E' },
+  SW: { S: 'W', W: 'S' },
+};
+
 function getDoorOnPassage(doors, x, y, dir) {
   const d = DMAP[dir];
   const nx = x + d.dx, ny = y + d.dy;
   const DIR_UP = dir.toUpperCase();
   const OPP = { n: 'S', s: 'N', e: 'W', w: 'E' }[dir];
   return (doors || []).find(dr => {
-    if (dr.open) return false;
-    if (dr.cellX === x  && dr.cellY === y  && dr.blockedDir === DIR_UP) return true;
-    return dr.cellX === nx && dr.cellY === ny && dr.blockedDir === OPP;
+    // Current blocked direction depends on angle: 0° → blockedDir, 90° → other dir
+    const isFlipped = (dr.angle || 0) !== 0;
+    const curDir = isFlipped
+      ? (DOOR_OTHER_DIR[dr.corner]?.[dr.blockedDir] || dr.blockedDir)
+      : dr.blockedDir;
+    if (dr.cellX === x  && dr.cellY === y  && curDir === DIR_UP) return true;
+    return dr.cellX === nx && dr.cellY === ny && curDir === OPP;
   }) || null;
 }
 
@@ -789,7 +801,7 @@ function continueAfterQuestion() {
 
   if (ctx.type === 'door' && wasCorrect) {
     const door = newState.doors.find(d => d.id === ctx.door.id);
-    if (door) { door.open = true; door.angle = 90; door.openedBy = myTeamId; }
+    if (door) { door.angle = (door.angle || 0) ? 0 : 90; door.openedBy = myTeamId; }
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
   } else if (ctx.type === 'symbol' && wasCorrect) {

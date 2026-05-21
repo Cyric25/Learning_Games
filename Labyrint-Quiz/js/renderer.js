@@ -192,8 +192,9 @@ class MazeRenderer {
     ctx.translate(ax, ay);
     ctx.rotate(baseRad + openRad);
 
+    const isFlipped = (door.angle || 0) !== 0;
     const lw = Math.max(3, cs * 0.13);
-    ctx.strokeStyle = door.open ? '#4a7c4f' : '#8B4513';
+    ctx.strokeStyle = isFlipped ? '#a0702a' : '#8B4513';
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -202,7 +203,7 @@ class MazeRenderer {
     ctx.stroke();
 
     // Hinge dot
-    ctx.fillStyle = door.open ? '#2d5a27' : '#5c2d0a';
+    ctx.fillStyle = '#5c2d0a';
     ctx.beginPath();
     ctx.arc(0, 0, Math.max(2, cs * 0.07), 0, Math.PI * 2);
     ctx.fill();
