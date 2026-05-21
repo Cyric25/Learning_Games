@@ -241,12 +241,18 @@ async function _gsEnter(code) {
   window.gameCode = code;
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = state;
-  if ((state.phase === 'playing' || state.phase === 'rolling' || state.phase === 'direction' || state.phase === 'question') && state.seed && state.config?.teamCount) {
+  if ((state.phase === 'playing' || state.phase === 'rolling' || state.phase === 'direction' || state.phase === 'question') && state.config?.teamCount) {
     activeCategories = new Set(state.config.kategorien || []);
-    const _sz = state.config?.mazeSize || 16;
-    const gen = new MazeGenerator(_sz, _sz, state.seed);
-    const mazeResult = gen.generate({ doorCount: getDoorCount(state.config.doorPreset, _sz), teamCount: state.config.teamCount });
-    localGrid = mazeResult.grid;
+    let mazeResult;
+    if (state.mazeData) {
+      localGrid = JSON.parse(JSON.stringify(state.mazeData.grid));
+      mazeResult = { grid: localGrid, startPositions: state.mazeData.startPositions };
+    } else {
+      const _sz = state.config?.mazeSize || 16;
+      const gen = new MazeGenerator(_sz, _sz, state.seed);
+      mazeResult = gen.generate({ doorCount: getDoorCount(state.config.doorPreset, _sz), teamCount: state.config.teamCount });
+      localGrid = mazeResult.grid;
+    }
     applyStateToGrid(localGrid, state.symbols || []);
     showScreen('game-screen');
     showGameCode();
@@ -299,11 +305,50 @@ function resetToSelector() {
 function buildSetupUI() {
   buildTeamCountUI();
   renderTeamSelectList(_cfg.teamCount);
+  buildMazeSourceUI();
   buildMazeSizeUI();
   buildDoorPresetUI();
   buildSymbolModeUI();
   buildSymbolsUI();
   buildTimerUI();
+}
+
+function buildMazeSourceUI() {
+  const row = document.getElementById('maze-source-row'); if (!row) return;
+  row.innerHTML = '';
+  const opts = [{ label: '🎲 Zufällig', v: 'random' }, { label: '📚 Aus Bibliothek', v: 'library' }];
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (opt.v === _cfg.mazeSource ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => {
+      _cfg.mazeSource = opt.v;
+      row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Show/hide maze-size and door-preset rows (not needed for library mode)
+      const hide = opt.v === 'library';
+      const szWrap = document.getElementById('maze-size-row-wrap');
+      if (szWrap) szWrap.closest('.settings-row').style.display = hide ? 'none' : '';
+      const dpWrap = document.getElementById('door-preset-row-wrap');
+      if (dpWrap) dpWrap.closest('.settings-row').style.display = hide ? 'none' : '';
+      updateLibraryHint(row);
+    };
+    row.appendChild(btn);
+  });
+  updateLibraryHint(row);
+}
+
+function updateLibraryHint(row) {
+  let hint = row.nextElementSibling;
+  if (hint && hint.classList.contains('lib-hint')) hint.remove();
+  if (_cfg.mazeSource === 'library') {
+    hint = document.createElement('div');
+    hint.className = 'lib-hint';
+    hint.style.cssText = 'font-size:.8rem;color:var(--text-secondary);margin-top:4px;';
+    const n = mazeLibrary.length;
+    hint.textContent = n > 0 ? `✅ ${n} Labyrinth${n!==1?'e':''} in der Bibliothek` : '⚠️ Bibliothek leer — Designer öffnen um Labyrinthe zu erstellen.';
+    row.after(hint);
+  }
 }
 
 function buildDoorPresetUI() {
@@ -550,7 +595,7 @@ function updateCategoryInfo() {
   if (btn) btn.disabled = !ok;
 }
 
-let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele' };
+let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele', mazeSource: 'random' };
 
 function getDoorCount(preset, size) {
   const presets = {
@@ -640,13 +685,26 @@ async function startGame() {
   }
 
   const seed = Date.now() & 0x7fffffff;
-  const size = _cfg.mazeSize || 12;
-  const doorCount = getDoorCount(_cfg.doorPreset, size);
-  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols, doorPreset: _cfg.doorPreset };
+  const useSaved = _cfg.mazeSource === 'library' && mazeLibrary.length > 0;
+  const size = useSaved ? (mazeLibrary[0]?.size || 12) : (_cfg.mazeSize || 12);
+  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols, doorPreset: _cfg.doorPreset, mazeSource: _cfg.mazeSource };
 
-  // Generate maze deterministically
-  const gen = new MazeGenerator(size, size, seed);
-  const mazeResult = gen.generate({ doorCount, teamCount: _cfg.teamCount });
+  let mazeResult;
+  if (useSaved) {
+    // Pick a random saved maze
+    const saved = mazeLibrary[Math.floor(Math.random() * mazeLibrary.length)];
+    config.mazeSize = saved.size;
+    mazeResult = {
+      grid: JSON.parse(JSON.stringify(saved.grid)),
+      doors: saved.doors.map(d => ({ ...d, angle: 0, openedBy: null })),
+      startPositions: saved.startPositions
+    };
+  } else {
+    const doorCount = getDoorCount(_cfg.doorPreset, size);
+    const gen = new MazeGenerator(size, size, seed);
+    mazeResult = gen.generate({ doorCount, teamCount: _cfg.teamCount });
+  }
+
   mazeResult.startPositions.forEach((pos, i) => { if (teams[i]) { teams[i].x = pos.x; teams[i].y = pos.y; } });
 
   // Place symbols deterministically
@@ -664,6 +722,7 @@ async function startGame() {
     phase: 'rolling',
     diceValue: 0, stepsRemaining: 0,
     symbols,
+    mazeData: useSaved ? { grid: mazeResult.grid, startPositions: mazeResult.startPositions } : null,
     doors: mazeResult.doors,
     usedQuestionIds: [],
     activeQuestion: null

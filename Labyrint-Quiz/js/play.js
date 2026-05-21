@@ -204,22 +204,27 @@ function startPlayView() {
 
 function buildLocalGrid() {
   if (!remoteState) return;
-  const { seed, config, teams, symbols, doors } = remoteState;
+  const { seed, config, symbols, mazeData } = remoteState;
   const sz = config.mazeSize || 16;
-  const gen = new MazeGenerator(sz, sz, seed);
-  const doorPresets = { wenig: { 10:4,12:6,16:10 }, viele: { 10:10,12:14,16:20 }, sehrviele: { 10:16,12:22,16:35 } };
-  const dcPreset = doorPresets[config.doorPreset] || doorPresets.viele;
-  const result = gen.generate({ doorCount: dcPreset[sz] || 14, teamCount: config.teamCount });
-  localGrid = result.grid;
 
-  // Apply stored symbols + doors
+  let mazeResult;
+  if (mazeData) {
+    localGrid = JSON.parse(JSON.stringify(mazeData.grid));
+    mazeResult = { grid: localGrid, startPositions: mazeData.startPositions };
+  } else {
+    const gen = new MazeGenerator(sz, sz, seed);
+    const doorPresets = { wenig:{10:4,12:6,16:10}, viele:{10:10,12:14,16:20}, sehrviele:{10:16,12:22,16:35} };
+    const dc = (doorPresets[config.doorPreset]||doorPresets.viele)[sz]||14;
+    mazeResult = gen.generate({ doorCount: dc, teamCount: config.teamCount });
+    localGrid = mazeResult.grid;
+  }
+
   applyStateToGrid(localGrid, symbols || []);
 
-  // Init canvas renderer
   const canvas = document.getElementById('maze-canvas');
   if (canvas && typeof MazeRenderer !== 'undefined') {
     renderer = new MazeRenderer(canvas);
-    renderer.setMaze(result);
+    renderer.setMaze(mazeResult);
   }
 }
 
