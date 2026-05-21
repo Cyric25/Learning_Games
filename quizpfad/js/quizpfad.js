@@ -67,11 +67,11 @@ const QpStorage = {
     const startPoll = () => {
       if(stopped||timer) return;
       const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
-      fn(); timer = setInterval(fn, 1000);
+      fn(); timer = setInterval(fn, 300);
     };
     const startLocalPoll = () => {
       if(stopped||timer) return; let last='';
-      timer = setInterval(() => { if(stopped) return; const s=localStorage.getItem('qp_gs_'+code); if(s&&s!==last){last=s;try{const d=JSON.parse(s);if(d&&d.meta)cb(this._deser(d));}catch{}} }, 500);
+      timer = setInterval(() => { if(stopped) return; const s=localStorage.getItem('qp_gs_'+code); if(s&&s!==last){last=s;try{const d=JSON.parse(s);if(d&&d.meta)cb(this._deser(d));}catch{}} }, 300);
     };
     (async () => { if (await this.checkServer()) startSSE(); else startLocalPoll(); })();
     return { unsubscribe() { stopped=true; src&&src.close(); timer&&clearInterval(timer); } };
@@ -406,7 +406,7 @@ function applyRemoteAnswer(lq) {
       if (document.getElementById('question-modal').classList.contains('open')) {
         continueAfterQuestion();
       }
-    }, 2500);
+    }, 1500);
   }
 }
 

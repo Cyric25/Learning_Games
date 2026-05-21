@@ -1134,7 +1134,7 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
     freshGs.phase = 'finished';
     freshGs.liveQuestion = null;
     freshGs.pendingDice = null;
-    await LsStorage.save(freshGs);
+    LsStorage.save(freshGs);
     lastGs = freshGs;
     setTimeout(() => { _closingAfterResult = false; closeQuestion(); renderAll(freshGs); }, 1500);
     return;
@@ -1219,7 +1219,7 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
     freshGs.phase = 'finished';
     freshGs.liveQuestion = null;
     freshGs.pendingDice = null;
-    await LsStorage.save(freshGs);
+    LsStorage.save(freshGs);
     lastGs = freshGs;
     setTimeout(() => { _closingAfterResult = false; closeQuestion(); renderAll(freshGs); }, 1500);
     return;

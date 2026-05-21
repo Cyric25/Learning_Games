@@ -77,7 +77,7 @@ const GameSync = {
   },
   _startPoll(code, cb) {
     if (this._poll) return;
-    this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 400);
+    this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 300);
   },
   unsubscribe() {
     this._session++;

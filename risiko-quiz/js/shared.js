@@ -220,7 +220,7 @@ const StorageManager = {
         } catch { }
       };
       doPoll();
-      pollInterval = setInterval(doPoll, 1000);
+      pollInterval = setInterval(doPoll, 300);
     };
 
     // Start: SSE wenn Server verfügbar, sonst Polling

@@ -583,7 +583,7 @@
       newGs.liveQuestion.resolved = true;
       newGs.liveQuestion.correct = correct;
       newGs.liveQuestion.selectedMcIndex = idx;
-      await QpStorage.save(QpStorage._deser(newGs));
+      QpStorage.save(QpStorage._deser(newGs));
     }
   }
 

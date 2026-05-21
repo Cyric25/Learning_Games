@@ -117,7 +117,7 @@ const LsStorage = {
           if (r.ok) { const d=await r.json(); if(d&&d.meta) cb(this._deser(d)); }
         } catch {}
       };
-      fn(); timer = setInterval(fn, 1000);
+      fn(); timer = setInterval(fn, 300);
     };
     const startLocalPoll = () => {
       if (stopped||timer) return;
@@ -126,7 +126,8 @@ const LsStorage = {
         if (stopped) return;
         const s = localStorage.getItem('ls_gs_'+code);
         if (s&&s!==last) { last=s; try { const d=JSON.parse(s); if(d&&d.meta) cb(this._deser(d)); } catch {} }
-      }, 500);
+
+      }, 300);
     };
 
     (async () => { if (await this.checkServer()) startSSE(); else startLocalPoll(); })();
