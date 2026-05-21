@@ -1584,10 +1584,9 @@ function startCellActionPoll() {
       const slot = gameData.boardSlots?.[action.slotIdx];
       if (!slot) { gameData.pendingCellAction = null; autosave(); return; }
       gameData.pendingCellAction = null;
-      autosave();
       const allQ = applyQuestionFilter(getSlotQuestionsForDiff(slot, action.diff));
       const unplayed = allQ.filter(q => !GameModel.isQuestionPlayed(gameData, q.id));
-      if (unplayed.length === 0) return;
+      if (unplayed.length === 0) { autosave(); return; }
       const key = GameModel.cellKey(slot, action.diff);
       const selectedId = gameData.session?.selectedQuestions?.[key];
       const pick = (selectedId && unplayed.find(q => q.id === selectedId))
