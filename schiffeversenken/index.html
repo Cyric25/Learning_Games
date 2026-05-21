@@ -678,8 +678,8 @@ function onStateUpdate(newState) {
     if (lq.id !== prevId || document.getElementById('question-modal').classList.contains('hidden')) {
       showQuestionModal(lq);
     } else if (lq.autoCorrect !== null && lq.autoCorrect !== undefined && !processingShot) {
-      // MC: autoCorrect gesetzt von Spieler → zeige Ergebnis im Modal aktuell
-      updateModalForMCResult(lq);
+      // MC: autoCorrect gesetzt von Spieler → Schuss sofort verarbeiten
+      processMCResult();
     }
   }
 }
@@ -717,7 +717,8 @@ function showQuestionModal(lq) {
     }).join('');
 
     if (lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
-      updateModalForMCResult(lq);
+      if (!processingShot) processMCResult();
+      return;
     } else {
       btns.innerHTML = '';
       result.textContent = `Warte auf Antwort von ${team.emoji} ${team.name}…`;
