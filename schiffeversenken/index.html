@@ -653,8 +653,8 @@ function startSSE() {
 function onStateUpdate(newState) {
   if (!newState || !newState.meta) return;
   if (!gameState) return;
+  if (processingShot) return; // gameState nicht überschreiben während Verarbeitung läuft
 
-  const prevLQ = gameState.liveQuestion;
   gameState = newState;
 
   renderTeamStatusList();
@@ -672,16 +672,15 @@ function onStateUpdate(newState) {
     return;
   }
 
-  // Neue Frage angekommen (von view.html gesetzt)
-  if (lq && !lq.resolved) {
-    const prevId = prevLQ ? prevLQ.id : null;
-    if (lq.id !== prevId || document.getElementById('question-modal').classList.contains('hidden')) {
-      showQuestionModal(lq);
-    } else if (lq.autoCorrect !== null && lq.autoCorrect !== undefined && !processingShot) {
-      // MC: autoCorrect gesetzt von Spieler → Schuss sofort verarbeiten
-      processMCResult();
-    }
+  // MC mit Antwort → sofort verarbeiten, kein Modal nötig
+  const isMC = lq.question.type === 'mc' || lq.question.type === 'multiple_choice';
+  if (isMC && lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
+    processMCResult();
+    return;
   }
+
+  // Fragen-Modal anzeigen (MC noch offen, oder offene Frage)
+  showQuestionModal(lq);
 }
 
 // ── Fragen-Modal ──────────────────────────────────────────────────
@@ -716,14 +715,9 @@ function showQuestionModal(lq) {
       return `<div class="${cls}">${escapeHtml(opt)}</div>`;
     }).join('');
 
-    if (lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
-      if (!processingShot) processMCResult();
-      return;
-    } else {
-      btns.innerHTML = '';
-      result.textContent = `Warte auf Antwort von ${team.emoji} ${team.name}…`;
-      result.className = 'modal-result-banner waiting';
-    }
+    btns.innerHTML = '';
+    result.textContent = `Warte auf Antwort von ${team.emoji} ${team.name}…`;
+    result.className = 'modal-result-banner waiting';
   } else {
     // Offene Frage: Spielleiter entscheidet
     opts.innerHTML = '';
