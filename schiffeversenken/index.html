@@ -673,15 +673,10 @@ function onStateUpdate(newState) {
     return;
   }
 
-  // MC mit Antwort → sofort verarbeiten, kein Modal nötig
+  // Modal nur für offene Fragen — MC wird direkt vom Spieler verarbeitet
   const isMC = lq.question.type === 'mc' || lq.question.type === 'multiple_choice';
-  if (isMC && lq.autoCorrect !== null && lq.autoCorrect !== undefined) {
-    processMCResult();
-    return;
-  }
-
-  // Fragen-Modal anzeigen (MC noch offen, oder offene Frage)
-  showQuestionModal(lq);
+  if (!isMC) showQuestionModal(lq);
+  else hideQuestionModal();
 }
 
 // ── Fragen-Modal ──────────────────────────────────────────────────
@@ -738,28 +733,6 @@ function showQuestionModal(lq) {
   modal.classList.remove('hidden');
 }
 
-function updateModalForMCResult(lq) {
-  const result = document.getElementById('modal-result');
-  const btns = document.getElementById('modal-btns');
-  const opts = document.getElementById('modal-mc-options');
-
-  const iQ = lq.question.correctIndex;
-  opts.querySelectorAll('.mc-option').forEach((el, i) => {
-    el.className = 'mc-option' + (i === iQ ? ' correct' : (i === lq.selectedMcIndex && !lq.autoCorrect ? ' wrong' : ''));
-  });
-
-  if (lq.autoCorrect) {
-    const entry = gameState.grid[lq.coordinate];
-    const isHit = entry && entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
-    result.textContent = isHit ? '💥 Richtig! Treffer!' : '✓ Richtig! — Aber Wasser...';
-    result.className = 'modal-result-banner hit';
-  } else {
-    result.textContent = '✗ Falsch — kein Schuss!';
-    result.className = 'modal-result-banner miss';
-  }
-  btns.innerHTML = `<button class="btn-modal-next" onclick="processMCResult()">Weiter →</button>`;
-}
-
 function hideQuestionModal() {
   document.getElementById('question-modal').classList.add('hidden');
 }
@@ -776,18 +749,6 @@ async function resolveOpen(correct) {
   await processShot(correct);
 }
 window.resolveOpen = resolveOpen;
-
-async function processMCResult() {
-  if (!gameState || !gameState.liveQuestion || processingShot) return;
-  const correct = gameState.liveQuestion.autoCorrect;
-  processingShot = true;
-  const ns = deepCopy(gameState);
-  ns.liveQuestion.resolved = true;
-  ns.liveQuestion.shotGranted = correct;
-  gameState = ns;
-  await processShot(correct);
-}
-window.processMCResult = processMCResult;
 
 async function processShot(correct) {
   hideQuestionModal();

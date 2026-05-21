@@ -459,6 +459,7 @@ function onRemoteUpdate(data) {
   }
 
   remoteState = data;
+  if (submittingShot) return; // Ergebnisanzeige läuft, kein Re-Render
 
   if (data.phase === 'setup') { showWaitScreen(); return; }
   if (data.phase === 'finished') {
@@ -785,19 +786,65 @@ function renderMCResult(lq, mcOpts, result) {
 async function submitMCAnswer(idx) {
   if (!remoteState || !remoteState.liveQuestion) return;
   const lq = remoteState.liveQuestion;
-  if (lq.selectedMcIndex !== null) return;
+  if (lq.selectedMcIndex !== null || submittingShot) return;
+  submittingShot = true;
 
   const correct = idx === lq.question.correctIndex;
+
+  // Ergebnis sofort anzeigen
+  const mcOpts = document.getElementById('q-mc-opts');
+  mcOpts.querySelectorAll('.mc-opt').forEach((el, i) => {
+    if (i === lq.question.correctIndex) el.classList.add('opt-correct');
+    else if (i === idx && !correct) el.classList.add('opt-wrong');
+  });
+  const result = document.getElementById('q-result');
+  result.style.display = '';
+  result.textContent = correct ? '✓ Richtig!' : '✗ Falsch — kein Schuss';
+  result.className = 'q-result ' + (correct ? 'correct' : 'wrong');
+
+  // Schuss direkt verarbeiten (kein Umweg über index.html)
   const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
   ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
-  ns.liveQuestion.selectedMcIndex = idx;
-  ns.liveQuestion.autoCorrect = correct;
-  remoteState = ns;
-  await BsStorage.save(ns);
+  ns.liveQuestion = null;
 
-  const mcOpts = document.getElementById('q-mc-opts');
-  const result = document.getElementById('q-result');
-  renderMCResult(ns.liveQuestion, mcOpts, result);
+  if (correct) {
+    const entry = ns.grid[lq.coordinate] || {};
+    entry.shotByTeamIdx = lq.teamIdx;
+    ns.grid[lq.coordinate] = entry;
+    if (entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined) {
+      const vt = ns.teams[entry.shipTeamIdx];
+      vt.ships.forEach(ship => {
+        if (ship.coords.includes(lq.coordinate)) {
+          const sunk = ship.coords.every(c => { const e = ns.grid[c]; return e && e.shotByTeamIdx !== null && e.shotByTeamIdx !== undefined; });
+          if (sunk) ship.sunk = true;
+        }
+      });
+      if (vt.ships.every(s => s.sunk)) {
+        vt.eliminated = true;
+        ns.turnOrder = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+      }
+    }
+  }
+
+  ns.usedQuestionIds.add(lq.question.id);
+  const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+  if (alive.length <= 1) {
+    ns.phase = 'finished';
+    ns.winner = alive.length === 1 ? alive[0] : null;
+  } else {
+    const prevIdx = alive.indexOf(lq.teamIdx);
+    ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
+  }
+
+  remoteState = ns;
+  BsStorage.save(ns); // fire-and-forget, kein await nötig
+
+  // Overlay nach 1.5s schließen, dann Grid neu rendern
+  setTimeout(() => {
+    document.getElementById('q-overlay').classList.add('hidden');
+    submittingShot = false;
+    renderGameView();
+  }, 1500);
 }
 window.submitMCAnswer = submitMCAnswer;
 

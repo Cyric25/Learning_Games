@@ -76,7 +76,7 @@ const BsStorage = {
     const startPoll = () => {
       if(stopped||timer) return;
       const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=bs-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
-      fn(); timer = setInterval(fn, 1000);
+      fn(); timer = setInterval(fn, 300);
     };
     const startLocalPoll = () => {
       if(stopped||timer) return; let last='';
