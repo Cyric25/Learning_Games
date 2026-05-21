@@ -33,15 +33,17 @@ const DIR = {
 };
 const DIRS = [DIR.N, DIR.E, DIR.S, DIR.W];
 
-// Start positions for up to 6 teams (corners + top/bottom center)
-const TEAM_START_POSITIONS = [
-  { x: 0,  y: 0  },   // Team 0: top-left
-  { x: 15, y: 15 },   // Team 1: bottom-right
-  { x: 15, y: 0  },   // Team 2: top-right
-  { x: 0,  y: 15 },   // Team 3: bottom-left
-  { x: 7,  y: 0  },   // Team 4: top-center
-  { x: 7,  y: 15 },   // Team 5: bottom-center
-];
+function getTeamStartPositions(w, h) {
+  const mx = w - 1, my = h - 1, cx = Math.floor((w - 1) / 2), cy = Math.floor((h - 1) / 2);
+  return [
+    { x: 0,  y: 0  },
+    { x: mx, y: my },
+    { x: mx, y: 0  },
+    { x: 0,  y: my },
+    { x: cx, y: 0  },
+    { x: cx, y: my },
+  ];
+}
 
 // ── MazeGenerator ────────────────────────────────────────────────
 class MazeGenerator {
@@ -71,7 +73,7 @@ class MazeGenerator {
     this._addExtraConnections(grid, 18 + this.rng.nextInt(0, 6));
 
     // 3. Mark start positions
-    const startPositions = TEAM_START_POSITIONS.slice(0, Math.min(teamCount, 6));
+    const startPositions = getTeamStartPositions(w, h).slice(0, Math.min(teamCount, 6));
     startPositions.forEach(pos => { grid[pos.y][pos.x].type = 'start'; });
 
     // 4. Place doors (excluding start vicinities)
