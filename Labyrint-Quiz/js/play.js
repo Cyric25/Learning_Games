@@ -207,11 +207,13 @@ function buildLocalGrid() {
   const { seed, config, teams, symbols, doors } = remoteState;
   const sz = config.mazeSize || 16;
   const gen = new MazeGenerator(sz, sz, seed);
-  const result = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[sz]||14, teamCount: config.teamCount });
+  const doorPresets = { wenig: { 10:4,12:6,16:10 }, viele: { 10:10,12:14,16:20 }, sehrviele: { 10:16,12:22,16:35 } };
+  const dcPreset = doorPresets[config.doorPreset] || doorPresets.viele;
+  const result = gen.generate({ doorCount: dcPreset[sz] || 14, teamCount: config.teamCount });
   localGrid = result.grid;
 
   // Apply stored symbols + doors
-  applyStateToGrid(localGrid, symbols || [], doors || []);
+  applyStateToGrid(localGrid, symbols || []);
 
   // Init canvas renderer
   const canvas = document.getElementById('maze-canvas');
@@ -221,13 +223,24 @@ function buildLocalGrid() {
   }
 }
 
-function applyStateToGrid(grid, symbols, doors) {
+function getDoorOnPassage(doors, x, y, dir) {
+  const d = DMAP[dir];
+  const nx = x + d.dx, ny = y + d.dy;
+  const DIR_UP = dir.toUpperCase();
+  const OPP = { n: 'S', s: 'N', e: 'W', w: 'E' }[dir];
+  return (doors || []).find(dr => {
+    if (dr.open) return false;
+    if (dr.cellX === x  && dr.cellY === y  && dr.blockedDir === DIR_UP) return true;
+    return dr.cellX === nx && dr.cellY === ny && dr.blockedDir === OPP;
+  }) || null;
+}
+
+function applyStateToGrid(grid, symbols) {
   const H = grid.length, W = grid[0]?.length || H;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
-      if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
+      if (grid[y][x].type === 'symbol') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
   symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
-  doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });
 }
 
 function onRemoteUpdate(data) {
@@ -250,7 +263,7 @@ function onRemoteUpdate(data) {
     return;
   }
   remoteState = data;
-  applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
+  applyStateToGrid(localGrid, data.symbols || []);
   renderCanvas(data);
   applyState(data);
 }
@@ -450,7 +463,7 @@ function advanceInDirection(dir, state) {
     const nx = cx + d.dx, ny = cy + d.dy;
     if (nx < 0 || nx >= W || ny < 0 || ny >= H) break;
 
-    const closedDoor = (state.doors || []).find(dr => dr.x === nx && dr.y === ny && !dr.open);
+    const closedDoor = getDoorOnPassage(state.doors, cx, cy, dir);
     if (closedDoor) return { stop: 'door', teamX: cx, teamY: cy, doorX: nx, doorY: ny, door: closedDoor };
 
     const cell = localGrid[ny][nx];
@@ -775,8 +788,8 @@ function continueAfterQuestion() {
   newState.usedQuestionIds = [...used];
 
   if (ctx.type === 'door' && wasCorrect) {
-    const door = newState.doors.find(d => d.x === ctx.target.x && d.y === ctx.target.y);
-    if (door) { door.open = true; door.openedBy = myTeamId; }
+    const door = newState.doors.find(d => d.id === ctx.door.id);
+    if (door) { door.open = true; door.angle = 90; door.openedBy = myTeamId; }
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
   } else if (ctx.type === 'symbol' && wasCorrect) {
@@ -803,7 +816,7 @@ function continueAfterQuestion() {
   newState.stepsRemaining = 0;
   newState.currentTeamIdx = (newState.currentTeamIdx + 1) % newState.teams.length;
 
-  applyStateToGrid(localGrid, newState.symbols || [], newState.doors || []);
+  applyStateToGrid(localGrid, newState.symbols || []);
   postState(newState);
 
   if (newState.currentTeamIdx !== myTeamId) {
@@ -852,7 +865,7 @@ function clearTimer() { if (timerInterval) { clearInterval(timerInterval); timer
 function postState(newState) {
   _ignoreNextUpdate = true;
   remoteState = newState;
-  applyStateToGrid(localGrid, newState.symbols || [], newState.doors || []);
+  applyStateToGrid(localGrid, newState.symbols || []);
   renderCanvas(newState);
   GameSync.save(gameCode, newState);
 }

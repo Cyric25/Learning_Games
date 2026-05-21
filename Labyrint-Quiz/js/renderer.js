@@ -183,36 +183,53 @@ class MazeRenderer {
         ctx.fillRect(ox + x * cs - sq / 2, oy + y * cs - sq / 2, sq, sq);
   }
 
-  // ── Door icon ──────────────────────────────────────────────────
+  // ── Rotating door (wall segment) ──────────────────────────────
   _drawDoor(ctx, door, c, cs, ox, oy) {
-    const cx = ox + door.x * cs + cs / 2;
-    const cy = oy + door.y * cs + cs / 2;
-    const r  = cs * 0.34;
+    const { ax, ay, baseRad } = this._doorGeometry(door, cs, ox, oy);
+    const openRad = door.rotDir * (door.angle || 0) * Math.PI / 180;
 
-    if (door.open) {
-      ctx.fillStyle = c.doorOpen;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${cs * 0.32}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('✓', cx, cy + 1);
-    } else {
-      // Stone arch / locked door
-      ctx.fillStyle = c.door;
-      ctx.beginPath();
-      ctx.roundRect(cx - r, cy - r, r * 2, r * 2, cs * 0.08);
-      ctx.fill();
+    ctx.save();
+    ctx.translate(ax, ay);
+    ctx.rotate(baseRad + openRad);
 
-      // Lock icon
-      ctx.fillStyle = '#f5e6c8';
-      ctx.font = `${cs * 0.36}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🔒', cx, cy + 1);
+    const lw = Math.max(3, cs * 0.13);
+    ctx.strokeStyle = door.open ? '#4a7c4f' : '#8B4513';
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(cs, 0);
+    ctx.stroke();
+
+    // Hinge dot
+    ctx.fillStyle = door.open ? '#2d5a27' : '#5c2d0a';
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(2, cs * 0.07), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  _doorGeometry(door, cs, ox, oy) {
+    const x = door.cellX, y = door.cellY;
+    const px = ox + x * cs, py = oy + y * cs;
+
+    let ax, ay;
+    switch (door.corner) {
+      case 'NW': ax = px;      ay = py;      break;
+      case 'NE': ax = px + cs; ay = py;      break;
+      case 'SE': ax = px + cs; ay = py + cs; break;
+      case 'SW': ax = px;      ay = py + cs; break;
     }
+
+    // Angle from anchor toward door's far end when closed (canvas: East=0, South=π/2, West=π, North=-π/2)
+    const baseAngles = {
+      NE: { N: Math.PI,       E:  Math.PI / 2 },
+      NW: { N: 0,             W:  Math.PI / 2 },
+      SE: { S: Math.PI,       E: -Math.PI / 2 },
+      SW: { S: 0,             W: -Math.PI / 2 },
+    };
+    return { ax, ay, baseRad: baseAngles[door.corner][door.blockedDir] };
   }
 
   // ── Team symbols ───────────────────────────────────────────────

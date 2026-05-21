@@ -237,9 +237,9 @@ async function _gsEnter(code) {
     activeCategories = new Set(state.config.kategorien || []);
     const _sz = state.config?.mazeSize || 16;
     const gen = new MazeGenerator(_sz, _sz, state.seed);
-    const mazeResult = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[_sz]||10, teamCount: state.config.teamCount });
+    const mazeResult = gen.generate({ doorCount: getDoorCount(state.config.doorPreset, _sz), teamCount: state.config.teamCount });
     localGrid = mazeResult.grid;
-    applyStateToGrid(localGrid, state.symbols || [], state.doors || []);
+    applyStateToGrid(localGrid, state.symbols || []);
     showScreen('game-screen');
     showGameCode();
     const canvas = document.getElementById('maze-canvas');
@@ -292,9 +292,22 @@ function buildSetupUI() {
   buildTeamCountUI();
   renderTeamSelectList(_cfg.teamCount);
   buildMazeSizeUI();
+  buildDoorPresetUI();
   buildSymbolModeUI();
   buildSymbolsUI();
   buildTimerUI();
+}
+
+function buildDoorPresetUI() {
+  const row = document.getElementById('door-preset-row'); if (!row) return;
+  row.innerHTML = '';
+  [{ label: 'Wenig', v: 'wenig' }, { label: 'Viele', v: 'viele' }, { label: 'Sehr viele', v: 'sehrviele' }].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'param-btn' + (opt.v === _cfg.doorPreset ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => { _cfg.doorPreset = opt.v; row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+    row.appendChild(btn);
+  });
 }
 
 function buildMazeSizeUI() {
@@ -529,7 +542,16 @@ function updateCategoryInfo() {
   if (btn) btn.disabled = !ok;
 }
 
-let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false };
+let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele' };
+
+function getDoorCount(preset, size) {
+  const presets = {
+    wenig:     { 10: 4,  12: 6,  16: 10 },
+    viele:     { 10: 10, 12: 14, 16: 20 },
+    sehrviele: { 10: 16, 12: 22, 16: 35 },
+  };
+  return (presets[preset] || presets.viele)[size] || 14;
+}
 
 // ── proceedToCategories (Setup → Category-Screen) ─────────────────
 function proceedToCategories() {
@@ -611,8 +633,8 @@ async function startGame() {
 
   const seed = Date.now() & 0x7fffffff;
   const size = _cfg.mazeSize || 12;
-  const doorCount = ({ 10: 8, 12: 10, 16: 14 })[size] || 10;
-  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols };
+  const doorCount = getDoorCount(_cfg.doorPreset, size);
+  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols, doorPreset: _cfg.doorPreset };
 
   // Generate maze deterministically
   const gen = new MazeGenerator(size, size, seed);
@@ -634,7 +656,7 @@ async function startGame() {
     phase: 'rolling',
     diceValue: 0, stepsRemaining: 0,
     symbols,
-    doors: mazeResult.doors.map(d => ({ id: d.id, x: d.x, y: d.y, open: false, openedBy: null })),
+    doors: mazeResult.doors,
     usedQuestionIds: [],
     activeQuestion: null
   };
@@ -675,7 +697,7 @@ function placeTeamSymbols(grid, teams, perTeam, seed, size) {
   const cells = [];
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
-      if (!excluded.has(`${x},${y}`) && grid[y][x].type !== 'door') cells.push({ x, y });
+      if (!excluded.has(`${x},${y}`)) cells.push({ x, y });
 
   new SeededRNG((seed * 31 + 7) & 0x7fffffff).shuffle(cells);
 
@@ -700,7 +722,7 @@ let _teacherEvalQuestionId = null;
 function applyRemoteState(data) {
   if (!data?.meta || !localGrid) return;
   gameState = data;
-  applyStateToGrid(localGrid, data.symbols || [], data.doors || []);
+  applyStateToGrid(localGrid, data.symbols || []);
   const aq = data.activeQuestion;
   if (aq && aq.questionResult === null) {
     // Lehrkraft-Eval-Modal nur für offene Fragen zeigen (nicht für MC)
@@ -799,13 +821,12 @@ async function resolveOpenQuestion(correct) {
 }
 window.resolveOpenQuestion = resolveOpenQuestion;
 
-function applyStateToGrid(grid, symbols, doors) {
+function applyStateToGrid(grid, symbols) {
   const H = grid.length, W = grid[0]?.length || H;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
-      if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
+      if (grid[y][x].type === 'symbol') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
   symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
-  doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });
 }
 
 // ── Board rendern ─────────────────────────────────────────────────

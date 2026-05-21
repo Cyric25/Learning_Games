@@ -150,29 +150,68 @@ class MazeGenerator {
         }
     });
 
-    // Candidates: corridor cells (exactly 2 open neighbors)
+    // Corner pairs: two adjacent open sides share a corner → anchor point
+    const PAIRS = [
+      { corner: 'NE', dirs: ['N', 'E'], walls: [1, 2] },
+      { corner: 'SE', dirs: ['E', 'S'], walls: [2, 4] },
+      { corner: 'SW', dirs: ['S', 'W'], walls: [4, 8] },
+      { corner: 'NW', dirs: ['W', 'N'], walls: [8, 1] },
+    ];
+
     const candidates = [];
-    for (let y = 0; y < this.h; y++)
+    for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
         if (excluded.has(`${x},${y}`)) continue;
-        if (this._getOpenNeighborCount(grid, x, y) === 2)
-          candidates.push({ x, y });
+        const cell = grid[y][x];
+        for (const pair of PAIRS) {
+          if (!(cell.walls & pair.walls[0]) && !(cell.walls & pair.walls[1]))
+            candidates.push({ x, y, pair });
+        }
       }
+    }
 
     this.rng.shuffle(candidates);
 
     const doors = [];
+    const usedPassages = new Set();
+
     for (const c of candidates) {
       if (doors.length >= count) break;
+
       let tooClose = false;
       for (const d of doors) {
-        if (Math.abs(d.x - c.x) + Math.abs(d.y - c.y) < 4) { tooClose = true; break; }
+        if (Math.abs(d.cellX - c.x) + Math.abs(d.cellY - c.y) < 3) { tooClose = true; break; }
       }
       if (tooClose) continue;
-      grid[c.y][c.x].type = 'door';
-      doors.push({ id: 'door-' + doors.length, x: c.x, y: c.y, open: false, openedBy: null });
+
+      // Randomly pick which of the two open sides the door blocks
+      const sideIdx = this.rng.nextInt(0, 1);
+      const blockedDir = c.pair.dirs[sideIdx];
+
+      const passKey = this._passageKey(c.x, c.y, blockedDir);
+      if (usedPassages.has(passKey)) continue;
+      usedPassages.add(passKey);
+
+      const rotDir = this.rng.nextInt(0, 1) === 0 ? 1 : -1;
+
+      doors.push({
+        id: 'door-' + doors.length,
+        cellX: c.x, cellY: c.y,
+        corner: c.pair.corner,
+        blockedDir,
+        rotDir,
+        angle: 0,
+        open: false,
+        openedBy: null
+      });
     }
     return doors;
+  }
+
+  _passageKey(x, y, dir) {
+    if (dir === 'S') return `N:${x},${y + 1}`;
+    if (dir === 'W') return `E:${x - 1},${y}`;
+    return `${dir}:${x},${y}`;
   }
 
   _validateConnected(grid, startPositions) {
