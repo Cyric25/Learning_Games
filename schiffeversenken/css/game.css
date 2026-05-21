@@ -241,6 +241,22 @@ button { cursor: pointer; font-family: inherit; }
 .qmode-desc { font-size: .74rem; font-weight: 400; color: var(--text-secondary); text-align: center; }
 .qmode-btn.active .qmode-desc { color: var(--accent); opacity: .8; }
 
+/* Timer-Einstellung */
+.timer-setting {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--border);
+}
+.timer-setting-label { font-size: .88rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.timer-btns { display: flex; gap: .35rem; flex-wrap: wrap; }
+.timer-btn {
+  padding: .35rem .8rem; font-size: .85rem; font-weight: 700;
+  background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 8px; cursor: pointer; color: var(--text-primary);
+  transition: border-color .15s, background .15s;
+}
+.timer-btn:hover { border-color: var(--accent); }
+.timer-btn.active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+
 /* Setup buttons */
 .btn-primary {
   padding: .8rem 2rem;

@@ -118,6 +118,17 @@
         <span class="qmode-desc">Spielleiter bewertet immer</span>
       </button>
     </div>
+    <div class="timer-setting" id="mc-timer-row">
+      <span class="timer-setting-label">⏱ Timer pro MC-Frage:</span>
+      <div class="timer-btns">
+        <button class="timer-btn active" data-sec="0"  onclick="setMcTimer(0)">Kein Timer</button>
+        <button class="timer-btn" data-sec="10" onclick="setMcTimer(10)">10 s</button>
+        <button class="timer-btn" data-sec="20" onclick="setMcTimer(20)">20 s</button>
+        <button class="timer-btn" data-sec="30" onclick="setMcTimer(30)">30 s</button>
+        <button class="timer-btn" data-sec="45" onclick="setMcTimer(45)">45 s</button>
+        <button class="timer-btn" data-sec="60" onclick="setMcTimer(60)">60 s</button>
+      </div>
+    </div>
   </div>
 
   <!-- Start -->
@@ -196,6 +207,7 @@ let rawCategories = [];
 let allQuestions  = [];
 let selectedCategoryIds = new Set();
 let questionMode = 'mixed'; // 'mixed' | 'mc' | 'open'
+let mcTimerSeconds = 0;    // 0 = kein Timer
 let bsSub = null;
 let processingShot = false;
 
@@ -421,6 +433,13 @@ function setQuestionMode(mode) {
 }
 window.setQuestionMode = setQuestionMode;
 
+function setMcTimer(sec) {
+  mcTimerSeconds = sec;
+  document.querySelectorAll('.timer-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.sec) === sec));
+}
+window.setMcTimer = setMcTimer;
+
 // ── Schiff-Platzierung ────────────────────────────────────────────
 function placeShipsForAllTeams(teams) {
   const occupied = new Set();
@@ -484,6 +503,7 @@ async function startGame() {
     winner: null,
     activeCategoryIds: [...selectedCategoryIds],
     questionMode,
+    mcTimerSeconds,
     usedQuestionIds: new Set()
   };
 
@@ -936,6 +956,7 @@ async function _gsEnter(code) {
   if (gs.phase === 'playing' || gs.phase === 'finished') {
     if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
     if (gs.questionMode) setQuestionMode(gs.questionMode);
+    if (gs.mcTimerSeconds !== undefined) setMcTimer(gs.mcTimerSeconds);
     enterGameScreen();
     if (gs.phase === 'finished' && gs.winner !== null) showWinnerScreen(gs.winner);
   } else {
@@ -944,6 +965,7 @@ async function _gsEnter(code) {
       : DEFAULT_TEAMS.map((t, i) => ({ ...t, id: i }));
     if (gs.activeCategoryIds) selectedCategoryIds = new Set(gs.activeCategoryIds);
     if (gs.questionMode) setQuestionMode(gs.questionMode);
+    if (gs.mcTimerSeconds !== undefined) setMcTimer(gs.mcTimerSeconds);
     renderTeamSetupList();
     buildCategoryUI();
     showScreen('setup-screen');

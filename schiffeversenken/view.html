@@ -220,6 +220,16 @@
     .q-result.correct { background: rgba(46,204,113,.15); color: var(--success); }
     .q-result.wrong   { background: rgba(231,76,60,.1); color: var(--danger); }
     .q-hint { font-size: .82rem; color: var(--text-2); font-style: italic; margin-top: .5rem; }
+    .q-timer { margin: .6rem 0 .3rem; }
+    .q-timer.hidden { display: none; }
+    .q-timer-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .q-timer-fill {
+      height: 100%; border-radius: 4px;
+      background: var(--accent);
+      transition: width 1s linear, background .3s;
+    }
+    .q-timer-fill.urgent { background: var(--danger); }
+    .q-timer-text { font-size: .8rem; font-weight: 700; color: var(--text-2); text-align: right; margin-top: .2rem; }
 
     /* ── Eliminated / Finished ── */
     .elim-banner {
@@ -325,6 +335,10 @@
     <div class="q-header">Schuss auf <span class="q-coord" id="q-coord"></span></div>
     <div id="q-category" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.3rem;"></div>
     <div class="q-text" id="q-text"></div>
+    <div class="q-timer hidden" id="q-timer">
+      <div class="q-timer-bar"><div class="q-timer-fill" id="q-timer-fill"></div></div>
+      <div class="q-timer-text" id="q-timer-text"></div>
+    </div>
     <div id="q-mc-opts" class="mc-opts"></div>
     <div class="open-waiting hidden" id="q-open-wait">📢 Beantworte die Frage mündlich.<br>Der Spielleiter bewertet deinen Schuss.</div>
     <div id="q-result" class="q-result" style="display:none;"></div>
@@ -345,6 +359,7 @@ let gameCode    = null;
 let bsSub       = null;
 let allQuestions = [];
 let submittingShot = false;
+let mcTimerInterval = null;
 
 // ── Utilities ─────────────────────────────────────────────────────
 function escapeHtml(s) {
@@ -770,6 +785,59 @@ async function fireShot() {
 }
 window.fireShot = fireShot;
 
+// ── MC-Timer ──────────────────────────────────────────────────────
+function startMCTimer(totalSec) {
+  clearMCTimer();
+  if (!totalSec) return;
+  let remaining = totalSec;
+  const timerEl  = document.getElementById('q-timer');
+  const fillEl   = document.getElementById('q-timer-fill');
+  const textEl   = document.getElementById('q-timer-text');
+  timerEl.classList.remove('hidden');
+  function tick() {
+    const pct = remaining / totalSec * 100;
+    fillEl.style.width = pct + '%';
+    fillEl.classList.toggle('urgent', remaining <= Math.min(5, Math.floor(totalSec * .25)));
+    textEl.textContent = remaining + ' s';
+    if (remaining <= 0) { clearMCTimer(); handleMCTimeout(); return; }
+    remaining--;
+  }
+  tick();
+  mcTimerInterval = setInterval(tick, 1000);
+}
+function clearMCTimer() {
+  if (mcTimerInterval) { clearInterval(mcTimerInterval); mcTimerInterval = null; }
+  const el = document.getElementById('q-timer');
+  if (el) el.classList.add('hidden');
+}
+async function handleMCTimeout() {
+  if (!remoteState || !remoteState.liveQuestion || submittingShot) return;
+  submittingShot = true;
+  const lq = remoteState.liveQuestion;
+  const result = document.getElementById('q-result');
+  result.style.display = '';
+  result.textContent = '⏰ Zeit abgelaufen — kein Schuss';
+  result.className = 'q-result wrong';
+  const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
+  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.liveQuestion = null;
+  ns.usedQuestionIds.add(lq.question.id);
+  const alive = ns.turnOrder.filter(id => !ns.teams[id].eliminated);
+  if (alive.length <= 1) {
+    ns.phase = 'finished'; ns.winner = alive.length === 1 ? alive[0] : null;
+  } else {
+    const prevIdx = alive.indexOf(lq.teamIdx);
+    ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
+  }
+  remoteState = ns;
+  BsStorage.save(ns);
+  setTimeout(() => {
+    document.getElementById('q-overlay').classList.add('hidden');
+    submittingShot = false;
+    renderGameView();
+  }, 1500);
+}
+
 // ── Fragen-Overlay ────────────────────────────────────────────────
 function showQuestionOverlay(lq) {
   const overlay = document.getElementById('q-overlay');
@@ -794,6 +862,7 @@ function showQuestionOverlay(lq) {
     mcOpts.innerHTML = (lq.question.options||[]).map((opt, i) =>
       `<button class="mc-opt" onclick="submitMCAnswer(${i})">${escapeHtml(opt)}</button>`
     ).join('');
+    startMCTimer(remoteState.mcTimerSeconds || 0);
   } else if (isMC && lq.autoCorrect !== null) {
     // MC: bereits beantwortet, zeige Ergebnis
     openWait.classList.add('hidden');
@@ -829,6 +898,7 @@ async function submitMCAnswer(idx) {
   const lq = remoteState.liveQuestion;
   if (lq.selectedMcIndex !== null || submittingShot) return;
   submittingShot = true;
+  clearMCTimer();
 
   const correct = idx === lq.question.correctIndex;
 
