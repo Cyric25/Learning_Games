@@ -168,6 +168,30 @@
 
     /* Fullscreen hint */
     .fs-hint { font-size: .75rem; color: var(--text-2); text-align: center; }
+
+    /* ── Fragen-Panel ── */
+    .board-question {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: .7rem 1rem; flex-shrink: 0;
+    }
+    .board-question.hidden { display: none; }
+    .bq-label {
+      font-size: .72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--accent); margin-bottom: .35rem;
+    }
+    .bq-text {
+      font-size: .97rem; font-weight: 600; color: var(--text);
+      line-height: 1.4; margin-bottom: .5rem;
+    }
+    .bq-opts { display: flex; flex-direction: column; gap: .3rem; }
+    .bq-opt {
+      background: var(--bg-secondary); border: 1px solid var(--border);
+      border-radius: 7px; padding: .35rem .7rem;
+      font-size: .88rem; color: var(--text);
+    }
+    .bq-hint {
+      font-size: .8rem; color: var(--text-2); margin-top: .4rem; font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -198,6 +222,12 @@
       </div>
     </div>
     <div class="turn-info" id="turn-info">Verbinde…</div>
+    <div class="board-question hidden" id="board-question">
+      <div class="bq-label" id="bq-label"></div>
+      <div class="bq-text" id="bq-text"></div>
+      <div class="bq-opts" id="bq-opts"></div>
+      <div class="bq-hint" id="bq-hint" style="display:none;"></div>
+    </div>
     <div class="grid-wrapper">
       <div id="board-grid" class="grid-outer"></div>
     </div>
@@ -205,7 +235,7 @@
   <div class="board-right">
     <div class="status-title">Teams</div>
     <div id="team-status"></div>
-    <div class="fs-hint">Schüsse: Treffer = Teamfarbe · Miss = ◦</div>
+    <div class="fs-hint">Treffer = Teamfarbe · Miss = ✕</div>
   </div>
 </div>
 
@@ -262,8 +292,38 @@ function renderBoard() {
   if (!boardState) return;
   document.getElementById('board-title').textContent = `⚓ ${boardState.meta.title||'Schiffeversenken'}`;
   renderTurnInfo();
+  renderBoardQuestion();
   renderBoardGrid();
   renderTeamStatus();
+}
+
+function renderBoardQuestion() {
+  const panel = document.getElementById('board-question');
+  const lq = boardState && boardState.liveQuestion;
+  if (!lq || lq.resolved) { panel.classList.add('hidden'); return; }
+
+  const team = boardState.teams[lq.teamIdx];
+  const q = lq.question;
+  const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+
+  document.getElementById('bq-label').textContent =
+    `${team?.emoji||''} ${team?.name||''} — Schuss auf ${lq.coordinate}`;
+  document.getElementById('bq-text').textContent = q.question || '';
+
+  const optsEl = document.getElementById('bq-opts');
+  if (isMC) {
+    optsEl.innerHTML = (q.options||[]).map((opt, i) =>
+      `<div class="bq-opt">${String.fromCharCode(65+i)}) ${escapeHtml(opt)}</div>`
+    ).join('');
+  } else {
+    optsEl.innerHTML = '';
+  }
+
+  const hintEl = document.getElementById('bq-hint');
+  if (q.hint) { hintEl.textContent = `💡 ${q.hint}`; hintEl.style.display = ''; }
+  else { hintEl.style.display = 'none'; }
+
+  panel.classList.remove('hidden');
 }
 
 function renderTurnInfo() {

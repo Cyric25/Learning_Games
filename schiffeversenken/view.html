@@ -568,7 +568,7 @@ function renderGameView() {
     if (isMyShot) {
       showQuestionOverlay(lq);
     } else {
-      document.getElementById('q-overlay').classList.add('hidden');
+      showSpectatorQuestion(lq);
     }
   } else {
     if (submittingShot) return;
@@ -798,6 +798,39 @@ async function submitMCAnswer(idx) {
   renderMCResult(ns.liveQuestion, mcOpts, result);
 }
 window.submitMCAnswer = submitMCAnswer;
+
+// ── Zuschauer-Fragenansicht ───────────────────────────────────────
+function showSpectatorQuestion(lq) {
+  const overlay = document.getElementById('q-overlay');
+  const team = remoteState.teams[lq.teamIdx];
+  const q = lq.question;
+  const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+
+  document.getElementById('q-coord').textContent = lq.coordinate;
+  document.getElementById('q-text').textContent = q.question || '';
+
+  const hint = document.getElementById('q-hint');
+  if (q.hint) { hint.textContent = `💡 ${q.hint}`; hint.style.display = ''; }
+  else { hint.style.display = 'none'; }
+
+  const mcOpts = document.getElementById('q-mc-opts');
+  const openWait = document.getElementById('q-open-wait');
+  const result = document.getElementById('q-result');
+  result.style.display = 'none';
+
+  if (isMC) {
+    openWait.classList.add('hidden');
+    mcOpts.innerHTML = (q.options||[]).map((opt, i) =>
+      `<div class="mc-opt" style="cursor:default;opacity:.85;">${String.fromCharCode(65+i)}) ${escapeHtml(opt)}</div>`
+    ).join('');
+  } else {
+    mcOpts.innerHTML = '';
+    openWait.classList.remove('hidden');
+    openWait.innerHTML = `📢 ${team?.emoji||''} <strong>${escapeHtml(team?.name||'')}</strong> beantwortet die Frage mündlich.`;
+  }
+
+  overlay.classList.remove('hidden');
+}
 
 // ── Init ──────────────────────────────────────────────────────────
 (async function init() {
