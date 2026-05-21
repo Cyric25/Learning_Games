@@ -169,28 +169,45 @@
     /* Fullscreen hint */
     .fs-hint { font-size: .75rem; color: var(--text-2); text-align: center; }
 
-    /* ── Fragen-Panel ── */
-    .board-question {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 10px; padding: .7rem 1rem; flex-shrink: 0;
+    /* ── Fragen-Modal ── */
+    .bq-modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.45);
+      align-items: center; justify-content: center;
+      padding: 1.5rem;
     }
-    .board-question.hidden { display: none; }
+    .bq-modal-overlay.active { display: flex; }
+    .bq-modal-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.8rem 2rem;
+      width: 100%; max-width: 600px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.35);
+      animation: bqFadeIn .2s ease;
+    }
+    @keyframes bqFadeIn { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:none; } }
     .bq-label {
-      font-size: .72rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .07em; color: var(--accent); margin-bottom: .35rem;
+      font-size: .8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-2); margin-bottom: .6rem;
+    }
+    .bq-category {
+      font-size: .8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--accent); margin-bottom: .4rem;
     }
     .bq-text {
-      font-size: .97rem; font-weight: 600; color: var(--text);
-      line-height: 1.4; margin-bottom: .5rem;
+      font-size: 1.25rem; font-weight: 600; color: var(--text);
+      line-height: 1.45; margin-bottom: .9rem;
     }
-    .bq-opts { display: flex; flex-direction: column; gap: .3rem; }
+    .bq-opts { display: flex; flex-direction: column; gap: .4rem; }
     .bq-opt {
-      background: var(--bg-secondary); border: 1px solid var(--border);
-      border-radius: 7px; padding: .35rem .7rem;
-      font-size: .88rem; color: var(--text);
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 9px; padding: .55rem .9rem;
+      font-size: 1rem; color: var(--text);
     }
     .bq-hint {
-      font-size: .8rem; color: var(--text-2); margin-top: .4rem; font-style: italic;
+      font-size: .85rem; color: var(--text-2); margin-top: .6rem; font-style: italic;
     }
   </style>
 </head>
@@ -222,13 +239,6 @@
       </div>
     </div>
     <div class="turn-info" id="turn-info">Verbinde…</div>
-    <div class="board-question hidden" id="board-question">
-      <div class="bq-label" id="bq-label"></div>
-      <div id="bq-category" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.3rem;"></div>
-      <div class="bq-text" id="bq-text"></div>
-      <div class="bq-opts" id="bq-opts"></div>
-      <div class="bq-hint" id="bq-hint" style="display:none;"></div>
-    </div>
     <div class="grid-wrapper">
       <div id="board-grid" class="grid-outer"></div>
     </div>
@@ -237,6 +247,17 @@
     <div class="status-title">Teams</div>
     <div id="team-status"></div>
     <div class="fs-hint">Treffer = Teamfarbe · Miss = ✕</div>
+  </div>
+</div>
+
+<!-- ── Fragen-Modal ────────────────────────────────────────────────── -->
+<div class="bq-modal-overlay" id="bq-modal">
+  <div class="bq-modal-card">
+    <div class="bq-label" id="bq-label"></div>
+    <div class="bq-category" id="bq-category"></div>
+    <div class="bq-text" id="bq-text"></div>
+    <div class="bq-opts" id="bq-opts"></div>
+    <div class="bq-hint" id="bq-hint" style="display:none;"></div>
   </div>
 </div>
 
@@ -299,9 +320,9 @@ function renderBoard() {
 }
 
 function renderBoardQuestion() {
-  const panel = document.getElementById('board-question');
+  const modal = document.getElementById('bq-modal');
   const lq = boardState && boardState.liveQuestion;
-  if (!lq || lq.resolved) { panel.classList.add('hidden'); return; }
+  if (!lq || lq.resolved) { modal.classList.remove('active'); return; }
 
   const team = boardState.teams[lq.teamIdx];
   const q = lq.question;
@@ -309,8 +330,7 @@ function renderBoardQuestion() {
 
   document.getElementById('bq-label').textContent =
     `${team?.emoji||''} ${team?.name||''} — Schuss auf ${lq.coordinate}`;
-  const catEl = document.getElementById('bq-category');
-  if (catEl) catEl.textContent = q.kategorieName || '';
+  document.getElementById('bq-category').textContent = q.kategorieName || '';
   document.getElementById('bq-text').textContent = q.question || '';
 
   const optsEl = document.getElementById('bq-opts');
@@ -326,7 +346,7 @@ function renderBoardQuestion() {
   if (q.hint) { hintEl.textContent = `💡 ${q.hint}`; hintEl.style.display = ''; }
   else { hintEl.style.display = 'none'; }
 
-  panel.classList.remove('hidden');
+  modal.classList.add('active');
 }
 
 function renderTurnInfo() {
