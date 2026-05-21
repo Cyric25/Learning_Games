@@ -69,7 +69,7 @@ async function showGameSelector() {
         <div class="gs-game-meta">${status} · ${date}${expiryHint}</div>
       </div>
       <div class="gs-game-actions">
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteGameFromSelector('${code}')">✕</button>
+        <button class="btn btn-danger btn-sm gs-btn-delete" onclick="event.stopPropagation();deleteGameFromSelector('${code}')">✕</button>
       </div>
     </div>`;
   }).join('');

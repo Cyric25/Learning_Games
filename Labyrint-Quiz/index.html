@@ -6,6 +6,11 @@
   <title>Labyrinth-Quiz</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
   <link rel="stylesheet" href="css/labyrinth.css">
+  <style>
+    body:not(.teacher) .gs-teacher-action { display: none !important; }
+    body:not(.teacher) .gs-btn-delete     { display: none !important; }
+    body.teacher        .gs-teacher-hint  { display: none !important; }
+  </style>
 </head>
 <body>
 
@@ -32,15 +37,20 @@
     </button>
     <div id="gs-join-error" style="color:var(--danger);min-height:1.5em;margin-top:0.8rem;font-size:0.95rem;font-weight:600;text-align:center;"></div>
     <div style="margin-top:2.5rem;border-top:1px solid var(--border-card);padding-top:1.5rem;text-align:center;width:100%;max-width:520px;">
-      <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Oder als Lehrkraft:</p>
+      <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Als Lehrkraft:</p>
       <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
-      <button onclick="createNewGame()"
-        style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
-          background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
-          transition:opacity 0.2s;"
-        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-        + Neues Spiel erstellen
-      </button>
+      <div class="gs-teacher-action">
+        <button onclick="createNewGame()"
+          style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
+            background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
+            transition:opacity 0.2s;"
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+          + Neues Spiel erstellen
+        </button>
+      </div>
+      <div class="gs-teacher-hint" style="margin-top:0.8rem;">
+        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Lehrermodus aktivieren</button>
+      </div>
     </div>
     <div style="margin-top:1.5rem;">
       <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;text-decoration:none;">← Zurück zur Übersicht</a>
@@ -269,6 +279,19 @@
   <script src="js/maze.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/labyrinth.js?v=3"></script>
+  <!-- Teacher Mode -->
+  <script>
+  (function() {
+    var LP_KEY = 'spiele_lp_mode', LP_PW = 'LP@FOS';
+    function applyTeacher() { document.body.classList.toggle('teacher', sessionStorage.getItem(LP_KEY) === '1'); }
+    window.activateTeacherMode = function() {
+      var pw = prompt('Lehrermodus – Passwort eingeben:');
+      if (pw === LP_PW) { sessionStorage.setItem(LP_KEY, '1'); applyTeacher(); if(typeof showGameSelector==='function') showGameSelector(); }
+      else if (pw !== null) alert('Falsches Passwort.');
+    };
+    applyTeacher();
+  })();
+  </script>
   <script>
     // Update sidebar hint when code is shown (hook into labyrinth.js showGameCode)
     const _origShow = window.showGameCode;
