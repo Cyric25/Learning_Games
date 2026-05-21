@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Labyrinth-Designer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:14px}
+.hdr{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#0f3460;border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0}
+.hdr h1{font-size:1.1rem;color:#c9a227;margin-right:auto}
+.hdr a{color:#a8a8b3;font-size:.82rem;text-decoration:none;padding:4px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:5px}
+.hdr a:hover{background:rgba(255,255,255,0.08)}
+.main{display:flex;flex:1;overflow:hidden}
+.sb{width:210px;flex-shrink:0;background:#16213e;border-right:1px solid rgba(255,255,255,0.1);overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px}
+.sc{background:rgba(0,0,0,0.2);border-radius:7px;padding:8px}
+.st{font-size:.7rem;font-weight:700;text-transform:uppercase;color:#a8a8b3;margin-bottom:6px;letter-spacing:.08em}
+.pr{display:flex;gap:4px;flex-wrap:wrap}
+.pb{padding:4px 9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:5px;color:#e0e0e0;cursor:pointer;font-size:.8rem}
+.pb:hover{background:rgba(255,255,255,0.14)}
+.pb.on{background:rgba(201,162,39,0.25);border-color:#c9a227;color:#c9a227}
+.tb{display:flex;align-items:center;gap:7px;width:100%;padding:7px 9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:#e0e0e0;cursor:pointer;font-size:.82rem;margin-bottom:3px}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:rgba(201,162,39,0.22);border-color:#c9a227;color:#c9a227}
+.ni{width:100%;padding:6px 8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#e0e0e0;font-size:.88rem}
+.ni:focus{outline:none;border-color:#c9a227}
+.ab{display:block;width:100%;padding:7px;border-radius:5px;border:none;cursor:pointer;font-size:.82rem;font-weight:600;margin-bottom:3px}
+.ab:hover{opacity:.85}
+.ar{background:#7c3aed;color:#fff}
+.ac{background:rgba(220,38,38,.65);color:#fff}
+.as{background:#2d6b27;color:#fff}
+.si{display:flex;align-items:center;gap:5px;padding:5px 7px;background:rgba(255,255,255,0.05);border-radius:5px;margin-bottom:3px;cursor:pointer;border:1px solid rgba(255,255,255,0.07)}
+.si:hover{background:rgba(255,255,255,0.1)}
+.si.cur{border-color:#c9a227}
+.sn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}
+.sx{background:none;border:none;color:rgba(220,38,38,.6);cursor:pointer;padding:1px 4px;font-size:.75rem}
+.sx:hover{color:#dc2626}
+.sd{color:#a8a8b3;font-size:.75rem;white-space:nowrap}
+.ca{flex:1;display:flex;align-items:center;justify-content:center;background:#0e0c1e;overflow:hidden}
+canvas{cursor:crosshair;display:block;image-rendering:pixelated}
+.stb{padding:4px 12px;background:#0f3460;border-top:1px solid rgba(255,255,255,0.08);font-size:.76rem;color:#a8a8b3;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>🗺️ Labyrinth-Designer</h1>
+  <a href="index.html">← Zum Spiel</a>
+</div>
+<div class="main">
+  <div class="sb">
+    <div class="sc">
+      <div class="st">📝 Name</div>
+      <input class="ni" id="mn" placeholder="Labyrinth-Name" value="Mein Labyrinth">
+    </div>
+    <div class="sc">
+      <div class="st">🗺️ Größe</div>
+      <div class="pr" id="szr"></div>
+    </div>
+    <div class="sc">
+      <div class="st">🔧 Werkzeug</div>
+      <button class="tb on" id="tw" onclick="setTool('wall')">🧱 Wand setzen/löschen</button>
+      <button class="tb" id="td" onclick="setTool('door')">🚪 Tür setzen/löschen</button>
+    </div>
+    <div class="sc">
+      <div class="st">⚡ Aktionen</div>
+      <button class="ab ar" onclick="generateRandom()">🎲 Zufällig generieren</button>
+      <button class="ab ac" onclick="clearMaze()">🗑️ Alles löschen</button>
+      <button class="ab as" onclick="saveMaze()">💾 Speichern</button>
+    </div>
+    <div class="sc" style="flex:1">
+      <div class="st">📚 Gespeichert</div>
+      <div id="sl"></div>
+    </div>
+  </div>
+  <div class="ca" id="ca"><canvas id="mc"></canvas></div>
+</div>
+<div class="stb" id="sb">Klicke auf eine Zellseite um Wände oder Türen zu bearbeiten.</div>
+
+<script src="js/maze.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let mazeSize = 12, grid = null, doors = [], editId = null, tool = 'wall';
+let hov = null; // { cx, cy, dir, edgePos }
+let logSz = 400, CS = 32, OX = 0, OY = 0;
+const dpr = window.devicePixelRatio || 1;
+const canvas = document.getElementById('mc');
+const ctx = canvas.getContext('2d');
+
+// ── Init ─────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  buildSzBtns();
+  initMaze();
+  resize();
+  render();
+  loadSavedList();
+  canvas.addEventListener('click', onCanvasClick);
+  canvas.addEventListener('mousemove', onHover);
+  canvas.addEventListener('mouseleave', () => { hov = null; render(); setStatus('Klicke auf eine Zellseite um Wände oder Türen zu bearbeiten.'); });
+  window.addEventListener('resize', () => { resize(); render(); });
+});
+
+function buildSzBtns() {
+  const row = document.getElementById('szr');
+  [{l:'10×10',v:10},{l:'12×12',v:12},{l:'16×16',v:16}].forEach(o => {
+    const b = document.createElement('button');
+    b.className = 'pb' + (o.v === mazeSize ? ' on' : '');
+    b.textContent = o.l; b.dataset.v = o.v;
+    b.onclick = () => {
+      if (mazeSize === o.v) return;
+      if (!confirm('Größe ändern löscht das aktuelle Labyrinth. Fortfahren?')) return;
+      mazeSize = o.v; editId = null;
+      row.querySelectorAll('.pb').forEach(x => x.classList.toggle('on', x.dataset.v == o.v));
+      initMaze(); resize(); render();
+    };
+    row.appendChild(b);
+  });
+}
+
+function setTool(t) {
+  tool = t;
+  document.getElementById('tw').classList.toggle('on', t === 'wall');
+  document.getElementById('td').classList.toggle('on', t === 'door');
+}
+window.setTool = setTool;
+
+function initMaze(sz) {
+  sz = sz || mazeSize;
+  grid = [];
+  for (let y = 0; y < sz; y++) { grid[y] = []; for (let x = 0; x < sz; x++) grid[y][x] = { walls: 15, type: 'path' }; }
+  doors = [];
+}
+
+function resize() {
+  const c = document.getElementById('ca');
+  const avail = Math.min(c.clientWidth - 24, c.clientHeight - 24);
+  logSz = Math.max(200, avail);
+  CS = Math.floor(logSz / mazeSize);
+  const px = CS * mazeSize;
+  OX = Math.floor((logSz - px) / 2); OY = OX;
+  canvas.style.width = logSz + 'px'; canvas.style.height = logSz + 'px';
+  canvas.width = logSz * dpr; canvas.height = logSz * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ── Rendering ────────────────────────────────────────────────────
+const BASE_A = { NE:{N:Math.PI,E:Math.PI/2}, NW:{N:0,W:Math.PI/2}, SE:{S:Math.PI,E:-Math.PI/2}, SW:{S:0,W:-Math.PI/2} };
+const STARTS_ICONS = ['🛡️','🐉','🦉','🦊','🧙','🤖'];
+const STARTS_COLORS = ['#1a3a8f','#8f1a1a','#1a6b1a','#6b1a6b','#8f5a1a','#1a6b6b'];
+
+function render() {
+  if (!grid) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0e0c1e'; ctx.fillRect(0, 0, logSz, logSz);
+
+  // Cell fills
+  for (let y = 0; y < mazeSize; y++)
+    for (let x = 0; x < mazeSize; x++) {
+      ctx.fillStyle = (x+y)%2===0 ? '#f5e6c8' : '#ecdfc0';
+      ctx.fillRect(OX+x*CS, OY+y*CS, CS, CS);
+    }
+
+  // Hover highlight
+  if (hov && !hov.isOuter) {
+    const {cx,cy,dir} = hov;
+    const m = Math.max(1, CS*0.18);
+    const px = OX+cx*CS, py = OY+cy*CS;
+    ctx.fillStyle = tool==='wall' ? 'rgba(201,162,39,0.55)' : 'rgba(139,69,19,0.55)';
+    if (dir==='N') ctx.fillRect(px, py-m, CS, m*2);
+    else if (dir==='S') ctx.fillRect(px, py+CS-m, CS, m*2);
+    else if (dir==='W') ctx.fillRect(px-m, py, m*2, CS);
+    else ctx.fillRect(px+CS-m, py, m*2, CS);
+  }
+
+  // Walls
+  ctx.strokeStyle = '#2c1810'; ctx.lineWidth = Math.max(2, CS*0.12); ctx.lineCap = 'square';
+  ctx.beginPath();
+  for (let y = 0; y < mazeSize; y++) for (let x = 0; x < mazeSize; x++) {
+    const p = OX+x*CS, q = OY+y*CS, w = grid[y][x].walls;
+    if (w&1) { ctx.moveTo(p,q); ctx.lineTo(p+CS,q); }
+    if (w&2) { ctx.moveTo(p+CS,q); ctx.lineTo(p+CS,q+CS); }
+    if (w&4) { ctx.moveTo(p,q+CS); ctx.lineTo(p+CS,q+CS); }
+    if (w&8) { ctx.moveTo(p,q); ctx.lineTo(p,q+CS); }
+  }
+  ctx.stroke();
+
+  // Corner squares
+  const sq = Math.max(2, Math.ceil(CS*0.13)); ctx.fillStyle = '#2c1810';
+  for (let y = 0; y <= mazeSize; y++) for (let x = 0; x <= mazeSize; x++)
+    ctx.fillRect(OX+x*CS-sq/2, OY+y*CS-sq/2, sq, sq);
+
+  // Outer border
+  ctx.strokeStyle = '#2c1810'; ctx.lineWidth = 3;
+  ctx.strokeRect(OX, OY, mazeSize*CS, mazeSize*CS);
+
+  // Start markers
+  const sp = getTeamStartPositions(mazeSize, mazeSize);
+  ctx.font = `${Math.max(10,CS*0.4)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  sp.forEach((pos, i) => {
+    ctx.globalAlpha = 0.25; ctx.fillStyle = STARTS_COLORS[i];
+    ctx.fillRect(OX+pos.x*CS+1, OY+pos.y*CS+1, CS-2, CS-2);
+    ctx.globalAlpha = 0.55; ctx.fillText(STARTS_ICONS[i], OX+pos.x*CS+CS/2, OY+pos.y*CS+CS/2+1);
+    ctx.globalAlpha = 1;
+  });
+
+  // Doors
+  doors.forEach(drawDoor);
+}
+
+function drawDoor(d) {
+  const px = OX+d.cellX*CS, py = OY+d.cellY*CS;
+  let ax, ay;
+  switch(d.corner) { case 'NW': ax=px; ay=py; break; case 'NE': ax=px+CS; ay=py; break; case 'SE': ax=px+CS; ay=py+CS; break; case 'SW': ax=px; ay=py+CS; break; }
+  const base = BASE_A[d.corner][d.blockedDir];
+  ctx.save(); ctx.translate(ax,ay); ctx.rotate(base + d.rotDir*(d.angle||0)*Math.PI/180);
+  ctx.strokeStyle = '#8B4513'; ctx.lineWidth = Math.max(3,CS*0.13); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(CS,0); ctx.stroke();
+  ctx.fillStyle = '#5c2d0a'; ctx.beginPath(); ctx.arc(0,0,Math.max(2,CS*0.07),0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── Edge detection ───────────────────────────────────────────────
+function getEdge(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const fx = (mx-OX)/CS, fy = (my-OY)/CS;
+  const cx = Math.floor(fx), cy = Math.floor(fy);
+  if (cx<0||cx>=mazeSize||cy<0||cy>=mazeSize) return {valid:false};
+  const rx = fx-cx, ry = fy-cy;
+  let dir;
+  if (ry<rx && ry<1-rx) dir='N';
+  else if (rx>ry && rx>1-ry) dir='E';
+  else if (ry>rx && ry>1-rx) dir='S';
+  else dir='W';
+  const edgePos = (dir==='N'||dir==='S') ? rx : ry;
+  const isOuter = (dir==='N'&&cy===0)||(dir==='S'&&cy===mazeSize-1)||(dir==='W'&&cx===0)||(dir==='E'&&cx===mazeSize-1);
+  return {valid:true, cx, cy, dir, edgePos, isOuter};
+}
+
+function onHover(e) {
+  hov = getEdge(e);
+  render();
+  if (hov?.valid && !hov.isOuter) {
+    const wb = {N:1,E:2,S:4,W:8}[hov.dir];
+    const hasWall = !!(grid[hov.cy][hov.cx].walls & wb);
+    const hasDoor = !!getDoorOnEdge(hov.cx, hov.cy, hov.dir);
+    let msg = tool==='wall'
+      ? (hasWall ? '🧱 Klicken: Wand entfernen' : '🧱 Klicken: Wand setzen')
+      : (hasDoor ? '🚪 Klicken: Tür entfernen'  : hasWall ? '⚠️ Kein Platz — zuerst Wand entfernen' : '🚪 Klicken: Tür setzen (linke/obere Hälfte = linker Ankerpunkt)');
+    setStatus(msg);
+  } else { setStatus('Klicke auf eine Zellseite um Wände oder Türen zu bearbeiten.'); }
+}
+
+function onCanvasClick(e) {
+  const edge = getEdge(e);
+  if (!edge.valid || edge.isOuter) return;
+  if (tool==='wall') toggleWall(edge.cx, edge.cy, edge.dir);
+  else toggleDoor(edge.cx, edge.cy, edge.dir, edge.edgePos);
+  render();
+}
+
+// ── Wall ops ──────────────────────────────────────────────────────
+const W = {N:{b:1,ox:0,oy:-1,ob:4},E:{b:2,ox:1,oy:0,ob:8},S:{b:4,ox:0,oy:1,ob:1},W:{b:8,ox:-1,oy:0,ob:2}};
+function toggleWall(cx,cy,dir) {
+  const w = W[dir]; const adding = !(grid[cy][cx].walls & w.b);
+  if (adding) removeDoorOnEdge(cx,cy,dir);
+  grid[cy][cx].walls ^= w.b;
+  const nx=cx+w.ox, ny=cy+w.oy;
+  if (nx>=0&&nx<mazeSize&&ny>=0&&ny<mazeSize) grid[ny][nx].walls ^= w.ob;
+}
+
+// ── Door ops ──────────────────────────────────────────────────────
+function pkey(cx,cy,dir) {
+  if (dir==='S') return `N:${cx},${cy+1}`;
+  if (dir==='W') return `E:${cx-1},${cy}`;
+  return `${dir}:${cx},${cy}`;
+}
+function getDoorOnEdge(cx,cy,dir) { const k=pkey(cx,cy,dir); return doors.find(d=>pkey(d.cellX,d.cellY,d.blockedDir)===k)||null; }
+function removeDoorOnEdge(cx,cy,dir) { const k=pkey(cx,cy,dir); const i=doors.findIndex(d=>pkey(d.cellX,d.cellY,d.blockedDir)===k); if(i>=0) doors.splice(i,1); }
+
+// anchor options per edge direction: [left/top half, right/bottom half]
+const AMAP = {
+  N:[{corner:'NW',blockedDir:'N',rotDir:+1},{corner:'NE',blockedDir:'N',rotDir:-1}],
+  S:[{corner:'SW',blockedDir:'S',rotDir:-1},{corner:'SE',blockedDir:'S',rotDir:+1}],
+  E:[{corner:'NE',blockedDir:'E',rotDir:+1},{corner:'SE',blockedDir:'E',rotDir:-1}],
+  W:[{corner:'NW',blockedDir:'W',rotDir:-1},{corner:'SW',blockedDir:'W',rotDir:+1}],
+};
+
+function toggleDoor(cx,cy,dir,edgePos) {
+  const wb = {N:1,E:2,S:4,W:8}[dir];
+  if (grid[cy][cx].walls & wb) return; // wall present
+  if (getDoorOnEdge(cx,cy,dir)) { removeDoorOnEdge(cx,cy,dir); return; }
+  const a = AMAP[dir][edgePos<0.5?0:1];
+  doors.push({ id:'d-'+Date.now()+Math.random().toString(36).slice(2), cellX:cx, cellY:cy,
+    corner:a.corner, blockedDir:a.blockedDir, rotDir:a.rotDir, angle:0, open:false, openedBy:null });
+}
+
+// ── Generate / Clear ──────────────────────────────────────────────
+function generateRandom() {
+  const seed = Date.now() & 0x7fffffff;
+  const gen = new MazeGenerator(mazeSize, mazeSize, seed);
+  const dc = {10:4,12:6,16:10}[mazeSize]||6;
+  const r = gen.generate({doorCount:dc,teamCount:6});
+  grid = r.grid; doors = r.doors; editId = null;
+  render(); setStatus('🎲 Zufälliges Labyrinth generiert. Jetzt anpassen!');
+}
+function clearMaze() {
+  if (!confirm('Labyrinth komplett leeren?')) return;
+  initMaze(); editId = null; render();
+}
+window.generateRandom = generateRandom; window.clearMaze = clearMaze;
+
+// ── Save / Load ───────────────────────────────────────────────────
+function getLib() { try { return JSON.parse(localStorage.getItem('lab_maze_library')||'[]'); } catch { return []; } }
+function setLib(lib) {
+  localStorage.setItem('lab_maze_library', JSON.stringify(lib));
+  if (location.protocol !== 'file:')
+    fetch('../api.php?f=lab-mazes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lib)}).catch(()=>{});
+}
+
+function saveMaze() {
+  const name = document.getElementById('mn').value.trim() || 'Labyrinth';
+  const now = new Date().toISOString();
+  const id = editId || ('maze-'+Date.now());
+  const m = { id, name, size:mazeSize, grid:JSON.parse(JSON.stringify(grid)),
+    doors:JSON.parse(JSON.stringify(doors)), startPositions:getTeamStartPositions(mazeSize,mazeSize),
+    createdAt:now, updatedAt:now };
+  const lib = getLib(); const idx = lib.findIndex(x=>x.id===id);
+  if (idx>=0) { m.createdAt=lib[idx].createdAt; lib[idx]=m; } else lib.push(m);
+  setLib(lib); editId = id;
+  setStatus(`✅ "${name}" gespeichert.`); loadSavedList();
+}
+
+function loadMaze(id) {
+  const m = getLib().find(x=>x.id===id); if (!m) return;
+  editId=m.id; mazeSize=m.size; grid=JSON.parse(JSON.stringify(m.grid));
+  doors=JSON.parse(JSON.stringify(m.doors||[]));
+  document.getElementById('mn').value=m.name;
+  document.querySelectorAll('#szr .pb').forEach(b=>b.classList.toggle('on',Number(b.dataset.v)===m.size));
+  resize(); render(); loadSavedList();
+}
+
+function deleteMaze(id) {
+  if (!confirm('Labyrinth wirklich löschen?')) return;
+  setLib(getLib().filter(x=>x.id!==id));
+  if (editId===id) { editId=null; initMaze(); render(); }
+  loadSavedList();
+}
+
+function loadSavedList() {
+  const el = document.getElementById('sl'); const lib = getLib();
+  if (!lib.length) { el.innerHTML='<p style="color:#a8a8b3;font-size:.78rem;font-style:italic">Noch nichts gespeichert.</p>'; return; }
+  el.innerHTML = '';
+  [...lib].reverse().forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'si' + (m.id===editId?' cur':'');
+    div.innerHTML = `<span class="sn" title="${m.name}">${m.name}</span><span class="sd">${m.size}×${m.size}</span><button class="sx" onclick="event.stopPropagation();deleteMaze('${m.id}')">✕</button>`;
+    div.onclick = () => loadMaze(m.id);
+    el.appendChild(div);
+  });
+}
+
+function setStatus(t) { document.getElementById('sb').textContent = t; }
+
+window.saveMaze = saveMaze; window.deleteMaze = deleteMaze;
+</script>
+</body>
+</html>

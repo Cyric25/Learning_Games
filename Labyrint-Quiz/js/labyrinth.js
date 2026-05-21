@@ -88,17 +88,25 @@ const GameSync = {
 
 // ── State ─────────────────────────────────────────────────────────
 let allQuestions = [];
-let rawCategories = [];  // original hierarchical structure
+let rawCategories = [];
 let activeCategories = new Set();
 let gameCode = null;
-let localGrid = null;   // regeneriert aus seed
-let gameState = null;   // vom Server
+let localGrid = null;
+let gameState = null;
 let renderer = null;
 let teacherEvalVisible = false;
+let mazeLibrary = [];  // saved mazes from designer
+
+async function loadMazeLibrary() {
+  if (location.protocol !== 'file:') {
+    try { const r = await fetch('../api.php?f=lab-mazes'); if (r.ok) { const d = await r.json(); if (Array.isArray(d)) { mazeLibrary = d; localStorage.setItem('lab_maze_library', JSON.stringify(d)); return; } } } catch {}
+  }
+  try { mazeLibrary = JSON.parse(localStorage.getItem('lab_maze_library') || '[]'); } catch { mazeLibrary = []; }
+}
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  await loadQuestions();
+  await Promise.all([loadQuestions(), loadMazeLibrary()]);
   const urlCode = new URLSearchParams(location.search).get('code');
   if (urlCode) await _gsEnter(urlCode.toUpperCase());
   else showGameSelector();
