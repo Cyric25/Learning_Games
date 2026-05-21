@@ -145,6 +145,7 @@
         <div class="modal-subtitle">schießt auf <span class="modal-coord" id="modal-coord"></span></div>
       </div>
     </div>
+    <div id="modal-category" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.35rem;"></div>
     <div class="modal-question-text" id="modal-question"></div>
     <div id="modal-mc-options" class="mc-options"></div>
     <div id="modal-hint" class="hint-text" style="display:none;"></div>
@@ -214,12 +215,12 @@ function flattenQuestions(cats) {
     const hasQ  = (cat.questions || []).length > 0;
     const isLeaf = !subs.length;
     if (hasQ && isLeaf) {
-      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id }));
+      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id, kategorieName: cat.name }));
       return;
     }
     subs.forEach(s => walk(s, cat.id));
     if (hasQ && !isLeaf) {
-      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id }));
+      cat.questions.forEach(q => result.push({ ...q, kategorieId: cat.id, kategorieName: cat.name }));
     }
   }
   cats.forEach(c => walk(c, null));
@@ -691,6 +692,8 @@ function showQuestionModal(lq) {
   document.getElementById('modal-team-name').textContent = `${team.emoji} ${team.name}`;
   document.getElementById('modal-coord').textContent = lq.coordinate;
   document.getElementById('modal-question').textContent = lq.question.question || '';
+  const catEl = document.getElementById('modal-category');
+  if (catEl) catEl.textContent = lq.question.kategorieName || '';
 
   const hint = document.getElementById('modal-hint');
   if (lq.question.hint) { hint.textContent = `💡 ${lq.question.hint}`; hint.style.display = ''; }

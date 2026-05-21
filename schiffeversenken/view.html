@@ -308,6 +308,7 @@
 <div class="question-overlay hidden" id="q-overlay">
   <div class="q-card">
     <div class="q-header">Schuss auf <span class="q-coord" id="q-coord"></span></div>
+    <div id="q-category" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.3rem;"></div>
     <div class="q-text" id="q-text"></div>
     <div id="q-mc-opts" class="mc-opts"></div>
     <div class="open-waiting hidden" id="q-open-wait">📢 Beantworte die Frage mündlich.<br>Der Spielleiter bewertet deinen Schuss.</div>
@@ -351,9 +352,9 @@ function flattenQuestions(cats) {
   function walk(cat) {
     const subs = cat.subcategories || [];
     const hasQ = (cat.questions||[]).length > 0;
-    if (hasQ && !subs.length) { cat.questions.forEach(q => result.push({...q, kategorieId: cat.id})); return; }
+    if (hasQ && !subs.length) { cat.questions.forEach(q => result.push({...q, kategorieId: cat.id, kategorieName: cat.name})); return; }
     subs.forEach(s => walk(s));
-    if (hasQ) cat.questions.forEach(q => result.push({...q, kategorieId: cat.id}));
+    if (hasQ) cat.questions.forEach(q => result.push({...q, kategorieId: cat.id, kategorieName: cat.name}));
   }
   cats.forEach(c => walk(c));
   return result;
@@ -731,6 +732,7 @@ window.fireShot = fireShot;
 function showQuestionOverlay(lq) {
   const overlay = document.getElementById('q-overlay');
   document.getElementById('q-coord').textContent = lq.coordinate;
+  document.getElementById('q-category').textContent = lq.question.kategorieName || '';
   document.getElementById('q-text').textContent = lq.question.question || '';
 
   const hint = document.getElementById('q-hint');
@@ -807,6 +809,7 @@ function showSpectatorQuestion(lq) {
   const isMC = q.type === 'mc' || q.type === 'multiple_choice';
 
   document.getElementById('q-coord').textContent = lq.coordinate;
+  document.getElementById('q-category').textContent = q.kategorieName || '';
   document.getElementById('q-text').textContent = q.question || '';
 
   const hint = document.getElementById('q-hint');

@@ -224,6 +224,7 @@
     <div class="turn-info" id="turn-info">Verbinde…</div>
     <div class="board-question hidden" id="board-question">
       <div class="bq-label" id="bq-label"></div>
+      <div id="bq-category" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.3rem;"></div>
       <div class="bq-text" id="bq-text"></div>
       <div class="bq-opts" id="bq-opts"></div>
       <div class="bq-hint" id="bq-hint" style="display:none;"></div>
@@ -308,6 +309,8 @@ function renderBoardQuestion() {
 
   document.getElementById('bq-label').textContent =
     `${team?.emoji||''} ${team?.name||''} — Schuss auf ${lq.coordinate}`;
+  const catEl = document.getElementById('bq-category');
+  if (catEl) catEl.textContent = q.kategorieName || '';
   document.getElementById('bq-text').textContent = q.question || '';
 
   const optsEl = document.getElementById('bq-opts');
