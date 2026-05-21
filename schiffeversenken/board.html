@@ -209,6 +209,17 @@
     .bq-hint {
       font-size: .85rem; color: var(--text-2); margin-top: .6rem; font-style: italic;
     }
+    .bq-opt.correct {
+      background: rgba(22,163,74,.12); border-color: #16a34a;
+      color: #16a34a; font-weight: 700;
+    }
+    .bq-result {
+      margin-top: .7rem; padding: .45rem .8rem; border-radius: 8px;
+      font-size: .9rem; font-weight: 700; text-align: center;
+    }
+    .bq-result.hit  { background: rgba(22,163,74,.12);  color: #16a34a; }
+    .bq-result.miss { background: rgba(220,38,38,.10);  color: #dc2626; }
+    .bq-result.open { background: rgba(100,116,139,.10); color: var(--text-2); }
   </style>
 </head>
 <body>
@@ -270,6 +281,8 @@ const COLS = ['A','B','C','D','E','F','G','H','I','J'];
 let boardState = null;
 let boardCode  = null;
 let boardSub   = null;
+let lastLQ     = null;   // letzte Frage, um Antwort 3s anzuzeigen
+let hideTimer  = null;
 
 function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -322,8 +335,32 @@ function renderBoard() {
 function renderBoardQuestion() {
   const modal = document.getElementById('bq-modal');
   const lq = boardState && boardState.liveQuestion;
-  if (!lq || lq.resolved) { modal.classList.remove('active'); return; }
 
+  // Frage aktiv → anzeigen und merken
+  if (lq && !lq.resolved) {
+    clearTimeout(hideTimer);
+    lastLQ = lq;
+    showBQModal(lq, false);
+    return;
+  }
+
+  // Frage gerade verschwunden → Antwort 3s einblenden
+  if (!lq && lastLQ && modal.classList.contains('active')) {
+    clearTimeout(hideTimer);
+    showBQModal(lastLQ, true);
+    hideTimer = setTimeout(() => {
+      modal.classList.remove('active');
+      lastLQ = null;
+    }, 3000);
+    return;
+  }
+
+  // Kein liveQuestion, kein ausstehender Timer → Modal weg
+  if (!hideTimer) modal.classList.remove('active');
+}
+
+function showBQModal(lq, showAnswer) {
+  const modal = document.getElementById('bq-modal');
   const team = boardState.teams[lq.teamIdx];
   const q = lq.question;
   const isMC = q.type === 'mc' || q.type === 'multiple_choice';
@@ -335,16 +372,42 @@ function renderBoardQuestion() {
 
   const optsEl = document.getElementById('bq-opts');
   if (isMC) {
-    optsEl.innerHTML = (q.options||[]).map((opt, i) =>
-      `<div class="bq-opt">${String.fromCharCode(65+i)}) ${escapeHtml(opt)}</div>`
-    ).join('');
+    optsEl.innerHTML = (q.options||[]).map((opt, i) => {
+      const cls = showAnswer && i === q.correctIndex ? 'bq-opt correct' : 'bq-opt';
+      return `<div class="${cls}">${String.fromCharCode(65+i)}) ${escapeHtml(opt)}</div>`;
+    }).join('');
   } else {
-    optsEl.innerHTML = '';
+    optsEl.innerHTML = showAnswer && q.answer
+      ? `<div class="bq-opt correct">✓ ${escapeHtml(q.answer)}</div>`
+      : '';
   }
 
   const hintEl = document.getElementById('bq-hint');
-  if (q.hint) { hintEl.textContent = `💡 ${q.hint}`; hintEl.style.display = ''; }
+  if (q.hint && !showAnswer) { hintEl.textContent = `💡 ${q.hint}`; hintEl.style.display = ''; }
   else { hintEl.style.display = 'none'; }
+
+  // Ergebnis-Banner nur bei Antwortanzeige
+  let resultEl = document.getElementById('bq-result');
+  if (!resultEl) {
+    resultEl = document.createElement('div');
+    resultEl.id = 'bq-result';
+    document.querySelector('.bq-modal-card').appendChild(resultEl);
+  }
+  if (showAnswer) {
+    const entry = boardState.grid && boardState.grid[lq.coordinate];
+    const wasHit = entry && entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined
+                        && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    if (isMC) {
+      resultEl.textContent = wasHit ? '💥 Treffer!' : (entry?.shotByTeamIdx !== undefined && entry?.shotByTeamIdx !== null ? '💦 Wasser!' : '✗ Falsch — kein Schuss');
+      resultEl.className = 'bq-result ' + (wasHit ? 'hit' : 'miss');
+    } else {
+      resultEl.textContent = '⏳ Spielleiter bewertet…';
+      resultEl.className = 'bq-result open';
+    }
+    resultEl.style.display = '';
+  } else {
+    resultEl.style.display = 'none';
+  }
 
   modal.classList.add('active');
 }
