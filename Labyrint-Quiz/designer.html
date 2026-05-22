@@ -64,6 +64,7 @@ canvas{cursor:crosshair;display:block;image-rendering:pixelated}
     <div class="sc">
       <div class="st">⚡ Aktionen</div>
       <button class="ab ar" onclick="generateRandom()">🎲 Zufällig generieren</button>
+      <button class="ab" onclick="generateAllDoors()" style="background:#7c5a1a;color:#fff;">🚪 Türen-Netz generieren</button>
       <button class="ab ac" onclick="clearMaze()">🗑️ Alles löschen</button>
       <button class="ab as" onclick="saveMaze()">💾 Speichern</button>
     </div>
@@ -303,11 +304,51 @@ function generateRandom() {
   grid = r.grid; doors = r.doors; editId = null;
   render(); setStatus('🎲 Zufälliges Labyrinth generiert. Jetzt anpassen!');
 }
+
+function generateAllDoors() {
+  const rng = new SeededRNG(Date.now() & 0x7fffffff);
+
+  // Fully open grid – only outer border walls remain
+  grid = [];
+  for (let y = 0; y < mazeSize; y++) {
+    grid[y] = [];
+    for (let x = 0; x < mazeSize; x++) {
+      let w = 0;
+      if (y === 0)            w |= 1; // N border
+      if (x === mazeSize - 1) w |= 2; // E border
+      if (y === mazeSize - 1) w |= 4; // S border
+      if (x === 0)            w |= 8; // W border
+      grid[y][x] = { walls: w, type: 'path' };
+    }
+  }
+
+  // One door per interior node (gx, gy) for gx,gy in [1, mazeSize-1]
+  // Represented as SE-corner of cell (gx-1, gy-1) – unique per node, no passage conflicts
+  doors = [];
+  for (let gy = 1; gy < mazeSize; gy++) {
+    for (let gx = 1; gx < mazeSize; gx++) {
+      const choice = rng.nextInt(0, 1);
+      const blockedDir = choice === 0 ? 'S' : 'E';
+      const rotDir     = choice === 0 ?  1  : -1;
+      doors.push({
+        id: 'n-' + gx + '-' + gy,
+        cellX: gx - 1, cellY: gy - 1,
+        corner: 'SE', blockedDir, rotDir,
+        angle: 0, open: false, openedBy: null
+      });
+    }
+  }
+
+  editId = null;
+  render();
+  setStatus('🚪 ' + doors.length + ' Türen an allen inneren Knotenpunkten generiert.');
+}
+
 function clearMaze() {
   if (!confirm('Labyrinth komplett leeren?')) return;
   initMaze(); editId = null; render();
 }
-window.generateRandom = generateRandom; window.clearMaze = clearMaze;
+window.generateRandom = generateRandom; window.generateAllDoors = generateAllDoors; window.clearMaze = clearMaze;
 
 // ── Save / Load ───────────────────────────────────────────────────
 function getLib() { try { return JSON.parse(localStorage.getItem('lab_maze_library')||'[]'); } catch { return []; } }
