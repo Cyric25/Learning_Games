@@ -981,7 +981,7 @@
   // ── Open answer ───────────────────────────────────────────
   function revealAnswer() {
     el('pr-reveal-btn').style.display = 'none';
-    el('pr-answer-box').style.display = '';
+    el('pr-answer-box').style.display = 'block';
     el('pr-self-rate').style.display  = 'flex';
   }
 
@@ -1057,7 +1057,7 @@
             fb.className = 'pr-feedback wrong';
             fb.textContent = '⏱ Zeit abgelaufen!';
             el('pr-reveal-btn').style.display = 'none';
-            el('pr-answer-box').style.display = '';
+            el('pr-answer-box').style.display = 'block';
             el('pr-self-rate').style.display = 'none';
             el('pr-next-btn').classList.add('visible');
           }

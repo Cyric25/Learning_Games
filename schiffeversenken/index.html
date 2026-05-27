@@ -673,7 +673,7 @@ function renderShipBadges(team) {
     const cells = ship.coords.map(coord => {
       const entry = gameState.grid[coord];
       const hit = entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
-      const bg = hit ? (ship.sunk ? 'rgba(231,76,60,.3)' : team.color) : team.color;
+      const bg = team.color;
       const opacity = hit ? (ship.sunk ? '0.4' : '1') : '0.35';
       return `<div class="ship-cell" style="background:${bg};opacity:${opacity};"></div>`;
     }).join('');
