@@ -170,6 +170,15 @@ function showTeamSelect(state) {
     if (!isTaken) btn.onclick = () => selectTeam(t.id);
     list.appendChild(btn);
   });
+  // Tafelansicht — kein Belegt-Tracking, beliebig oft wählbar
+  const sep = document.createElement('hr');
+  sep.style.cssText = 'border:none;border-top:1px solid var(--border-card);margin:.6rem 0;';
+  list.appendChild(sep);
+  const boardBtn = document.createElement('button');
+  boardBtn.className = 'team-select-btn board-view-btn';
+  boardBtn.innerHTML = '<span class="ts-emoji">📺</span><span class="ts-name">Tafelansicht</span>';
+  boardBtn.onclick = () => { window.location.href = 'board.html?code=' + gameCode; };
+  list.appendChild(boardBtn);
 }
 
 async function selectTeam(id) {
