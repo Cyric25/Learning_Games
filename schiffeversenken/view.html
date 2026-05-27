@@ -294,7 +294,10 @@
       autocomplete="off" spellcheck="false"
       oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
       onkeydown="if(event.key==='Enter')doJoin()">
-    <button class="btn-join" onclick="doJoin()">Beitreten →</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-join" style="flex:1;" onclick="doJoin()">Beitreten →</button>
+      <button class="btn-join" style="flex:0 0 auto;background:var(--bg-field);color:var(--text);border:1.5px solid var(--border);" onclick="openBoardView()" title="Tafelansicht öffnen">📺</button>
+    </div>
     <div class="join-error" id="join-error"></div>
     <hr class="solo-divider">
     <button onclick="showScreen('screen-solo-setup')"
@@ -557,6 +560,16 @@ function selectQuestionWithCycling(activeCats, mode, counts, cycleState) {
 }
 
 // ── Join ──────────────────────────────────────────────────────────
+function openBoardView() {
+  const input = document.getElementById('join-code-input');
+  const code = (input ? input.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const errEl = document.getElementById('join-error');
+  if (!code || code.length < 4) { errEl.textContent = 'Bitte zuerst 4-stelligen Code eingeben.'; return; }
+  errEl.textContent = '';
+  window.location.href = 'board.html?code=' + code;
+}
+window.openBoardView = openBoardView;
+
 async function doJoin() {
   const input = document.getElementById('join-code-input');
   const errEl = document.getElementById('join-error');
