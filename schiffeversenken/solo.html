@@ -164,23 +164,23 @@
     </div>
   </div>
 
-  <!-- Game area: own board (large left) + sidebar (right) -->
+  <!-- Game area: enemy board (large left, clickable) + sidebar (right) -->
   <div class="solo-game-main">
-    <!-- Own board (large, centered) — shows AI shots -->
+    <!-- Enemy board: large and central, click to shoot -->
     <div class="solo-own-area">
-      <div class="solo-grid-label">🛡 Deine Flotte</div>
+      <div class="solo-grid-label">🎯 Feindliche Flotte — Klicke zum Schießen</div>
       <div class="grid-wrapper">
-        <div id="player-grid" class="grid-outer"></div>
+        <div id="enemy-grid" class="grid-outer"></div>
       </div>
     </div>
 
     <!-- Right sidebar -->
     <div class="solo-right">
-      <!-- Enemy grid (small, clickable) -->
+      <!-- Own fleet (small, shows AI shots) -->
       <div class="side-section">
-        <div class="side-title">🎯 Feindliche Flotte</div>
-        <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.4rem;">Klicke zum Schießen</div>
-        <div id="enemy-grid" class="grid-outer solo-enemy-mini"></div>
+        <div class="side-title">🛡 Deine Flotte</div>
+        <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.4rem;">KI-Schüsse sichtbar</div>
+        <div id="player-grid" class="grid-outer solo-enemy-mini"></div>
       </div>
       <div class="solo-divider"></div>
 
@@ -204,7 +204,7 @@
 
       <!-- Eigene Flotte -->
       <div class="side-section">
-        <div class="side-title">🛡 Deine Flotte</div>
+        <div class="side-title">🛡 Deine Schiffe</div>
         <div class="ships-wrap" id="player-ship-status"></div>
       </div>
 
