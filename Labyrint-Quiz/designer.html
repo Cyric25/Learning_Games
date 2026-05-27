@@ -322,8 +322,7 @@ function generateAllDoors() {
     }
   }
 
-  // One door per interior node (gx, gy) for gx,gy in [1, mazeSize-1]
-  // Represented as NW-corner of cell (gx, gy) – covers all interior passages incl. last row/col
+  // One door per interior node (gx, gy): NW-corner covers all passages between interior rows/cols
   doors = [];
   for (let gy = 1; gy < mazeSize; gy++) {
     for (let gx = 1; gx < mazeSize; gx++) {
@@ -339,9 +338,29 @@ function generateAllDoors() {
     }
   }
 
+  // Left column (x=0) vertical passages: NE corner of cell (0, y+1) → interior pivot (1, y+1)
+  for (let y = 0; y < mazeSize - 1; y++) {
+    doors.push({
+      id: 'col0-' + y,
+      cellX: 0, cellY: y + 1,
+      corner: 'NE', blockedDir: 'N', rotDir: -1,
+      angle: 0, open: false, openedBy: null
+    });
+  }
+
+  // Top row (y=0) horizontal passages: SW corner of cell (x+1, 0) → interior pivot (x+1, 1)
+  for (let x = 0; x < mazeSize - 1; x++) {
+    doors.push({
+      id: 'row0-' + x,
+      cellX: x + 1, cellY: 0,
+      corner: 'SW', blockedDir: 'W', rotDir: +1,
+      angle: 0, open: false, openedBy: null
+    });
+  }
+
   editId = null;
   render();
-  setStatus('🚪 ' + doors.length + ' Türen an allen inneren Knotenpunkten generiert.');
+  setStatus('🚪 ' + doors.length + ' Türen an allen Knotenpunkten generiert.');
 }
 
 function clearMaze() {
