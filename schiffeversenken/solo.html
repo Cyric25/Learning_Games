@@ -286,6 +286,8 @@ const HS_MAX    = 10;
 
 // ── State ───────────────────────────────────────────────────────────
 let rawCategories = [], allQuestions = [], selectedCategoryIds = new Set();
+let leafToTopCat = {}, leafToSubCat = {};
+let questionCycleState = { topIdx: 0, subByTop: {} };
 let questionMode = 'mixed', mcTimerSec = 0, playerName = '';
 
 // Feindliche Flotte (KI) — Spieler schießt hier, Fragen nötig
@@ -345,6 +347,7 @@ async function loadQuestions() {
   if (!data) data = { categories: [] };
   rawCategories = data.categories || [];
   allQuestions  = flattenQuestions(rawCategories);
+  buildCatMappings();
   buildCategoryUI();
 }
 
@@ -359,6 +362,102 @@ function flattenQuestions(cats) {
   }
   cats.forEach(c => walk(c));
   return result;
+}
+
+// ── Kategorie-Mapping (einmalig beim Laden) ──────────────────────────
+function buildCatMappings() {
+  leafToTopCat = {};
+  leafToSubCat = {};
+  rawCategories.forEach(topCat => {
+    if ((topCat.questions || []).length > 0) {
+      leafToTopCat[topCat.id] = topCat.id;
+      leafToSubCat[topCat.id] = topCat.id;
+    }
+    (topCat.subcategories || []).forEach(directSub => {
+      function walk(node) {
+        if ((node.questions || []).length > 0) {
+          leafToTopCat[node.id] = topCat.id;
+          leafToSubCat[node.id] = directSub.id;
+        }
+        (node.subcategories || []).forEach(s => walk(s));
+      }
+      walk(directSub);
+    });
+  });
+}
+
+function _orderedTopIds(pool) {
+  const activeSet = new Set(pool.map(q => leafToTopCat[q.kategorieId]).filter(Boolean));
+  return rawCategories.map(tc => tc.id).filter(id => activeSet.has(id));
+}
+
+function _orderedSubIds(topPool, topCatId) {
+  const activeSet = new Set(topPool.map(q => leafToSubCat[q.kategorieId]).filter(Boolean));
+  const topCat = rawCategories.find(tc => tc.id === topCatId);
+  if (topCat && (topCat.subcategories || []).length > 0) {
+    const ordered = topCat.subcategories.map(s => s.id).filter(id => activeSet.has(id));
+    if (activeSet.has(topCatId) && !ordered.includes(topCatId)) ordered.unshift(topCatId);
+    return ordered;
+  }
+  return [...activeSet];
+}
+
+function selectQuestionWithCycling(activeCats, mode, counts, cycleState) {
+  function matchesMode(q) {
+    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+    if (mode === 'mc')   return isMC;
+    if (mode === 'open') return !isMC;
+    return true;
+  }
+  const fullPool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
+  if (!fullPool.length) return null;
+
+  const roundMin = Math.min(...fullPool.map(q => counts[q.id] || 0));
+  const topIds   = _orderedTopIds(fullPool);
+  if (!topIds.length) {
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+
+  const numTop = topIds.length;
+  let topCatId = null, topOffset = 0;
+  for (let i = 0; i < numTop; i++) {
+    const tid = topIds[(cycleState.topIdx + i) % numTop];
+    if (fullPool.filter(q => leafToTopCat[q.kategorieId] === tid)
+                .some(q => (counts[q.id] || 0) === roundMin)) {
+      topCatId = tid; topOffset = i; break;
+    }
+  }
+  if (!topCatId) {
+    cycleState.topIdx++;
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+
+  const topPool = fullPool.filter(q => leafToTopCat[q.kategorieId] === topCatId);
+  const subIds  = _orderedSubIds(topPool, topCatId);
+  const numSub  = subIds.length;
+  const subBase = cycleState.subByTop[topCatId] || 0;
+  let subCatId = null, subOffset = 0;
+  for (let i = 0; i < numSub; i++) {
+    const sid = subIds[(subBase + i) % numSub];
+    if (topPool.filter(q => leafToSubCat[q.kategorieId] === sid)
+               .some(q => (counts[q.id] || 0) === roundMin)) {
+      subCatId = sid; subOffset = i; break;
+    }
+  }
+
+  cycleState.subByTop[topCatId] = subBase + subOffset + 1;
+  cycleState.topIdx = cycleState.topIdx + topOffset + 1;
+
+  const finalPool = subCatId
+    ? topPool.filter(q => leafToSubCat[q.kategorieId] === subCatId && (counts[q.id] || 0) === roundMin)
+    : topPool.filter(q => (counts[q.id] || 0) === roundMin);
+  if (!finalPool.length) {
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+  return finalPool[Math.floor(Math.random() * finalPool.length)];
 }
 
 // ── Kategorie-UI ────────────────────────────────────────────────────
@@ -483,7 +582,8 @@ function startSolo() {
   playerShots = {}; playerShotsFired = 0; playerHits = 0;
   aiShotSet   = new Set(); aiHitSet = new Set();
   ai = { mode: 'hunt', currentHits: [], direction: null, queue: [] };
-  questionPlayCounts = {};
+  questionPlayCounts  = {};
+  questionCycleState  = { topIdx: 0, subByTop: {} };
   answering = false; aiTurnPending = false;
 
   showScreen('screen-play');
@@ -627,15 +727,9 @@ function tapEnemyCell(key) {
   showQuestion(key);
 }
 
-// ── Frage auswählen — Cycling: erst alle einmal, dann zweimal, usw. ──
+// ── Frage auswählen — Kategorien-Cycling mit Oberkategorie-Rotation ──
 function pickQuestion() {
-  let pool = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
-  if (questionMode === 'mc')   { const p = pool.filter(q => q.type==='mc'||q.type==='multiple_choice');   if (p.length) pool = p; }
-  if (questionMode === 'open') { const p = pool.filter(q => q.type!=='mc'&&q.type!=='multiple_choice'); if (p.length) pool = p; }
-  if (!pool.length) return null;
-  const minCount = Math.min(...pool.map(q => questionPlayCounts[q.id] || 0));
-  const candidates = pool.filter(q => (questionPlayCounts[q.id] || 0) === minCount);
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return selectQuestionWithCycling(selectedCategoryIds, questionMode, questionPlayCounts, questionCycleState);
 }
 
 // ── Frage anzeigen ──────────────────────────────────────────────────

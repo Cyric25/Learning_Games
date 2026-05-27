@@ -156,14 +156,19 @@
     .ts-dot { width: 12px; height: 12px; border-radius: 50%; }
     .ts-name { font-weight: 600; font-size: .9rem; flex: 1; }
     .ts-elim { font-size: .72rem; color: var(--danger); font-weight: 700; }
-    .ts-ships { display: flex; gap: .3rem; flex-wrap: wrap; }
-    .ship-badge { display: flex; gap: 2px; }
-    .ship-cell {
-      width: 10px; height: 10px; border-radius: 2px;
-      border: 1px solid rgba(255,255,255,.2);
+    .ts-ships { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: .35rem; }
+    .hit-box {
+      width: 13px; height: 13px; border-radius: 3px;
+      border: 1.5px solid var(--border);
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .hit-box-x { border-color: var(--danger); }
+    .hit-box-x::after {
+      content: '✕'; font-size: .6rem; font-weight: 900; color: var(--danger);
     }
     .shot-counter {
-      font-size: .78rem; color: var(--text-2); margin-top: .4rem;
+      font-size: .78rem; color: var(--text-2);
     }
 
     /* Fullscreen hint */
@@ -257,7 +262,7 @@
   <div class="board-right">
     <div class="status-title">Teams</div>
     <div id="team-status"></div>
-    <div class="fs-hint">Treffer = Teamfarbe · Miss = ✕</div>
+    <div class="fs-hint">✕ = Schuss gelandet · Kästchen = Trefferzähler</div>
   </div>
 </div>
 
@@ -490,22 +495,13 @@ function makeBoardCell(col, row, size) {
 
   if (entry) {
     const wasShot = entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
-    const hasShip = entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
 
-    if (wasShot && hasShip) {
-      const shipTeam = boardState.teams[entry.shipTeamIdx];
-      const isSunk = shipTeam && shipTeam.ships.every(s =>
-        !s.coords.includes(key) || s.sunk
-      );
-      cell.style.background = shipTeam.color;
-      cell.style.opacity = isSunk ? '0.55' : '1';
-      if (isSunk) cell.classList.add('sunk');
-    } else if (wasShot && !hasShip) {
+    if (wasShot) {
       const shotTeam = boardState.teams[entry.shotByTeamIdx];
-      cell.classList.add('miss');
+      cell.classList.add('miss'); // ✕ via ::after
       cell.style.color = shotTeam?.color || '#aaa';
     }
-    // Ungetroffene Schiffe werden auf der Tafelansicht NICHT angezeigt
+    // Schiffpositionen werden nicht angezeigt
   }
 
   // Aktive Koordinate
@@ -550,16 +546,13 @@ function renderTeamStatus() {
 }
 
 function renderShipBadges(team) {
-  return team.ships.map(ship => {
-    const cells = ship.coords.map(coord => {
-      const entry = boardState.grid[coord];
-      const hit = entry && entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
-      const bg = hit ? (ship.sunk ? 'rgba(231,76,60,.4)' : team.color) : team.color;
-      const opacity = hit ? '1' : '0.3';
-      return `<div class="ship-cell" style="background:${bg};opacity:${opacity};"></div>`;
-    }).join('');
-    return `<div class="ship-badge">${cells}</div>`;
-  }).join('');
+  const totalCells = team.ships.reduce((n, s) => n + s.size, 0);
+  const hitsOnTeam = Object.values(boardState.grid).filter(e =>
+    e.shipTeamIdx === team.id && e.shotByTeamIdx !== null && e.shotByTeamIdx !== undefined
+  ).length;
+  return Array.from({ length: totalCells }, (_, i) =>
+    `<div class="hit-box${i < hitsOnTeam ? ' hit-box-x' : ''}"></div>`
+  ).join('');
 }
 
 // ── Fullscreen ────────────────────────────────────────────────────

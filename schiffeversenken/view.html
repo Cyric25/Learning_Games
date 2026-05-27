@@ -413,6 +413,9 @@ let myTeamId    = null;
 let gameCode    = null;
 let bsSub       = null;
 let allQuestions = [];
+let rawCategories = [];
+let leafToTopCat  = {};  // leafId → topCatId
+let leafToSubCat  = {};  // leafId → direct-child-of-topCat id
 let submittingShot = false;
 let mcTimerInterval = null;
 let soloMode = false;
@@ -445,6 +448,112 @@ function flattenQuestions(cats) {
   }
   cats.forEach(c => walk(c));
   return result;
+}
+
+// ── Kategorie-Mapping (einmalig beim Laden aufgebaut) ─────────────
+function buildCatMappings() {
+  leafToTopCat = {};
+  leafToSubCat = {};
+  rawCategories.forEach(topCat => {
+    if ((topCat.questions || []).length > 0) {
+      leafToTopCat[topCat.id] = topCat.id;
+      leafToSubCat[topCat.id] = topCat.id;
+    }
+    (topCat.subcategories || []).forEach(directSub => {
+      function walk(node) {
+        if ((node.questions || []).length > 0) {
+          leafToTopCat[node.id] = topCat.id;
+          leafToSubCat[node.id] = directSub.id;
+        }
+        (node.subcategories || []).forEach(s => walk(s));
+      }
+      walk(directSub);
+    });
+  });
+}
+
+function _orderedTopIds(pool) {
+  const activeSet = new Set(pool.map(q => leafToTopCat[q.kategorieId]).filter(Boolean));
+  return rawCategories.map(tc => tc.id).filter(id => activeSet.has(id));
+}
+
+function _orderedSubIds(topPool, topCatId) {
+  const activeSet = new Set(topPool.map(q => leafToSubCat[q.kategorieId]).filter(Boolean));
+  const topCat = rawCategories.find(tc => tc.id === topCatId);
+  if (topCat && (topCat.subcategories || []).length > 0) {
+    const ordered = topCat.subcategories.map(s => s.id).filter(id => activeSet.has(id));
+    if (activeSet.has(topCatId) && !ordered.includes(topCatId)) ordered.unshift(topCatId);
+    return ordered;
+  }
+  return [...activeSet];
+}
+
+// Wählt Frage mit Kategorien-Cycling:
+// Oberkategorien round-robin → Unterkategorien round-robin → least-played Frage
+// cycleState wird in-place mutiert: { topIdx, subByTop: {topId: idx} }
+function selectQuestionWithCycling(activeCats, mode, counts, cycleState) {
+  function matchesMode(q) {
+    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+    if (mode === 'mc')   return isMC;
+    if (mode === 'open') return !isMC;
+    return true;
+  }
+  const fullPool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
+  if (!fullPool.length) return null;
+
+  // Rundenminimum: Neustart erst wenn alle Fragen gespielt wurden
+  const roundMin = Math.min(...fullPool.map(q => counts[q.id] || 0));
+
+  const topIds = _orderedTopIds(fullPool);
+  if (!topIds.length) {
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+
+  const numTop = topIds.length;
+
+  // Oberkategorie wählen (erste mit verfügbaren Fragen ab Rotation-Position)
+  let topCatId = null, topOffset = 0;
+  for (let i = 0; i < numTop; i++) {
+    const tid = topIds[(cycleState.topIdx + i) % numTop];
+    const tPool = fullPool.filter(q => leafToTopCat[q.kategorieId] === tid);
+    if (tPool.some(q => (counts[q.id] || 0) === roundMin)) {
+      topCatId = tid; topOffset = i; break;
+    }
+  }
+  if (!topCatId) {
+    cycleState.topIdx++;
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+
+  const topPool = fullPool.filter(q => leafToTopCat[q.kategorieId] === topCatId);
+  const subIds  = _orderedSubIds(topPool, topCatId);
+  const numSub  = subIds.length;
+  const subBase = cycleState.subByTop[topCatId] || 0;
+
+  // Unterkategorie wählen (erste mit verfügbaren Fragen ab Rotation-Position)
+  let subCatId = null, subOffset = 0;
+  for (let i = 0; i < numSub; i++) {
+    const sid = subIds[(subBase + i) % numSub];
+    const sPool = topPool.filter(q => leafToSubCat[q.kategorieId] === sid);
+    if (sPool.some(q => (counts[q.id] || 0) === roundMin)) {
+      subCatId = sid; subOffset = i; break;
+    }
+  }
+
+  // Indizes vorwärts schieben (über übersprungene hinaus)
+  cycleState.subByTop[topCatId] = subBase + subOffset + 1;
+  cycleState.topIdx = cycleState.topIdx + topOffset + 1;
+
+  const finalPool = subCatId
+    ? topPool.filter(q => leafToSubCat[q.kategorieId] === subCatId && (counts[q.id] || 0) === roundMin)
+    : topPool.filter(q => (counts[q.id] || 0) === roundMin);
+  if (!finalPool.length) {
+    const cands = fullPool.filter(q => (counts[q.id] || 0) === roundMin);
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+  return finalPool[Math.floor(Math.random() * finalPool.length)];
 }
 
 // ── Join ──────────────────────────────────────────────────────────
@@ -810,29 +919,19 @@ async function fireShot() {
 
   submittingShot = true;
 
-  // Zufällige Frage wählen — Cycling: erst alle einmal, dann zweimal, usw.
-  const activeCats = new Set(remoteState.activeCategoryIds || []);
-  const mode = remoteState.questionMode || 'mixed';
-  const counts = remoteState.questionPlayCounts || {};
-  function matchesMode(q) {
-    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
-    if (mode === 'mc')   return isMC;
-    if (mode === 'open') return !isMC;
-    return true;
-  }
-  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
-  if (!pool.length) pool = allQuestions.filter(q => matchesMode(q));
-  if (!pool.length) { errEl.textContent = 'Keine Fragen verfügbar!'; submittingShot = false; return; }
-  const minCount = Math.min(...pool.map(q => counts[q.id] || 0));
-  const candidates = pool.filter(q => (counts[q.id] || 0) === minCount);
-  const q = candidates[Math.floor(Math.random() * candidates.length)];
+  // Frage mit Kategorien-Cycling wählen
+  const ns0 = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
+  ns0.usedQuestionIds    = new Set(ns0.usedQuestionIds || []);
+  ns0.questionPlayCounts = ns0.questionPlayCounts || {};
+  ns0.questionCycleState = ns0.questionCycleState || { topIdx: 0, subByTop: {} };
+  const activeCats = new Set(ns0.activeCategoryIds || []);
+  const mode = ns0.questionMode || 'mixed';
+  const q = selectQuestionWithCycling(activeCats, mode, ns0.questionPlayCounts, ns0.questionCycleState);
+  if (!q) { errEl.textContent = 'Keine Fragen verfügbar!'; submittingShot = false; return; }
 
-  // liveQuestion setzen
-  const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
-  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
-  ns.questionPlayCounts = ns.questionPlayCounts || {};
-  ns.questionPlayCounts[q.id] = (ns.questionPlayCounts[q.id] || 0) + 1;
-  ns.liveQuestion = {
+  // liveQuestion setzen (ns0 enthält bereits den deep-copy + cycle-state-Update)
+  ns0.questionPlayCounts[q.id] = (ns0.questionPlayCounts[q.id] || 0) + 1;
+  ns0.liveQuestion = {
     id: `lq-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     teamIdx: myTeamId,
     coordinate: coord,
@@ -842,12 +941,12 @@ async function fireShot() {
     shotGranted: null,
     resolved: false
   };
-  remoteState = ns;
-  await BsStorage.save(ns);
+  remoteState = ns0;
+  await BsStorage.save(ns0);
 
   input.value = '';
   document.getElementById('shot-panel').classList.add('hidden');
-  showQuestionOverlay(ns.liveQuestion);
+  showQuestionOverlay(ns0.liveQuestion);
   submittingShot = false;
 }
 window.fireShot = fireShot;
@@ -1133,7 +1232,9 @@ function showSpectatorQuestion(lq) {
 // ── Init ──────────────────────────────────────────────────────────
 (async function init() {
   const qData = await loadQuestions();
-  allQuestions = flattenQuestions(qData.categories || []);
+  rawCategories = qData.categories || [];
+  allQuestions  = flattenQuestions(rawCategories);
+  buildCatMappings();
 
   const urlCode = new URLSearchParams(window.location.search).get('code');
   if (urlCode) {
