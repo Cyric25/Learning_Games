@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schiffeversenken – Solo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    /* ── Solo-spezifische Stile ─────────────────────────────── */
+    #screen-setup  { min-height:100vh; flex-direction:column; align-items:center; padding:1.5rem 1rem; gap:1rem; overflow-y:auto; background:var(--bg-body); }
+    #screen-result { min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:2rem; gap:1.2rem; text-align:center; background:var(--bg-body); }
+
+    /* Play-Screen */
+    #screen-play { flex-direction:row; height:100vh; overflow:hidden; background:var(--bg-body); }
+    .solo-left  { flex:1; display:flex; flex-direction:column; overflow:hidden; padding:.8rem; gap:.5rem; min-width:0; }
+    .solo-right { width:260px; flex-shrink:0; display:flex; flex-direction:column; background:var(--bg-secondary); border-left:1px solid var(--border); padding:1rem .8rem; gap:.8rem; overflow-y:auto; }
+    @media (max-width:780px) {
+      #screen-play { flex-direction:column; height:auto; overflow:auto; }
+      .solo-right { width:100%; border-left:none; border-top:1px solid var(--border); flex-direction:row; flex-wrap:wrap; }
+    }
+    .solo-topbar { display:flex; align-items:center; justify-content:space-between; background:var(--bg-secondary); border-radius:10px; padding:.55rem .9rem; flex-shrink:0; }
+    .solo-topbar-title { font-weight:700; color:var(--accent); font-size:.95rem; }
+
+    /* Klickbare Grid-Zellen */
+    .grid-cell.clickable { cursor:crosshair; }
+    .grid-cell.clickable:hover { background:var(--grid-water-h); border-color:var(--accent); }
+    .grid-cell.wasted::after { content:'○'; font-size:.85rem; color:var(--text-secondary); opacity:.55; position:absolute; }
+
+    /* Statuslabels Sidebar */
+    .side-section { }
+    .side-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text-secondary); margin-bottom:.4rem; padding-bottom:.2rem; border-bottom:1px solid var(--border); }
+    .stat-row { display:flex; justify-content:space-between; align-items:center; padding:.15rem 0; }
+    .stat-label { font-size:.82rem; color:var(--text-secondary); }
+    .stat-val   { font-size:.88rem; font-weight:700; color:var(--text-primary); }
+    .stat-val.accent { color:var(--accent); }
+    .stat-val.danger { color:var(--danger); }
+
+    /* Schiff-Badges (Sidebar) */
+    .ships-wrap { display:flex; flex-direction:column; gap:.3rem; }
+    .ship-row   { display:flex; align-items:center; gap:.4rem; }
+    .ship-label { font-size:.72rem; color:var(--text-secondary); min-width:2rem; }
+    .ship-cells { display:flex; gap:2px; }
+    .ship-cell  { width:12px; height:12px; border-radius:2px; border:1px solid rgba(0,0,0,.15); }
+    .ship-tag   { font-size:.68rem; font-weight:700; margin-left:.2rem; }
+
+    /* KI-Toast */
+    #ai-toast {
+      position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+      background:var(--bg-secondary); border:1px solid var(--border);
+      border-radius:12px; padding:.6rem 1.2rem; font-size:.9rem; font-weight:600;
+      box-shadow:0 4px 20px rgba(0,0,0,.35); z-index:600;
+      pointer-events:none; transition:opacity .3s;
+    }
+    #ai-toast.hidden { opacity:0; }
+
+    /* Timer-Bar MC */
+    .mc-timer-bar  { height:4px; background:var(--border); border-radius:2px; margin-bottom:.5rem; overflow:hidden; }
+    .mc-timer-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .1s linear; }
+
+    /* Musterlösung */
+    .answer-reveal { background:rgba(46,204,113,.1); border:1px solid rgba(46,204,113,.3); border-radius:8px; padding:.45rem .9rem; margin-bottom:.7rem; }
+    .answer-reveal-label { font-size:.68rem; font-weight:700; text-transform:uppercase; color:var(--success); }
+    .answer-reveal-text  { font-size:.9rem; font-weight:600; color:var(--text-primary); }
+
+    /* Result */
+    .result-title  { font-size:clamp(1.8rem,4vw,2.6rem); font-weight:900; }
+    .result-sub    { font-size:1rem; color:var(--text-secondary); }
+    .result-stats  { display:flex; gap:2rem; justify-content:center; flex-wrap:wrap; }
+    .result-stat   { text-align:center; }
+    .result-stat-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-secondary); }
+    .result-stat-value { font-size:2rem; font-weight:800; color:var(--accent); }
+    .hs-card       { background:var(--bg-secondary); border:1px solid var(--border); border-radius:14px; padding:1rem 1.5rem; width:100%; max-width:440px; }
+    .hs-card-title { font-size:.9rem; font-weight:700; color:var(--accent); margin-bottom:.5rem; }
+    .hs-table      { width:100%; border-collapse:collapse; font-size:.83rem; }
+    .hs-table th,
+    .hs-table td   { padding:.28rem .45rem; text-align:left; border-bottom:1px solid var(--border); }
+    .hs-table th   { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); }
+    .hs-me         { font-weight:700; color:var(--accent); }
+    .hs-rank       { font-weight:800; color:var(--text-secondary); text-align:center; }
+
+    /* Mini-Grid (eigene Flotte) */
+    .mini-grid-outer { display:inline-flex; flex-direction:column; gap:1px; }
+    .mini-grid-row   { display:flex; gap:1px; }
+    .mini-cell-hdr   { width:14px; height:14px; display:flex; align-items:center; justify-content:center; font-size:.5rem; font-weight:700; color:var(--text-secondary); }
+    .mini-cell       { width:14px; height:14px; border-radius:2px; border:1px solid var(--border); background:var(--grid-water); position:relative; overflow:hidden; }
+    .mini-cell.my-ship    { border-color:rgba(255,255,255,.2); }
+    .mini-cell.ai-hit     { background:#ef4444 !important; border-color:rgba(255,255,255,.4); }
+    .mini-cell.ai-miss::after { content:'•'; font-size:.55rem; color:var(--text-secondary); position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+    .mini-cell.ai-sunk    { opacity:.55; }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup Screen ─────────────────────────────────────────── -->
+<div class="screen active" id="screen-setup">
+  <div class="setup-header" style="max-width:680px;">
+    <div class="setup-h1">⚓ Solo-Schiffeversenken</div>
+    <div style="display:flex;gap:8px;">
+      <a href="index.html" class="header-btn">← Mehrspielermodus</a>
+      <a href="../spiele.html" class="header-btn">← Übersicht</a>
+      <button class="header-btn" id="btn-theme-setup" onclick="toggleTheme()">☀️ Light</button>
+    </div>
+  </div>
+
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">👤 Spielername</div>
+    <input type="text" id="solo-player-name" class="title-input" placeholder="Dein Name" maxlength="30">
+  </div>
+
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">📚 Kategorien</div>
+    <div class="cat-toggle-btns">
+      <button class="btn-cat-toggle" onclick="toggleAllCats(true)">Alle</button>
+      <button class="btn-cat-toggle" onclick="toggleAllCats(false)">Keine</button>
+    </div>
+    <div id="cat-select-list" class="cat-select-list">
+      <div style="color:var(--text-secondary);font-style:italic;font-size:.9rem;">Lade Kategorien…</div>
+    </div>
+    <div id="cat-select-info" class="cat-select-info"></div>
+  </div>
+
+  <div class="setup-card" style="max-width:680px;">
+    <div class="setup-card-title">❓ Fragentyp</div>
+    <div class="qmode-group">
+      <button class="qmode-btn active" data-mode="mixed" onclick="setQuestionMode('mixed')">
+        🔀 Gemischt<span class="qmode-desc">MC + Offene Fragen</span>
+      </button>
+      <button class="qmode-btn" data-mode="mc" onclick="setQuestionMode('mc')">
+        🅰 Nur MC<span class="qmode-desc">Selbstständig spielen</span>
+      </button>
+      <button class="qmode-btn" data-mode="open" onclick="setQuestionMode('open')">
+        💬 Nur Offen<span class="qmode-desc">Selbst bewerten</span>
+      </button>
+    </div>
+    <div class="timer-setting">
+      <span class="timer-setting-label">⏱ Timer pro MC-Frage:</span>
+      <div class="timer-btns">
+        <button class="timer-btn active" data-sec="0"  onclick="setMcTimer(0)">Kein Timer</button>
+        <button class="timer-btn"        data-sec="15" onclick="setMcTimer(15)">15 s</button>
+        <button class="timer-btn"        data-sec="20" onclick="setMcTimer(20)">20 s</button>
+        <button class="timer-btn"        data-sec="30" onclick="setMcTimer(30)">30 s</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding-bottom:2rem;">
+    <button class="btn-primary" onclick="startSolo()">🚢 Spiel starten</button>
+  </div>
+</div>
+
+<!-- ── Play Screen ──────────────────────────────────────────── -->
+<div class="screen" id="screen-play">
+  <div class="solo-left">
+    <div class="solo-topbar">
+      <div class="solo-topbar-title" id="play-title">⚓ Solo-Schiffeversenken</div>
+      <div style="display:flex;gap:.4rem;">
+        <button class="header-btn" id="btn-theme-play" onclick="toggleTheme()">☀️ Light</button>
+        <button class="header-btn" onclick="confirmQuit()">✕ Aufgeben</button>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:.8rem;color:var(--text-secondary);flex-shrink:0;">🎯 Feindliche Flotte — klicke eine Zelle zum Schießen</div>
+    <div class="grid-wrapper">
+      <div id="enemy-grid" class="grid-outer"></div>
+    </div>
+  </div>
+
+  <div class="solo-right">
+    <!-- Statistik -->
+    <div class="side-section">
+      <div class="side-title">⏱ Spielstand</div>
+      <div class="stat-row"><span class="stat-label">Zeit</span>       <span class="stat-val" id="stopwatch">0:00</span></div>
+      <div class="stat-row"><span class="stat-label">Deine Schüsse</span><span class="stat-val accent" id="shot-count">0</span></div>
+      <div class="stat-row"><span class="stat-label">Deine Treffer</span><span class="stat-val" id="hit-count">0 / 12</span></div>
+      <div class="stat-row"><span class="stat-label">KI-Schüsse</span>  <span class="stat-val" id="ai-shot-count">0</span></div>
+      <div class="stat-row"><span class="stat-label">KI-Treffer</span>  <span class="stat-val danger" id="ai-hit-count">0 / 12</span></div>
+    </div>
+
+    <!-- Feindliche Schiffe -->
+    <div class="side-section">
+      <div class="side-title">💀 Feindliche Flotte</div>
+      <div class="ships-wrap" id="enemy-ship-status"></div>
+    </div>
+
+    <!-- Eigene Flotte -->
+    <div class="side-section">
+      <div class="side-title">🛡 Deine Flotte</div>
+      <div class="ships-wrap" id="player-ship-status"></div>
+      <div style="margin-top:.5rem;">
+        <div id="mini-fleet-grid"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;">
+      <a href="../spiele.html" style="font-size:.78rem;color:var(--text-secondary);text-decoration:none;">← Zur Übersicht</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Result Screen ────────────────────────────────────────── -->
+<div class="screen" id="screen-result">
+  <div class="winner-trophy" id="result-emoji">🏆</div>
+  <div class="result-title"  id="result-title">Gewonnen!</div>
+  <div class="result-sub"    id="result-sub"></div>
+  <div class="result-stats">
+    <div class="result-stat">
+      <div class="result-stat-label">Deine Schüsse</div>
+      <div class="result-stat-value" id="result-shots">—</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-label">Zeit</div>
+      <div class="result-stat-value" id="result-time">—</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-label">KI-Schüsse</div>
+      <div class="result-stat-value" id="result-ai-shots">—</div>
+    </div>
+  </div>
+  <div class="hs-card">
+    <div class="hs-card-title">🏅 Bestenliste (nur Siege)</div>
+    <table class="hs-table">
+      <thead><tr><th>#</th><th>Name</th><th>Schüsse</th><th>Zeit</th></tr></thead>
+      <tbody id="hs-body"></tbody>
+    </table>
+  </div>
+  <div style="display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;">
+    <button class="btn-primary"  onclick="restartSolo()">🔄 Nochmal spielen</button>
+    <a href="../spiele.html" class="btn-secondary" style="padding:.7rem 1.5rem;border-radius:12px;text-decoration:none;display:flex;align-items:center;">← Zur Übersicht</a>
+  </div>
+</div>
+
+<!-- ── Fragen-Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="question-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-team-dot" style="background:var(--accent)"></div>
+      <div>
+        <div style="font-weight:700;" id="modal-player-name">Spieler</div>
+        <div class="modal-subtitle">schießt auf <span class="modal-coord" id="modal-coord">A1</span></div>
+      </div>
+    </div>
+    <div id="modal-category" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);margin-bottom:.35rem;"></div>
+    <div class="mc-timer-bar" id="timer-bar-wrap" style="display:none;">
+      <div class="mc-timer-fill" id="timer-bar-fill" style="width:100%"></div>
+    </div>
+    <div class="modal-question-text" id="modal-question"></div>
+    <div id="modal-mc-options" class="mc-options"></div>
+    <div id="answer-reveal" class="answer-reveal" style="display:none;">
+      <div class="answer-reveal-label">Musterlösung</div>
+      <div class="answer-reveal-text" id="answer-reveal-text"></div>
+    </div>
+    <div id="modal-hint" class="hint-text" style="display:none;"></div>
+    <div id="modal-result" class="modal-result-banner" style="display:none;"></div>
+    <div class="modal-btns" id="modal-btns"></div>
+  </div>
+</div>
+
+<!-- ── KI-Toast ─────────────────────────────────────────────── -->
+<div id="ai-toast" class="hidden"></div>
+
+<script>
+// ── Konstanten ──────────────────────────────────────────────────────
+const COLS      = ['A','B','C','D','E','F','G','H','I','J'];
+const CAT_ICONS = ['📚','🔬','🌍','⚡','🎯','🏛️','🧮','🌿','⚗️','🎨','💡','🦁','🎵','🏔️','🌊'];
+const SHIP_SIZES = [6, 4, 2];  // 12 Schiffzellen gesamt
+const HS_KEY    = 'bs_solo_hs';
+const HS_MAX    = 10;
+
+// ── State ───────────────────────────────────────────────────────────
+let rawCategories = [], allQuestions = [], selectedCategoryIds = new Set();
+let questionMode = 'mixed', mcTimerSec = 0, playerName = '';
+
+// Feindliche Flotte (KI) — Spieler schießt hier, Fragen nötig
+let enemyShips = [], enemyShipGrid = {}, playerShots = {};
+let playerShotsFired = 0, playerHits = 0;
+
+// Eigene Flotte — KI schießt hier, keine Fragen
+let myShips = [], myShipGrid = {};
+let aiShotSet  = new Set();  // alle KI-Schüsse
+let aiHitSet   = new Set();  // KI-Treffer
+
+// KI-Strategie (Hunt/Target)
+let ai = { mode: 'hunt', currentHits: [], direction: null, queue: [] };
+
+let startTime = null, stopwatchTimer = null;
+let pendingCoord = null, usedQuestionIds = new Set();
+let mcTimerHandle = null, answering = false;
+let aiTurnPending = false;
+
+// ── Theme ───────────────────────────────────────────────────────────
+(function () {
+  const KEY = 'spiele_theme';
+  function apply(dark) {
+    document.body.classList.toggle('dark', dark);
+    ['btn-theme-setup','btn-theme-play'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = dark ? '☀️ Light' : '🌙 Dark';
+    });
+  }
+  window.toggleTheme = function () {
+    const dark = !document.body.classList.contains('dark');
+    localStorage.setItem(KEY, dark ? 'dark' : 'light');
+    apply(dark);
+  };
+  apply(localStorage.getItem(KEY) === 'dark');
+})();
+
+// ── Screens ─────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatTime(sec) { return Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0'); }
+function colIdx(col) { return COLS.indexOf(col); }
+
+// ── Fragen laden ────────────────────────────────────────────────────
+async function loadQuestions() {
+  let data = null;
+  try { const r = await fetch('../api.php?f=questions'); if (r.ok) { const d = await r.json(); if (d?.categories) data = d; } } catch {}
+  if (!data) try { const r = await fetch('../data/questions.json'); if (r.ok) { const d = await r.json(); if (d?.categories) data = d; } } catch {}
+  if (!data) { try { const c = localStorage.getItem('rq_questions'); if (c) data = JSON.parse(c); } catch {} }
+  if (!data) data = { categories: [] };
+  rawCategories = data.categories || [];
+  allQuestions  = flattenQuestions(rawCategories);
+  buildCategoryUI();
+}
+
+function flattenQuestions(cats) {
+  const result = [];
+  function walk(cat) {
+    const subs = cat.subcategories || [];
+    const hasQ = (cat.questions||[]).length > 0;
+    if (hasQ && !subs.length) { cat.questions.forEach(q => result.push({...q, kategorieId:cat.id, kategorieName:cat.name})); return; }
+    subs.forEach(s => walk(s));
+    if (hasQ && subs.length) cat.questions.forEach(q => result.push({...q, kategorieId:cat.id, kategorieName:cat.name}));
+  }
+  cats.forEach(c => walk(c));
+  return result;
+}
+
+// ── Kategorie-UI ────────────────────────────────────────────────────
+function buildCategoryUI() {
+  const list = document.getElementById('cat-select-list');
+  if (!rawCategories.length) { list.innerHTML = '<div style="color:var(--text-secondary);font-style:italic;font-size:.9rem;">Keine Kategorien gefunden.</div>'; return; }
+  list.innerHTML = '';
+  selectedCategoryIds.clear();
+  function leaves(cat) {
+    if ((cat.questions||[]).length > 0) return [cat.id];
+    return (cat.subcategories||[]).flatMap(s => leaves(s));
+  }
+  rawCategories.forEach(cat => leaves(cat).forEach(id => selectedCategoryIds.add(id)));
+  rawCategories.forEach((cat, i) => _buildCatNode(list, cat, CAT_ICONS[i % CAT_ICONS.length]));
+  updateCatInfo();
+}
+
+function _buildCatNode(container, cat, icon) {
+  const subs = cat.subcategories || [];
+  const hasQ = (cat.questions||[]).length > 0;
+  if (!hasQ && !subs.length) return;
+  function countQ(c) {
+    const ss = c.subcategories||[];
+    if ((c.questions||[]).length > 0 && !ss.length) return (c.questions||[]).length;
+    return ss.reduce((n,s)=>n+countQ(s),0) + ((c.questions||[]).length>0&&ss.length?(c.questions||[]).length:0);
+  }
+  const qc = countQ(cat);
+  if (hasQ && !subs.length) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const item = document.createElement('div');
+    item.className = 'cat-select-item' + (sel ? ' selected' : '');
+    item.dataset.catId = cat.id;
+    item.innerHTML = `<span class="cat-select-icon">${icon||'📁'}</span><span class="cat-select-name">${escapeHtml(cat.name)}</span><span class="cat-select-count">${qc} Fr.</span><div class="cat-select-check">${sel?'✓':''}</div>`;
+    item.onclick = () => {
+      const on = !selectedCategoryIds.has(cat.id);
+      if (on) selectedCategoryIds.add(cat.id); else selectedCategoryIds.delete(cat.id);
+      item.classList.toggle('selected', on); item.querySelector('.cat-select-check').textContent = on?'✓':''; updateCatInfo();
+    };
+    container.appendChild(item); return;
+  }
+  const wrap = document.createElement('div'); wrap.className = 'cat-group-wrap';
+  wrap.innerHTML = `<div class="cat-group-header"><span class="cat-group-icon">${icon||'📁'}</span><span class="cat-group-name">${escapeHtml(cat.name)}</span><span class="cat-group-count">${qc} Fr.</span><span class="cat-group-toggle">▼</span></div><div class="cat-group-children"></div>`;
+  wrap.querySelector('.cat-group-header').onclick = () => wrap.classList.toggle('open');
+  const ch = wrap.querySelector('.cat-group-children');
+  subs.forEach(s => _buildCatNode(ch, s, '📄'));
+  if (hasQ && subs.length) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const li = document.createElement('div'); li.className = 'cat-select-item' + (sel?' selected':''); li.dataset.catId = cat.id;
+    li.innerHTML = `<span class="cat-select-icon">📄</span><span class="cat-select-name">${escapeHtml(cat.name)} (direkt)</span><span class="cat-select-count">${(cat.questions||[]).length} Fr.</span><div class="cat-select-check">${sel?'✓':''}</div>`;
+    li.onclick = () => { const on=!selectedCategoryIds.has(cat.id); if(on)selectedCategoryIds.add(cat.id);else selectedCategoryIds.delete(cat.id); li.classList.toggle('selected',on); li.querySelector('.cat-select-check').textContent=on?'✓':''; updateCatInfo(); };
+    ch.appendChild(li);
+  }
+  container.appendChild(wrap);
+}
+
+function updateCatInfo() {
+  const q = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  const info = document.getElementById('cat-select-info');
+  if (!info) return;
+  if (!q.length) { info.textContent = '⚠ Keine Fragen ausgewählt.'; info.className = 'cat-select-info warn'; }
+  else { info.textContent = `${q.length} Fragen aus ${selectedCategoryIds.size} Kategorie(n)`; info.className = 'cat-select-info'; }
+}
+
+function toggleAllCats(on) {
+  function leaves(cat) { if((cat.questions||[]).length>0) return [cat.id]; return (cat.subcategories||[]).flatMap(s=>leaves(s)); }
+  if (on) rawCategories.forEach(c => leaves(c).forEach(id => selectedCategoryIds.add(id)));
+  else selectedCategoryIds.clear();
+  buildCategoryUI();
+}
+window.toggleAllCats = toggleAllCats;
+
+function setQuestionMode(mode) {
+  questionMode = mode;
+  document.querySelectorAll('.qmode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+window.setQuestionMode = setQuestionMode;
+
+function setMcTimer(sec) {
+  mcTimerSec = sec;
+  document.querySelectorAll('.timer-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.sec) === sec));
+}
+window.setMcTimer = setMcTimer;
+
+// ── Schiff-Platzierung ──────────────────────────────────────────────
+function placeFleet(targetShipsArr, targetGridObj) {
+  const occupied = new Set();
+  targetShipsArr.length = 0;
+  for (const key in targetGridObj) delete targetGridObj[key];
+  SHIP_SIZES.forEach(size => {
+    let placed = false, tries = 0;
+    while (!placed && tries < 500) {
+      tries++;
+      const horiz = Math.random() > 0.5;
+      const startCol = Math.floor(Math.random() * (horiz ? 11-size : 10));
+      const startRow = Math.floor(Math.random() * (horiz ? 10 : 11-size));
+      const coords = Array.from({length:size}, (_,k) => {
+        const c = COLS[startCol + (horiz?k:0)];
+        const r = startRow + 1 + (horiz?0:k);
+        return `${c}${r}`;
+      });
+      if (coords.every(c => !occupied.has(c))) {
+        coords.forEach(c => { occupied.add(c); targetGridObj[c] = true; });
+        targetShipsArr.push({ size, coords, sunk: false });
+        placed = true;
+      }
+    }
+  });
+}
+
+// ── Spiel starten ───────────────────────────────────────────────────
+function startSolo() {
+  const activeQ = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  if (!activeQ.length) { alert('Bitte mindestens eine Kategorie mit Fragen wählen!'); return; }
+
+  playerName = document.getElementById('solo-player-name').value.trim() || 'Spieler';
+  document.getElementById('play-title').textContent = `⚓ ${playerName} vs. KI`;
+  document.getElementById('modal-player-name').textContent = playerName;
+
+  placeFleet(enemyShips, enemyShipGrid);
+  placeFleet(myShips,    myShipGrid);
+
+  playerShots = {}; playerShotsFired = 0; playerHits = 0;
+  aiShotSet   = new Set(); aiHitSet = new Set();
+  ai = { mode: 'hunt', currentHits: [], direction: null, queue: [] };
+  usedQuestionIds = new Set();
+  answering = false; aiTurnPending = false;
+
+  showScreen('screen-play');
+  renderEnemyGrid();
+  renderShipStatus();
+  renderMiniFleetGrid();
+  updateStats();
+
+  startTime = Date.now();
+  if (stopwatchTimer) clearInterval(stopwatchTimer);
+  stopwatchTimer = setInterval(() => {
+    const el = document.getElementById('stopwatch');
+    if (el && startTime) el.textContent = formatTime(Math.floor((Date.now()-startTime)/1000));
+  }, 500);
+}
+window.startSolo = startSolo;
+
+// ── Feindliches Grid rendern ────────────────────────────────────────
+function renderEnemyGrid() {
+  const container = document.getElementById('enemy-grid');
+  container.innerHTML = '';
+  const hdr = document.createElement('div'); hdr.className = 'grid-row';
+  hdr.appendChild(makeHdrCell(''));
+  COLS.forEach(c => hdr.appendChild(makeHdrCell(c)));
+  container.appendChild(hdr);
+  for (let row = 1; row <= 10; row++) {
+    const rowEl = document.createElement('div'); rowEl.className = 'grid-row';
+    rowEl.appendChild(makeHdrCell(String(row)));
+    COLS.forEach(col => rowEl.appendChild(makeEnemyCell(col, row)));
+    container.appendChild(rowEl);
+  }
+}
+
+function makeHdrCell(text) {
+  const el = document.createElement('div'); el.className = 'grid-cell-header'; el.textContent = text; return el;
+}
+
+function makeEnemyCell(col, row) {
+  const key = `${col}${row}`;
+  const cell = document.createElement('div');
+  const shot = playerShots[key];
+  if (shot) {
+    cell.className = 'grid-cell';
+    if (shot.correct && enemyShipGrid[key]) {
+      cell.style.background = '#ef4444'; cell.classList.add('ship-hit');
+      const ship = enemyShips.find(s => s.coords.includes(key));
+      if (ship?.sunk) { cell.classList.add('sunk-ship'); cell.style.opacity = '.65'; }
+      cell.title = `💥 Treffer — ${key}`;
+    } else if (shot.correct && !enemyShipGrid[key]) {
+      cell.classList.add('miss'); cell.title = `💧 Wasser — ${key}`;
+    } else {
+      cell.classList.add('wasted'); cell.title = `○ Schuss verpufft — ${key}`;
+    }
+  } else {
+    cell.className = 'grid-cell clickable'; cell.title = key;
+    cell.onclick = () => tapEnemyCell(key);
+  }
+  return cell;
+}
+
+// ── Mini-Grid (eigene Flotte) ────────────────────────────────────────
+function renderMiniFleetGrid() {
+  const container = document.getElementById('mini-fleet-grid');
+  container.innerHTML = '';
+  const outer = document.createElement('div'); outer.className = 'mini-grid-outer';
+  const hdr = document.createElement('div'); hdr.className = 'mini-grid-row';
+  hdr.appendChild(Object.assign(document.createElement('div'), {className:'mini-cell-hdr'}));
+  COLS.forEach(c => {
+    const el = Object.assign(document.createElement('div'), {className:'mini-cell-hdr', textContent:c});
+    hdr.appendChild(el);
+  });
+  outer.appendChild(hdr);
+  for (let row = 1; row <= 10; row++) {
+    const rowEl = document.createElement('div'); rowEl.className = 'mini-grid-row';
+    const rh = Object.assign(document.createElement('div'), {className:'mini-cell-hdr', textContent:String(row)});
+    rowEl.appendChild(rh);
+    COLS.forEach(col => {
+      const key = `${col}${row}`;
+      const cell = document.createElement('div');
+      cell.className = 'mini-cell';
+      const hasShip = !!myShipGrid[key];
+      const aiShot  = aiShotSet.has(key);
+      const aiHit   = aiHitSet.has(key);
+      if (hasShip) {
+        const ship = myShips.find(s => s.coords.includes(key));
+        if (aiHit) {
+          cell.classList.add('my-ship', 'ai-hit');
+          if (ship?.sunk) cell.classList.add('ai-sunk');
+        } else {
+          cell.classList.add('my-ship');
+          cell.style.background = 'rgba(59,130,246,.5)'; // Eigene Schiffe in blau
+          cell.style.borderColor = 'rgba(59,130,246,.4)';
+        }
+      } else if (aiShot && !aiHit) {
+        cell.classList.add('ai-miss');
+      }
+      rowEl.appendChild(cell);
+    });
+    outer.appendChild(rowEl);
+  }
+  container.appendChild(outer);
+}
+
+// ── Schiff-Status Sidebar ────────────────────────────────────────────
+function renderShipStatus() {
+  renderFleetStatus('enemy-ship-status', enemyShips, playerShots, enemyShipGrid, '#ef4444');
+  renderFleetStatus('player-ship-status', myShips, null, myShipGrid, '#3b82f6', true);
+}
+
+function renderFleetStatus(elId, ships, shots, grid, color, aiMode) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = ships.map(ship => {
+    const cells = ship.coords.map(coord => {
+      let bg, op;
+      if (aiMode) {
+        // Eigene Flotte: zeige KI-Treffer
+        if (aiHitSet.has(coord)) { bg = '#ef4444'; op = '1'; }
+        else { bg = color; op = '0.45'; }
+      } else {
+        // Feindliche Flotte: zeige Spielertreffer
+        if (shots?.[coord]?.correct && grid[coord]) { bg = color; op = '1'; }
+        else { bg = 'rgba(150,150,150,.3)'; op = '1'; }
+      }
+      return `<div class="ship-cell" style="background:${bg};opacity:${op}"></div>`;
+    }).join('');
+    const tag = ship.sunk
+      ? `<span class="ship-tag" style="color:var(--danger)">versenkt</span>`
+      : '';
+    return `<div class="ship-row"><div class="ship-label">${ship.size}er</div><div class="ship-cells">${cells}</div>${tag}</div>`;
+  }).join('');
+}
+
+// ── Stats updaten ────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('shot-count').textContent    = playerShotsFired;
+  document.getElementById('hit-count').textContent     = `${playerHits} / 12`;
+  document.getElementById('ai-shot-count').textContent = aiShotSet.size;
+  document.getElementById('ai-hit-count').textContent  = `${aiHitSet.size} / 12`;
+}
+
+// ── Zelle antippen ──────────────────────────────────────────────────
+function tapEnemyCell(key) {
+  if (answering || aiTurnPending) return;
+  pendingCoord = key;
+  showQuestion(key);
+}
+
+// ── Frage auswählen ─────────────────────────────────────────────────
+function pickQuestion() {
+  const active = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  let pool = active.filter(q => !usedQuestionIds.has(q.id));
+  if (!pool.length) pool = active;
+  if (questionMode === 'mc')   pool = pool.filter(q => q.type==='mc'||q.type==='multiple_choice').length ? pool.filter(q=>q.type==='mc'||q.type==='multiple_choice') : pool;
+  if (questionMode === 'open') pool = pool.filter(q => q.type!=='mc'&&q.type!=='multiple_choice').length ? pool.filter(q=>q.type!=='mc'&&q.type!=='multiple_choice') : pool;
+  return pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+// ── Frage anzeigen ──────────────────────────────────────────────────
+function showQuestion(coord) {
+  answering = true;
+  const q = pickQuestion();
+  if (!q) { answering = false; return; }
+  const modal = document.getElementById('question-modal');
+  modal._q = q;
+  document.getElementById('modal-coord').textContent     = coord;
+  document.getElementById('modal-category').textContent  = q.kategorieName || '';
+  document.getElementById('modal-question').textContent  = q.question || '';
+  document.getElementById('modal-result').style.display  = 'none';
+  document.getElementById('answer-reveal').style.display = 'none';
+  document.getElementById('modal-btns').innerHTML        = '';
+  const hint = document.getElementById('modal-hint');
+  if (q.hint) { hint.textContent = `💡 ${q.hint}`; hint.style.display = ''; } else hint.style.display = 'none';
+  const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+  const tb = document.getElementById('timer-bar-wrap'), tf = document.getElementById('timer-bar-fill');
+  if (isMC) {
+    document.getElementById('modal-mc-options').innerHTML = (q.options||[])
+      .map((opt,i) => `<button class="mc-option" onclick="submitMC(${i})">${escapeHtml(opt)}</button>`).join('');
+    if (mcTimerSec > 0) {
+      tb.style.display = ''; tf.style.width = '100%'; let rem = mcTimerSec;
+      if (mcTimerHandle) clearInterval(mcTimerHandle);
+      mcTimerHandle = setInterval(() => {
+        rem -= 0.1; tf.style.width = Math.max(0, rem/mcTimerSec*100) + '%';
+        if (rem <= 0) { clearInterval(mcTimerHandle); mcTimerHandle = null; submitMC(-1); }
+      }, 100);
+    } else tb.style.display = 'none';
+  } else {
+    document.getElementById('modal-mc-options').innerHTML = '';
+    tb.style.display = 'none';
+    if (mcTimerHandle) { clearInterval(mcTimerHandle); mcTimerHandle = null; }
+    if (q.answer) { document.getElementById('answer-reveal-text').textContent = q.answer; document.getElementById('answer-reveal').style.display = ''; }
+    document.getElementById('modal-btns').innerHTML =
+      `<button class="btn-modal-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+       <button class="btn-modal-wrong"   onclick="resolveOpen(false)">✗ Falsch</button>`;
+  }
+  modal.classList.remove('hidden');
+}
+
+function submitMC(selectedIdx) {
+  if (mcTimerHandle) { clearInterval(mcTimerHandle); mcTimerHandle = null; }
+  const q = document.getElementById('question-modal')._q;
+  if (!q) return;
+  document.getElementById('timer-bar-wrap').style.display = 'none';
+  const correct = selectedIdx !== -1 && selectedIdx === q.correctIndex;
+  document.querySelectorAll('#modal-mc-options .mc-option').forEach((btn,i) => {
+    btn.onclick = null;
+    if (i === q.correctIndex) btn.classList.add('correct');
+    else if (i === selectedIdx && !correct) btn.classList.add('wrong');
+    btn.style.cursor = 'default';
+  });
+  applyPlayerShot(correct, q);
+}
+window.submitMC = submitMC;
+
+function resolveOpen(correct) {
+  document.getElementById('modal-btns').innerHTML = '';
+  applyPlayerShot(correct, document.getElementById('question-modal')._q);
+}
+window.resolveOpen = resolveOpen;
+
+function applyPlayerShot(correct, q) {
+  usedQuestionIds.add(q.id);
+  playerShots[pendingCoord] = { correct };
+  playerShotsFired++;
+  const isHit = correct && !!enemyShipGrid[pendingCoord];
+  if (isHit) {
+    playerHits++;
+    const ship = enemyShips.find(s => s.coords.includes(pendingCoord));
+    if (ship) { const sunk = ship.coords.every(c => playerShots[c]?.correct); if (sunk) ship.sunk = true; }
+  }
+  const resultEl = document.getElementById('modal-result');
+  if (isHit) {
+    const ship = enemyShips.find(s => s.coords.includes(pendingCoord));
+    resultEl.textContent = ship?.sunk ? `💥 Schiff (${ship.size} Felder) versenkt!` : '💥 Treffer!';
+    resultEl.className   = 'modal-result-banner hit';
+  } else if (correct) {
+    resultEl.textContent = '💧 Wasser.'; resultEl.className = 'modal-result-banner miss';
+  } else {
+    resultEl.textContent = '✗ Falsche Antwort — Schuss verpufft.'; resultEl.className = 'modal-result-banner miss';
+  }
+  resultEl.style.display = '';
+  document.getElementById('modal-btns').innerHTML = `<button class="btn-modal-next" onclick="closeQuestion(${enemyShips.every(s=>s.sunk)})">Weiter →</button>`;
+}
+
+function closeQuestion(playerWon) {
+  document.getElementById('question-modal').classList.add('hidden');
+  answering = false;
+  renderEnemyGrid();
+  updateStats();
+  renderShipStatus();
+  if (playerWon) { setTimeout(() => finishGame(true), 200); return; }
+  // KI-Zug nach 600ms
+  aiTurnPending = true;
+  setTimeout(doAITurn, 600);
+}
+window.closeQuestion = closeQuestion;
+
+// ── KI-Strategie ────────────────────────────────────────────────────
+function aiPickCoord() {
+  // Target-Modus: Queue abarbeiten
+  if (ai.mode === 'target' && ai.queue.length > 0) {
+    // Überspringe bereits beschossene
+    while (ai.queue.length > 0 && aiShotSet.has(ai.queue[0])) ai.queue.shift();
+    if (ai.queue.length > 0) return ai.queue.shift();
+  }
+  // Hunt-Modus: zufällig (bevorzugt Schachbrettmuster für Effizienz)
+  const candidates = [];
+  for (let c = 0; c < 10; c++) {
+    for (let r = 1; r <= 10; r++) {
+      const key = `${COLS[c]}${r}`;
+      if (!aiShotSet.has(key)) {
+        // Schachbrettmuster: nur Felder mit (c+r) gerade, falls noch viele übrig
+        if ((c + r) % 2 === 0) candidates.push(key);
+      }
+    }
+  }
+  // Falls keine Schachbrettkandidaten (fast alle beschossen), alle nehmen
+  if (!candidates.length) {
+    for (let c = 0; c < 10; c++) for (let r = 1; r <= 10; r++) {
+      const key = `${COLS[c]}${r}`;
+      if (!aiShotSet.has(key)) candidates.push(key);
+    }
+  }
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function aiRebuildQueue() {
+  ai.queue = [];
+  if (ai.currentHits.length === 0) return;
+
+  if (ai.currentHits.length === 1) {
+    // Erste Treffer: alle 4 Richtungen ausprobieren
+    const coord = ai.currentHits[0];
+    const ci = colIdx(coord[0]);
+    const ri = parseInt(coord.slice(1));
+    [ [1,0],[-1,0],[0,1],[0,-1] ].forEach(([dc,dr]) => {
+      const nc = ci+dc, nr = ri+dr;
+      if (nc>=0&&nc<10&&nr>=1&&nr<=10) {
+        const nk = `${COLS[nc]}${nr}`;
+        if (!aiShotSet.has(nk)) ai.queue.push(nk);
+      }
+    });
+    return;
+  }
+
+  // Richtung aus Treffern ableiten
+  if (!ai.direction) {
+    const cols = new Set(ai.currentHits.map(c => c[0]));
+    ai.direction = cols.size === 1 ? 'V' : 'H';
+  }
+
+  // Treffer sortieren
+  const sorted = [...ai.currentHits].sort((a,b) => {
+    return ai.direction === 'H'
+      ? colIdx(a[0]) - colIdx(b[0])
+      : parseInt(a.slice(1)) - parseInt(b.slice(1));
+  });
+  const first = sorted[0], last = sorted[sorted.length-1];
+
+  if (ai.direction === 'H') {
+    const fc = colIdx(first[0]), lc = colIdx(last[0]);
+    const r  = parseInt(first.slice(1));
+    // Rechts vom letzten Treffer
+    if (lc+1 < 10) { const k=`${COLS[lc+1]}${r}`; if(!aiShotSet.has(k)) ai.queue.push(k); }
+    // Links vom ersten Treffer
+    if (fc-1 >= 0) { const k=`${COLS[fc-1]}${r}`; if(!aiShotSet.has(k)) ai.queue.push(k); }
+  } else {
+    const col = first[0];
+    const fr  = parseInt(first.slice(1)), lr = parseInt(last.slice(1));
+    // Unter dem letzten Treffer
+    if (lr+1 <= 10) { const k=`${col}${lr+1}`; if(!aiShotSet.has(k)) ai.queue.push(k); }
+    // Über dem ersten Treffer
+    if (fr-1 >= 1)  { const k=`${col}${fr-1}`;  if(!aiShotSet.has(k)) ai.queue.push(k); }
+  }
+}
+
+function doAITurn() {
+  const coord = aiPickCoord();
+  if (!coord) { aiTurnPending = false; return; }
+
+  aiShotSet.add(coord);
+  const hit = !!myShipGrid[coord];
+
+  if (hit) {
+    aiHitSet.add(coord);
+    ai.currentHits.push(coord);
+    const ship = myShips.find(s => s.coords.includes(coord));
+    if (ship) {
+      const sunk = ship.coords.every(c => aiHitSet.has(c));
+      if (sunk) {
+        ship.sunk = true;
+        // Schiff versenkt → Jagd-Modus zurücksetzen
+        ai.mode = 'hunt';
+        ai.currentHits = [];
+        ai.direction   = null;
+        ai.queue       = [];
+        showAIToast(`🤖 KI schießt ${coord} — 💥 ${ship.size}er-Schiff versenkt!`);
+      } else {
+        ai.mode = 'target';
+        aiRebuildQueue();
+        showAIToast(`🤖 KI schießt ${coord} — 💥 Treffer!`);
+      }
+    }
+  } else {
+    if (ai.mode === 'target') {
+      // Miss im Target-Modus: Queue neu aufbauen (mit aktuellem Wissen)
+      aiRebuildQueue();
+    }
+    showAIToast(`🤖 KI schießt ${coord} — 💧 Wasser`);
+  }
+
+  updateStats();
+  renderShipStatus();
+  renderMiniFleetGrid();
+  aiTurnPending = false;
+
+  // Spieler verliert wenn alle eigenen Schiffe versenkt
+  if (myShips.every(s => s.sunk)) setTimeout(() => finishGame(false), 400);
+}
+
+function showAIToast(msg) {
+  const el = document.getElementById('ai-toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 2000);
+}
+
+// ── Spiel beenden ───────────────────────────────────────────────────
+function finishGame(playerWon) {
+  if (stopwatchTimer) { clearInterval(stopwatchTimer); stopwatchTimer = null; }
+  const elapsed = startTime ? Math.floor((Date.now()-startTime)/1000) : 0;
+
+  document.getElementById('result-emoji').textContent = playerWon ? '🏆' : '💀';
+  document.getElementById('result-title').textContent = playerWon ? 'Gewonnen!' : 'Verloren!';
+  document.getElementById('result-sub').textContent   = playerWon
+    ? 'Du hast alle feindlichen Schiffe versenkt!'
+    : 'Die KI hat deine gesamte Flotte versenkt.';
+  document.getElementById('result-shots').textContent    = playerShotsFired;
+  document.getElementById('result-time').textContent     = formatTime(elapsed);
+  document.getElementById('result-ai-shots').textContent = aiShotSet.size;
+
+  if (playerWon) {
+    const entry = { name: playerName, shots: playerShotsFired, time: elapsed, date: new Date().toLocaleDateString('de-AT') };
+    const hs = loadHighscore();
+    hs.push(entry);
+    hs.sort((a,b) => a.shots-b.shots || a.time-b.time);
+    const trimmed = hs.slice(0, HS_MAX);
+    localStorage.setItem(HS_KEY, JSON.stringify(trimmed));
+    renderHighscore(trimmed, entry);
+  } else {
+    renderHighscore(loadHighscore(), null);
+  }
+  showScreen('screen-result');
+}
+
+function confirmQuit() {
+  if (!confirm('Spiel wirklich aufgeben?')) return;
+  if (stopwatchTimer) { clearInterval(stopwatchTimer); stopwatchTimer = null; }
+  if (mcTimerHandle)  { clearInterval(mcTimerHandle);  mcTimerHandle  = null; }
+  showScreen('screen-setup');
+}
+window.confirmQuit = confirmQuit;
+
+function restartSolo() { showScreen('screen-setup'); }
+window.restartSolo = restartSolo;
+
+// ── Highscore ───────────────────────────────────────────────────────
+function loadHighscore() { try { return JSON.parse(localStorage.getItem(HS_KEY)||'[]'); } catch { return []; } }
+
+function renderHighscore(hs, newEntry) {
+  const tbody = document.getElementById('hs-body');
+  if (!hs.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-secondary);font-style:italic;padding:.5rem;">Noch keine Siege.</td></tr>'; return; }
+  tbody.innerHTML = hs.map((e,i) => {
+    const isMe = e === newEntry;
+    return `<tr class="${isMe?'hs-me':''}"><td class="hs-rank">${['🥇','🥈','🥉'][i]||(i+1)}</td><td>${escapeHtml(e.name)}</td><td>${e.shots}</td><td>${formatTime(e.time)}</td></tr>`;
+  }).join('');
+}
+
+// ── Init ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => { loadQuestions(); });
+</script>
+</body>
+</html>

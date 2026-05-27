@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schlangen &amp; Leitern – Solomodus</title>
+  <link rel="stylesheet" href="css/leiterspiel.css">
+  <style>
+    #screen-setup {
+      position: fixed; inset: 0;
+      background: var(--bg-primary);
+      z-index: 490;
+      flex-direction: column; align-items: center;
+      overflow-y: auto; padding: 2rem;
+    }
+    #screen-result {
+      position: fixed; inset: 0;
+      background: var(--bg-body);
+      z-index: 500;
+      flex-direction: column; align-items: center;
+      justify-content: flex-start;
+      overflow-y: auto; padding: 2rem;
+    }
+    .solo-container { width: 100%; max-width: 580px; }
+    .solo-title { color: var(--accent); font-size: 2rem; font-weight: 800; text-align: center; margin-bottom: 0.3rem; }
+    .solo-sub { color: var(--text-secondary); text-align: center; font-size: 0.95rem; margin-bottom: 2rem; }
+    .solo-back-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .solo-back-nav a { text-decoration: none; }
+
+    .solo-player-card {
+      background: var(--bg-field); border-radius: 12px;
+      padding: 12px; margin-bottom: 14px; text-align: center;
+    }
+    .solo-player-emoji { font-size: 2.2rem; margin-bottom: 4px; }
+    .solo-player-field { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .solo-stat-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.82rem; color: var(--text-secondary); margin-top: 3px;
+    }
+    .solo-stat-val { font-weight: 700; color: var(--text-primary); }
+
+    .result-card {
+      background: var(--bg-sidebar); border-radius: 20px;
+      box-shadow: var(--shadow-lg); padding: clamp(20px, 3vh, 36px);
+      max-width: 560px; width: 100%;
+      border: 2px solid var(--border); margin: 0 auto;
+    }
+    .result-trophy { font-size: 4rem; text-align: center; margin-bottom: 10px; }
+    .result-title { font-size: 1.8rem; font-weight: 800; color: var(--accent); text-align: center; margin-bottom: 6px; }
+    .result-stats {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin: 14px 0;
+    }
+    .result-stat { background: var(--bg-field); border-radius: 12px; padding: 12px; text-align: center; }
+    .result-stat-val { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+    .result-stat-lbl { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+    .result-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+
+    .hs-title { font-weight: 700; color: var(--accent); font-size: 1rem; margin-bottom: 8px; margin-top: 16px; }
+    .hs-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    .hs-table th { text-align: left; padding: 5px 8px; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
+    .hs-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    .hs-table tr:last-child td { border-bottom: none; }
+    .hs-row-new { background: rgba(227,79,32,0.1); font-weight: 700; }
+    body.dark .hs-row-new { background: rgba(247,151,30,0.12); }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup Screen ───────────────────────────────────────────── -->
+<div class="screen active" id="screen-setup">
+  <div class="solo-container">
+    <div class="solo-back-nav">
+      <a href="index.html" class="header-btn">← Spielauswahl</a>
+      <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+    </div>
+    <div class="solo-title">🎲 Solomodus</div>
+    <div class="solo-sub">Schlangen &amp; Leitern – alleine spielen</div>
+
+    <div class="settings-section-label">Spielfigur wählen</div>
+    <div class="animal-picker" id="solo-animal-picker" style="margin-bottom:1.5rem;gap:6px;"></div>
+
+    <div class="settings-section-label">Kategorien</div>
+    <div class="cat-select-actions">
+      <button class="btn-sm" onclick="toggleAllCats(true)">Alle</button>
+      <button class="btn-sm" onclick="toggleAllCats(false)">Keine</button>
+    </div>
+    <div class="cat-select-list" id="cat-select-list" style="margin-top:0.5rem;"></div>
+    <div class="cat-select-info" id="cat-info" style="margin-top:0.5rem;"></div>
+
+    <div class="setup-error" id="setup-error"></div>
+    <div class="setup-actions">
+      <a href="../spiele.html" class="setup-btn setup-btn-ghost">🏠 Übersicht</a>
+      <button class="setup-btn" id="btn-start" onclick="startGame()">▶ Spielen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Game Screen ────────────────────────────────────────────── -->
+<div class="screen" id="screen-game">
+  <div class="board-area">
+    <div class="board-header">
+      <button class="header-btn" onclick="confirmQuit()">← Beenden</button>
+      <h2>Schlangen &amp; Leitern</h2>
+      <button class="header-btn" id="btn-theme-game" onclick="toggleTheme()">🌙</button>
+    </div>
+    <div class="active-team-banner" id="active-banner">Du bist dran — Feld 1</div>
+    <div class="board-container">
+      <div class="board-grid" id="board-grid"></div>
+      <svg class="svg-overlay" id="svg-overlay"></svg>
+    </div>
+  </div>
+  <div class="sidebar">
+    <div class="dice-area">
+      <div class="dice-display" id="dice-display">🎲</div>
+      <button class="btn-roll" id="btn-roll" onclick="rollDice()" disabled>Würfeln</button>
+    </div>
+    <div class="solo-player-card">
+      <div class="solo-player-emoji" id="sidebar-emoji">🐕</div>
+      <div class="solo-player-field">Feld <strong id="sidebar-field">1</strong></div>
+      <div class="solo-stat-row"><span>Würfe</span><span class="solo-stat-val" id="sidebar-rolls">0</span></div>
+      <div class="solo-stat-row"><span>Punkte</span><span class="solo-stat-val" id="sidebar-score">0</span></div>
+      <div class="solo-stat-row"><span>Richtig</span><span class="solo-stat-val" id="sidebar-correct">0</span></div>
+    </div>
+    <div class="sidebar-legend">
+      <h3>Legende</h3>
+      <div class="legend-list">
+        <div class="legend-item"><div class="legend-color" style="background:var(--field-easy);"></div><span>Leicht (30s)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--field-medium);"></div><span>Mittel (45s)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--field-hard);"></div><span>Schwer (60s)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--ladder-color);"></div><span>🪜 Leiter (hoch)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--snake-color);"></div><span>🐍 Schlange (runter)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--bonus-roll);"></div><span>🎲 Nochmals würfeln</span></div>
+        <div class="legend-item"><div class="legend-color" style="background:var(--bonus-free);"></div><span>🎁 Frei bewegen</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Question Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="question-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-cat-name" id="q-cat-name"></span>
+      <span class="modal-difficulty" id="q-difficulty"></span>
+    </div>
+    <div class="timer-bar-wrap"><div class="timer-bar" id="q-timer-bar"></div></div>
+    <div class="timer-text" id="q-timer-text"></div>
+    <div class="modal-question" id="q-text"></div>
+    <div class="answer-options" id="q-options"></div>
+    <div class="open-answer-section" id="q-open-section" style="display:none;">
+      <button class="btn-show-answer" id="q-show-answer" onclick="showOpenAnswer()">Lösung anzeigen</button>
+      <div class="open-answer-text" id="q-open-answer"></div>
+      <div class="open-actions" id="q-open-actions" style="display:none;">
+        <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+        <button class="btn-wrong" onclick="resolveOpen(false)">✗ Falsch</button>
+      </div>
+    </div>
+    <div class="modal-result" id="q-result"></div>
+    <div class="modal-explanation" id="q-explanation">
+      <h4>Erklärung</h4>
+      <p id="q-explanation-text"></p>
+    </div>
+    <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
+  </div>
+</div>
+
+<!-- ── Bonus Modal ────────────────────────────────────────────── -->
+<div class="modal-overlay bonus-modal" id="bonus-modal">
+  <div class="modal-card">
+    <div class="bonus-icon" id="bonus-icon"></div>
+    <div class="bonus-title" id="bonus-title"></div>
+    <div class="bonus-desc" id="bonus-desc"></div>
+    <button class="modal-continue visible" id="bonus-continue" onclick="continueAfterBonus()">Weiter</button>
+  </div>
+</div>
+
+<!-- ── Result Screen ──────────────────────────────────────────── -->
+<div class="screen" id="screen-result">
+  <div class="result-card">
+    <div class="result-trophy" id="result-trophy">🏆</div>
+    <div class="result-title" id="result-title">Gewonnen!</div>
+    <div class="result-stats">
+      <div class="result-stat">
+        <div class="result-stat-val" id="res-rolls">0</div>
+        <div class="result-stat-lbl">Würfe</div>
+      </div>
+      <div class="result-stat">
+        <div class="result-stat-val" id="res-score">0</div>
+        <div class="result-stat-lbl">Punkte</div>
+      </div>
+      <div class="result-stat">
+        <div class="result-stat-val" id="res-correct">0/0</div>
+        <div class="result-stat-lbl">Richtig/Falsch</div>
+      </div>
+      <div class="result-stat">
+        <div class="result-stat-val" id="res-time">0:00</div>
+        <div class="result-stat-lbl">Zeit</div>
+      </div>
+    </div>
+    <div id="hs-section"></div>
+    <div class="result-actions">
+      <button class="setup-btn setup-btn-ghost" onclick="goToSetup()">← Nochmal</button>
+      <a href="../spiele.html" class="setup-btn">🏠 Übersicht</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Helpers ────────────────────────────────────────────────────
+function isMcCorrect(q, selectedArr) {
+  const correct = (Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? [...q.correctIndices].sort((a,b)=>a-b) : [q.richtig ?? 0];
+  const sel = [...selectedArr].sort((a,b)=>a-b);
+  return correct.length === sel.length && correct.every((v,i) => v === sel[i]);
+}
+function correctSet(q) {
+  return new Set((Array.isArray(q.correctIndices) && q.correctIndices.length > 0)
+    ? q.correctIndices : [q.richtig ?? 0]);
+}
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ── Constants ──────────────────────────────────────────────────
+const FIELD_COUNT = 100;
+const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67 };
+const SNAKES  = { 16: 6, 47: 26, 62: 19, 93: 73, 98: 87 };
+const TIMER_SECONDS = { leicht: 30, mittel: 45, schwer: 60 };
+const POINTS = { leicht: 10, mittel: 20, schwer: 30 };
+const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+const ANIMALS = [
+  { id: 'dog',   emoji: '🐕' }, { id: 'cat',   emoji: '🐱' },
+  { id: 'bunny', emoji: '🐰' }, { id: 'hippo', emoji: '🦛' },
+  { id: 'goat',  emoji: '🐐' }, { id: 'sheep', emoji: '🐑' },
+  { id: 'pig',   emoji: '🐷' }, { id: 'cow',   emoji: '🐄' },
+  { id: 'horse', emoji: '🐴' }, { id: 'bird',  emoji: '🐦' }
+];
+const CAT_ICONS = ['📚','🔬','🌍','⚡','🎯','🏛️','🧮','🌿','⚗️','🎨','🏃','💡','🔭','🎵','📊','🌊','🧩','🦋','🌺','🚀'];
+const LADDER_SNAKE_FIELDS = new Set([
+  ...Object.keys(LADDERS).map(Number), ...Object.values(LADDERS),
+  ...Object.keys(SNAKES).map(Number),  ...Object.values(SNAKES)
+]);
+
+// ── Game State ─────────────────────────────────────────────────
+let fragenBank = null;
+let rawCategories = [];
+let selectedCategoryIds = new Set();
+let activeFragenBank = [];
+
+let playerPos = 1;
+let playerEmoji = '🐕';
+let playerAnimal = 'dog';
+let playerScore = 0;
+let diceRollCount = 0;
+let correctCount = 0;
+let wrongCount = 0;
+let startTime = null;
+let board = [];
+let currentQuestion = null;
+let questionResolved = false;
+let lastAnswerCorrect = false;
+let pendingDice = null;
+let timerInterval = null;
+let timerRemaining = 0;
+let freeMoveMode = false;
+let pendingBonus = null;
+let usedQuestionIds = new Set();
+
+// ── Load Questions ─────────────────────────────────────────────
+async function loadFragen() {
+  let rqData = null;
+  if (window.location.protocol !== 'file:') {
+    try {
+      const r = await fetch('../api.php?f=questions');
+      if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
+    } catch {}
+  }
+  if (!rqData) {
+    try {
+      const r = await fetch('../data/questions.json');
+      if (r.ok) { const d = await r.json(); if (d.categories && d.categories.length) rqData = d; }
+    } catch {}
+  }
+  if (!rqData) {
+    const ls = localStorage.getItem('rq_questions');
+    if (ls) try { const d = JSON.parse(ls); if (d.categories && d.categories.length) rqData = d; } catch {}
+  }
+  if (rqData) {
+    rawCategories = rqData.categories || [];
+    fragenBank = convertRQ(rqData);
+  } else {
+    document.getElementById('setup-error').textContent =
+      'Keine Fragen geladen. Bitte in der zentralen Fragendatenbank Fragen anlegen.';
+    document.getElementById('btn-start').disabled = true;
+  }
+}
+
+function convertRQ(rqData) {
+  const kategorien = [], fragen = [];
+  const colors = ['#332288','#88ccee','#44aa99','#117733','#999933','#ddcc77','#cc6677','#882255','#aa4499','#0077bb'];
+  let colorIdx = 0;
+  const icons = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯'];
+
+  function walk(node, path, icon) {
+    const subs = node.subcategories || [];
+    const hasQ = node.questions && node.questions.length > 0;
+    const isLeaf = !subs.length;
+    if (hasQ && isLeaf) {
+      if (!kategorien.find(k => k.id === node.id)) {
+        kategorien.push({ id: node.id, name: path.join(' › '), icon: icon || '📚', farbe: colors[colorIdx++ % colors.length] });
+      }
+      node.questions.forEach(q => {
+        const schwierigkeit = q.difficulty <= 200 ? 'leicht' : q.difficulty <= 300 ? 'mittel' : 'schwer';
+        let typ, antworten, richtig, correctIndices = null;
+        if (q.type === 'mc' && q.options && q.options.length > 0) {
+          typ = 'multiple_choice'; antworten = q.options.slice();
+          richtig = typeof q.correctIndex === 'number' ? q.correctIndex : 0;
+          if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) correctIndices = q.correctIndices.slice();
+        } else {
+          typ = 'offen'; antworten = []; richtig = -1;
+        }
+        const obj = { id: q.id, kategorie: node.id, schwierigkeit, frage: q.question || '', typ, antworten, richtig, erklaerung: q.answer || q.hint || '' };
+        if (correctIndices) obj.correctIndices = correctIndices;
+        fragen.push(obj);
+      });
+      return;
+    }
+    subs.forEach(s => walk(s, [...path, s.name], icon));
+  }
+
+  (rqData.categories || []).forEach((cat, i) => walk(cat, [cat.name], icons[i % icons.length]));
+  return { kategorien, fragen };
+}
+
+// ── Category UI ────────────────────────────────────────────────
+function buildCategoryUI() {
+  if (!rawCategories.length) return;
+  const list = document.getElementById('cat-select-list');
+  list.innerHTML = '';
+  selectedCategoryIds.clear();
+
+  function collectLeaves(cat) {
+    const subs = cat.subcategories || [];
+    if (cat.questions && cat.questions.length > 0 && !subs.length) return [cat.id];
+    return subs.flatMap(s => collectLeaves(s));
+  }
+  rawCategories.forEach(cat => collectLeaves(cat).forEach(id => selectedCategoryIds.add(id)));
+  rawCategories.forEach((cat, i) => _buildCatNode(list, cat, CAT_ICONS[i % CAT_ICONS.length]));
+  updateCatInfo();
+}
+
+function _countLeafQ(node) {
+  const subs = node.subcategories || [];
+  if (node.questions && node.questions.length > 0 && !subs.length) return node.questions.length;
+  return subs.reduce((sum, s) => sum + _countLeafQ(s), 0);
+}
+
+function _buildCatNode(container, cat, icon) {
+  const subs = cat.subcategories || [];
+  const hasQ = cat.questions && cat.questions.length > 0;
+  if (!hasQ && !subs.length) return;
+  const qCount = _countLeafQ(cat);
+
+  if (hasQ && !subs.length) {
+    const sel = selectedCategoryIds.has(cat.id);
+    const item = document.createElement('div');
+    item.className = 'cat-select-item' + (sel ? ' selected' : '');
+    item.dataset.catId = cat.id;
+    item.innerHTML =
+      '<span class="cat-select-icon">' + (icon || '📁') + '</span>' +
+      '<span class="cat-select-name">' + cat.name + '</span>' +
+      '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
+      '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
+    item.onclick = () => {
+      const on = !selectedCategoryIds.has(cat.id);
+      if (on) { selectedCategoryIds.add(cat.id); item.classList.add('selected'); item.querySelector('.cat-select-check').textContent = '✓'; }
+      else     { selectedCategoryIds.delete(cat.id); item.classList.remove('selected'); item.querySelector('.cat-select-check').textContent = ''; }
+      _syncGroup(container.closest('.cat-group-wrap'));
+      updateCatInfo();
+    };
+    container.appendChild(item);
+    return;
+  }
+
+  const allLeaves = [];
+  (function collect(c) {
+    const cs = (c.subcategories || []).length > 0;
+    if (c.questions && c.questions.length > 0 && !cs) allLeaves.push(c.id);
+    (c.subcategories || []).forEach(s => collect(s));
+  })(cat);
+  const allSel = allLeaves.every(id => selectedCategoryIds.has(id));
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cat-group-wrap';
+  const header = document.createElement('div');
+  header.className = 'cat-group-header collapsed';
+  header.innerHTML =
+    '<span class="cat-group-chevron">▶</span>' +
+    '<span class="cat-group-icon">' + icon + '</span>' +
+    '<span class="cat-group-name">' + cat.name + '</span>' +
+    '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
+    '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
+    '</label>';
+  const children = document.createElement('div');
+  children.className = 'cat-group-children hidden';
+
+  header.addEventListener('click', () => {
+    const col = header.classList.contains('collapsed');
+    header.classList.toggle('collapsed', !col);
+    children.classList.toggle('hidden', !col);
+  });
+  const cb = header.querySelector('.cat-group-cb');
+  cb.addEventListener('change', () => {
+    const on = cb.checked;
+    allLeaves.forEach(id => { if (on) selectedCategoryIds.add(id); else selectedCategoryIds.delete(id); });
+    children.querySelectorAll('.cat-select-item').forEach(item => {
+      item.classList.toggle('selected', on);
+      item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+    });
+    children.querySelectorAll('.cat-group-cb').forEach(gcb => gcb.checked = on);
+    updateCatInfo();
+  });
+
+  wrap.appendChild(header); wrap.appendChild(children); container.appendChild(wrap);
+  subs.forEach(sub => _buildCatNode(children, sub, icon));
+}
+
+function _syncGroup(wrap) {
+  if (!wrap) return;
+  const cb = wrap.querySelector(':scope > .cat-group-header .cat-group-cb');
+  if (!cb) return;
+  const items = wrap.querySelectorAll('.cat-select-item');
+  cb.checked = [...items].every(i => i.classList.contains('selected'));
+}
+
+function toggleAllCats(on) {
+  if (!fragenBank) return;
+  fragenBank.kategorien.forEach(k => { if (on) selectedCategoryIds.add(k.id); else selectedCategoryIds.delete(k.id); });
+  document.querySelectorAll('.cat-select-item').forEach(item => {
+    item.classList.toggle('selected', on);
+    const chk = item.querySelector('.cat-select-check');
+    if (chk) chk.textContent = on ? '✓' : '';
+  });
+  document.querySelectorAll('.cat-group-cb').forEach(c => c.checked = on);
+  updateCatInfo();
+}
+
+function updateCatInfo() {
+  const activeQ = (fragenBank ? fragenBank.fragen : []).filter(q => selectedCategoryIds.has(q.kategorie));
+  const info = document.getElementById('cat-info');
+  if (!info) return;
+  if (activeQ.length === 0) {
+    info.textContent = 'Keine Kategorien ausgewählt!';
+    info.className = 'cat-select-info warning';
+  } else {
+    info.textContent = activeQ.length + ' Fragen aus ' + selectedCategoryIds.size + ' Kategorie(n)';
+    info.className = 'cat-select-info';
+  }
+}
+
+// ── Animal Picker ──────────────────────────────────────────────
+function buildAnimalPicker() {
+  const picker = document.getElementById('solo-animal-picker');
+  picker.innerHTML = '';
+  ANIMALS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'animal-btn' + (a.id === playerAnimal ? ' selected' : '');
+    btn.textContent = a.emoji;
+    btn.title = a.id;
+    btn.onclick = () => {
+      playerAnimal = a.id; playerEmoji = a.emoji;
+      picker.querySelectorAll('.animal-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    picker.appendChild(btn);
+  });
+}
+
+// ── Start Game ─────────────────────────────────────────────────
+function startGame() {
+  const errEl = document.getElementById('setup-error');
+  errEl.textContent = '';
+  if (!fragenBank) { errEl.textContent = 'Keine Fragen geladen.'; return; }
+
+  activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
+  if (activeFragenBank.length === 0) { errEl.textContent = 'Bitte mindestens eine Kategorie wählen!'; return; }
+
+  const counts = { leicht: 0, mittel: 0, schwer: 0 };
+  activeFragenBank.forEach(q => { if (counts[q.schwierigkeit] !== undefined) counts[q.schwierigkeit]++; });
+  if (counts.leicht < 1 || counts.mittel < 1 || counts.schwer < 1) {
+    errEl.textContent = 'Zu wenig Fragen (mind. 1 Frage pro Schwierigkeitsgrad).';
+    return;
+  }
+
+  playerPos = 1; playerScore = 0; diceRollCount = 0;
+  correctCount = 0; wrongCount = 0;
+  startTime = Date.now();
+  usedQuestionIds = new Set();
+  pendingDice = null; freeMoveMode = false; pendingBonus = null;
+
+  generateBoard();
+  showScreen('screen-game');
+  renderBoard();
+  updatePieces();
+  updateBanner();
+  updateSidebar();
+
+  document.getElementById('sidebar-emoji').textContent = playerEmoji;
+  document.getElementById('btn-roll').disabled = false;
+  drawLaddersAndSnakes();
+  window.addEventListener('resize', drawLaddersAndSnakes);
+}
+
+// ── Board Generation ──────────────────────────────────────────
+function generateBoard() {
+  board = new Array(FIELD_COUNT + 1);
+  for (let i = 1; i <= FIELD_COUNT; i++) {
+    const r = Math.random();
+    const difficulty = i === 1 ? 'leicht' : i === 100 ? 'schwer' :
+      (r < 0.4 ? 'leicht' : r < 0.75 ? 'mittel' : 'schwer');
+    board[i] = { number: i, difficulty, ladderTo: LADDERS[i] || null, snakeTo: SNAKES[i] || null, bonusType: null };
+  }
+  const bonusTypes = ['roll_again','roll_again','roll_again','roll_again',
+                      'free_move','free_move','free_move','free_move',
+                      'swap','swap'];
+  shuffleArray(bonusTypes);
+  for (let row = 0; row < 10; row++) {
+    const start = row * 10 + 1;
+    const candidates = [];
+    for (let f = start; f <= start + 9; f++) {
+      if (f === 1 || f === 100 || LADDER_SNAKE_FIELDS.has(f)) continue;
+      candidates.push(f);
+    }
+    if (candidates.length > 0) {
+      board[candidates[Math.floor(Math.random() * candidates.length)]].bonusType = bonusTypes[row];
+    }
+  }
+}
+
+// ── Board Rendering ───────────────────────────────────────────
+function fieldToGridPosition(fieldNum) {
+  const row = Math.floor((fieldNum - 1) / 10);
+  const colInRow = (fieldNum - 1) % 10;
+  const col = row % 2 === 1 ? (9 - colInRow) : colInRow;
+  return { gridRow: (9 - row) + 1, gridCol: col + 1 };
+}
+
+function renderBoard() {
+  const grid = document.getElementById('board-grid');
+  grid.innerHTML = '';
+  const dm = { leicht: 'easy', mittel: 'medium', schwer: 'hard' };
+  for (let f = 1; f <= FIELD_COUNT; f++) {
+    const field = board[f];
+    const pos = fieldToGridPosition(f);
+    const div = document.createElement('div');
+    div.className = 'board-field'; div.id = 'field-' + f;
+    div.style.gridRow = pos.gridRow; div.style.gridColumn = pos.gridCol;
+
+    if (f === 1) div.classList.add('field-start');
+    else if (f === 100) div.classList.add('field-goal');
+    else if (field.bonusType === 'roll_again' || field.bonusType === 'swap') div.classList.add('bonus-roll');
+    else if (field.bonusType === 'free_move') div.classList.add('bonus-free');
+    else div.classList.add('field-' + (dm[field.difficulty] || field.difficulty));
+
+    if (field.ladderTo) div.classList.add('has-ladder');
+    if (field.snakeTo) div.classList.add('has-snake');
+
+    const num = document.createElement('span'); num.className = 'field-number'; num.textContent = f; div.appendChild(num);
+
+    if (field.bonusType) {
+      const badge = document.createElement('span'); badge.className = 'field-bonus-badge';
+      badge.textContent = field.bonusType === 'free_move' ? '🎁' : '🎲'; div.appendChild(badge);
+    }
+    if (f === 1) { const ic = document.createElement('span'); ic.className = 'field-bonus-badge'; ic.textContent = '🏁'; div.appendChild(ic); }
+    if (f === 100) { const ic = document.createElement('span'); ic.className = 'field-bonus-badge'; ic.textContent = '🏆'; div.appendChild(ic); }
+    if (field.ladderTo) { const ic = document.createElement('span'); ic.className = 'field-special-icon'; ic.textContent = '🪜'; ic.title = '→ Feld ' + field.ladderTo; div.appendChild(ic); }
+    if (field.snakeTo) { const ic = document.createElement('span'); ic.className = 'field-special-icon'; ic.textContent = '🐍'; ic.title = '→ Feld ' + field.snakeTo; div.appendChild(ic); }
+
+    const pieces = document.createElement('div'); pieces.className = 'field-pieces'; pieces.id = 'pieces-' + f; div.appendChild(pieces);
+    grid.appendChild(div);
+  }
+}
+
+function updatePieces() {
+  for (let f = 1; f <= FIELD_COUNT; f++) { const c = document.getElementById('pieces-' + f); if (c) c.innerHTML = ''; }
+  const c = document.getElementById('pieces-' + playerPos);
+  if (c) { const p = document.createElement('span'); p.className = 'piece'; p.textContent = playerEmoji; c.appendChild(p); }
+  document.querySelectorAll('.board-field.current-field').forEach(f => f.classList.remove('current-field'));
+  const el = document.getElementById('field-' + playerPos);
+  if (el) el.classList.add('current-field');
+}
+
+function updateBanner() {
+  const field = board[playerPos];
+  const diff = field ? field.difficulty : '';
+  const dl = { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' };
+  document.getElementById('active-banner').textContent =
+    playerEmoji + ' Du bist dran — Feld ' + playerPos + (dl[diff] ? ' (' + dl[diff] + ')' : '');
+}
+
+function updateSidebar() {
+  document.getElementById('sidebar-field').textContent = playerPos;
+  document.getElementById('sidebar-rolls').textContent = diceRollCount;
+  document.getElementById('sidebar-score').textContent = playerScore;
+  document.getElementById('sidebar-correct').textContent = correctCount + '/' + wrongCount;
+}
+
+// ── SVG Ladders & Snakes ──────────────────────────────────────
+function drawLaddersAndSnakes() {
+  const svg = document.getElementById('svg-overlay');
+  const grid = document.getElementById('board-grid');
+  if (!svg || !grid) return;
+  const gridRect = grid.getBoundingClientRect();
+  const containerRect = svg.parentElement.getBoundingClientRect();
+  svg.style.left = (gridRect.left - containerRect.left) + 'px';
+  svg.style.top  = (gridRect.top  - containerRect.top)  + 'px';
+  svg.setAttribute('width', gridRect.width); svg.setAttribute('height', gridRect.height);
+  svg.setAttribute('viewBox', '0 0 ' + gridRect.width + ' ' + gridRect.height);
+  svg.innerHTML = '';
+
+  function gc(fn) {
+    const el = document.getElementById('field-' + fn); if (!el) return null;
+    const fr = el.getBoundingClientRect();
+    return { x: fr.left - gridRect.left + fr.width / 2, y: fr.top - gridRect.top + fr.height / 2 };
+  }
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  }
+
+  // Leitern
+  Object.entries(LADDERS).forEach(([from, to]) => {
+    const a = gc(Number(from)), b = gc(Number(to)); if (!a || !b) return;
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx*dx + dy*dy), W = 5.5;
+    const nx = -dy / len * W, ny = dx / len * W;
+    svg.appendChild(svgEl('line', { x1:a.x+nx+2,y1:a.y+ny+2.5,x2:b.x+nx+2,y2:b.y+ny+2.5,stroke:'#000','stroke-width':'5',opacity:'0.1','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('line', { x1:a.x-nx+2,y1:a.y-ny+2.5,x2:b.x-nx+2,y2:b.y-ny+2.5,stroke:'#000','stroke-width':'5',opacity:'0.1','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('line', { x1:a.x+nx,y1:a.y+ny,x2:b.x+nx,y2:b.y+ny,stroke:'#5D2E0C','stroke-width':'4',opacity:'1','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('line', { x1:a.x-nx,y1:a.y-ny,x2:b.x-nx,y2:b.y-ny,stroke:'#5D2E0C','stroke-width':'4',opacity:'1','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('line', { x1:a.x+nx*0.3,y1:a.y+ny*0.3,x2:b.x+nx*0.3,y2:b.y+ny*0.3,stroke:'#A0622D','stroke-width':'1.5',opacity:'0.5','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('line', { x1:a.x-nx*0.3,y1:a.y-ny*0.3,x2:b.x-nx*0.3,y2:b.y-ny*0.3,stroke:'#A0622D','stroke-width':'1.5',opacity:'0.5','stroke-linecap':'round' }));
+    const rungCount = Math.max(3, Math.floor(len / 14));
+    for (let i = 1; i < rungCount; i++) {
+      const t = i / rungCount, rx = a.x + dx*t, ry = a.y + dy*t;
+      svg.appendChild(svgEl('line', { x1:rx+nx,y1:ry+ny,x2:rx-nx,y2:ry-ny,stroke:'#8B4513','stroke-width':'3',opacity:'0.95','stroke-linecap':'round' }));
+      svg.appendChild(svgEl('line', { x1:rx+nx*0.3,y1:ry+ny*0.3,x2:rx-nx*0.3,y2:ry-ny*0.3,stroke:'#C47A3A','stroke-width':'1.2',opacity:'0.5','stroke-linecap':'round' }));
+    }
+    svg.appendChild(svgEl('circle', { cx:a.x,cy:a.y,r:'6',fill:'#43A047',opacity:'0.95' }));
+    svg.appendChild(svgEl('circle', { cx:a.x,cy:a.y,r:'3.5',fill:'#fff',opacity:'0.5' }));
+    svg.appendChild(svgEl('circle', { cx:b.x,cy:b.y,r:'6',fill:'#1B5E20',opacity:'0.95' }));
+    svg.appendChild(svgEl('circle', { cx:b.x,cy:b.y,r:'3.5',fill:'#fff',opacity:'0.4' }));
+    const ah = 8, udx = dx/len, udy = dy/len;
+    const ap = 'M '+(b.x-udx*ah-nx*0.7)+' '+(b.y-udy*ah-ny*0.7)+' L '+b.x+' '+b.y+' L '+(b.x-udx*ah+nx*0.7)+' '+(b.y-udy*ah+ny*0.7);
+    svg.appendChild(svgEl('path', { d:ap,fill:'none',stroke:'#1B5E20','stroke-width':'3','stroke-linecap':'round','stroke-linejoin':'round',opacity:'0.95' }));
+  });
+
+  // Schlangen
+  const snakeColors = ['#C62828','#E65100','#6A1B9A','#1565C0','#2E7D32'];
+  let snakeIdx = 0;
+  Object.entries(SNAKES).forEach(([from, to]) => {
+    const a = gc(Number(from)), b = gc(Number(to)); if (!a || !b) return;
+    const color = snakeColors[snakeIdx++ % snakeColors.length];
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx*dx + dy*dy);
+    const waves = Math.max(3, Math.floor(len / 20)), amplitude = Math.min(20, len * 0.09);
+    const nx = -dy / len, ny = dx / len;
+    function buildPath(ox, oy) {
+      let d = 'M '+(a.x+ox)+' '+(a.y+oy);
+      for (let i = 1; i <= waves * 2; i++) {
+        const t = i / (waves * 2), px = a.x + dx*t + ox, py = a.y + dy*t + oy;
+        const side = i % 2 === 0 ? 1 : -1;
+        d += ' Q '+(a.x+dx*(t-0.5/(waves*2))+nx*amplitude*side+ox)+' '+(a.y+dy*(t-0.5/(waves*2))+ny*amplitude*side+oy)+' '+px+' '+py;
+      }
+      return d;
+    }
+    svg.appendChild(svgEl('path', { d:buildPath(2,3),fill:'none',stroke:'#000','stroke-width':'8',opacity:'0.1','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('path', { d:buildPath(0,0),fill:'none',stroke:'#000','stroke-width':'8',opacity:'0.15','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('path', { d:buildPath(0,0),fill:'none',stroke:color,'stroke-width':'6',opacity:'0.92','stroke-linecap':'round' }));
+    svg.appendChild(svgEl('path', { d:buildPath(0,0),fill:'none',stroke:'#fff','stroke-width':'1.5',opacity:'0.25','stroke-linecap':'round','stroke-dasharray':'8 12' }));
+    svg.appendChild(svgEl('circle', { cx:a.x,cy:a.y,r:'8',fill:color,opacity:'0.97' }));
+    svg.appendChild(svgEl('circle', { cx:a.x,cy:a.y,r:'5.5',fill:'#000',opacity:'0.12' }));
+    const enx = nx*2.8, eny = ny*2.8, ebx = dx/len*2, eby = dy/len*2;
+    svg.appendChild(svgEl('circle', { cx:a.x+enx-ebx,cy:a.y+eny-eby,r:'2.2',fill:'#fff',opacity:'1' }));
+    svg.appendChild(svgEl('circle', { cx:a.x-enx-ebx,cy:a.y-eny-eby,r:'2.2',fill:'#fff',opacity:'1' }));
+    svg.appendChild(svgEl('circle', { cx:a.x+enx-ebx,cy:a.y+eny-eby,r:'1.1',fill:'#000',opacity:'0.9' }));
+    svg.appendChild(svgEl('circle', { cx:a.x-enx-ebx,cy:a.y-eny-eby,r:'1.1',fill:'#000',opacity:'0.9' }));
+    const tx = a.x - dx/len*10, ty = a.y - dy/len*10;
+    const tongue = 'M '+a.x+' '+a.y+' L '+tx+' '+ty+' M '+tx+' '+ty+' L '+(tx-nx*4-dx/len*3)+' '+(ty-ny*4-dy/len*3)+' M '+tx+' '+ty+' L '+(tx+nx*4-dx/len*3)+' '+(ty+ny*4-dy/len*3);
+    svg.appendChild(svgEl('path', { d:tongue,fill:'none',stroke:'#FF1744','stroke-width':'1.5','stroke-linecap':'round',opacity:'0.9' }));
+    svg.appendChild(svgEl('circle', { cx:b.x,cy:b.y,r:'3',fill:color,opacity:'0.7' }));
+  });
+}
+
+// ── Dice Rolling ──────────────────────────────────────────────
+function rollDice() {
+  document.getElementById('btn-roll').disabled = true;
+  diceRollCount++;
+  updateSidebar();
+
+  const display = document.getElementById('dice-display');
+  display.classList.add('rolling');
+  let animCount = 0;
+  const interval = setInterval(() => {
+    display.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
+    animCount++;
+    if (animCount >= 10) {
+      clearInterval(interval);
+      display.classList.remove('rolling');
+      const result = Math.floor(Math.random() * 6) + 1;
+      display.textContent = DICE_FACES[result - 1];
+      pendingDice = result;
+
+      if (freeMoveMode) {
+        freeMoveMode = false;
+        setTimeout(() => movePlayer(), 400);
+      } else {
+        const q = pickQuestion();
+        if (q) { currentQuestion = q; usedQuestionIds.add(q.id); setTimeout(() => askQuestion(q), 400); }
+        else setTimeout(() => movePlayer(), 400);
+      }
+    }
+  }, 80);
+}
+
+// ── Pick Question ─────────────────────────────────────────────
+function pickQuestion() {
+  if (!activeFragenBank || !activeFragenBank.length) return null;
+  const diff = (board[playerPos] || {}).difficulty || 'leicht';
+  let pool = activeFragenBank.filter(q => q.schwierigkeit === diff && !usedQuestionIds.has(q.id));
+  if (!pool.length) pool = activeFragenBank.filter(q => !usedQuestionIds.has(q.id));
+  if (!pool.length) { usedQuestionIds.clear(); pool = activeFragenBank.filter(q => q.schwierigkeit === diff); }
+  if (!pool.length) pool = activeFragenBank;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ── Ask Question ──────────────────────────────────────────────
+function askQuestion(question) {
+  currentQuestion = question; questionResolved = false; lastAnswerCorrect = false;
+
+  const kat = fragenBank.kategorien.find(k => k.id === question.kategorie);
+  document.getElementById('q-cat-name').textContent = kat ? kat.icon + ' ' + kat.name : '';
+
+  const diff = question.schwierigkeit;
+  const diffEl = document.getElementById('q-difficulty');
+  diffEl.textContent = { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' }[diff] || diff;
+  diffEl.className = 'modal-difficulty diff-' + ({ leicht: 'easy', mittel: 'medium', schwer: 'hard' }[diff] || diff);
+
+  document.getElementById('q-text').textContent = question.frage;
+
+  const timerSecs = TIMER_SECONDS[diff] || 30;
+  document.getElementById('q-timer-text').textContent = timerSecs + 's';
+  const timerBar = document.getElementById('q-timer-bar');
+  timerBar.style.width = '100%'; timerBar.className = 'timer-bar';
+
+  document.getElementById('q-result').className = 'modal-result'; document.getElementById('q-result').textContent = '';
+  document.getElementById('q-explanation').className = 'modal-explanation';
+  document.getElementById('q-continue').className = 'modal-continue';
+
+  const optDiv = document.getElementById('q-options'), openSec = document.getElementById('q-open-section');
+
+  if (question.typ === 'multiple_choice') {
+    openSec.style.display = 'none'; optDiv.style.display = ''; optDiv.innerHTML = '';
+    const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
+    if (!isMulti) {
+      question.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = ans;
+        btn.onclick = () => selectAnswer(btn, idx, question);
+        optDiv.appendChild(btn);
+      });
+    } else {
+      const pending = new Set(), allBtns = [];
+      question.antworten.forEach((ans, idx) => {
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = ans;
+        btn.addEventListener('click', () => {
+          if (questionResolved) return;
+          if (pending.has(idx)) { pending.delete(idx); btn.classList.remove('mc-selected-pending'); }
+          else { pending.add(idx); btn.classList.add('mc-selected-pending'); }
+        });
+        allBtns.push(btn); optDiv.appendChild(btn);
+      });
+      const confirmBtn = document.createElement('button'); confirmBtn.className = 'answer-btn mc-confirm-btn'; confirmBtn.textContent = '✓ Bestätigen';
+      confirmBtn.addEventListener('click', () => {
+        if (questionResolved) return; clearInterval(timerInterval);
+        const sel = [...pending], ok = isMcCorrect(question, sel), cs = correctSet(question);
+        allBtns.forEach(b => b.classList.add('disabled')); confirmBtn.classList.add('disabled');
+        allBtns.forEach((b, i) => { if (cs.has(i)) b.classList.add('correct'); else if (pending.has(i)) b.classList.add('wrong'); });
+        resolveQuestion(ok);
+      });
+      optDiv.appendChild(confirmBtn);
+    }
+  } else {
+    optDiv.style.display = 'none'; openSec.style.display = '';
+    document.getElementById('q-show-answer').style.display = '';
+    document.getElementById('q-open-answer').style.display = 'none';
+    document.getElementById('q-open-answer').textContent = question.erklaerung || 'Keine Antwort hinterlegt';
+    document.getElementById('q-open-actions').style.display = 'none';
+  }
+
+  startTimer(timerSecs);
+  document.getElementById('question-modal').classList.add('open');
+}
+
+function startTimer(seconds) {
+  timerRemaining = seconds; const total = seconds;
+  const timerBar = document.getElementById('q-timer-bar'), timerText = document.getElementById('q-timer-text');
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timerRemaining--;
+    timerBar.style.width = (timerRemaining / total * 100) + '%';
+    timerText.textContent = timerRemaining + 's';
+    if (timerRemaining <= 10) timerBar.className = 'timer-bar warning';
+    if (timerRemaining <= 5) timerBar.className = 'timer-bar danger';
+    if (timerRemaining <= 0) { clearInterval(timerInterval); if (!questionResolved) resolveQuestion(false); }
+  }, 1000);
+}
+
+function selectAnswer(btn, idx, question) {
+  if (questionResolved) return; clearInterval(timerInterval);
+  const correct = idx === question.richtig, cs = correctSet(question);
+  document.querySelectorAll('#q-options .answer-btn').forEach((b, i) => {
+    b.classList.add('disabled');
+    if (cs.has(i)) b.classList.add('correct');
+    if (i === idx && !correct) b.classList.add('wrong');
+  });
+  resolveQuestion(correct);
+}
+
+function showOpenAnswer() {
+  clearInterval(timerInterval);
+  document.getElementById('q-show-answer').style.display = 'none';
+  document.getElementById('q-open-answer').style.display = 'block';
+  document.getElementById('q-open-actions').style.display = '';
+}
+
+function resolveOpen(correct) {
+  if (questionResolved) return; clearInterval(timerInterval);
+  document.getElementById('q-open-actions').style.display = 'none';
+  resolveQuestion(correct);
+}
+
+function resolveQuestion(correct) {
+  questionResolved = true; lastAnswerCorrect = correct;
+  const field = board[playerPos];
+  if (correct) {
+    playerScore += POINTS[field.difficulty] || 10; correctCount++;
+    document.getElementById('q-result').textContent = '✓ Richtig!';
+    document.getElementById('q-result').className = 'modal-result visible correct-result';
+  } else {
+    wrongCount++;
+    document.getElementById('q-result').textContent = '✗ Falsch!';
+    document.getElementById('q-result').className = 'modal-result visible wrong-result';
+  }
+  if (currentQuestion && currentQuestion.erklaerung) {
+    document.getElementById('q-explanation-text').textContent = currentQuestion.erklaerung;
+    document.getElementById('q-explanation').classList.add('visible');
+  }
+  document.getElementById('q-continue').classList.add('visible');
+  updateSidebar();
+}
+
+function continueAfterQuestion() {
+  document.getElementById('question-modal').classList.remove('open');
+  clearInterval(timerInterval);
+  if (lastAnswerCorrect) {
+    movePlayer();
+  } else {
+    document.getElementById('btn-roll').disabled = false;
+    updateBanner();
+  }
+}
+
+// ── Movement ──────────────────────────────────────────────────
+function movePlayer() {
+  const newPos = playerPos + pendingDice;
+  if (newPos > 100) {
+    document.getElementById('btn-roll').disabled = false;
+    updateBanner();
+    return;
+  }
+  playerPos = newPos;
+  updatePieces(); updateSidebar();
+  if (playerPos === 100) { setTimeout(() => finishGame(true), 500); return; }
+  const field = board[playerPos];
+  if (field.ladderTo) {
+    setTimeout(() => { playerPos = field.ladderTo; updatePieces(); updateSidebar(); updateBanner(); afterLanding(); }, 600);
+  } else if (field.snakeTo) {
+    setTimeout(() => { playerPos = field.snakeTo; updatePieces(); updateSidebar(); updateBanner(); afterLanding(); }, 600);
+  } else {
+    afterLanding();
+  }
+}
+
+function afterLanding() {
+  if (playerPos === 100) { setTimeout(() => finishGame(true), 300); return; }
+  updateBanner();
+  const field = board[playerPos];
+  if (field.bonusType) {
+    const type = field.bonusType === 'swap' ? 'roll_again' : field.bonusType;
+    pendingBonus = type;
+    setTimeout(() => showBonusModal(type), 400);
+  } else {
+    document.getElementById('btn-roll').disabled = false;
+  }
+}
+
+function showBonusModal(type) {
+  const iconEl = document.getElementById('bonus-icon'), titleEl = document.getElementById('bonus-title'), descEl = document.getElementById('bonus-desc');
+  if (type === 'roll_again') {
+    iconEl.textContent = '🎲'; titleEl.textContent = 'Nochmals würfeln!';
+    descEl.textContent = 'Du darfst sofort noch einmal würfeln und eine Frage beantworten!';
+  } else {
+    iconEl.textContent = '🎁'; titleEl.textContent = 'Freie Bewegung!';
+    descEl.textContent = 'Würfle und bewege dich — ohne Frage beantworten zu müssen!';
+  }
+  document.getElementById('bonus-modal').classList.add('open');
+}
+
+function continueAfterBonus() {
+  document.getElementById('bonus-modal').classList.remove('open');
+  if (pendingBonus === 'free_move') freeMoveMode = true;
+  pendingBonus = null;
+  setTimeout(() => rollDice(), 200);
+}
+
+// ── Finish Game ───────────────────────────────────────────────
+function finishGame(won) {
+  clearInterval(timerInterval);
+  window.removeEventListener('resize', drawLaddersAndSnakes);
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+  const timeStr = mins + ':' + String(secs).padStart(2, '0');
+
+  document.getElementById('result-trophy').textContent = won ? '🏆' : '🚪';
+  document.getElementById('result-title').textContent = won ? 'Gewonnen!' : 'Aufgehört';
+  document.getElementById('res-rolls').textContent = diceRollCount;
+  document.getElementById('res-score').textContent = playerScore;
+  document.getElementById('res-correct').textContent = correctCount + ' / ' + wrongCount;
+  document.getElementById('res-time').textContent = timeStr;
+
+  const newEntry = won ? { emoji: playerEmoji, rolls: diceRollCount, score: playerScore, time: elapsed } : null;
+  if (won) saveHighscore(elapsed);
+  renderHighscores(newEntry);
+  showScreen('screen-result');
+}
+
+// ── Highscore ─────────────────────────────────────────────────
+const HS_KEY = 'ls_solo_hs';
+
+function saveHighscore(elapsedSecs) {
+  let hs = [];
+  try { hs = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch {}
+  hs.push({ emoji: playerEmoji, rolls: diceRollCount, score: playerScore, time: elapsedSecs });
+  hs.sort((a, b) => a.rolls !== b.rolls ? a.rolls - b.rolls : a.time - b.time);
+  localStorage.setItem(HS_KEY, JSON.stringify(hs.slice(0, 10)));
+}
+
+function renderHighscores(newEntry) {
+  const sec = document.getElementById('hs-section');
+  let hs = [];
+  try { hs = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch {}
+  if (!hs.length) { sec.innerHTML = ''; return; }
+  const rows = hs.map((h, i) => {
+    const m = Math.floor(h.time / 60), s = h.time % 60;
+    const isNew = newEntry && h.rolls === newEntry.rolls && h.time === newEntry.time && h.emoji === newEntry.emoji;
+    return '<tr class="' + (isNew ? 'hs-row-new' : '') + '">' +
+      '<td>' + (i + 1) + '.</td>' +
+      '<td>' + h.emoji + '</td>' +
+      '<td>' + h.rolls + ' Würfe</td>' +
+      '<td>' + h.score + ' Pkt</td>' +
+      '<td>' + m + ':' + String(s).padStart(2,'0') + '</td>' +
+      '</tr>';
+  }).join('');
+  sec.innerHTML =
+    '<div class="hs-title">🏅 Bestenliste</div>' +
+    '<table class="hs-table">' +
+    '<thead><tr><th>#</th><th></th><th>Würfe</th><th>Punkte</th><th>Zeit</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+// ── Screen Management ─────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'screen-game') setTimeout(() => drawLaddersAndSnakes(), 50);
+}
+
+function confirmQuit() {
+  if (confirm('Spiel wirklich beenden?')) {
+    clearInterval(timerInterval);
+    finishGame(false);
+  }
+}
+
+function goToSetup() {
+  window.removeEventListener('resize', drawLaddersAndSnakes);
+  showScreen('screen-setup');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAnimalPicker();
+  await loadFragen();
+  if (fragenBank) buildCategoryUI();
+});
+</script>
+
+<!-- Theme Toggle -->
+<script>
+(function () {
+  const KEY = 'spiele_theme';
+  function applyTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    ['btn-theme','btn-theme-game'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+    });
+  }
+  window.toggleTheme = function () {
+    const isDark = !document.body.classList.contains('dark');
+    localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+    applyTheme(isDark);
+  };
+  applyTheme(localStorage.getItem(KEY) === 'dark');
+})();
+</script>
+
+</body>
+</html>
