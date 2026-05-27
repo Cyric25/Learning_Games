@@ -280,6 +280,15 @@
       .q-text        { font-size: .97rem; }
       .mc-opt        { padding: .55rem .8rem; font-size: .9rem; }
     }
+    #board-view-btn {
+      position: fixed; bottom: 12px; left: 12px; z-index: 999;
+      display: none; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border);
+      background: var(--bg-field); color: var(--text-2);
+      font-size: .85rem; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,.3); transition: border-color .15s, color .15s;
+    }
+    #board-view-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 </head>
 <body>
@@ -403,6 +412,8 @@
     <div id="q-hint" class="q-hint" style="display:none;"></div>
   </div>
 </div>
+
+<button id="board-view-btn" onclick="window.location.href='board.html?code='+gameCode" title="Tafelansicht öffnen">📺 Tafelansicht</button>
 
 <script src="js/shared.js"></script>
 <script>
@@ -583,6 +594,8 @@ async function doJoin() {
   if (!state || !state.meta) { errEl.textContent = 'Spiel nicht gefunden. Code prüfen.'; return; }
   errEl.textContent = '';
   remoteState = state;
+  const boardBtn = document.getElementById('board-view-btn');
+  if (boardBtn) boardBtn.style.display = 'flex';
 
   // Gespeicherte Teamwahl?
   const saved = localStorage.getItem('bs_myteam_' + code);
