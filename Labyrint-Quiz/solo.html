@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Labyrinth-Quiz – Solo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+  <link rel="stylesheet" href="css/labyrinth.css">
+  <style>
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+
+    .solo-screen { display: none; }
+    .solo-screen.active { display: flex; }
+
+    #solo-setup,
+    #solo-categories {
+      flex-direction: column; align-items: center; overflow-y: auto;
+      background: var(--bg-primary); padding: 2rem;
+      position: fixed; inset: 0; z-index: 200;
+    }
+
+    #solo-play {
+      flex-direction: row; height: 100vh; overflow: hidden;
+      position: fixed; inset: 0; z-index: 100;
+    }
+
+    #solo-result {
+      flex-direction: column; align-items: center; justify-content: center;
+      overflow-y: auto; background: var(--bg-primary); padding: 2rem;
+      position: fixed; inset: 0; z-index: 200;
+    }
+
+    /* ── Play layout ── */
+    .solo-canvas-col {
+      flex: 1; min-width: 0; background: #c8b49c;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    body.dark .solo-canvas-col { background: #090c14; }
+
+    .solo-sidebar {
+      width: clamp(160px, 24vw, 240px); flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: var(--bg-card); border-left: 1px solid var(--border-card); overflow: hidden;
+    }
+
+    .solo-header {
+      display: flex; flex-direction: column; gap: 0.35rem;
+      padding: 0.6rem 0.7rem;
+      border-bottom: 1px solid var(--border-card); flex-shrink: 0;
+    }
+    .solo-player-row { display: flex; align-items: center; justify-content: space-between; }
+    #solo-player-name { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
+    #solo-stopwatch { font-size: 1.1rem; font-weight: 800; font-family: monospace; color: var(--accent); letter-spacing: 0.05em; }
+    #solo-sym-bar { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-top: 2px; min-height: 1.2rem; }
+    .solo-sym-dot { font-size: 0.95rem; opacity: 0.2; }
+    .solo-sym-dot.found { opacity: 1; }
+
+    #solo-play-area {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 0.7rem; box-sizing: border-box; overflow-y: auto;
+    }
+
+    /* ── Turn / Direction screens ── */
+    .turn-screen { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; text-align: center; width: 100%; }
+    .turn-title  { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
+    .dice-pair { display: flex; gap: 0.3rem; justify-content: center; }
+    .dice-pair.rolling .dice-display { animation: diceShake 0.08s infinite alternate; }
+    .dice-display { font-size: clamp(2.2rem, 9vw, 3.8rem); line-height: 1; user-select: none; }
+    @keyframes diceShake { 0%{transform:rotate(-8deg) scale(0.93)} 100%{transform:rotate(8deg) scale(1.07)} }
+
+    .move-screen { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; width: 100%; }
+    .steps-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+    .dice-val   { font-size: 1.8rem; }
+    .steps-left { font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; }
+    .dir-grid { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+    .dir-row  { display: flex; align-items: center; gap: 0.3rem; }
+    .dir-center { font-size: 1.5rem; width: 48px; text-align: center; }
+    .dir-btn {
+      width: clamp(44px, 11vw, 56px); height: clamp(44px, 11vw, 56px);
+      border-radius: 10px; border: 2px solid var(--border-card);
+      background: var(--bg-card); color: var(--text-primary);
+      font-size: 1.3rem; cursor: pointer; transition: all 0.15s;
+      font-family: inherit; display: flex; align-items: center; justify-content: center;
+    }
+    .dir-btn:not(:disabled):hover { background: rgba(227,79,32,0.12); border-color: var(--accent); }
+    .dir-btn.dir-free { border-color: rgba(227,79,32,0.40); }
+    .dir-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    .btn-action {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 10px; padding: 0.7rem 1.5rem;
+      font-size: 1rem; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-action:hover { opacity: 0.85; }
+    .btn-skip {
+      background: transparent; border: 1px solid var(--border-card);
+      color: var(--text-secondary); font-size: 0.82rem;
+      padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-family: inherit;
+    }
+
+    /* ── Finished (inline in sidebar) ── */
+    .finished-screen { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; padding: 0.6rem; width: 100%; }
+    .finished-trophy { font-size: 3rem; }
+    .finished-title  { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
+    .finished-score  { font-size: 0.82rem; color: var(--text-secondary); }
+
+    /* ── Question modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); backdrop-filter: blur(4px); z-index: 500; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal-card { background: var(--bg-card); border: 2px solid var(--border-card); border-radius: 18px; padding: 1.5rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; }
+    .modal-cat-name  { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+    .modal-difficulty { font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 20px; background: rgba(227,79,32,0.12); color: var(--accent); }
+    .modal-trigger { font-size: 0.9rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 8px; text-align: center; }
+    .trigger-door   { background: rgba(220,38,38,0.15); color: #dc2626; }
+    .trigger-symbol { background: rgba(124,58,237,0.15); color: #7c3aed; }
+    .timer-bar-wrap { height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden; }
+    .timer-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.95s linear; }
+    .timer-text { font-size: 0.8rem; color: var(--text-secondary); text-align: right; min-height: 1.1em; }
+    .modal-question { font-size: 1.15rem; font-weight: 600; line-height: 1.5; color: var(--text-primary); }
+    .answer-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    @media (max-width: 420px) { .answer-options { grid-template-columns: 1fr; } }
+    .answer-btn {
+      background: var(--bg-primary); border: 2px solid var(--border-card);
+      border-radius: 10px; padding: 0.75rem 1rem; font-size: 1rem;
+      color: var(--text-primary); cursor: pointer; text-align: left;
+      font-family: inherit; transition: all 0.15s; white-space: normal;
+      word-break: break-word; overflow-wrap: break-word;
+    }
+    .answer-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(227,79,32,0.10); }
+    .answer-btn.correct { background: rgba(22,163,74,0.2);  border-color: #16a34a; }
+    .answer-btn.wrong   { background: rgba(220,38,38,0.2);  border-color: #dc2626; }
+    .answer-btn:disabled { cursor: default; }
+    body.dark .answer-btn.correct { background: rgba(22,163,74,0.15); }
+    body.dark .answer-btn.wrong   { background: rgba(220,38,38,0.15); }
+
+    .open-answer-section { display: flex; flex-direction: column; gap: 0.6rem; }
+    .btn-show-answer {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; padding: 0.65rem 1.4rem;
+      font-size: 0.95rem; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .btn-show-answer:hover { opacity: 0.85; }
+    .open-answer-text {
+      background: rgba(22,163,74,0.12); border: 1px solid #16a34a;
+      border-radius: 8px; padding: 0.7rem 1rem; color: #16a34a; font-weight: 600;
+      display: none;
+    }
+    .open-answer-text.visible { display: block; }
+    .open-actions { display: none; gap: 0.6rem; }
+    .open-actions.visible { display: flex; }
+    .btn-correct { flex: 1; background: #16a34a; color: #fff; border: none; border-radius: 8px; padding: 0.7rem; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-wrong   { flex: 1; background: #dc2626; color: #fff; border: none; border-radius: 8px; padding: 0.7rem; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-correct:hover, .btn-wrong:hover { opacity: 0.85; }
+
+    .modal-result { display: none; text-align: center; padding: 0.6rem 1rem; border-radius: 8px; font-size: 1rem; font-weight: 700; }
+    .modal-result.visible { display: block; }
+    .result-correct { background: rgba(22,163,74,0.15); color: #16a34a; }
+    .result-wrong   { background: rgba(220,38,38,0.15); color: #dc2626; }
+    body.dark .result-correct { background: rgba(22,163,74,0.20); }
+    body.dark .result-wrong   { background: rgba(220,38,38,0.20); }
+
+    .modal-continue { display: none; width: 100%; padding: 0.75rem; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 0.3rem; }
+    .modal-continue.visible { display: block; }
+    .modal-continue:hover { opacity: 0.85; }
+
+    /* ── Result screen ── */
+    .result-card {
+      background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-card);
+      box-shadow: var(--shadow-lg); padding: 2rem; width: min(520px, 92vw); text-align: center;
+    }
+    .result-trophy { font-size: 4rem; margin-bottom: 0.5rem; }
+    .result-card h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); }
+    .result-stats { display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .stat-box { background: var(--bg-primary); border: 1px solid var(--border-card); border-radius: 10px; padding: 0.6rem 1.2rem; }
+    .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+    .stat-lbl { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+    .hs-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem; text-align: left; }
+    .hs-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; text-align: left; }
+    .hs-table th { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border-card); }
+    .hs-table td { font-size: 0.85rem; color: var(--text-primary); padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border-card); }
+    .hs-row-me td { background: rgba(227,79,32,0.07); font-weight: 700; color: var(--accent); }
+    .result-actions { display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap; }
+    .btn-result {
+      padding: 0.7rem 1.5rem; border-radius: 8px; border: 2px solid var(--border-card);
+      font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer;
+      transition: all 0.15s; text-decoration: none; display: inline-block;
+    }
+    .btn-result:hover { opacity: 0.85; }
+    .btn-result-primary   { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-result-secondary { background: var(--bg-card); color: var(--text-primary); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      #solo-play { flex-direction: column; }
+      .solo-canvas-col { flex: 1 1 0; min-height: 0; width: 100%; }
+      .solo-sidebar { flex: none; width: 100%; height: 33vh; height: 33svh; border-left: none; border-top: 1px solid var(--border-card); }
+      .solo-header { flex-direction: row; align-items: center; justify-content: space-between; }
+      #solo-play-area { flex: 1; min-height: 0; overflow-y: auto; padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Setup Screen ────────────────────────────────────────────── -->
+  <div class="solo-screen active" id="solo-setup">
+    <h2 style="color:var(--accent);font-size:2rem;margin-bottom:0.5rem;text-align:center;">🏰 Solo-Modus</h2>
+    <p style="color:var(--text-secondary);margin-bottom:1.5rem;text-align:center;max-width:520px;">Navigiere alleine durch das Labyrinth und sammle alle Symbole!</p>
+
+    <div style="max-width:520px;width:100%;">
+
+      <div class="settings-section-label">👤 Spieler</div>
+      <div class="settings-row">
+        <div><div class="settings-row-title">📝 Dein Name</div></div>
+        <input type="text" id="solo-name" placeholder="Spieler" maxlength="20" class="settings-text-input">
+      </div>
+
+      <div class="settings-section-label" style="margin-top:1rem;">⚙ Spieleinstellungen</div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">📐 Labyrinth-Größe</div>
+          <div class="settings-row-desc">Größer = mehr Wege</div>
+        </div>
+        <div class="param-row" id="solo-size-row"></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">🚪 Türen</div>
+          <div class="settings-row-desc">Türen blockieren Wege – Frage beantworten zum Öffnen</div>
+        </div>
+        <div class="param-row" id="solo-door-row"></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">🔮 Anzahl Symbole</div>
+          <div class="settings-row-desc">Zu sammeln für den Sieg</div>
+        </div>
+        <div class="param-row" id="solo-sym-row"></div>
+      </div>
+
+      <div class="settings-row">
+        <div><div class="settings-row-title">⏱ Zeitlimit pro Frage</div></div>
+        <div class="param-row" id="solo-timer-row"></div>
+      </div>
+
+      <div class="settings-row">
+        <div><div class="settings-row-title">🎨 Erscheinungsbild</div></div>
+        <button class="setup-btn setup-btn-ghost" id="btn-theme" onclick="toggleTheme()" style="padding:0.4rem 0.9rem;font-size:0.9rem;">🌙 Darkmode</button>
+      </div>
+
+      <div class="setup-actions">
+        <button class="setup-btn" onclick="proceedToCategories()">Weiter &#9658;</button>
+        <a href="../spiele.html" class="setup-btn setup-btn-ghost" style="text-decoration:none;">&#8592; Übersicht</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Category Screen ────────────────────────────────────────── -->
+  <div class="solo-screen" id="solo-categories">
+    <div class="cat-screen-container">
+      <div class="cat-screen-header">
+        <h2 class="cat-screen-title">Kategorien auswählen</h2>
+        <p style="color:var(--text-secondary);font-size:0.9rem;">Wähle die Themengebiete für dieses Spiel.</p>
+      </div>
+      <div class="cat-select-actions">
+        <button class="btn-sm" onclick="toggleAllCategories(true)">Alle</button>
+        <button class="btn-sm" onclick="toggleAllCategories(false)">Keine</button>
+      </div>
+      <div class="cat-select-list" id="cat-select-list"></div>
+      <div class="cat-select-info" id="cat-select-info"></div>
+      <div class="setup-actions">
+        <button class="setup-btn" id="btn-start-solo" onclick="startSoloGame()">Spiel starten &#9658;</button>
+        <button class="setup-btn setup-btn-ghost" onclick="showSoloScreen('solo-setup')">&#8592; Zurück</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Play Screen ────────────────────────────────────────────── -->
+  <div class="solo-screen" id="solo-play">
+    <div class="solo-canvas-col">
+      <canvas id="maze-canvas"></canvas>
+    </div>
+    <div class="solo-sidebar">
+      <div class="solo-header">
+        <div class="solo-player-row">
+          <span id="solo-player-name">🛡️ Spieler</span>
+          <span id="solo-stopwatch">0:00</span>
+        </div>
+        <div id="solo-sym-bar"></div>
+      </div>
+      <div id="solo-play-area"></div>
+    </div>
+  </div>
+
+  <!-- ── Result Screen ──────────────────────────────────────────── -->
+  <div class="solo-screen" id="solo-result">
+    <div class="result-card">
+      <div class="result-trophy">🏆</div>
+      <h2>Geschafft!</h2>
+      <div class="result-stats" id="solo-stats"></div>
+      <div class="hs-title">🏅 Bestenliste</div>
+      <table class="hs-table">
+        <thead><tr><th>#</th><th>Name</th><th>Punkte</th><th>Zeit</th><th>Symbole</th></tr></thead>
+        <tbody id="solo-hs-body"></tbody>
+      </table>
+      <div class="result-actions">
+        <button class="btn-result btn-result-primary" onclick="restartSolo()">↩ Nochmal spielen</button>
+        <a href="../spiele.html" class="btn-result btn-result-secondary">← Übersicht</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Question Modal ────────────────────────────────────────── -->
+  <div class="modal-overlay" id="question-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-cat-name" id="q-cat-name"></span>
+        <span class="modal-difficulty" id="q-difficulty"></span>
+      </div>
+      <div class="modal-trigger" id="q-trigger-type"></div>
+      <div class="timer-bar-wrap"><div class="timer-bar" id="q-timer-bar"></div></div>
+      <div class="timer-text" id="q-timer-text"></div>
+      <div class="modal-question" id="q-text"></div>
+      <div class="answer-options" id="q-options"></div>
+      <div class="open-answer-section" id="q-open-section" style="display:none;">
+        <button class="btn-show-answer" id="q-show-answer" onclick="showOpenAnswer()">Lösung anzeigen</button>
+        <div class="open-answer-text" id="q-open-answer"></div>
+        <div class="open-actions" id="q-open-actions">
+          <button class="btn-correct" onclick="resolveOpen(true)">✓ Richtig</button>
+          <button class="btn-wrong"  onclick="resolveOpen(false)">✗ Falsch</button>
+        </div>
+      </div>
+      <div class="modal-result" id="q-result"></div>
+      <button class="modal-continue" id="q-continue" onclick="continueAfterQuestion()">Weiter</button>
+    </div>
+  </div>
+
+  <script src="js/maze.js"></script>
+  <script src="js/renderer.js"></script>
+  <script>
+  'use strict';
+
+  // ── Constants ────────────────────────────────────────────────────
+  const DMAP = {
+    n: { dx: 0, dy: -1, wall: 1, opp: 4 },
+    e: { dx: 1, dy:  0, wall: 2, opp: 8 },
+    s: { dx: 0, dy:  1, wall: 4, opp: 1 },
+    w: { dx:-1, dy:  0, wall: 8, opp: 2 }
+  };
+  const DOOR_OTHER_DIR = {
+    NE: { N:'E', E:'N' }, NW: { W:'N', N:'W' },
+    SE: { E:'S', S:'E' }, SW: { S:'W', W:'S' }
+  };
+  const WALL_BIT = { N:1, E:2, S:4, W:8 };
+  const DICE_CHARS = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+  const TEAM_COLORS = ['#1a3a8f','#8f1a1a','#1a6b1a','#6b1a6b','#8f5a1a','#1a6b6b'];
+  const TEAM_SYMBOL_ICONS = ['👑','⚔️','💎','🔮','🗝️','📜'];
+  const CAT_ICONS = ['🧪','🧬','⚗️','🔬','🌍','📐','💡','🎯','📚','🏛️','🎨','⚡'];
+  const HS_KEY = 'lab_solo_hs';
+
+  // ── State ────────────────────────────────────────────────────────
+  let allQuestions = [], rawCategories = [], activeCategories = new Set();
+  let soloCfg = { mazeSize: 12, doorPreset: 'viele', symbolCount: 5, timerSeconds: 30 };
+  let soloState = null, localGrid = null, renderer = null;
+  let questionCtx = null, timerInterval = null;
+  let stopwatchInterval = null, stopwatchSecs = 0;
+
+  // ── Init ─────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', async () => {
+    await loadQuestions();
+    buildSetupUI();
+  });
+
+  // ── Screen helper ─────────────────────────────────────────────────
+  function showSoloScreen(id) {
+    document.querySelectorAll('.solo-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id)?.classList.add('active');
+  }
+
+  // ── Questions ─────────────────────────────────────────────────────
+  async function loadQuestions() {
+    let data = null;
+    if (location.protocol !== 'file:') {
+      try { const r = await fetch('../api.php?f=questions'); if (r.ok) data = await r.json(); } catch {}
+      if (!data) { try { const r = await fetch('../data/questions.json'); if (r.ok) data = await r.json(); } catch {} }
+    }
+    if (!data) { const c = localStorage.getItem('rq_questions'); if (c) try { data = JSON.parse(c); } catch {} }
+    if (!data) data = { categories: [] };
+    rawCategories = data.categories || [];
+    allQuestions = convertRQ(data);
+  }
+
+  function convertRQ(rqData) {
+    const out = [];
+    function walk(cat, path) {
+      const subs = cat.subcategories || [];
+      const full = path ? path + ' › ' + cat.name : cat.name;
+      if (!subs.length) {
+        (cat.questions || []).forEach(q => {
+          const diff = q.difficulty <= 200 ? 'leicht' : q.difficulty >= 400 ? 'schwer' : 'mittel';
+          out.push({ ...q, kategorieId: cat.id, kategorieName: full, schwierigkeit: diff,
+            type: q.type === 'mc' ? 'multiple_choice' : 'offen' });
+        });
+      } else {
+        subs.forEach(s => walk(s, full));
+      }
+    }
+    (rqData.categories || []).forEach(c => walk(c, ''));
+    return out;
+  }
+
+  // ── Setup UI ──────────────────────────────────────────────────────
+  function buildSetupUI() {
+    buildParamRow('solo-size-row',   [10,12,16],       v => v,         v => v === soloCfg.mazeSize,   v => { soloCfg.mazeSize = v; });
+    buildParamRow('solo-door-row',   [{v:'wenig',l:'Wenig'},{v:'viele',l:'Viele'},{v:'sehrviele',l:'Sehr viele'},{v:'allnodes',l:'Türen-Netz'}],
+      o => o.l, o => o.v === soloCfg.doorPreset, o => { soloCfg.doorPreset = o.v; });
+    buildParamRow('solo-sym-row',    [3,5,7,10],       v => v,         v => v === soloCfg.symbolCount, v => { soloCfg.symbolCount = v; });
+    buildParamRow('solo-timer-row',  [{v:0,l:'Kein'},{v:30,l:'30s'},{v:45,l:'45s'},{v:60,l:'60s'}],
+      o => o.l, o => o.v === soloCfg.timerSeconds, o => { soloCfg.timerSeconds = o.v; });
+  }
+
+  function buildParamRow(id, items, label, isActive, onSet) {
+    const row = document.getElementById(id); if (!row) return; row.innerHTML = '';
+    items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.className = 'param-btn' + (isActive(item) ? ' active' : '');
+      btn.textContent = label(item);
+      btn.onclick = () => {
+        onSet(item);
+        row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+      row.appendChild(btn);
+    });
+  }
+
+  // ── Category UI ───────────────────────────────────────────────────
+  function proceedToCategories() {
+    buildCategoryUI();
+    showSoloScreen('solo-categories');
+  }
+
+  function buildCategoryUI() {
+    const list = document.getElementById('cat-select-list'); if (!list) return;
+    list.innerHTML = '';
+    activeCategories.clear();
+    function collectLeaves(cat) {
+      const subs = cat.subcategories || [];
+      if (cat.questions && cat.questions.length > 0 && !subs.length) return [cat.id];
+      return subs.flatMap(s => collectLeaves(s));
+    }
+    rawCategories.forEach(cat => collectLeaves(cat).forEach(id => activeCategories.add(id)));
+    rawCategories.forEach((cat, ci) => _buildCatNode(list, cat, CAT_ICONS[ci % CAT_ICONS.length]));
+    updateCategoryInfo();
+  }
+
+  function _buildCatNode(container, cat, icon, depth) {
+    depth = depth || 0;
+    const subs = cat.subcategories || [];
+    const hasQ = cat.questions && cat.questions.length > 0;
+    if (!hasQ && !subs.length) return;
+    const qCount = _countLeafQ(cat);
+
+    if (hasQ && !subs.length) {
+      const sel = activeCategories.has(cat.id);
+      const item = document.createElement('div');
+      item.className = 'cat-select-item' + (sel ? ' selected' : '');
+      item.dataset.catId = cat.id;
+      item.innerHTML =
+        '<span class="cat-select-icon">' + (icon||'📁') + '</span>' +
+        '<span class="cat-select-name">' + cat.name + '</span>' +
+        '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
+        '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
+      item.onclick = () => {
+        const on = !activeCategories.has(cat.id);
+        const check = item.querySelector('.cat-select-check');
+        if (on) { activeCategories.add(cat.id); item.classList.add('selected'); check.textContent = '✓'; }
+        else     { activeCategories.delete(cat.id); item.classList.remove('selected'); check.textContent = ''; }
+        _syncGroupHeader(container.closest('.cat-group-wrap'));
+        updateCategoryInfo();
+      };
+      container.appendChild(item);
+      return;
+    }
+
+    const allLeaves = [];
+    (function collect(c) {
+      const cSubs = (c.subcategories||[]).length > 0;
+      if (c.questions && c.questions.length > 0 && !cSubs) allLeaves.push(c.id);
+      (c.subcategories||[]).forEach(s => collect(s));
+    })(cat);
+    const allSel = allLeaves.every(id => activeCategories.has(id));
+
+    const wrap = document.createElement('div'); wrap.className = 'cat-group-wrap';
+    const header = document.createElement('div');
+    header.className = 'cat-group-header collapsed';
+    header.innerHTML =
+      '<span class="cat-group-chevron">▶</span>' +
+      '<span class="cat-group-icon">' + icon + '</span>' +
+      '<span class="cat-group-name">' + cat.name + '</span>' +
+      '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
+      '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
+        '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
+      '</label>';
+    const children = document.createElement('div');
+    children.className = 'cat-group-children hidden';
+
+    header.addEventListener('click', () => {
+      const collapsed = header.classList.contains('collapsed');
+      header.classList.toggle('collapsed', !collapsed);
+      children.classList.toggle('hidden', !collapsed);
+    });
+
+    const cb = header.querySelector('.cat-group-cb');
+    cb.addEventListener('change', () => {
+      const on = cb.checked;
+      allLeaves.forEach(id => { if (on) activeCategories.add(id); else activeCategories.delete(id); });
+      children.querySelectorAll('.cat-select-item').forEach(item => {
+        item.classList.toggle('selected', on);
+        item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+      });
+      children.querySelectorAll('.cat-group-cb').forEach(gcb => gcb.checked = on);
+      updateCategoryInfo();
+    });
+
+    wrap.appendChild(header); wrap.appendChild(children); container.appendChild(wrap);
+    subs.forEach(sub => _buildCatNode(children, sub, icon, depth + 1));
+  }
+
+  function _countLeafQ(cat) {
+    const subs = cat.subcategories || [];
+    if (cat.questions && cat.questions.length > 0 && !subs.length)
+      return allQuestions.filter(q => q.kategorieId === cat.id).length;
+    return subs.reduce((s, c) => s + _countLeafQ(c), 0);
+  }
+
+  function _syncGroupHeader(wrap) {
+    if (!wrap) return;
+    const cb = wrap.querySelector(':scope > .cat-group-header .cat-group-cb');
+    if (!cb) return;
+    const items = wrap.querySelectorAll('.cat-select-item');
+    cb.checked = items.length > 0 && [...items].every(i => i.classList.contains('selected'));
+    const parentChildren = wrap.parentElement;
+    if (parentChildren && parentChildren.classList.contains('cat-group-children'))
+      _syncGroupHeader(parentChildren.closest('.cat-group-wrap'));
+  }
+
+  function toggleAllCategories(on) {
+    activeCategories.clear();
+    document.querySelectorAll('#cat-select-list .cat-select-item').forEach(item => {
+      item.classList.toggle('selected', on);
+      item.querySelector('.cat-select-check').textContent = on ? '✓' : '';
+      if (on) activeCategories.add(item.dataset.catId);
+    });
+    document.querySelectorAll('#cat-select-list .cat-group-cb').forEach(cb => cb.checked = on);
+    updateCategoryInfo();
+  }
+
+  function updateCategoryInfo() {
+    const el = document.getElementById('cat-select-info'); if (!el) return;
+    const n = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+    const btn = document.getElementById('btn-start-solo');
+    if (activeCategories.size === 0 || n === 0) {
+      el.className = 'cat-select-info warning';
+      el.textContent = 'Keine Kategorie ausgewählt!';
+      if (btn) btn.disabled = true;
+      return;
+    }
+    el.className = 'cat-select-info';
+    el.textContent = '✅ ' + n + ' Fragen aus ' + activeCategories.size + ' Kategorien';
+    if (btn) btn.disabled = false;
+  }
+
+  // ── Game Start ────────────────────────────────────────────────────
+  function startSoloGame() {
+    const n = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+    if (n === 0) { updateCategoryInfo(); return; }
+
+    soloCfg.playerName = (document.getElementById('solo-name')?.value.trim()) || 'Spieler';
+
+    // Show play screen first so canvas has real dimensions
+    showSoloScreen('solo-play');
+    buildSoloGame();
+    startStopwatch();
+    showRolling();
+  }
+
+  function buildSoloGame() {
+    const { mazeSize, doorPreset, symbolCount } = soloCfg;
+    const seed = Date.now() & 0x7fffffff;
+
+    let grid, doors, startPositions;
+
+    if (doorPreset === 'allnodes') {
+      const res = buildAllNodesMaze(mazeSize, seed);
+      grid = res.grid; doors = res.doors;
+      try { startPositions = getTeamStartPositions(mazeSize, mazeSize); }
+      catch { startPositions = [{ x: 0, y: 0 }]; }
+    } else {
+      const doorCounts = { wenig:{10:4,12:6,16:10}, viele:{10:10,12:14,16:20}, sehrviele:{10:16,12:22,16:35} };
+      const dc = (doorCounts[doorPreset]||doorCounts.viele)[mazeSize]||14;
+      const gen = new MazeGenerator(mazeSize, mazeSize, seed);
+      const res = gen.generate({ doorCount: dc, teamCount: 1 });
+      grid = res.grid; doors = res.doors || []; startPositions = res.startPositions;
+    }
+
+    const startX = startPositions[0]?.x || 0;
+    const startY = startPositions[0]?.y || 0;
+    const symbols = placeSoloSymbols(grid, startX, startY, symbolCount, mazeSize, seed);
+
+    localGrid = grid;
+    soloState = {
+      phase: 'rolling',
+      team: {
+        id: 0, name: soloCfg.playerName,
+        emoji: '🛡️', symbolIcon: TEAM_SYMBOL_ICONS[0],
+        color: TEAM_COLORS[0],
+        x: startX, y: startY, startX, startY,
+        score: 0, symbolsFound: 0
+      },
+      doors, symbols,
+      stepsRemaining: 0, diceValue: 0, diceValues: null,
+      usedQuestionIds: new Set(),
+      config: { mazeSize, doorPreset, symbolCount, timerSeconds: soloCfg.timerSeconds }
+    };
+
+    const canvas = document.getElementById('maze-canvas');
+    renderer = new MazeRenderer(canvas);
+    renderer.setMaze({ grid, startPositions });
+
+    const nameEl = document.getElementById('solo-player-name');
+    if (nameEl) nameEl.textContent = soloState.team.emoji + ' ' + soloState.team.name;
+
+    renderSoloCanvas();
+    updateSymbolBar();
+  }
+
+  function buildAllNodesMaze(mazeSize, seed) {
+    const grid = [];
+    for (let y = 0; y < mazeSize; y++) {
+      grid[y] = [];
+      for (let x = 0; x < mazeSize; x++) {
+        let w = 0;
+        if (y === 0)            w |= 1;
+        if (x === mazeSize - 1) w |= 2;
+        if (y === mazeSize - 1) w |= 4;
+        if (x === 0)            w |= 8;
+        grid[y][x] = { walls: w, type: 'path' };
+      }
+    }
+    const rng = new SeededRNG(seed);
+    const doors = [];
+    for (let gy = 1; gy < mazeSize; gy++) {
+      for (let gx = 1; gx < mazeSize; gx++) {
+        const choice = rng.nextInt(0, 1);
+        const blockedDir = choice === 0 ? 'N' : 'W';
+        const rotDir = choice === 0 ? 1 : -1;
+        doors.push({ id:'n-'+gx+'-'+gy, cellX:gx, cellY:gy, corner:'NW', blockedDir, rotDir, angle:0, open:false, openedBy:null });
+      }
+    }
+    return { grid, doors };
+  }
+
+  function placeSoloSymbols(grid, startX, startY, count, mazeSize, seed) {
+    const exR = ({10:2,12:3,16:4})[mazeSize]||3;
+    const excluded = new Set();
+    for (let dy = -exR; dy <= exR; dy++)
+      for (let dx = -exR; dx <= exR; dx++) {
+        const nx = startX+dx, ny = startY+dy;
+        if (nx>=0&&nx<mazeSize&&ny>=0&&ny<mazeSize) excluded.add(nx+','+ny);
+      }
+    const cells = [];
+    for (let y=0;y<mazeSize;y++) for (let x=0;x<mazeSize;x++) if (!excluded.has(x+','+y)) cells.push({x,y});
+    new SeededRNG(((seed*31)+7)&0x7fffffff).shuffle(cells);
+    const symbols = [];
+    for (let i=0;i<Math.min(count,cells.length);i++) {
+      const {x,y}=cells[i];
+      symbols.push({id:'sym-0-'+i,teamId:0,x,y,found:false,foundBy:null});
+      grid[y][x].type='symbol'; grid[y][x].symTeamId=0;
+    }
+    return symbols;
+  }
+
+  function applyStateToGrid(grid, symbols) {
+    const H=grid.length, W=grid[0]?.length||H;
+    for (let y=0;y<H;y++) for (let x=0;x<W;x++)
+      if (grid[y][x].type==='symbol') { grid[y][x].type='path'; delete grid[y][x].symTeamId; }
+    symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type='symbol'; grid[s.y][s.x].symTeamId=s.teamId; } });
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────
+  function renderSoloCanvas() {
+    if (!renderer || !soloState) return;
+    renderer.render({
+      phase: soloState.phase,
+      teams: [soloState.team],
+      currentTeamIdx: 0,
+      allSymbols: soloState.symbols,
+      doors: soloState.doors,
+      _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
+    });
+  }
+
+  function updateSymbolBar() {
+    const bar = document.getElementById('solo-sym-bar'); if (!bar||!soloState) return;
+    bar.innerHTML = '';
+    soloState.symbols.forEach(s => {
+      const span = document.createElement('span');
+      span.className = 'solo-sym-dot'+(s.found?' found':'');
+      span.textContent = s.found ? soloState.team.symbolIcon : '○';
+      bar.appendChild(span);
+    });
+  }
+
+  // ── Stopwatch ─────────────────────────────────────────────────────
+  function startStopwatch() {
+    stopwatchSecs = 0;
+    updateStopwatchDisplay();
+    stopwatchInterval = setInterval(() => { stopwatchSecs++; updateStopwatchDisplay(); }, 1000);
+  }
+  function stopStopwatch() { if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; } }
+  function updateStopwatchDisplay() {
+    const m = Math.floor(stopwatchSecs/60), s = stopwatchSecs%60;
+    const el = document.getElementById('solo-stopwatch');
+    if (el) el.textContent = m+':'+String(s).padStart(2,'0');
+  }
+
+  // ── Movement ──────────────────────────────────────────────────────
+  function checkDoorOnPassage(doors, x, y, dir, grid) {
+    const d = DMAP[dir];
+    const nx = x+d.dx, ny = y+d.dy;
+    const DIR_UP = dir.toUpperCase();
+    const OPP = {n:'S',s:'N',e:'W',w:'E'}[dir];
+    let matchedDoor=null, isNeighborMatch=false;
+    for (const dr of (doors||[])) {
+      const isFlipped = (dr.angle||0)!==0;
+      const curDir = isFlipped ? (DOOR_OTHER_DIR[dr.corner]?.[dr.blockedDir]||dr.blockedDir) : dr.blockedDir;
+      if (dr.cellX===x&&dr.cellY===y&&curDir===DIR_UP) { matchedDoor=dr; isNeighborMatch=false; break; }
+      if (dr.cellX===nx&&dr.cellY===ny&&curDir===OPP)  { matchedDoor=dr; isNeighborMatch=true;  break; }
+    }
+    if (!matchedDoor) return null;
+    if (!isNeighborMatch) return { door:matchedDoor, canOpen:false };
+    if (grid) {
+      const isFlipped=(matchedDoor.angle||0)!==0;
+      const targetDir=isFlipped ? matchedDoor.blockedDir : (DOOR_OTHER_DIR[matchedDoor.corner]?.[matchedDoor.blockedDir]);
+      if (targetDir&&(grid[matchedDoor.cellY]?.[matchedDoor.cellX]?.walls&WALL_BIT[targetDir]))
+        return { door:matchedDoor, canOpen:false };
+    }
+    return { door:matchedDoor, canOpen:true };
+  }
+
+  function computeValidDirs() {
+    if (!soloState||!localGrid) return {};
+    const {x,y}=soloState.team, valid={};
+    for (const [key,d] of Object.entries(DMAP)) {
+      if (localGrid[y][x].walls&d.wall) continue;
+      const dc=checkDoorOnPassage(soloState.doors,x,y,key,localGrid);
+      if (dc&&!dc.canOpen) continue;
+      valid[key]=true;
+    }
+    return valid;
+  }
+
+  function advanceSolo(dir) {
+    const d=DMAP[dir];
+    let cx=soloState.team.x, cy=soloState.team.y;
+    const W=localGrid[0]?.length||16, H=localGrid.length||16;
+    const fromWall=d.opp;
+    while (true) {
+      if (localGrid[cy][cx].walls&d.wall) break;
+      const nx=cx+d.dx, ny=cy+d.dy;
+      if (nx<0||nx>=W||ny<0||ny>=H) break;
+      const doorCheck=checkDoorOnPassage(soloState.doors,cx,cy,dir,localGrid);
+      if (doorCheck) {
+        if (!doorCheck.canOpen) break;
+        return {stop:'door',teamX:cx,teamY:cy,doorX:nx,doorY:ny,door:doorCheck.door};
+      }
+      const cell=localGrid[ny][nx];
+      if (cell.type==='symbol'&&cell.symTeamId===0) {
+        const sym=soloState.symbols.find(s=>s.x===nx&&s.y===ny&&!s.found);
+        if (sym) return {stop:'symbol',teamX:cx,teamY:cy,symX:nx,symY:ny,sym};
+      }
+      cx=nx; cy=ny;
+      let exits=0;
+      for (const d2 of Object.values(DMAP)) {
+        if (d2.wall===fromWall) continue;
+        if (!(localGrid[cy][cx].walls&d2.wall)) exits++;
+      }
+      if (exits!==1) break;
+    }
+    return {stop:'moved',teamX:cx,teamY:cy};
+  }
+
+  // ── Game Phases ───────────────────────────────────────────────────
+  function showRolling() {
+    soloState.phase='rolling';
+    const area=document.getElementById('solo-play-area'); if (!area) return;
+    area.innerHTML=`
+      <div class="turn-screen">
+        <div class="turn-title">🎲 Dein Zug!</div>
+        <div class="dice-pair">
+          <div class="dice-display" id="dice-1">🎲</div>
+          <div class="dice-display" id="dice-2">🎲</div>
+        </div>
+        <button class="btn-action" id="btn-roll" onclick="rollDice()">Würfeln</button>
+      </div>`;
+  }
+
+  function rollDice() {
+    const btn=document.getElementById('btn-roll'); if(btn) btn.disabled=true;
+    const d1=document.getElementById('dice-1'), d2=document.getElementById('dice-2');
+    const pair=document.querySelector('.dice-pair'); if(!pair) return;
+    pair.classList.add('rolling');
+    let frames=0;
+    const anim=setInterval(()=>{
+      frames++;
+      if(d1) d1.textContent=DICE_CHARS[Math.floor(Math.random()*6)];
+      if(d2) d2.textContent=DICE_CHARS[Math.floor(Math.random()*6)];
+      if(frames>=20) {
+        clearInterval(anim); pair.classList.remove('rolling');
+        const r1=Math.floor(Math.random()*6)+1, r2=Math.floor(Math.random()*6)+1;
+        if(d1) d1.textContent=DICE_CHARS[r1-1];
+        if(d2) d2.textContent=DICE_CHARS[r2-1];
+        soloState.diceValue=r1+r2; soloState.diceValues=[r1,r2];
+        soloState.stepsRemaining=r1+r2;
+        showDirection();
+      }
+    },70);
+  }
+
+  function showDirection() {
+    soloState.phase='direction';
+    const area=document.getElementById('solo-play-area'); if(!area) return;
+    const valid=computeValidDirs();
+    const movesLeft=soloState.stepsRemaining;
+    const dv=soloState.diceValues;
+    const diceStr=dv?(DICE_CHARS[dv[0]-1]+' '+DICE_CHARS[dv[1]-1]):DICE_CHARS[(soloState.diceValue||1)-1];
+    const mkBtn=(dir,arrow)=>{
+      const ok=valid[dir];
+      return `<button class="dir-btn${ok?' dir-free':''}" ${ok?`onclick="chooseDir('${dir}')"`:'disabled'}>${arrow}</button>`;
+    };
+    area.innerHTML=`
+      <div class="move-screen">
+        <div class="steps-indicator">
+          <span class="dice-val">${diceStr}</span>
+          <span class="steps-left">${movesLeft} Zug${movesLeft!==1?'züge':''}</span>
+        </div>
+        <div class="dir-grid">
+          <div class="dir-row">${mkBtn('n','▲')}</div>
+          <div class="dir-row">${mkBtn('w','◀')}<span class="dir-center">${soloState.team.emoji}</span>${mkBtn('e','▶')}</div>
+          <div class="dir-row">${mkBtn('s','▼')}</div>
+        </div>
+        <button class="btn-skip" onclick="skipTurn()">Zug beenden</button>
+      </div>`;
+  }
+
+  function chooseDir(dir) {
+    if (!soloState||soloState.phase!=='direction') return;
+    if (!computeValidDirs()[dir]) return;
+    const res=advanceSolo(dir);
+    soloState.team.x=res.teamX; soloState.team.y=res.teamY;
+
+    if (res.stop==='door') {
+      soloState.stepsRemaining=0; soloState.phase='question';
+      renderSoloCanvas();
+      questionCtx={type:'door',target:{x:res.doorX,y:res.doorY},door:res.door};
+      showQuestionModal(); return;
+    }
+    if (res.stop==='symbol') {
+      soloState.stepsRemaining=0; soloState.phase='question';
+      renderSoloCanvas();
+      questionCtx={type:'symbol',target:{x:res.symX,y:res.symY},sym:res.sym};
+      showQuestionModal(); return;
+    }
+    soloState.stepsRemaining--;
+    renderSoloCanvas();
+    if (soloState.stepsRemaining<=0) showRolling();
+    else showDirection();
+  }
+
+  function skipTurn() {
+    soloState.phase='rolling'; soloState.stepsRemaining=0; showRolling();
+  }
+
+  // ── Question Modal ────────────────────────────────────────────────
+  function showQuestionModal() {
+    const cats=[...activeCategories];
+    const used=soloState.usedQuestionIds;
+    let pool=allQuestions.filter(q=>cats.includes(q.kategorieId)&&!used.has(q.id));
+    if (!pool.length) pool=allQuestions.filter(q=>cats.includes(q.kategorieId));
+    if (!pool.length) { resolveQuestionResult(false); return; }
+    const q=pool[Math.floor(Math.random()*pool.length)];
+    questionCtx.question=q;
+
+    document.getElementById('q-cat-name').textContent=q.kategorieName?.split(' › ').pop()||'';
+    document.getElementById('q-difficulty').textContent=q.schwierigkeit||'';
+    const trigger=document.getElementById('q-trigger-type');
+    if (questionCtx.type==='door') { trigger.textContent='🔒 Tür öffnen'; trigger.className='modal-trigger trigger-door'; }
+    else { trigger.textContent=soloState.team.symbolIcon+' Symbol einsammeln'; trigger.className='modal-trigger trigger-symbol'; }
+
+    document.getElementById('q-text').textContent=q.question;
+    document.getElementById('q-result').textContent='';
+    document.getElementById('q-result').className='modal-result';
+    document.getElementById('q-continue').className='modal-continue';
+
+    const optEl=document.getElementById('q-options');
+    const openSec=document.getElementById('q-open-section');
+
+    if (q.type==='multiple_choice'&&q.options?.length) {
+      optEl.style.display=''; openSec.style.display='none'; optEl.innerHTML='';
+      q.options.forEach((opt,i)=>{
+        const btn=document.createElement('button');
+        btn.className='answer-btn'; btn.textContent=opt;
+        btn.onclick=()=>resolveChoice(i);
+        optEl.appendChild(btn);
+      });
+      startTimer(soloCfg.timerSeconds);
+    } else {
+      optEl.style.display='none'; openSec.style.display='';
+      const ansEl=document.getElementById('q-open-answer');
+      ansEl.textContent=q.answer||q.hint||'(keine Musterlösung)';
+      ansEl.className='open-answer-text';
+      document.getElementById('q-show-answer').style.display='';
+      document.getElementById('q-open-actions').className='open-actions';
+      startTimer(0);
+    }
+
+    document.getElementById('question-modal').classList.add('active');
+  }
+
+  function resolveChoice(idx) {
+    clearTimer();
+    const q=questionCtx.question;
+    const cs=new Set((Array.isArray(q.correctIndices)&&q.correctIndices.length>0)?q.correctIndices:[q.correctIndex??0]);
+    const correct=cs.has(idx);
+    document.querySelectorAll('#q-options .answer-btn').forEach((btn,i)=>{
+      btn.disabled=true; btn.onclick=null;
+      if (cs.has(i)) btn.classList.add('correct');
+      else if (i===idx&&!correct) btn.classList.add('wrong');
+    });
+    resolveQuestionResult(correct);
+  }
+
+  function showOpenAnswer() {
+    document.getElementById('q-open-answer').className='open-answer-text visible';
+    document.getElementById('q-show-answer').style.display='none';
+    document.getElementById('q-open-actions').className='open-actions visible';
+  }
+
+  function resolveOpen(correct) { clearTimer(); resolveQuestionResult(correct); }
+
+  function resolveQuestionResult(correct) {
+    document.getElementById('q-open-actions').className='open-actions';
+    const resultEl=document.getElementById('q-result');
+    if (correct) {
+      resultEl.className='modal-result visible result-correct';
+      resultEl.textContent=questionCtx.type==='door'
+        ? '✓ Richtig! Die Tür öffnet sich!'
+        : '✓ Richtig! '+soloState.team.symbolIcon+' Symbol eingesammelt! +10 Pkt';
+    } else {
+      resultEl.className='modal-result visible result-wrong';
+      resultEl.textContent='✗ Leider falsch.';
+    }
+    document.getElementById('q-continue').className='modal-continue visible';
+  }
+
+  function continueAfterQuestion() {
+    clearTimer();
+    document.getElementById('question-modal').classList.remove('active');
+    const ctx=questionCtx; questionCtx=null;
+    const wasCorrect=document.getElementById('q-result').classList.contains('result-correct');
+    if (ctx.question) soloState.usedQuestionIds.add(ctx.question.id);
+
+    if (ctx.type==='door'&&wasCorrect) {
+      const door=soloState.doors.find(d=>d.id===ctx.door.id);
+      if (door) { door.angle=door.angle?0:90; door.openedBy=0; }
+      soloState.team.x=ctx.target.x; soloState.team.y=ctx.target.y;
+    } else if (ctx.type==='symbol'&&wasCorrect) {
+      const sym=soloState.symbols.find(s=>s.x===ctx.target.x&&s.y===ctx.target.y&&!s.found);
+      if (sym) { sym.found=true; sym.foundBy=0; }
+      soloState.team.score+=10;
+      soloState.team.symbolsFound++;
+      soloState.team.x=ctx.target.x; soloState.team.y=ctx.target.y;
+      applyStateToGrid(localGrid,soloState.symbols);
+      updateSymbolBar();
+      if (soloState.team.symbolsFound>=soloState.config.symbolCount) {
+        soloState.team.score+=50; soloState.phase='finished';
+        stopStopwatch(); renderSoloCanvas(); showSoloResult(); return;
+      }
+    }
+
+    soloState.phase='rolling'; soloState.stepsRemaining=0;
+    renderSoloCanvas(); showRolling();
+  }
+
+  // ── Timer ─────────────────────────────────────────────────────────
+  function startTimer(seconds) {
+    clearTimer();
+    const bar=document.getElementById('q-timer-bar'), txt=document.getElementById('q-timer-text');
+    if (!seconds) { if(bar) bar.style.width='0%'; if(txt) txt.textContent=''; return; }
+    let rem=seconds;
+    if(bar) bar.style.width='100%'; if(txt) txt.textContent=rem+'s';
+    timerInterval=setInterval(()=>{
+      rem--;
+      if(bar) bar.style.width=Math.max(0,rem/seconds*100)+'%';
+      if(txt) txt.textContent=rem>0?rem+'s':'';
+      if(rem<=0) { clearTimer(); resolveQuestionResult(false); }
+    },1000);
+  }
+  function clearTimer() {
+    if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+    const b=document.getElementById('q-timer-bar'); if(b) b.style.width='0%';
+  }
+
+  // ── Result & Highscore ────────────────────────────────────────────
+  function showSoloResult() {
+    const secs=stopwatchSecs, score=soloState.team.score, symbols=soloState.team.symbolsFound;
+    const name=soloState.team.name;
+    const {hs,myIdx}=saveHighscore({name,score,secs,symbols,date:new Date().toLocaleDateString('de-AT')});
+
+    const m=Math.floor(secs/60), s=secs%60;
+    const timeStr=m+':'+String(s).padStart(2,'0');
+    document.getElementById('solo-stats').innerHTML=
+      '<div class="stat-box"><div class="stat-val">'+score+'</div><div class="stat-lbl">Punkte</div></div>'+
+      '<div class="stat-box"><div class="stat-val">'+timeStr+'</div><div class="stat-lbl">Zeit</div></div>'+
+      '<div class="stat-box"><div class="stat-val">'+symbols+'</div><div class="stat-lbl">Symbole</div></div>';
+
+    const tbody=document.getElementById('solo-hs-body');
+    tbody.innerHTML=hs.map((e,i)=>{
+      const em=Math.floor(e.secs/60), es=e.secs%60;
+      return '<tr class="'+(i===myIdx?'hs-row-me':'')+'">'+
+        '<td>'+(i+1)+'</td><td>'+_esc(e.name)+'</td>'+
+        '<td>'+e.score+'</td>'+
+        '<td>'+em+':'+String(es).padStart(2,'0')+'</td>'+
+        '<td>'+e.symbols+'</td></tr>';
+    }).join('');
+
+    showSoloScreen('solo-result');
+  }
+
+  function saveHighscore(entry) {
+    const hs=loadHighscores();
+    const newEntry={...entry,_new:true};
+    hs.push(newEntry);
+    hs.sort((a,b)=>b.score-a.score||a.secs-b.secs);
+    hs.splice(10);
+    const myIdx=hs.findIndex(e=>e._new);
+    if(myIdx>=0) delete hs[myIdx]._new;
+    localStorage.setItem(HS_KEY,JSON.stringify(hs));
+    return {hs,myIdx};
+  }
+  function loadHighscores() {
+    try { return JSON.parse(localStorage.getItem(HS_KEY)||'[]'); } catch { return []; }
+  }
+
+  function restartSolo() { showSoloScreen('solo-setup'); }
+
+  function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ── Exports (onclick handlers) ────────────────────────────────────
+  window.showSoloScreen     = showSoloScreen;
+  window.proceedToCategories = proceedToCategories;
+  window.toggleAllCategories = toggleAllCategories;
+  window.startSoloGame      = startSoloGame;
+  window.rollDice           = rollDice;
+  window.chooseDir          = chooseDir;
+  window.skipTurn           = skipTurn;
+  window.showOpenAnswer     = showOpenAnswer;
+  window.resolveOpen        = resolveOpen;
+  window.continueAfterQuestion = continueAfterQuestion;
+  window.restartSolo        = restartSolo;
+  </script>
+
+  <!-- ── Theme ─────────────────────────────────────────────────────── -->
+  <script>
+  (function(){
+    const KEY='spiele_theme';
+    function applyTheme(active){
+      document.body.classList.toggle('dark',active);
+      document.querySelectorAll('#btn-theme').forEach(el=>{if(el)el.textContent=active?'☀️ Lightmode':'🌙 Darkmode';});
+    }
+    window.toggleTheme=function(){
+      const isActive=!document.body.classList.contains('dark');
+      localStorage.setItem(KEY,isActive?'dark':'light');
+      applyTheme(isActive);
+    };
+    applyTheme(localStorage.getItem(KEY)==='dark');
+  })();
+  </script>
+
+</body>
+</html>
