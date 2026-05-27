@@ -283,7 +283,7 @@ let aiHitSet   = new Set();  // KI-Treffer
 let ai = { mode: 'hunt', currentHits: [], direction: null, queue: [] };
 
 let startTime = null, stopwatchTimer = null;
-let pendingCoord = null, usedQuestionIds = new Set();
+let pendingCoord = null, questionPlayCounts = {};
 let mcTimerHandle = null, answering = false;
 let aiTurnPending = false;
 
@@ -465,7 +465,7 @@ function startSolo() {
   playerShots = {}; playerShotsFired = 0; playerHits = 0;
   aiShotSet   = new Set(); aiHitSet = new Set();
   ai = { mode: 'hunt', currentHits: [], direction: null, queue: [] };
-  usedQuestionIds = new Set();
+  questionPlayCounts = {};
   answering = false; aiTurnPending = false;
 
   showScreen('screen-play');
@@ -614,14 +614,15 @@ function tapEnemyCell(key) {
   showQuestion(key);
 }
 
-// ── Frage auswählen ─────────────────────────────────────────────────
+// ── Frage auswählen — Cycling: erst alle einmal, dann zweimal, usw. ──
 function pickQuestion() {
-  const active = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
-  let pool = active.filter(q => !usedQuestionIds.has(q.id));
-  if (!pool.length) pool = active;
-  if (questionMode === 'mc')   pool = pool.filter(q => q.type==='mc'||q.type==='multiple_choice').length ? pool.filter(q=>q.type==='mc'||q.type==='multiple_choice') : pool;
-  if (questionMode === 'open') pool = pool.filter(q => q.type!=='mc'&&q.type!=='multiple_choice').length ? pool.filter(q=>q.type!=='mc'&&q.type!=='multiple_choice') : pool;
-  return pool[Math.floor(Math.random() * pool.length)] || null;
+  let pool = allQuestions.filter(q => selectedCategoryIds.has(q.kategorieId));
+  if (questionMode === 'mc')   { const p = pool.filter(q => q.type==='mc'||q.type==='multiple_choice');   if (p.length) pool = p; }
+  if (questionMode === 'open') { const p = pool.filter(q => q.type!=='mc'&&q.type!=='multiple_choice'); if (p.length) pool = p; }
+  if (!pool.length) return null;
+  const minCount = Math.min(...pool.map(q => questionPlayCounts[q.id] || 0));
+  const candidates = pool.filter(q => (questionPlayCounts[q.id] || 0) === minCount);
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 // ── Frage anzeigen ──────────────────────────────────────────────────
@@ -629,6 +630,7 @@ function showQuestion(coord) {
   answering = true;
   const q = pickQuestion();
   if (!q) { answering = false; return; }
+  questionPlayCounts[q.id] = (questionPlayCounts[q.id] || 0) + 1;
   const modal = document.getElementById('question-modal');
   modal._q = q;
   document.getElementById('modal-coord').textContent     = coord;
@@ -687,7 +689,6 @@ function resolveOpen(correct) {
 window.resolveOpen = resolveOpen;
 
 function applyPlayerShot(correct, q) {
-  usedQuestionIds.add(q.id);
   playerShots[pendingCoord] = { correct };
   playerShotsFired++;
   const isHit = correct && !!enemyShipGrid[pendingCoord];

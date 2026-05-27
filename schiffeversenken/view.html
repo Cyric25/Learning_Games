@@ -799,27 +799,28 @@ async function fireShot() {
 
   submittingShot = true;
 
-  // Zufällige Frage wählen
+  // Zufällige Frage wählen — Cycling: erst alle einmal, dann zweimal, usw.
   const activeCats = new Set(remoteState.activeCategoryIds || []);
-  const used = remoteState.usedQuestionIds instanceof Set
-    ? remoteState.usedQuestionIds
-    : new Set(remoteState.usedQuestionIds||[]);
   const mode = remoteState.questionMode || 'mixed';
+  const counts = remoteState.questionPlayCounts || {};
   function matchesMode(q) {
     const isMC = q.type === 'mc' || q.type === 'multiple_choice';
     if (mode === 'mc')   return isMC;
     if (mode === 'open') return !isMC;
     return true;
   }
-  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && !used.has(q.id) && matchesMode(q));
-  if (!pool.length) pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
+  let pool = allQuestions.filter(q => activeCats.has(q.kategorieId) && matchesMode(q));
   if (!pool.length) pool = allQuestions.filter(q => matchesMode(q));
   if (!pool.length) { errEl.textContent = 'Keine Fragen verfügbar!'; submittingShot = false; return; }
-  const q = pool[Math.floor(Math.random() * pool.length)];
+  const minCount = Math.min(...pool.map(q => counts[q.id] || 0));
+  const candidates = pool.filter(q => (counts[q.id] || 0) === minCount);
+  const q = candidates[Math.floor(Math.random() * candidates.length)];
 
   // liveQuestion setzen
   const ns = JSON.parse(JSON.stringify(remoteState, (k,v) => v instanceof Set ? [...v] : v));
   ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
+  ns.questionPlayCounts = ns.questionPlayCounts || {};
+  ns.questionPlayCounts[q.id] = (ns.questionPlayCounts[q.id] || 0) + 1;
   ns.liveQuestion = {
     id: `lq-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     teamIdx: myTeamId,

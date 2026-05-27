@@ -505,7 +505,8 @@ async function startGame() {
     activeCategoryIds: [...selectedCategoryIds],
     questionMode,
     mcTimerSeconds,
-    usedQuestionIds: new Set()
+    usedQuestionIds: new Set(),
+    questionPlayCounts: {}
   };
 
   await BsStorage.save(gameState);
