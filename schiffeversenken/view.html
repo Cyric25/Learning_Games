@@ -84,6 +84,8 @@
     .team-emoji-big { font-size: 1.8rem; }
     .team-opt-name { font-weight: 700; font-size: 1rem; }
     .team-taken { font-size: .78rem; color: var(--danger); font-weight: 700; margin-left: .4rem; }
+    .board-view-btn { border-style: dashed; opacity: .85; }
+    .board-view-btn:hover { border-style: solid; opacity: 1; }
 
     /* ── Wait Screen ── */
     #screen-wait .card { gap: 1rem; display: flex; flex-direction: column; align-items: center; }
@@ -493,6 +495,15 @@ function showTeamSelect(state) {
     if (!isTaken) btn.onclick = () => selectTeam(t.id, state);
     list.appendChild(btn);
   });
+  // Tafelansicht — kein "belegt", beliebig oft wählbar
+  const sep = document.createElement('hr');
+  sep.style.cssText = 'border:none;border-top:1px solid var(--border);margin:.6rem 0;';
+  list.appendChild(sep);
+  const boardBtn = document.createElement('button');
+  boardBtn.className = 'team-option board-view-btn';
+  boardBtn.innerHTML = '<span class="team-emoji-big">📺</span><span class="team-opt-name">Tafelansicht</span>';
+  boardBtn.onclick = () => { window.location.href = 'board.html?code=' + gameCode; };
+  list.appendChild(boardBtn);
 }
 
 async function selectTeam(id, stateHint) {
