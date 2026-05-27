@@ -11,21 +11,29 @@
     #screen-setup  { min-height:100vh; flex-direction:column; align-items:center; padding:1.5rem 1rem; gap:1rem; overflow-y:auto; background:var(--bg-body); }
     #screen-result { min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:2rem; gap:1.2rem; text-align:center; background:var(--bg-body); }
 
-    /* Play-Screen */
-    #screen-play { flex-direction:row; height:100vh; overflow:hidden; background:var(--bg-body); }
-    .solo-left  { flex:1; display:flex; flex-direction:column; overflow:hidden; padding:.8rem; gap:.5rem; min-width:0; }
-    .solo-right { width:260px; flex-shrink:0; display:flex; flex-direction:column; background:var(--bg-secondary); border-left:1px solid var(--border); padding:1rem .8rem; gap:.8rem; overflow-y:auto; }
-    @media (max-width:780px) {
-      #screen-play { flex-direction:column; height:auto; overflow:auto; }
-      .solo-right { width:100%; border-left:none; border-top:1px solid var(--border); flex-direction:row; flex-wrap:wrap; }
-    }
-    .solo-topbar { display:flex; align-items:center; justify-content:space-between; background:var(--bg-secondary); border-radius:10px; padding:.55rem .9rem; flex-shrink:0; }
-    .solo-topbar-title { font-weight:700; color:var(--accent); font-size:.95rem; }
+    /* Play-Screen: Header oben, Spielbereich darunter */
+    #screen-play { flex-direction:column; height:100vh; overflow:hidden; background:var(--bg-body); }
+    .solo-play-header { display:flex; align-items:center; justify-content:space-between; background:var(--bg-secondary); border-bottom:1px solid var(--border); padding:.55rem .9rem; flex-shrink:0; }
+    .solo-play-header-title { font-weight:700; color:var(--accent); font-size:.95rem; }
+    .solo-game-main { flex:1; display:flex; min-height:0; overflow:hidden; }
+
+    /* Links: eigene Flotte groß */
+    .solo-own-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:.6rem; min-width:0; overflow:hidden; }
+    .solo-grid-label { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-secondary); margin-bottom:.3rem; }
+
+    /* Rechts: feindliches Grid klein + Stats */
+    .solo-right { width:280px; flex-shrink:0; display:flex; flex-direction:column; background:var(--bg-secondary); border-left:1px solid var(--border); padding:.8rem; gap:.6rem; overflow-y:auto; }
+    .solo-divider { height:1px; background:var(--border); margin:.2rem 0; flex-shrink:0; }
+
+    /* Kleines feindliches Grid */
+    .solo-enemy-mini .grid-cell-header { width:22px !important; height:22px !important; font-size:.45rem !important; }
+    .solo-enemy-mini .grid-cell        { width:22px !important; height:22px !important; font-size:.45rem !important; }
+    .solo-enemy-mini .grid-cell.clickable:hover { transform:scale(1.15); z-index:1; }
+    .solo-enemy-mini .grid-cell.miss::after { font-size:.75rem; }
 
     /* Klickbare Grid-Zellen */
     .grid-cell.clickable { cursor:crosshair; }
     .grid-cell.clickable:hover { background:var(--grid-water-h); border-color:var(--accent); }
-    .grid-cell.wasted::after { content:'○'; font-size:.85rem; color:var(--text-secondary); opacity:.55; position:absolute; }
 
     /* Statuslabels Sidebar */
     .side-section { }
@@ -36,7 +44,7 @@
     .stat-val.accent { color:var(--accent); }
     .stat-val.danger { color:var(--danger); }
 
-    /* Schiff-Badges (Sidebar) */
+    /* Schiff-Badges */
     .ships-wrap { display:flex; flex-direction:column; gap:.3rem; }
     .ship-row   { display:flex; align-items:center; gap:.4rem; }
     .ship-label { font-size:.72rem; color:var(--text-secondary); min-width:2rem; }
@@ -79,15 +87,11 @@
     .hs-me         { font-weight:700; color:var(--accent); }
     .hs-rank       { font-weight:800; color:var(--text-secondary); text-align:center; }
 
-    /* Mini-Grid (eigene Flotte) */
-    .mini-grid-outer { display:inline-flex; flex-direction:column; gap:1px; }
-    .mini-grid-row   { display:flex; gap:1px; }
-    .mini-cell-hdr   { width:14px; height:14px; display:flex; align-items:center; justify-content:center; font-size:.5rem; font-weight:700; color:var(--text-secondary); }
-    .mini-cell       { width:14px; height:14px; border-radius:2px; border:1px solid var(--border); background:var(--grid-water); position:relative; overflow:hidden; }
-    .mini-cell.my-ship    { border-color:rgba(255,255,255,.2); }
-    .mini-cell.ai-hit     { background:#ef4444 !important; border-color:rgba(255,255,255,.4); }
-    .mini-cell.ai-miss::after { content:'•'; font-size:.55rem; color:var(--text-secondary); position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
-    .mini-cell.ai-sunk    { opacity:.55; }
+    @media (max-width:700px) {
+      .solo-game-main { flex-direction:column-reverse; overflow-y:auto; }
+      .solo-right { width:100%; border-left:none; border-top:1px solid var(--border); max-height:45vh; }
+      .solo-own-area { min-height:55vh; flex-shrink:0; }
+    }
   </style>
 </head>
 <body>
@@ -151,48 +155,62 @@
 
 <!-- ── Play Screen ──────────────────────────────────────────── -->
 <div class="screen" id="screen-play">
-  <div class="solo-left">
-    <div class="solo-topbar">
-      <div class="solo-topbar-title" id="play-title">⚓ Solo-Schiffeversenken</div>
-      <div style="display:flex;gap:.4rem;">
-        <button class="header-btn" id="btn-theme-play" onclick="toggleTheme()">☀️ Light</button>
-        <button class="header-btn" onclick="confirmQuit()">✕ Aufgeben</button>
-      </div>
-    </div>
-    <div style="text-align:center;font-size:.8rem;color:var(--text-secondary);flex-shrink:0;">🎯 Feindliche Flotte — klicke eine Zelle zum Schießen</div>
-    <div class="grid-wrapper">
-      <div id="enemy-grid" class="grid-outer"></div>
+  <!-- Header bar -->
+  <div class="solo-play-header">
+    <div class="solo-play-header-title" id="play-title">⚓ Solo-Schiffeversenken</div>
+    <div style="display:flex;gap:.4rem;">
+      <button class="header-btn" id="btn-theme-play" onclick="toggleTheme()">☀️ Light</button>
+      <button class="header-btn" onclick="confirmQuit()">✕ Aufgeben</button>
     </div>
   </div>
 
-  <div class="solo-right">
-    <!-- Statistik -->
-    <div class="side-section">
-      <div class="side-title">⏱ Spielstand</div>
-      <div class="stat-row"><span class="stat-label">Zeit</span>       <span class="stat-val" id="stopwatch">0:00</span></div>
-      <div class="stat-row"><span class="stat-label">Deine Schüsse</span><span class="stat-val accent" id="shot-count">0</span></div>
-      <div class="stat-row"><span class="stat-label">Deine Treffer</span><span class="stat-val" id="hit-count">0 / 12</span></div>
-      <div class="stat-row"><span class="stat-label">KI-Schüsse</span>  <span class="stat-val" id="ai-shot-count">0</span></div>
-      <div class="stat-row"><span class="stat-label">KI-Treffer</span>  <span class="stat-val danger" id="ai-hit-count">0 / 12</span></div>
-    </div>
-
-    <!-- Feindliche Schiffe -->
-    <div class="side-section">
-      <div class="side-title">💀 Feindliche Flotte</div>
-      <div class="ships-wrap" id="enemy-ship-status"></div>
-    </div>
-
-    <!-- Eigene Flotte -->
-    <div class="side-section">
-      <div class="side-title">🛡 Deine Flotte</div>
-      <div class="ships-wrap" id="player-ship-status"></div>
-      <div style="margin-top:.5rem;">
-        <div id="mini-fleet-grid"></div>
+  <!-- Game area: own board (large left) + sidebar (right) -->
+  <div class="solo-game-main">
+    <!-- Own board (large, centered) — shows AI shots -->
+    <div class="solo-own-area">
+      <div class="solo-grid-label">🛡 Deine Flotte</div>
+      <div class="grid-wrapper">
+        <div id="player-grid" class="grid-outer"></div>
       </div>
     </div>
 
-    <div style="margin-top:auto;">
-      <a href="../spiele.html" style="font-size:.78rem;color:var(--text-secondary);text-decoration:none;">← Zur Übersicht</a>
+    <!-- Right sidebar -->
+    <div class="solo-right">
+      <!-- Enemy grid (small, clickable) -->
+      <div class="side-section">
+        <div class="side-title">🎯 Feindliche Flotte</div>
+        <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.4rem;">Klicke zum Schießen</div>
+        <div id="enemy-grid" class="grid-outer solo-enemy-mini"></div>
+      </div>
+      <div class="solo-divider"></div>
+
+      <!-- Statistik -->
+      <div class="side-section">
+        <div class="side-title">⏱ Spielstand</div>
+        <div class="stat-row"><span class="stat-label">Zeit</span>       <span class="stat-val" id="stopwatch">0:00</span></div>
+        <div class="stat-row"><span class="stat-label">Deine Schüsse</span><span class="stat-val accent" id="shot-count">0</span></div>
+        <div class="stat-row"><span class="stat-label">Deine Treffer</span><span class="stat-val" id="hit-count">0 / 12</span></div>
+        <div class="stat-row"><span class="stat-label">KI-Schüsse</span>  <span class="stat-val" id="ai-shot-count">0</span></div>
+        <div class="stat-row"><span class="stat-label">KI-Treffer</span>  <span class="stat-val danger" id="ai-hit-count">0 / 12</span></div>
+      </div>
+      <div class="solo-divider"></div>
+
+      <!-- Feindliche Schiffe -->
+      <div class="side-section">
+        <div class="side-title">💀 Feindliche Flotte</div>
+        <div class="ships-wrap" id="enemy-ship-status"></div>
+      </div>
+      <div class="solo-divider"></div>
+
+      <!-- Eigene Flotte -->
+      <div class="side-section">
+        <div class="side-title">🛡 Deine Flotte</div>
+        <div class="ships-wrap" id="player-ship-status"></div>
+      </div>
+
+      <div style="margin-top:auto;padding-top:.5rem;">
+        <a href="../spiele.html" style="font-size:.78rem;color:var(--text-secondary);text-decoration:none;">← Zur Übersicht</a>
+      </div>
     </div>
   </div>
 </div>
@@ -471,7 +489,7 @@ function startSolo() {
   showScreen('screen-play');
   renderEnemyGrid();
   renderShipStatus();
-  renderMiniFleetGrid();
+  renderPlayerGrid();
   updateStats();
 
   startTime = Date.now();
@@ -509,15 +527,13 @@ function makeEnemyCell(col, row) {
   const shot = playerShots[key];
   if (shot) {
     cell.className = 'grid-cell';
-    if (shot.correct && enemyShipGrid[key]) {
+    if (enemyShipGrid[key]) {
       cell.style.background = '#ef4444'; cell.classList.add('ship-hit');
       const ship = enemyShips.find(s => s.coords.includes(key));
       if (ship?.sunk) { cell.classList.add('sunk-ship'); cell.style.opacity = '.65'; }
       cell.title = `💥 Treffer — ${key}`;
-    } else if (shot.correct && !enemyShipGrid[key]) {
-      cell.classList.add('miss'); cell.title = `💧 Wasser — ${key}`;
     } else {
-      cell.classList.add('wasted'); cell.title = `○ Schuss verpufft — ${key}`;
+      cell.classList.add('miss'); cell.title = `💧 Wasser — ${key}`;
     }
   } else {
     cell.className = 'grid-cell clickable'; cell.title = key;
@@ -526,47 +542,44 @@ function makeEnemyCell(col, row) {
   return cell;
 }
 
-// ── Mini-Grid (eigene Flotte) ────────────────────────────────────────
-function renderMiniFleetGrid() {
-  const container = document.getElementById('mini-fleet-grid');
+// ── Eigene Flotte Grid rendern (groß, zeigt KI-Schüsse) ─────────────
+function renderPlayerGrid() {
+  const container = document.getElementById('player-grid');
   container.innerHTML = '';
-  const outer = document.createElement('div'); outer.className = 'mini-grid-outer';
-  const hdr = document.createElement('div'); hdr.className = 'mini-grid-row';
-  hdr.appendChild(Object.assign(document.createElement('div'), {className:'mini-cell-hdr'}));
-  COLS.forEach(c => {
-    const el = Object.assign(document.createElement('div'), {className:'mini-cell-hdr', textContent:c});
-    hdr.appendChild(el);
-  });
-  outer.appendChild(hdr);
+  const hdr = document.createElement('div'); hdr.className = 'grid-row';
+  hdr.appendChild(makeHdrCell(''));
+  COLS.forEach(c => hdr.appendChild(makeHdrCell(c)));
+  container.appendChild(hdr);
   for (let row = 1; row <= 10; row++) {
-    const rowEl = document.createElement('div'); rowEl.className = 'mini-grid-row';
-    const rh = Object.assign(document.createElement('div'), {className:'mini-cell-hdr', textContent:String(row)});
-    rowEl.appendChild(rh);
-    COLS.forEach(col => {
-      const key = `${col}${row}`;
-      const cell = document.createElement('div');
-      cell.className = 'mini-cell';
-      const hasShip = !!myShipGrid[key];
-      const aiShot  = aiShotSet.has(key);
-      const aiHit   = aiHitSet.has(key);
-      if (hasShip) {
-        const ship = myShips.find(s => s.coords.includes(key));
-        if (aiHit) {
-          cell.classList.add('my-ship', 'ai-hit');
-          if (ship?.sunk) cell.classList.add('ai-sunk');
-        } else {
-          cell.classList.add('my-ship');
-          cell.style.background = 'rgba(59,130,246,.5)'; // Eigene Schiffe in blau
-          cell.style.borderColor = 'rgba(59,130,246,.4)';
-        }
-      } else if (aiShot && !aiHit) {
-        cell.classList.add('ai-miss');
-      }
-      rowEl.appendChild(cell);
-    });
-    outer.appendChild(rowEl);
+    const rowEl = document.createElement('div'); rowEl.className = 'grid-row';
+    rowEl.appendChild(makeHdrCell(String(row)));
+    COLS.forEach(col => rowEl.appendChild(makePlayerCell(col, row)));
+    container.appendChild(rowEl);
   }
-  container.appendChild(outer);
+}
+
+function makePlayerCell(col, row) {
+  const key = `${col}${row}`;
+  const cell = document.createElement('div');
+  cell.className = 'grid-cell';
+  const hasShip = !!myShipGrid[key];
+  const aiHit   = aiHitSet.has(key);
+  const aiMiss  = aiShotSet.has(key) && !aiHit;
+  if (hasShip) {
+    if (aiHit) {
+      cell.style.background = '#ef4444'; cell.classList.add('ship-hit');
+      const ship = myShips.find(s => s.coords.includes(key));
+      if (ship?.sunk) { cell.classList.add('sunk-ship'); cell.style.opacity = '.65'; }
+      cell.title = `💥 KI-Treffer — ${key}`;
+    } else {
+      cell.style.background = 'rgba(59,130,246,.55)';
+      cell.style.borderColor = 'rgba(59,130,246,.6)';
+      cell.title = `🛡 ${key}`;
+    }
+  } else if (aiMiss) {
+    cell.classList.add('miss'); cell.title = `💧 KI daneben — ${key}`;
+  }
+  return cell;
 }
 
 // ── Schiff-Status Sidebar ────────────────────────────────────────────
@@ -689,7 +702,7 @@ function resolveOpen(correct) {
 window.resolveOpen = resolveOpen;
 
 function applyPlayerShot(correct, q) {
-  playerShots[pendingCoord] = { correct };
+  if (correct) playerShots[pendingCoord] = { correct };
   playerShotsFired++;
   const isHit = correct && !!enemyShipGrid[pendingCoord];
   if (isHit) {
@@ -841,7 +854,7 @@ function doAITurn() {
 
   updateStats();
   renderShipStatus();
-  renderMiniFleetGrid();
+  renderPlayerGrid();
   aiTurnPending = false;
 
   // Spieler verliert wenn alle eigenen Schiffe versenkt
