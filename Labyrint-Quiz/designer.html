@@ -323,17 +323,17 @@ function generateAllDoors() {
   }
 
   // One door per interior node (gx, gy) for gx,gy in [1, mazeSize-1]
-  // Represented as SE-corner of cell (gx-1, gy-1) – unique per node, no passage conflicts
+  // Represented as NW-corner of cell (gx, gy) – covers all interior passages incl. last row/col
   doors = [];
   for (let gy = 1; gy < mazeSize; gy++) {
     for (let gx = 1; gx < mazeSize; gx++) {
       const choice = rng.nextInt(0, 1);
-      const blockedDir = choice === 0 ? 'S' : 'E';
+      const blockedDir = choice === 0 ? 'N' : 'W';
       const rotDir     = choice === 0 ?  1  : -1;
       doors.push({
         id: 'n-' + gx + '-' + gy,
-        cellX: gx - 1, cellY: gy - 1,
-        corner: 'SE', blockedDir, rotDir,
+        cellX: gx, cellY: gy,
+        corner: 'NW', blockedDir, rotDir,
         angle: 0, open: false, openedBy: null
       });
     }
