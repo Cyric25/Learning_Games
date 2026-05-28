@@ -361,6 +361,25 @@ body.dark .setup-btn-ghost  { background: rgba(255,255,255,0.07) !important; }
 .param-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 body.dark .param-btn { background: rgba(255,255,255,0.05); }
 
+/* ── Bibliotheks-Labyrinth-Picker ─────────────────────────────────── */
+.maze-lib-picker { display: flex; flex-direction: column; gap: .3rem; width: 100%; }
+.maze-lib-item {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .45rem .85rem;
+  background: var(--bg-card); border: 2px solid var(--border-card);
+  border-radius: 8px; cursor: pointer;
+  font-size: .88rem; font-weight: 500; color: var(--text-primary);
+  transition: border-color .15s, background .15s;
+  text-align: left; width: 100%;
+}
+.maze-lib-item:hover { border-color: var(--accent); }
+.maze-lib-item.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 700; }
+.maze-lib-item-name { flex: 1; }
+.maze-lib-item-meta { font-size: .78rem; color: var(--text-secondary); white-space: nowrap; }
+.maze-lib-item.selected .maze-lib-item-meta { color: var(--accent); opacity: .8; }
+body.dark .maze-lib-item { background: rgba(255,255,255,0.05); }
+body.dark .maze-lib-item.selected { background: rgba(124,58,237,0.2); }
+
 /* ── Fragentyp-Auswahl ──────────────────────────────────────────── */
 .qmode-group { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }
 .qmode-btn {

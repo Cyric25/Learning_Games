@@ -351,30 +351,47 @@ function buildMazeSourceUI() {
       _cfg.mazeSource = opt.v;
       row.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      // Show/hide maze-size and door-preset rows (not needed for library mode)
       const hide = opt.v === 'library';
       const szWrap = document.getElementById('maze-size-row-wrap');
       if (szWrap) szWrap.closest('.settings-row').style.display = hide ? 'none' : '';
       const dpWrap = document.getElementById('door-preset-row-wrap');
       if (dpWrap) dpWrap.closest('.settings-row').style.display = hide ? 'none' : '';
-      updateLibraryHint(row);
+      buildLibraryPickerUI();
     };
     row.appendChild(btn);
   });
-  updateLibraryHint(row);
+  buildLibraryPickerUI();
 }
 
-function updateLibraryHint(row) {
-  let hint = row.nextElementSibling;
-  if (hint && hint.classList.contains('lib-hint')) hint.remove();
-  if (_cfg.mazeSource === 'library') {
-    hint = document.createElement('div');
-    hint.className = 'lib-hint';
-    hint.style.cssText = 'font-size:.8rem;color:var(--text-secondary);margin-top:4px;';
-    const n = mazeLibrary.length;
-    hint.textContent = n > 0 ? `✅ ${n} Labyrinth${n!==1?'e':''} in der Bibliothek` : '⚠️ Bibliothek leer — Designer öffnen um Labyrinthe zu erstellen.';
-    row.after(hint);
+function buildLibraryPickerUI() {
+  const libRow = document.getElementById('maze-library-row');
+  const picker = document.getElementById('maze-library-picker');
+  if (!picker) return;
+  if (_cfg.mazeSource !== 'library' || mazeLibrary.length === 0) {
+    if (libRow) libRow.style.display = 'none';
+    return;
   }
+  if (libRow) libRow.style.display = '';
+  picker.innerHTML = '';
+  const items = [
+    { id: null, name: '🎲 Zufällig', meta: mazeLibrary.length + ' Labyrinth' + (mazeLibrary.length !== 1 ? 'e' : '') + ' verfügbar' },
+    ...mazeLibrary.map(m => ({ id: m.id, name: m.name, meta: m.size + '×' + m.size }))
+  ];
+  const list = document.createElement('div');
+  list.className = 'maze-lib-picker';
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'maze-lib-item' + (item.id === _cfg.selectedMazeId ? ' selected' : '');
+    btn.innerHTML = '<span class="maze-lib-item-name">' + escapeHtml(item.name) + '</span>' +
+                    '<span class="maze-lib-item-meta">' + escapeHtml(item.meta) + '</span>';
+    btn.onclick = () => {
+      _cfg.selectedMazeId = item.id;
+      list.querySelectorAll('.maze-lib-item').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    list.appendChild(btn);
+  });
+  picker.appendChild(list);
 }
 
 function buildDoorPresetUI() {
@@ -630,7 +647,7 @@ function updateCategoryInfo() {
   if (btn) btn.disabled = !ok;
 }
 
-let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele', mazeSource: 'random', questionMode: 'mixed' };
+let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele', mazeSource: 'random', questionMode: 'mixed', selectedMazeId: null };
 
 function getDoorCount(preset, size) {
   const presets = {
@@ -726,8 +743,8 @@ async function startGame() {
 
   let mazeResult;
   if (useSaved) {
-    // Pick a random saved maze
-    const saved = mazeLibrary[Math.floor(Math.random() * mazeLibrary.length)];
+    const saved = (_cfg.selectedMazeId && mazeLibrary.find(m => m.id === _cfg.selectedMazeId))
+      || mazeLibrary[Math.floor(Math.random() * mazeLibrary.length)];
     config.mazeSize = saved.size;
     mazeResult = {
       grid: JSON.parse(JSON.stringify(saved.grid)),
