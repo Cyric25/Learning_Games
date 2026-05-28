@@ -783,6 +783,32 @@
           </div>
         </div>
 
+        <!-- Codenames -->
+        <div class="game-card" data-game="codenames">
+          <button class="game-toggle" onclick="toggleGameVisibility('codenames')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #1a1a2e, #2c3e50);">
+            <span class="card-emoji">🕵️</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Codenames</div>
+            <div class="card-desc">
+              Geheimdienstspiel für zwei Teams: Hinweisgeber leiten ihre Agenten mit
+              Codewörtern zu den richtigen Karten – ohne den Attentäter zu treffen.
+              PIN-basierter Multiplayer, 6 Sprachen, eigene Wortlisten.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Teams</span>
+              <span class="tag">Wörter</span>
+              <span class="tag">Multiplayer</span>
+              <span class="tag">6 Sprachen</span>
+            </div>
+            <div class="card-actions">
+              <a href="codenames/index.html" class="btn btn-play" style="background: linear-gradient(135deg, #1a1a2e, #2c3e50);">▶ Spielen</a>
+              <a href="codenames/admin.html" class="btn btn-admin teacher-only">📝 Wortlisten</a>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -837,7 +863,7 @@
   const DEFAULT_ENABLED = ['slf', 'risiko'];
 
   // Neu hinzugefügte Spiele, die bei bestehenden Nutzern automatisch aktiviert werden
-  const NEW_GAMES = ['lernkarten', 'schiffeversenken'];
+  const NEW_GAMES = ['lernkarten', 'schiffeversenken', 'codenames'];
 
   // ── Theme ────────────────────────────────────────────────
   function applyTheme(dark) {

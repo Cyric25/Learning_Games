@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codenames – Beamer</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow: hidden; }
+    #screen-spectator.screen { flex-direction: column; height: 100vh; }
+
+    /* Compact header for beamer */
+    .spec-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem;
+      background: var(--bg-container);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 1rem;
+    }
+    .spec-header-title { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
+    .spec-pin { font-family: monospace; font-weight: 900; font-size: 1.1rem; letter-spacing: 4px; color: var(--accent); }
+
+    /* Score bar large for beamer */
+    .spec-score {
+      display: flex; align-items: center; justify-content: center;
+      gap: 2rem; padding: 0.5rem 1rem;
+      background: var(--bg-container); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .spec-score-team { display: flex; align-items: center; gap: 0.6rem; }
+    .spec-score-dot { width: 16px; height: 16px; border-radius: 50%; }
+    .spec-score-dot.red  { background: var(--cn-red); }
+    .spec-score-dot.blue { background: var(--cn-blue); }
+    .spec-score-name { font-size: 1.1rem; font-weight: 600; }
+    .spec-score-num { font-size: 2rem; font-weight: 900; }
+    .spec-score-num.red  { color: var(--cn-red); }
+    .spec-score-num.blue { color: var(--cn-blue); }
+    .spec-turn-badge {
+      padding: 6px 20px; border-radius: 20px; font-size: 1rem; font-weight: 700; border: 2px solid;
+    }
+    .spec-turn-badge.red  { border-color: var(--cn-red);  background: var(--cn-red-light);  color: var(--cn-red); }
+    .spec-turn-badge.blue { border-color: var(--cn-blue); background: var(--cn-blue-light); color: var(--cn-blue); }
+
+    /* Clue display for beamer (large) */
+    .spec-clue-bar {
+      display: flex; align-items: center; justify-content: center;
+      gap: 1.5rem; padding: 0.6rem 1rem;
+      background: var(--bg-container); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .spec-clue-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .spec-clue-word { font-size: 2rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+    .spec-clue-word.red  { color: var(--cn-red); }
+    .spec-clue-word.blue { color: var(--cn-blue); }
+    .spec-clue-num {
+      font-size: 1.6rem; font-weight: 700;
+      padding: 4px 18px; border-radius: 20px;
+      background: var(--bg-input); border: 1.5px solid var(--border);
+    }
+    .spec-clue-remaining { font-size: 0.9rem; color: var(--text-secondary); }
+    .spec-no-clue { font-size: 1rem; color: var(--text-secondary); font-style: italic; }
+
+    /* Grid fills remaining space */
+    .spec-grid-wrap {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 0.5rem; overflow: hidden;
+    }
+    .spec-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; width: 100%; max-width: 900px;
+    }
+    .spec-card {
+      border-radius: 10px; min-height: 70px;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      padding: 8px 4px;
+      background: var(--cn-hidden);
+      border: 2px solid transparent;
+    }
+    .spec-card.revealed.team-red      { background: var(--cn-red);      border-color: var(--cn-red-dark); }
+    .spec-card.revealed.team-blue     { background: var(--cn-blue);     border-color: var(--cn-blue-dark); }
+    .spec-card.revealed.team-neutral  { background: var(--cn-neutral);  border-color: #6c7a7b; }
+    .spec-card.revealed.team-assassin { background: var(--cn-assassin); border-color: #555; }
+    .spec-card-word {
+      font-size: clamp(0.7rem, 2vw, 1rem); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.03em;
+      color: var(--cn-text-hidden); line-height: 1.2; word-break: break-word;
+    }
+    .spec-card.revealed .spec-card-word { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .spec-card.revealed.team-neutral .spec-card-word { color: #fff; }
+
+    /* End overlay */
+    .spec-end {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.7); z-index: 100;
+    }
+    .spec-end-box {
+      background: var(--bg-container); border: 2px solid var(--border);
+      border-radius: 20px; padding: 3rem 2.5rem; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .spec-end-winner { font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem; }
+    .spec-end-winner.red  { color: var(--cn-red); }
+    .spec-end-winner.blue { color: var(--cn-blue); }
+    .spec-end-reason { color: var(--text-secondary); font-size: 1.1rem; }
+
+    /* Join screen */
+    #screen-join.screen { align-items: center; justify-content: center; }
+    .join-box {
+      background: var(--bg-container); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2rem 1.8rem; max-width: 380px; width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3); text-align: center;
+    }
+    .join-box h2 { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-bottom: 1.2rem; }
+
+    /* Fullscreen button */
+    .fs-btn {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text-secondary); padding: 5px 10px; font-size: 0.85rem;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .fs-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    @media (min-width: 900px) {
+      .spec-card { min-height: 88px; }
+      .spec-card-word { font-size: clamp(0.8rem, 1.5vw, 1.1rem); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- JOIN SCREEN -->
+<div id="screen-join" class="screen active">
+  <div class="join-box">
+    <h2>🕵️ Codenames</h2>
+    <p style="color:var(--text-secondary);margin-bottom:1.2rem;font-size:0.9rem">Beamer / Zuschauer-Ansicht</p>
+    <div style="margin-bottom:1rem">
+      <label class="cn-label" style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">SPIEL-PIN</label>
+      <input id="spec-pin" class="cn-input pin-input" type="text" maxlength="4" placeholder="A3K7"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+        onkeydown="if(event.key==='Enter')spectatorJoin()">
+    </div>
+    <button class="cn-btn cn-btn-primary" onclick="spectatorJoin()">Beamer starten →</button>
+    <div id="spec-join-error" class="cn-error"></div>
+    <div style="margin-top:1rem">
+      <a href="index.html" style="font-size:0.82rem;color:var(--text-secondary)">← Zum Spiel</a>
+    </div>
+  </div>
+</div>
+
+<!-- SPECTATOR BOARD SCREEN -->
+<div id="screen-spectator" class="screen">
+
+  <!-- Header -->
+  <div class="spec-header">
+    <span class="spec-header-title">🕵️ Codenames</span>
+    <span>PIN: <span id="spec-pin-display" class="spec-pin">—</span></span>
+    <div style="display:flex;gap:0.5rem">
+      <button class="fs-btn" onclick="toggleFS()">⛶ Vollbild</button>
+      <button id="btn-theme" class="fs-btn" onclick="toggleTheme()">☀️ Light</button>
+    </div>
+  </div>
+
+  <!-- Score bar -->
+  <div class="spec-score">
+    <div class="spec-score-team">
+      <span class="spec-score-dot red"></span>
+      <span id="spec-red-name" class="spec-score-name">Rot</span>
+      <span id="spec-red-num" class="spec-score-num red">9</span>
+    </div>
+    <div id="spec-turn" class="spec-turn-badge red">Rot ist dran</div>
+    <div class="spec-score-team">
+      <span id="spec-blue-num" class="spec-score-num blue">8</span>
+      <span id="spec-blue-name" class="spec-score-name">Blau</span>
+      <span class="spec-score-dot blue"></span>
+    </div>
+  </div>
+
+  <!-- Clue bar -->
+  <div class="spec-clue-bar">
+    <span class="spec-clue-label">Hinweis</span>
+    <div id="spec-clue-content">
+      <span class="spec-no-clue">Warte auf Hinweis…</span>
+    </div>
+  </div>
+
+  <!-- Card grid -->
+  <div class="spec-grid-wrap">
+    <div id="spec-grid" class="spec-grid"></div>
+  </div>
+
+</div>
+
+<!-- End overlay (hidden) -->
+<div id="spec-end" class="spec-end hidden">
+  <div class="spec-end-box">
+    <div id="spec-end-winner" class="spec-end-winner"></div>
+    <div id="spec-end-reason" class="spec-end-reason"></div>
+    <button class="cn-btn cn-btn-secondary" style="margin-top:1.5rem;max-width:220px"
+      onclick="document.getElementById('spec-end').classList.add('hidden')">Schließen</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Theme ─────────────────────────────────────────────────────────────────
+(function() {
+  const KEY = 'spiele_theme';
+  function apply(light) {
+    document.body.classList.toggle('light', light);
+    const el = document.getElementById('btn-theme');
+    if (el) el.textContent = light ? '🌙 Dark' : '☀️ Light';
+  }
+  window.toggleTheme = function() {
+    const nowLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, nowLight ? 'light' : 'dark');
+    apply(nowLight);
+  };
+  apply(localStorage.getItem(KEY) === 'light');
+})();
+
+// ── Fullscreen ────────────────────────────────────────────────────────────
+window.toggleFS = function() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+};
+
+// ── State ─────────────────────────────────────────────────────────────────
+let pin = null;
+let pollTimer = null;
+let lastCards = [];
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function getState() {
+  if (!pin) return null;
+  try {
+    const r = await fetch(`./api.php?action=get_state&pin=${pin}`, {cache:'no-store'});
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+// ── Join ──────────────────────────────────────────────────────────────────
+window.spectatorJoin = async function() {
+  const input = document.getElementById('spec-pin');
+  const errEl = document.getElementById('spec-join-error');
+  const code  = (input?.value || '').trim().toUpperCase();
+  errEl.textContent = '';
+  if (code.length < 4) { errEl.textContent = 'Bitte 4-stelligen PIN eingeben.'; return; }
+
+  const gs = await getState();
+  if (!gs || gs.error) {
+    errEl.textContent = gs?.error === 'game_not_found' ? 'PIN nicht gefunden.' : 'Verbindungsfehler.';
+    return;
+  }
+
+  pin = code;
+  const url = new URL(location.href);
+  url.searchParams.set('pin', pin);
+  history.replaceState({}, '', url.toString());
+
+  document.getElementById('spec-pin-display').textContent = pin;
+  showScreen('screen-spectator');
+  renderBoard(gs);
+  startPolling();
+};
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const gs = await getState();
+    if (gs && !gs.error) renderBoard(gs);
+  }, 1500);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+const TURN_LABELS = {de:{red:'Rot ist dran',blue:'Blau ist dran'},en:{red:'Red\'s turn',blue:'Blue\'s turn'},it:{red:'Turno Rosso',blue:'Turno Blu'},es:{red:'Turno Rojo',blue:'Turno Azul'},ru:{red:'Ход красных',blue:'Ход синих'},fr:{red:'Tour Rouge',blue:'Tour Bleu'}};
+const REMAINING  = {de:'übrig',en:'remaining',it:'rimanenti',es:'restantes',ru:'осталось',fr:'restants'};
+const REASON_ASS = {de:'Attentäter aufgedeckt',en:'Assassin revealed',it:'Assassino rivelato',es:'Asesino revelado',ru:'Убийца раскрыт',fr:'Assassin révélé'};
+const REASON_ALL = {de:'Alle Karten gefunden',en:'All cards found',it:'Tutte le carte trovate',es:'Todas las cartas',ru:'Все карты найдены',fr:'Toutes les cartes'};
+const WINS       = {de:'gewinnt!',en:'wins!',it:'vince!',es:'¡gana!',ru:'побеждает!',fr:'gagne!'};
+const CLUE_LABEL = {de:'Hinweis',en:'Clue',it:'Indizio',es:'Pista',ru:'Подсказка',fr:'Indice'};
+const WAIT_CLUE  = {de:'Warte auf Hinweis…',en:'Waiting for clue…',it:'Attesa indizio…',es:'Esperando pista…',ru:'Ожидание подсказки…',fr:'En attente d\'indice…'};
+const UNLIMITED  = '∞';
+
+function loc(obj, l) { return obj[l] || obj['de'] || ''; }
+
+function renderBoard(gs) {
+  const l = gs.language || 'de';
+
+  // Score bar
+  document.getElementById('spec-red-name').textContent  = gs.teams?.red?.name  || 'Rot';
+  document.getElementById('spec-blue-name').textContent = gs.teams?.blue?.name || 'Blau';
+  document.getElementById('spec-red-num').textContent   = gs.teams?.red?.remaining  ?? '?';
+  document.getElementById('spec-blue-num').textContent  = gs.teams?.blue?.remaining ?? '?';
+  const turn = gs.current_turn || 'red';
+  const turnEl = document.getElementById('spec-turn');
+  turnEl.textContent = loc(TURN_LABELS, l)[turn] || turn;
+  turnEl.className   = `spec-turn-badge ${turn}`;
+
+  // Clue bar
+  const clueEl = document.getElementById('spec-clue-content');
+  if (gs.current_clue) {
+    const c   = gs.current_clue;
+    const num = c.number === 0 ? UNLIMITED : c.number;
+    clueEl.innerHTML = `
+      <span class="spec-clue-word ${c.team}">${escHtml(c.word)}</span>
+      <span class="spec-clue-num">${num}</span>
+      <span class="spec-clue-remaining">(${c.guesses_left} ${loc(REMAINING, l)})</span>
+    `;
+  } else {
+    clueEl.innerHTML = `<span class="spec-no-clue">${loc(WAIT_CLUE, l)}</span>`;
+  }
+
+  // Card grid
+  const grid = document.getElementById('spec-grid');
+  if (!grid) return;
+
+  // Detect newly revealed
+  const newlyRevealed = new Set();
+  (gs.cards || []).forEach((c, i) => {
+    if (c.revealed && !lastCards[i]?.revealed) newlyRevealed.add(i);
+  });
+  lastCards = JSON.parse(JSON.stringify(gs.cards || []));
+
+  grid.innerHTML = '';
+  (gs.cards || []).forEach((card, i) => {
+    const div = document.createElement('div');
+    div.className = 'spec-card';
+    if (card.revealed) {
+      div.className += ` revealed team-${card.team}`;
+      if (newlyRevealed.has(i)) div.classList.add('just-revealed');
+    }
+    div.innerHTML = `<span class="spec-card-word">${escHtml(card.word)}</span>`;
+    grid.appendChild(div);
+  });
+
+  // End overlay
+  if (gs.status === 'finished' && gs.winner) {
+    const endEl     = document.getElementById('spec-end');
+    const winnerEl  = document.getElementById('spec-end-winner');
+    const reasonEl  = document.getElementById('spec-end-reason');
+    const winName   = gs.teams?.[gs.winner]?.name || gs.winner;
+    winnerEl.textContent = winName + ' ' + loc(WINS, l);
+    winnerEl.className   = 'spec-end-winner ' + gs.winner;
+    reasonEl.textContent = gs.win_reason === 'assassin' ? loc(REASON_ASS, l) : loc(REASON_ALL, l);
+    endEl.classList.remove('hidden');
+    clearInterval(pollTimer);
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(function init() {
+  const urlPin = new URLSearchParams(location.search).get('pin');
+  if (urlPin) {
+    pin = urlPin.toUpperCase();
+    const input = document.getElementById('spec-pin');
+    if (input) input.value = pin;
+    // Auto-join
+    getState().then(gs => {
+      if (gs && !gs.error) {
+        document.getElementById('spec-pin-display').textContent = pin;
+        showScreen('screen-spectator');
+        renderBoard(gs);
+        startPolling();
+      } else {
+        showScreen('screen-join');
+      }
+    });
+  } else {
+    showScreen('screen-join');
+  }
+})();
+</script>
+</body>
+</html>

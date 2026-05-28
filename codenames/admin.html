@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codenames – Wortlisten</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { min-height: 100vh; background: var(--bg-body); }
+
+    /* ── Layout ─────────────────────────────────────── */
+    .admin-wrap {
+      display: flex; flex-direction: column; min-height: 100vh;
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1.2rem;
+      background: var(--bg-container); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .admin-header-title { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+    .admin-header-actions { display: flex; gap: 0.5rem; }
+    .admin-body {
+      display: flex; flex: 1; gap: 0; overflow: hidden; max-height: calc(100vh - 54px);
+    }
+
+    /* ── List panel (left) ──────────────────────────── */
+    .list-panel {
+      width: 300px; min-width: 220px; flex-shrink: 0;
+      background: var(--bg-container); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .list-panel-header {
+      padding: 0.9rem 1rem; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .list-panel-header h3 {
+      font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-secondary); margin: 0;
+    }
+    .list-filter { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+      border: 1.5px solid var(--border); background: var(--bg-input);
+      color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn.active { border-color: var(--accent); background: rgba(226,185,111,0.15); color: var(--accent); }
+    .list-scroll { flex: 1; overflow-y: auto; padding: 0.5rem; }
+    .list-item {
+      padding: 0.7rem 0.8rem; border-radius: 10px; cursor: pointer;
+      border: 1.5px solid transparent; transition: all 0.15s;
+      margin-bottom: 0.3rem;
+    }
+    .list-item:hover { background: var(--bg-card-hover); border-color: var(--border); }
+    .list-item.active { background: var(--bg-card); border-color: var(--accent); }
+    .list-item-name { font-weight: 600; font-size: 0.92rem; color: var(--text-primary); }
+    .list-item-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem; }
+    .list-empty { text-align: center; color: var(--text-secondary); font-size: 0.88rem; font-style: italic; padding: 2rem 1rem; }
+    .btn-new-list {
+      margin: 0.5rem; padding: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      border: none; border-radius: 10px; color: #fff;
+      font-weight: 700; font-size: 0.9rem; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-new-list:hover { opacity: 0.88; }
+
+    /* ── Editor panel (right) ───────────────────────── */
+    .editor-panel {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--bg-body);
+    }
+    .editor-inner {
+      flex: 1; overflow-y: auto; padding: 1.2rem;
+    }
+    .editor-box {
+      max-width: 680px; margin: 0 auto;
+      background: var(--bg-container); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .editor-box h2 {
+      font-size: 1.1rem; font-weight: 700; color: var(--accent); margin-bottom: 1.2rem;
+    }
+    .editor-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.7rem; margin-bottom: 0.9rem; }
+    .editor-words-wrap { position: relative; }
+    .words-editor {
+      width: 100%; min-height: 340px; padding: 10px 12px;
+      background: var(--bg-input); border: 1.5px solid var(--border);
+      border-radius: 10px; color: var(--text-primary);
+      font-size: 0.95rem; font-family: 'Consolas', 'SF Mono', monospace;
+      line-height: 1.7; resize: vertical; outline: none;
+    }
+    .words-editor:focus { border-color: var(--border-focus); }
+    .words-status {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 0.3rem; font-size: 0.82rem;
+    }
+    .words-count-badge {
+      padding: 2px 10px; border-radius: 20px; font-weight: 700; font-size: 0.78rem;
+    }
+    .words-count-badge.ok    { background: rgba(46,204,113,0.2); color: var(--success); border: 1px solid var(--success); }
+    .words-count-badge.warn  { background: rgba(243,156,18,0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .words-count-badge.error { background: rgba(231,76,60,0.2);  color: var(--danger);  border: 1px solid var(--danger); }
+    .editor-actions {
+      display: flex; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; align-items: center;
+    }
+    .btn-save {
+      padding: 11px 24px; background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      border: none; border-radius: 10px; color: #fff;
+      font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-save:hover:not(:disabled) { opacity: 0.88; }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-delete {
+      padding: 11px 18px; background: none;
+      border: 1.5px solid var(--danger); border-radius: 10px;
+      color: var(--danger); font-weight: 600; font-size: 0.9rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-delete:hover { background: var(--danger); color: #fff; }
+    .save-status { font-size: 0.82rem; color: var(--text-secondary); }
+    .empty-editor {
+      text-align: center; color: var(--text-secondary);
+      padding: 3rem 1rem; font-size: 0.95rem;
+    }
+    .empty-editor .icon { font-size: 3rem; display: block; margin-bottom: 0.8rem; }
+
+    /* ── Select override ────────────────────────────── */
+    select.cn-input {
+      appearance: none; -webkit-appearance: none; cursor: pointer;
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 680px) {
+      .admin-body { flex-direction: column; max-height: none; overflow: visible; }
+      .list-panel { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 280px; }
+      .editor-panel { min-height: 400px; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-wrap">
+
+  <!-- Header -->
+  <div class="admin-header">
+    <span class="admin-header-title">🕵️ Codenames – Wortlisten</span>
+    <div class="admin-header-actions">
+      <a href="index.html" class="cn-btn-icon">← Spiel</a>
+      <a href="../spiele.html" class="cn-btn-icon">← Übersicht</a>
+      <button id="btn-theme" class="cn-btn-icon" onclick="toggleTheme()">☀️ Light</button>
+    </div>
+  </div>
+
+  <div class="admin-body">
+
+    <!-- ── List Panel ───────────────────────────────── -->
+    <div class="list-panel">
+      <div class="list-panel-header">
+        <h3>Wortlisten</h3>
+        <div class="list-filter" id="lang-filter">
+          <button class="filter-btn active" data-lang="" onclick="setFilter(this,'')">Alle</button>
+          <button class="filter-btn" data-lang="de" onclick="setFilter(this,'de')">🇩🇪 DE</button>
+          <button class="filter-btn" data-lang="en" onclick="setFilter(this,'en')">🇬🇧 EN</button>
+          <button class="filter-btn" data-lang="it" onclick="setFilter(this,'it')">🇮🇹 IT</button>
+          <button class="filter-btn" data-lang="es" onclick="setFilter(this,'es')">🇪🇸 ES</button>
+          <button class="filter-btn" data-lang="ru" onclick="setFilter(this,'ru')">🇷🇺 RU</button>
+          <button class="filter-btn" data-lang="fr" onclick="setFilter(this,'fr')">🇫🇷 FR</button>
+        </div>
+      </div>
+      <div class="list-scroll" id="list-scroll"></div>
+      <button class="btn-new-list" onclick="newList()">+ Neue Liste</button>
+    </div>
+
+    <!-- ── Editor Panel ─────────────────────────────── -->
+    <div class="editor-panel">
+      <div class="editor-inner">
+        <div id="editor-content">
+          <div class="empty-editor">
+            <span class="icon">📋</span>
+            Wähle eine Liste oder erstelle eine neue.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Theme ─────────────────────────────────────────────────────────────────
+(function() {
+  const KEY = 'spiele_theme';
+  function apply(light) {
+    document.body.classList.toggle('light', light);
+    const el = document.getElementById('btn-theme');
+    if (el) el.textContent = light ? '🌙 Dark' : '☀️ Light';
+  }
+  window.toggleTheme = function() {
+    const nowLight = !document.body.classList.contains('light');
+    localStorage.setItem(KEY, nowLight ? 'light' : 'dark');
+    apply(nowLight);
+  };
+  apply(localStorage.getItem(KEY) === 'light');
+})();
+
+// ── State ─────────────────────────────────────────────────────────────────
+let allLists    = [];
+let filterLang  = '';
+let currentId   = null;   // ID of list being edited (null = new)
+let hasUnsaved  = false;
+
+// ── API helpers ───────────────────────────────────────────────────────────
+async function apiGet(action, params = {}) {
+  const url = new URL('./api.php', location.href);
+  url.searchParams.set('action', action);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  try { const r = await fetch(url, {cache:'no-store'}); return r.ok ? await r.json() : null; } catch { return null; }
+}
+async function apiPost(action, data = {}) {
+  const url = new URL('./api.php', location.href);
+  url.searchParams.set('action', action);
+  try {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    return await r.json();
+  } catch { return {error:'network'}; }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Load all lists ────────────────────────────────────────────────────────
+async function loadLists() {
+  const data = await apiGet('get_wordlists', filterLang ? {language: filterLang} : {});
+  allLists = data?.lists || [];
+  renderListPanel();
+}
+
+function renderListPanel() {
+  const container = document.getElementById('list-scroll');
+  if (!container) return;
+
+  const visible = filterLang ? allLists.filter(l => l.language === filterLang) : allLists;
+
+  if (!visible.length) {
+    container.innerHTML = '<div class="list-empty">Keine Listen vorhanden.</div>';
+    return;
+  }
+
+  container.innerHTML = visible.map(l => `
+    <div class="list-item ${l.id === currentId ? 'active' : ''}" onclick="openList('${esc(l.id)}')">
+      <div class="list-item-name">${esc(l.name)}</div>
+      <div class="list-item-meta">
+        🌐 ${(l.language||'de').toUpperCase()} · 📚 ${esc(l.subject||'—')} · 📝 ${l.word_count||25} Wörter
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Open list for editing ─────────────────────────────────────────────────
+async function openList(id) {
+  if (hasUnsaved && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  currentId  = id;
+  hasUnsaved = false;
+
+  const data = await apiGet('get_wordlist', {id});
+  if (!data || data.error) { alert('Liste nicht gefunden.'); return; }
+
+  renderEditor(data);
+  renderListPanel(); // highlight active
+}
+
+// ── New list ──────────────────────────────────────────────────────────────
+function newList() {
+  if (hasUnsaved && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  currentId  = null;
+  hasUnsaved = false;
+  renderEditor({id: null, name: '', language: filterLang || 'de', subject: '', words: []});
+}
+
+// ── Render editor ─────────────────────────────────────────────────────────
+function renderEditor(data) {
+  const container = document.getElementById('editor-content');
+  const wordsText = (data.words || []).join('\n');
+  const isNew     = !data.id;
+
+  container.innerHTML = `
+    <div class="editor-box">
+      <h2>${isNew ? '+ Neue Liste erstellen' : 'Liste bearbeiten'}</h2>
+
+      <div class="editor-meta-row">
+        <div>
+          <label class="cn-label">Name</label>
+          <input id="ed-name" class="cn-input" type="text" maxlength="80"
+            value="${esc(data.name)}" oninput="markDirty()" style="padding:9px 12px;font-size:0.92rem">
+        </div>
+        <div>
+          <label class="cn-label">Fach / Subject</label>
+          <input id="ed-subject" class="cn-input" type="text" maxlength="50"
+            value="${esc(data.subject||'')}" oninput="markDirty()" style="padding:9px 12px;font-size:0.92rem">
+        </div>
+        <div>
+          <label class="cn-label">Sprache</label>
+          <select id="ed-lang" class="cn-input" onchange="markDirty()" style="padding:9px 12px;font-size:0.92rem">
+            ${['de','en','it','es','ru','fr'].map(l =>
+              `<option value="${l}" ${l===data.language?'selected':''}>${{de:'🇩🇪 Deutsch',en:'🇬🇧 English',it:'🇮🇹 Italiano',es:'🇪🇸 Español',ru:'🇷🇺 Русский',fr:'🇫🇷 Français'}[l]}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="editor-words-wrap">
+        <label class="cn-label">Wörter <span style="font-weight:400;text-transform:none">(genau 25 – ein Wort pro Zeile)</span></label>
+        <textarea id="ed-words" class="words-editor"
+          placeholder="Wort 1&#10;Wort 2&#10;Wort 3&#10;…"
+          oninput="markDirty(); updateEditorCounter()">${esc(wordsText)}</textarea>
+        <div class="words-status">
+          <span id="ed-status" class="save-status"></span>
+          <span id="ed-counter" class="words-count-badge warn">0 / 25</span>
+        </div>
+      </div>
+
+      <div class="editor-actions">
+        <button class="btn-save" id="btn-save" onclick="saveList()" disabled>💾 Speichern</button>
+        ${!isNew ? `<button class="btn-delete" onclick="deleteList('${esc(data.id)}')">🗑 Löschen</button>` : ''}
+        <span id="save-feedback" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+      </div>
+    </div>
+  `;
+
+  updateEditorCounter();
+}
+
+function updateEditorCounter() {
+  const ta = document.getElementById('ed-words');
+  const ctr = document.getElementById('ed-counter');
+  const saveBtn = document.getElementById('btn-save');
+  if (!ta || !ctr) return;
+  const words = ta.value.split('\n').map(w => w.trim()).filter(w => w);
+  const n = words.length;
+  ctr.textContent = n + ' / 25';
+  ctr.className = 'words-count-badge ' + (n === 25 ? 'ok' : n > 25 ? 'error' : 'warn');
+  if (saveBtn) saveBtn.disabled = (n !== 25);
+}
+
+function markDirty() {
+  hasUnsaved = true;
+  const fb = document.getElementById('ed-status');
+  if (fb) fb.textContent = '● Ungespeichert';
+  updateEditorCounter();
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────
+async function saveList() {
+  const name    = document.getElementById('ed-name')?.value.trim();
+  const subject = document.getElementById('ed-subject')?.value.trim() || '';
+  const lang    = document.getElementById('ed-lang')?.value || 'de';
+  const ta      = document.getElementById('ed-words');
+  const words   = ta?.value.split('\n').map(w => w.trim()).filter(w => w) || [];
+  const fb      = document.getElementById('save-feedback');
+
+  if (!name) { if (fb) { fb.textContent = '⚠ Name fehlt'; fb.style.color='var(--danger)'; } return; }
+  if (words.length !== 25) {
+    if (fb) { fb.textContent = `⚠ ${words.length} Wörter (benötigt: 25)`; fb.style.color='var(--danger)'; }
+    return;
+  }
+
+  const payload = { name, language: lang, subject, words };
+  if (currentId) payload.id = currentId;
+
+  if (fb) { fb.textContent = '⏳ Speichern…'; fb.style.color='var(--text-secondary)'; }
+
+  const res = await apiPost('save_wordlist', payload);
+  if (res?.ok && res?.id) {
+    currentId  = res.id;
+    hasUnsaved = false;
+    if (fb) { fb.textContent = '✓ Gespeichert'; fb.style.color='var(--success)'; }
+    const status = document.getElementById('ed-status');
+    if (status) status.textContent = '';
+    await loadLists();
+  } else {
+    if (fb) { fb.textContent = '❌ Fehler beim Speichern'; fb.style.color='var(--danger)'; }
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────
+async function deleteList(id) {
+  const name = document.getElementById('ed-name')?.value || id;
+  if (!confirm(`Liste "${name}" wirklich löschen?\n\nDies kann nicht rückgängig gemacht werden.`)) return;
+
+  const res = await apiPost('delete_wordlist', {id, confirm_id: id});
+  if (res?.ok) {
+    currentId  = null;
+    hasUnsaved = false;
+    document.getElementById('editor-content').innerHTML = `
+      <div class="empty-editor">
+        <span class="icon">🗑</span>Liste wurde gelöscht.
+      </div>`;
+    await loadLists();
+  } else {
+    alert('Fehler beim Löschen.');
+  }
+}
+
+// ── Language filter ───────────────────────────────────────────────────────
+function setFilter(btn, lang) {
+  filterLang = lang;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderListPanel();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadLists();
+</script>
+</body>
+</html>

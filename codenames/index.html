@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Codenames</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Lobby-Settings Inline-Styles */
+    details.lobby-settings { margin-top: 0; }
+    .ls-settings-body { padding-top: 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+    .ls-team-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .ls-words-row { margin-top: 0.2rem; }
+    .ls-textarea {
+      width: 100%; min-height: 120px; padding: 8px 12px;
+      background: var(--bg-input); border: 1.5px solid var(--border);
+      border-radius: 10px; color: var(--text-primary);
+      font-size: 0.88rem; font-family: 'Consolas','SF Mono',monospace;
+      line-height: 1.6; resize: vertical; outline: none;
+    }
+    .ls-textarea:focus { border-color: var(--border-focus); }
+    .lobby-words-counter { font-size: 0.78rem; text-align: right; margin-top: 0.2rem; color: var(--text-secondary); }
+    .spectator-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .spec-link-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 7px 14px; background: var(--bg-input);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;
+      text-decoration: none; transition: all 0.15s;
+    }
+    .spec-link-btn:hover { border-color: var(--accent); color: var(--accent); }
+    /* Wortlisten-Select in Lobby */
+    .ls-select {
+      width: 100%; padding: 9px 12px;
+      background: var(--bg-input); border: 1.5px solid var(--border);
+      border-radius: 10px; color: var(--text-primary);
+      font-size: 0.88rem; font-family: inherit; outline: none;
+    }
+    .ls-select:focus { border-color: var(--border-focus); }
+    /* wl-select in create */
+    #wl-select {
+      padding: 10px 12px; background: var(--bg-input);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      color: var(--text-primary); font-size: 0.92rem;
+      font-family: inherit; outline: none; width: 100%;
+    }
+    #wl-select:focus { border-color: var(--border-focus); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 1: START
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-start" class="screen">
+  <div class="start-box">
+
+    <!-- Logo -->
+    <div class="start-logo">
+      <span class="start-logo-icon">🕵️</span>
+      <div class="start-logo-title">Codenames</div>
+      <div class="start-logo-sub" data-t="tagline"></div>
+    </div>
+
+    <!-- Language selector -->
+    <div class="lang-row">
+      <button class="lang-btn" data-lang="de" onclick="setLang('de')">🇩🇪 DE</button>
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">🇬🇧 EN</button>
+      <button class="lang-btn" data-lang="it" onclick="setLang('it')">🇮🇹 IT</button>
+      <button class="lang-btn" data-lang="es" onclick="setLang('es')">🇪🇸 ES</button>
+      <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">🇷🇺 RU</button>
+      <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button>
+    </div>
+
+    <!-- Name -->
+    <div class="cn-field">
+      <label class="cn-label" data-t="name_label"></label>
+      <input id="start-name" class="cn-input" type="text" maxlength="30"
+        data-t-ph="name_ph"
+        onkeydown="if(event.key==='Enter')document.getElementById('start-pin').focus()">
+    </div>
+
+    <!-- PIN + Join -->
+    <div class="cn-field">
+      <label class="cn-label" data-t="pin_label"></label>
+      <input id="start-pin" class="cn-input pin-input" type="text"
+        maxlength="4" data-t-ph="pin_ph"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+        onkeydown="if(event.key==='Enter')doJoin()">
+    </div>
+
+    <button class="cn-btn cn-btn-primary" onclick="doJoin()" data-t="btn_join"></button>
+
+    <hr class="cn-divider">
+
+    <button class="cn-btn cn-btn-secondary" onclick="goToCreate()" data-t="btn_create"></button>
+
+    <div id="start-error" class="cn-error"></div>
+
+    <!-- Theme + Back to Spiele -->
+    <div style="display:flex;justify-content:space-between;margin-top:1rem;gap:0.5rem">
+      <a href="../spiele.html" style="font-size:0.82rem;color:var(--text-secondary)">← Spiele</a>
+      <button id="btn-theme" onclick="toggleTheme()" style="background:none;border:none;color:var(--text-secondary);font-size:0.85rem;cursor:pointer">☀️ Lightmode</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 2: CREATE GAME
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-create" class="screen">
+  <div class="create-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.4rem">
+      <h2 style="margin:0" data-t="create_title"></h2>
+      <button class="cn-btn-icon" onclick="goBackToStart()" data-t="back"></button>
+    </div>
+
+    <!-- Team names -->
+    <div class="cn-field">
+      <div class="team-names-row">
+        <div>
+          <label class="cn-label" data-t="team_red"></label>
+          <input id="team-red-name" class="cn-input" type="text" maxlength="30" data-t-ph="team_red">
+        </div>
+        <div>
+          <label class="cn-label" data-t="team_blue"></label>
+          <input id="team-blue-name" class="cn-input" type="text" maxlength="30" data-t-ph="team_blue">
+        </div>
+      </div>
+    </div>
+
+    <hr class="cn-divider">
+
+    <!-- Word list loader -->
+    <div class="cn-field">
+      <label class="cn-label" data-t="wl_label"></label>
+      <select id="wl-select" onchange="onWordlistSelect()"></select>
+    </div>
+
+    <!-- Word textarea -->
+    <div class="cn-field">
+      <label class="cn-label" data-t="words_label"></label>
+      <textarea id="words-textarea" class="cn-textarea"
+        data-t-ph="words_ph"
+        oninput="updateWordCounter()"></textarea>
+      <div id="words-counter" class="words-counter warn">0 / 25</div>
+    </div>
+
+    <!-- Save list -->
+    <div class="cn-field" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:0.9rem">
+      <div style="font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-bottom:0.6rem" data-t="save_list"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem">
+        <input id="wl-name" class="cn-input" type="text" maxlength="80" data-t-ph="list_name" style="font-size:0.88rem;padding:8px 10px">
+        <input id="wl-subj" class="cn-input" type="text" maxlength="50" data-t-ph="list_subj" style="font-size:0.88rem;padding:8px 10px">
+      </div>
+      <button class="cn-btn-sm cn-btn-secondary" onclick="doSaveWordlist()"
+        style="background:var(--bg-input);border:1.5px solid var(--border);color:var(--text-primary)" data-t="save_list"></button>
+    </div>
+
+    <hr class="cn-divider">
+
+    <button class="cn-btn cn-btn-primary" onclick="doCreateGame()" data-t="btn_create_game"></button>
+    <div id="create-error" class="cn-error"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 3: LOBBY
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+  <!-- Header -->
+  <div class="cn-header">
+    <span class="cn-header-title" data-t="lobby_title"></span>
+    <div class="cn-header-actions">
+      <button id="btn-theme" onclick="toggleTheme()">☀️ Lightmode</button>
+      <a href="../spiele.html" class="cn-btn-icon">← Spiele</a>
+    </div>
+  </div>
+
+  <div class="lobby-body">
+
+    <!-- PIN display -->
+    <div class="pin-display-card">
+      <div>
+        <div class="pin-display-label" data-t="lobby_pin"></div>
+        <div id="lobby-pin-value" class="pin-display-value">—</div>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <button class="pin-copy-btn" onclick="copyPin()">📋 Copy</button>
+        <a id="spectator-link" href="#" class="spec-link-btn" target="_blank">📺 Beamer ↗</a>
+      </div>
+    </div>
+
+    <!-- Role selector -->
+    <div class="role-card">
+      <h3 data-t="role_title"></h3>
+      <div id="role-selector"></div>
+    </div>
+
+    <!-- Player list -->
+    <div class="players-card">
+      <h3 data-t="lobby_players"></h3>
+      <div id="player-list"></div>
+    </div>
+
+    <!-- Settings (host only) -->
+    <details id="lobby-settings" class="lobby-settings role-card" style="display:none">
+      <summary data-t="lobby_settings"></summary>
+      <div class="ls-settings-body">
+        <div class="ls-team-row">
+          <div>
+            <label class="cn-label" data-t="team_red"></label>
+            <input id="ls-team-red" class="cn-input" type="text" maxlength="30" style="padding:8px 10px;font-size:0.88rem">
+          </div>
+          <div>
+            <label class="cn-label" data-t="team_blue"></label>
+            <input id="ls-team-blue" class="cn-input" type="text" maxlength="30" style="padding:8px 10px;font-size:0.88rem">
+          </div>
+        </div>
+        <div class="ls-words-row">
+          <label class="cn-label" data-t="wl_label"></label>
+          <select id="ls-wl-select" class="ls-select" onchange="onLsWordlistSelect()"></select>
+        </div>
+        <div class="ls-words-row">
+          <label class="cn-label" data-t="words_label"></label>
+          <textarea id="ls-words-textarea" class="ls-textarea"
+            data-t-ph="words_ph" oninput="updateLsWordCounter()"></textarea>
+          <div id="ls-words-counter" class="lobby-words-counter"></div>
+        </div>
+        <button class="cn-btn cn-btn-secondary" onclick="doUpdateSettings()" style="margin-top:0.3rem">✓ Speichern</button>
+      </div>
+    </details>
+
+    <!-- Start button (host) / Wait message -->
+    <button id="btn-lobby-start" class="cn-btn cn-btn-primary" style="display:none"
+      onclick="doStartGame()" data-t="btn_start"></button>
+    <div id="lobby-wait-msg" style="text-align:center;color:var(--text-secondary);font-size:0.9rem;padding:0.5rem" data-t="wait_host"></div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 4: GAME
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-layout">
+
+    <!-- Score bar + header -->
+    <div style="display:flex;align-items:center;gap:0;background:var(--bg-container);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div id="score-bar" class="score-bar" style="flex:1;border-bottom:none"></div>
+      <div style="display:flex;gap:4px;padding:0 0.6rem;flex-shrink:0">
+        <button id="btn-theme" onclick="toggleTheme()" class="cn-btn-icon">☀️</button>
+      </div>
+    </div>
+
+    <!-- Card grid -->
+    <div class="card-grid-wrap">
+      <div id="card-grid" class="card-grid"></div>
+    </div>
+
+    <!-- Clue area (sidebar on desktop, bottom on mobile) -->
+    <div id="clue-area" class="clue-area"></div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 5: END
+═══════════════════════════════════════════════════════════ -->
+<div id="screen-end" class="screen">
+  <div id="end-box" class="end-box" style="margin:auto"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="game.js"></script>
+<script>
+// Extra lobby helper: load wordlists for host settings panel
+async function onLsWordlistSelect() {
+  const sel = document.getElementById('ls-wl-select');
+  const id  = sel?.value;
+  if (!id) return;
+  const data = await apiGet('get_wordlist', {id});
+  if (data?.words) {
+    const ta = document.getElementById('ls-words-textarea');
+    if (ta) { ta.value = data.words.join('\n'); updateLsWordCounter(); }
+  }
+}
+function updateLsWordCounter() {
+  const ta = document.getElementById('ls-words-textarea');
+  const counter = document.getElementById('ls-words-counter');
+  if (!ta || !counter) return;
+  const n = ta.value.split('\n').map(w=>w.trim()).filter(w=>w).length;
+  counter.textContent = n + ' / 25';
+  counter.style.color = n === 25 ? 'var(--success)' : n > 25 ? 'var(--danger)' : 'var(--text-secondary)';
+}
+
+// Populate ls-wl-select when lobby settings open
+document.getElementById('lobby-settings')?.addEventListener('toggle', async function() {
+  if (this.open) {
+    const sel = document.getElementById('ls-wl-select');
+    if (sel && sel.options.length <= 1) {
+      const data = await apiGet('get_wordlists');
+      const lists = data?.lists || [];
+      sel.innerHTML = '<option value="">— Liste wählen —</option>'
+        + lists.map(l=>`<option value="${l.id}">[${l.language.toUpperCase()}] ${l.name}</option>`).join('');
+    }
+    // Pre-fill team names from current state
+    if (lastState) {
+      const r = document.getElementById('ls-team-red');
+      const b = document.getElementById('ls-team-blue');
+      if (r) r.value = lastState.teams?.red?.name || '';
+      if (b) b.value = lastState.teams?.blue?.name || '';
+    }
+  }
+});
+</script>
+</body>
+</html>
