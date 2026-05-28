@@ -624,7 +624,7 @@ let _mcPending = new Set(); // aktuelle Multi-Correct Auswahl
 function matchesMode(q) {
   const mode = remoteState.config?.questionMode || 'mixed';
   if (mode === 'mixed') return true;
-  const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+  const isMC = (q.type === 'mc' || q.type === 'multiple_choice') && (q.options?.length > 0);
   return mode === 'mc' ? isMC : !isMC;
 }
 

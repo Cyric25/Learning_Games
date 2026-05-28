@@ -600,7 +600,7 @@ function filterByMode(questions) {
   const mode = _cfg.questionMode || 'mixed';
   if (mode === 'mixed') return questions;
   return questions.filter(q => {
-    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+    const isMC = (q.type === 'mc' || q.type === 'multiple_choice') && (q.options?.length > 0);
     return mode === 'mc' ? isMC : !isMC;
   });
 }

@@ -7,6 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
   <link rel="stylesheet" href="css/labyrinth.css">
   <style>
+    html, body { height: 100%; margin: 0; padding: 0; }
     body { overflow: hidden; }
 
     .board-screen { display:none; width:100%; height:100%; }
@@ -251,6 +252,11 @@
     document.getElementById(id).classList.add('active');
   }
 
+  function _doorCount(preset, sz) {
+    const p = { wenig:{10:4,12:6,16:10}, viele:{10:10,12:14,16:20}, sehrviele:{10:16,12:22,16:35} };
+    return (p[preset] || p.viele)[sz] || 14;
+  }
+
   async function boardJoin() {
     const inp = document.getElementById('bj-code');
     const err = document.getElementById('bj-error');
@@ -263,21 +269,30 @@
     boardState = state;
     document.getElementById('btb-code').textContent = code;
     showBoardScreen('bs-board');
-    buildBoardGrid(state);
-    applyBoardState(state);
-    BoardSync.subscribe(code, applyBoardState);
+    // requestAnimationFrame ensures the board screen is laid out before reading canvas dimensions
+    requestAnimationFrame(() => {
+      buildBoardGrid(state);
+      applyBoardState(state);
+      BoardSync.subscribe(code, applyBoardState);
+    });
   }
 
   function buildBoardGrid(state) {
     const { seed, config, symbols, doors } = state;
-    if (!seed || !config?.teamCount) return;
-    const sz = config.mazeSize || 16;
-    const gen = new MazeGenerator(sz, sz, seed);
-    const result = gen.generate({ doorCount: ({ 10:8,12:10,16:14 })[sz]||14, teamCount: config.teamCount });
-    boardLocalGrid = result.grid;
-    applyGridState(boardLocalGrid, symbols || [], doors || []);
     const canvas = document.getElementById('board-canvas');
     boardRenderer = new MazeRenderer(canvas);
+    let result;
+    if (state.mazeData?.grid) {
+      // Library maze: use saved grid + startPositions
+      result = { grid: JSON.parse(JSON.stringify(state.mazeData.grid)), doors: doors || [], startPositions: state.mazeData.startPositions || [] };
+    } else {
+      if (!seed || !config?.teamCount) return;
+      const sz = config.mazeSize || 16;
+      const gen = new MazeGenerator(sz, sz, seed);
+      result = gen.generate({ doorCount: _doorCount(config.doorPreset, sz), teamCount: config.teamCount });
+    }
+    boardLocalGrid = result.grid;
+    applyGridState(boardLocalGrid, symbols || [], doors || []);
     boardRenderer.setMaze(result);
   }
 
