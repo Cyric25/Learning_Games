@@ -76,7 +76,8 @@ let activeCategories = new Set();
 let questionContext = null;
 let timerInterval = null;
 let diceAnimId = null;
-let _lastStateTs = 0;  // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
+let _lastStateTs = 0;      // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
+let _waitingForTeacher = false;  // Student wartet auf Lehrkraft-Bewertung (offene Frage)
 let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
