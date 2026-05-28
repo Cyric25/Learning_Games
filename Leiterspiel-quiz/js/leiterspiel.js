@@ -1223,7 +1223,7 @@ function renderCustomBoardSVG() {
     grid.style.display = 'none';
     svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
     svg.setAttribute('viewBox', '0 0 100 100');
-    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   }
 
   svg.innerHTML = '';
