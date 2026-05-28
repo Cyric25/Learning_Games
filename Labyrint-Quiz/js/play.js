@@ -76,8 +76,7 @@ let activeCategories = new Set();
 let questionContext = null;
 let timerInterval = null;
 let diceAnimId = null;
-let _ignoreNextUpdate = false; // verhindert Echo beim eigenen POST
-let _waitingForTeacher = false; // warten auf Lehrkraft-Bewertung (offene Frage)
+let _lastStateTs = 0;  // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
 let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -301,24 +300,20 @@ function applyStateToGrid(grid, symbols) {
 }
 
 function onRemoteUpdate(data) {
-  if (_ignoreNextUpdate) { _ignoreNextUpdate = false; return; }
-
-  // Spielleiter hat das Team freigegeben → Spieler zurück zur Teamwahl
+  // Kick-Erkennung immer zuerst
   if (myTeamId !== null && Array.isArray(data.takenTeams) &&
       !data.takenTeams.includes(myTeamId)) {
     handleKicked();
     return;
   }
 
-  // Teacher has evaluated an open question we're waiting on
-  if (_waitingForTeacher && data.activeQuestion?.questionResult !== null &&
-      data.activeQuestion?.questionResult !== undefined) {
-    _waitingForTeacher = false;
-    remoteState = data;
-    clearTimer();
-    resolveQuestionResult(data.activeQuestion.questionResult);
+  // Veraltete Echos eigener Saves ignorieren (nur Canvas aktualisieren)
+  if (data._ts && data._ts < _lastStateTs) {
+    applyStateToGrid(localGrid, data.symbols || []);
+    renderCanvas(data);
     return;
   }
+
   remoteState = data;
   applyStateToGrid(localGrid, data.symbols || []);
   renderCanvas(data);
@@ -773,7 +768,6 @@ function showOpenAnswer() {
 function resolveOpen(correct) { clearTimer(); resolveQuestionResult(correct); }
 
 function resolveQuestionResult(correct) {
-  _waitingForTeacher = false;
   const ctx = questionContext;
   const resultEl = document.getElementById('q-result');
   const myTeam = remoteState.teams[myTeamId];
@@ -883,14 +877,28 @@ function startTimer(seconds) {
     rem--;
     if (bar) bar.style.width = Math.max(0, rem / seconds * 100) + '%';
     if (txt) txt.textContent = rem > 0 ? rem + 's' : '';
-    if (rem <= 0) { clearTimer(); resolveQuestionResult(false); }
+    if (rem <= 0) {
+      clearTimer();
+      const q = questionContext?.question;
+      const isMC = q && (q.type === 'multiple_choice') && q.options?.length > 0;
+      if (isMC) {
+        // MC: Zeit abgelaufen → automatisch als falsch werten
+        resolveQuestionResult(false);
+      } else {
+        // Offene Frage: Bedenkzeit vorbei → Lösung einblenden, Schüler bewertet selbst
+        showOpenAnswer();
+        if (txt) txt.textContent = '⏰';
+      }
+    }
   }, 1000);
 }
 function clearTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } const b = document.getElementById('q-timer-bar'); if (b) b.style.width = '0%'; }
 
 // ── State posten ──────────────────────────────────────────────────
 function postState(newState) {
-  _ignoreNextUpdate = true;
+  const ts = Date.now();
+  newState._ts = ts;
+  _lastStateTs = ts;
   remoteState = newState;
   applyStateToGrid(localGrid, newState.symbols || []);
   renderCanvas(newState);
@@ -907,7 +915,7 @@ function showSpectatorQuestion(aq, activeTeam) {
       <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
       <div class="spec-q-context">${contextIcon} ${contextLabel}</div>
       <div class="spec-q-text">${_escHtml(aq.question)}</div>
-      <div class="spec-q-wait">⏳ Lehrkraft bewertet…</div>
+      <div class="spec-q-wait">⏳ Team beantwortet…</div>
     </div>`;
 }
 
