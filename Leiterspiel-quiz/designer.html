@@ -298,13 +298,17 @@ async function _checkServer() {
 }
 
 async function _boardsLoad() {
+  const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(_LS_KEY) || '[]'); } catch { return []; } })();
   if (await _checkServer()) {
     try {
       const r = await fetch(_API);
-      if (r.ok) return await r.json();
+      if (r.ok) {
+        const srv = await r.json();
+        if (srv.length > 0) return srv;
+      }
     } catch {}
   }
-  try { return JSON.parse(localStorage.getItem(_LS_KEY) || '[]'); } catch { return []; }
+  return lsBoards;
 }
 
 async function _boardsSave(boards) {

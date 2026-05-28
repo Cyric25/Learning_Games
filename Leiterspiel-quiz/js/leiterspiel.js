@@ -142,6 +142,7 @@ const _LS_BOARDS_API = '../api.php?f=ls-boards';
 let _lsBoardsServerOk = null;
 
 async function _lsBoardsLoad() {
+  const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(_LS_BOARDS_KEY) || '[]'); } catch { return []; } })();
   if (_lsBoardsServerOk === null && window.location.protocol !== 'file:') {
     try {
       await fetch(_LS_BOARDS_API, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
@@ -149,9 +150,12 @@ async function _lsBoardsLoad() {
     } catch { _lsBoardsServerOk = false; }
   }
   if (_lsBoardsServerOk) {
-    try { const r = await fetch(_LS_BOARDS_API); if (r.ok) return await r.json(); } catch {}
+    try {
+      const r = await fetch(_LS_BOARDS_API);
+      if (r.ok) { const srv = await r.json(); if (srv.length > 0) return srv; }
+    } catch {}
   }
-  try { return JSON.parse(localStorage.getItem(_LS_BOARDS_KEY) || '[]'); } catch { return []; }
+  return lsBoards;
 }
 
 // ── copyCode ──────────────────────────────────────────────────
