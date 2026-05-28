@@ -626,6 +626,20 @@ body.dark .cat-select-item.selected { background: rgba(255,255,255,0.06); }
   justify-content: center;
 }
 
+/* Custom board mode: fixed aspect ratio, image fills container */
+.board-container.is-custom {
+  flex: none;
+  aspect-ratio: var(--custom-ar, 1.777);
+  max-height: 100%;
+  max-width: 100%;
+  height: auto;
+  align-self: center;
+  background: #1a1a2e;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
 /* ── Board Grid (10×10) ──────────────────────────────────── */
 .board-grid {
   display: grid;

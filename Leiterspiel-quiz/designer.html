@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brett-Designer – Schlangen &amp; Leitern</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f0f2f5; --surface: #fff; --surface2: #f8f9fa;
+      --accent: #E34F20; --text: #1e293b; --text2: #64748b;
+      --border: #e0e0e0; --danger: #dc2626; --success: #16a34a;
+      --ladder: #2E7D32; --snake: #B71C1C;
+    }
+    body.dark {
+      --bg: #1a1a2e; --surface: #16213e; --surface2: #1a2744;
+      --accent: #f7971e; --text: #fff; --text2: #a8a8b3;
+      --border: rgba(255,255,255,0.12);
+    }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-size: 14px; }
+
+    /* Toolbar */
+    #toolbar { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.8rem;
+      background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+    #toolbar-title { font-weight: 700; font-size: 1rem; color: var(--accent); margin-right: 0.3rem; }
+    .tsep { width: 1px; height: 22px; background: var(--border); margin: 0 0.2rem; flex-shrink: 0; }
+    .tbtn { padding: 0.3rem 0.65rem; border: 1.5px solid var(--border); border-radius: 7px;
+      background: var(--surface2); color: var(--text); cursor: pointer; font-size: 0.82rem;
+      font-weight: 600; transition: all 0.13s; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; }
+    .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+    .tbtn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .tbtn.ladder.active { background: var(--ladder); border-color: var(--ladder); color: #fff; }
+    .tbtn.snake.active  { background: var(--snake);  border-color: var(--snake);  color: #fff; }
+
+    /* Layout */
+    #layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* Left Panel */
+    #panel { width: 265px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border);
+      overflow-y: auto; display: flex; flex-direction: column; }
+    .psec { border-bottom: 1px solid var(--border); padding: 0.65rem 0.75rem; }
+    .ptitle { font-size: 0.73rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text2); margin-bottom: 0.55rem; }
+
+    /* Inputs */
+    .p-input { width: 100%; padding: 0.32rem 0.55rem; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 0.82rem; }
+    .p-input:focus { outline: none; border-color: var(--accent); }
+    .p-row { display: flex; gap: 0.35rem; }
+    .p-row .p-input { flex: 1; }
+    .mini-btn { padding: 0.32rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface2); color: var(--text); cursor: pointer; font-size: 0.82rem; white-space: nowrap; }
+    .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* File upload */
+    .upload-lbl { display: block; padding: 0.35rem 0.7rem; border: 1px dashed var(--border);
+      border-radius: 6px; cursor: pointer; font-size: 0.82rem; color: var(--text2);
+      text-align: center; transition: border-color 0.2s, color 0.2s; margin-bottom: 0.4rem; }
+    .upload-lbl:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Field list */
+    #field-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.22rem; }
+    .fi { display: flex; align-items: center; gap: 0.35rem; padding: 0.28rem 0.45rem;
+      border-radius: 5px; cursor: pointer; border: 1px solid transparent; transition: background 0.13s; }
+    .fi:hover { background: var(--surface2); }
+    .fi.sel { border-color: var(--accent); background: var(--surface2); }
+    .fi-dot { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
+    .fi-n { font-weight: 700; font-size: 0.8rem; min-width: 1.6em; }
+    .fi-nm { flex: 1; font-size: 0.8rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fi-acts { display: flex; gap: 0.18rem; flex-shrink: 0; }
+    .fi-btn { width: 20px; height: 20px; border: 1px solid var(--border); border-radius: 3px;
+      background: none; color: var(--text2); cursor: pointer; font-size: 0.68rem;
+      display: flex; align-items: center; justify-content: center; padding: 0; }
+    .fi-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .fi-btn:disabled { opacity: 0.28; cursor: default; }
+    .fi-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* Props panel */
+    #sec-props { display: none; }
+    .pr { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.38rem; }
+    .pr label { font-size: 0.8rem; color: var(--text2); min-width: 85px; }
+    .pr select { flex: 1; padding: 0.28rem 0.45rem; border: 1px solid var(--border);
+      border-radius: 5px; background: var(--surface2); color: var(--text); font-size: 0.8rem; }
+    .pr-checks { display: flex; gap: 0.65rem; margin-bottom: 0.45rem; }
+    .pr-checks label { display: flex; align-items: center; gap: 0.28rem; font-size: 0.8rem; cursor: pointer; }
+    .btn-del { width: 100%; padding: 0.28rem; background: none; border: 1px solid var(--danger);
+      color: var(--danger); border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+    .btn-del:hover { background: var(--danger); color: #fff; }
+
+    /* Connections */
+    .conn-i { display: flex; align-items: center; justify-content: space-between;
+      padding: 0.28rem 0.45rem; border-radius: 5px; font-size: 0.8rem;
+      background: var(--surface2); border: 1px solid var(--border); margin-bottom: 0.22rem; }
+    .conn-i button { background: none; border: none; cursor: pointer; color: var(--text2);
+      font-size: 0.75rem; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    .conn-i button:hover { color: var(--danger); }
+    .hint { color: var(--text2); font-size: 0.78rem; font-style: italic; }
+
+    /* Canvas area */
+    #canvas-area { flex: 1; overflow: auto; display: flex; align-items: center;
+      justify-content: center; padding: 1.2rem; background: var(--bg); }
+    #board-wrap { position: relative; width: 100%; max-width: 920px; aspect-ratio: 16/9;
+      background: #1a1a2e; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    #board-bg { display: none; width: 100%; height: 100%; object-fit: fill; }
+    #board-ph { position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; color: rgba(255,255,255,0.35);
+      font-size: 0.9rem; text-align: center; gap: 0.4rem; pointer-events: none; }
+    #board-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #board-svg.t-select { cursor: default; }
+    #board-svg.t-draw   { cursor: crosshair; }
+    #board-svg.t-ladder, #board-svg.t-snake { cursor: pointer; }
+
+    /* Status bar */
+    #statusbar { padding: 0.28rem 0.9rem; background: var(--surface); border-top: 1px solid var(--border);
+      font-size: 0.78rem; color: var(--text2); flex-shrink: 0; }
+
+    /* Modal */
+    .modal-ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 100; align-items: center; justify-content: center; }
+    .modal-ov.open { display: flex; }
+    .modal-box { background: var(--surface); border-radius: 13px; padding: 1.3rem;
+      width: min(460px, 92vw); max-height: 80vh; display: flex; flex-direction: column; gap: 0.9rem; }
+    .modal-ttl { font-size: 1.05rem; font-weight: 700; }
+    .modal-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0.45rem; max-height: 48vh; }
+    .modal-item { display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 7px; background: var(--surface2); }
+    .modal-item-acts { display: flex; gap: 0.35rem; }
+    .modal-item-acts button { padding: 0.28rem 0.7rem; border-radius: 5px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 600; border: 1.5px solid var(--accent);
+      background: none; color: var(--accent); }
+    .modal-item-acts button:hover { background: var(--accent); color: #fff; }
+    .modal-item-acts .d-btn { border-color: var(--border); color: var(--text2); }
+    .modal-item-acts .d-btn:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .modal-close { align-self: flex-end; padding: 0.38rem 0.9rem; border: 1px solid var(--border);
+      border-radius: 7px; background: none; color: var(--text2); cursor: pointer; font-size: 0.82rem; }
+    .modal-close:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Toast */
+    #toast { display: none; position: fixed; bottom: 2.2rem; right: 1rem; background: var(--success);
+      color: #fff; padding: 0.55rem 1.1rem; border-radius: 8px; font-size: 0.88rem;
+      font-weight: 600; z-index: 200; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+
+    /* Scrollbars */
+    #panel::-webkit-scrollbar, #field-list::-webkit-scrollbar { width: 4px; }
+    #panel::-webkit-scrollbar-thumb, #field-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <span id="toolbar-title">🎲 Brett-Designer</span>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btn-select" onclick="setTool('select')">⬆ Auswählen</button>
+  <button class="tbtn" id="btn-draw" onclick="setTool('draw')">✏ Feld zeichnen</button>
+  <button class="tbtn ladder" id="btn-ladder" onclick="setTool('ladder')">🪜 Leiter</button>
+  <button class="tbtn snake" id="btn-snake" onclick="setTool('snake')">🐍 Schlange</button>
+  <div class="tsep"></div>
+  <button class="tbtn" onclick="newBoard()">📄 Neu</button>
+  <button class="tbtn" onclick="saveBoard()">💾 Speichern</button>
+  <button class="tbtn" onclick="openLoadModal()">📂 Laden</button>
+  <button class="tbtn" onclick="exportBoard()">⬇ Export</button>
+  <label class="tbtn" style="cursor:pointer;" title="Brett aus JSON importieren">⬆ Import
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImport(event)">
+  </label>
+  <div class="tsep"></div>
+  <a href="index.html" class="tbtn">← Zurück</a>
+  <button class="tbtn" id="btn-theme" onclick="toggleTheme()" style="margin-left:auto;">🌙</button>
+</div>
+
+<!-- Layout -->
+<div id="layout">
+
+  <!-- Left Panel -->
+  <div id="panel">
+
+    <!-- Name -->
+    <div class="psec">
+      <div class="ptitle">Brett-Name</div>
+      <input type="text" class="p-input" id="board-name" placeholder="z.B. Mein Spielbrett" value="Mein Brett"
+        oninput="board.name = this.value">
+    </div>
+
+    <!-- Background -->
+    <div class="psec">
+      <div class="ptitle">Hintergrundbild</div>
+      <label class="upload-lbl" id="upload-lbl">
+        📷 Bild hochladen
+        <input type="file" id="bg-upload" accept="image/*" style="display:none" onchange="handleBgUpload(event)">
+      </label>
+      <div class="p-row">
+        <input type="text" class="p-input" id="bg-url" placeholder="Bild-URL…"
+          onkeydown="if(event.key==='Enter')loadBgFromUrl()">
+        <button class="mini-btn" onclick="loadBgFromUrl()">OK</button>
+      </div>
+      <button class="mini-btn" id="btn-clear-bg" style="display:none;width:100%;margin-top:0.35rem;" onclick="clearBg()">✕ Bild entfernen</button>
+    </div>
+
+    <!-- Fields -->
+    <div class="psec">
+      <div class="ptitle">Felder (<span id="field-count">0</span>)</div>
+      <div id="field-list"></div>
+      <p id="field-empty" class="hint" style="margin-top:0.4rem;">Werkzeug „Feld zeichnen" wählen und auf das Spielbrett klicken.</p>
+    </div>
+
+    <!-- Properties -->
+    <div class="psec" id="sec-props">
+      <div class="ptitle">Feld-Eigenschaften</div>
+      <div class="pr">
+        <label>Schwierigkeit</label>
+        <select id="prop-diff" onchange="applyProp('difficulty',this.value)">
+          <option value="leicht">Leicht</option>
+          <option value="mittel">Mittel</option>
+          <option value="schwer">Schwer</option>
+        </select>
+      </div>
+      <div class="pr">
+        <label>Bonus</label>
+        <select id="prop-bonus" onchange="applyProp('bonusType',this.value||null)">
+          <option value="">Kein Bonus</option>
+          <option value="roll_again">🎲 Nochmal würfeln</option>
+          <option value="free_move">🎁 Freizug</option>
+          <option value="swap">🔄 Tauschen</option>
+        </select>
+      </div>
+      <div class="pr-checks">
+        <label><input type="checkbox" id="prop-start" onchange="applyProp('isStart',this.checked)"> 🏁 Start</label>
+        <label><input type="checkbox" id="prop-goal"  onchange="applyProp('isGoal', this.checked)"> 🏆 Ziel</label>
+      </div>
+      <button class="btn-del" onclick="deleteSelField()">🗑 Feld löschen</button>
+    </div>
+
+    <!-- Connections -->
+    <div class="psec">
+      <div class="ptitle">Verbindungen</div>
+      <div id="conn-list"><p class="hint">Noch keine Verbindungen.</p></div>
+    </div>
+
+    <!-- Help -->
+    <div class="psec" style="flex:1;">
+      <div class="ptitle">Hilfe</div>
+      <div style="font-size:0.76rem;color:var(--text2);line-height:1.65;">
+        <p><b>✏ Zeichnen:</b> Klicken = Eckpunkt. Ersten Punkt oder Doppelklick = Abschließen. ESC = Abbrechen.</p>
+        <p style="margin-top:0.45rem;"><b>⬆ Auswählen:</b> Feld anklicken, weiße Punkte ziehen zum Bearbeiten.</p>
+        <p style="margin-top:0.45rem;"><b>🪜/🐍:</b> Startfeld → Zielfeld klicken.</p>
+        <p style="margin-top:0.45rem;"><b>Reihenfolge:</b> ↑↓ Buttons bestimmen die Spielpfad-Nummern.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Canvas Area -->
+  <div id="canvas-area">
+    <div id="board-wrap">
+      <img id="board-bg" alt="" style="display:none;">
+      <div id="board-ph">
+        <span style="font-size:2.2rem;">🖼️</span>
+        <span>Hintergrundbild hochladen oder URL eingeben</span>
+        <span style="font-size:0.82rem;margin-top:0.2rem;">Felder können auch ohne Hintergrund gezeichnet werden</span>
+      </div>
+      <svg id="board-svg" class="t-draw" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- Status Bar -->
+<div id="statusbar">✏ Auf das Spielfeld klicken um Eckpunkte zu setzen. Doppelklick oder ersten Punkt klicken zum Abschließen.</div>
+
+<!-- Load Modal -->
+<div class="modal-ov" id="modal-load">
+  <div class="modal-box">
+    <div class="modal-ttl">📂 Gespeicherte Bretter</div>
+    <div class="modal-list" id="modal-list"></div>
+    <button class="modal-close" onclick="closeModal()">Schließen</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+let board = {
+  id: null, name: 'Mein Brett', backgroundImage: null, aspectRatio: 16/9,
+  fields: [], ladders: [], snakes: []
+};
+let _nid = 1;
+let tool = 'draw';
+let drawPts = [];
+let previewPt = null;
+let selId = null;       // selected field id
+let connFrom = null;    // id of "from" field in ladder/snake mode
+let dragInfo = null;    // {fi, vi}
+
+const NS = 'http://www.w3.org/2000/svg';
+
+// ── SVG helper ─────────────────────────────────────────────────
+function mkSvg(tag, attrs, txt) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+
+// ── Utilities ──────────────────────────────────────────────────
+function centroid(pts) {
+  return [ pts.reduce((s,p)=>s+p[0],0)/pts.length, pts.reduce((s,p)=>s+p[1],0)/pts.length ];
+}
+
+function svgXY(e) {
+  const r = document.getElementById('board-wrap').getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  return [
+    Math.max(0, Math.min(100, (cx-r.left)/r.width*100)),
+    Math.max(0, Math.min(100, (cy-r.top)/r.height*100))
+  ];
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function fieldColor(f) {
+  if (f.isStart) return '#1565C0';
+  if (f.isGoal)  return '#6A1B9A';
+  const bonus = {roll_again:'#0277BD', free_move:'#33691E', swap:'#880E4F'};
+  if (f.bonusType && bonus[f.bonusType]) return bonus[f.bonusType];
+  return {leicht:'#2E7D32', mittel:'#E65100', schwer:'#B71C1C'}[f.difficulty] || '#455A64';
+}
+
+function byId(id) { return board.fields.find(f=>f.id===id)||null; }
+
+function status(msg) { document.getElementById('statusbar').textContent = msg; }
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = err ? '#dc2626' : '#16a34a';
+  t.style.display = 'block';
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>{ t.style.display='none'; }, 2500);
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function render() {
+  const svg = document.getElementById('board-svg');
+  svg.innerHTML = '';
+
+  // Arrow marker defs
+  const defs = mkSvg('defs');
+  ['ladder','snake'].forEach(t => {
+    const m = mkSvg('marker', {id:'arr-'+t, markerWidth:'7', markerHeight:'7', refX:'6', refY:'3.5', orient:'auto'});
+    m.appendChild(mkSvg('path', {d:'M0,0 L0,7 L7,3.5 z', fill: t==='ladder'?'#43A047':'#C62828'}));
+    defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  renderConns(svg);
+  renderFields(svg);
+  renderPreview(svg);
+}
+
+function renderFields(svg) {
+  board.fields.forEach((f, fi) => {
+    if (!f.points || f.points.length < 3) return;
+    const isSel = f.id === selId;
+    const isFrom = f.id === connFrom;
+    const g = mkSvg('g');
+
+    const xs = f.points.map(p=>p[0]), ys = f.points.map(p=>p[1]);
+    const w = Math.max(...xs)-Math.min(...xs), h = Math.max(...ys)-Math.min(...ys);
+    const fsize = Math.max(1.4, Math.min(3.8, Math.min(w,h)*0.33));
+    const [cx, cy] = centroid(f.points);
+
+    const poly = mkSvg('polygon', {
+      points: f.points.map(p=>p.join(',')).join(' '),
+      fill: fieldColor(f),
+      stroke: isSel ? '#ffffff' : isFrom ? '#FFD700' : 'rgba(255,255,255,0.4)',
+      'stroke-width': isSel ? '0.6' : '0.25',
+      opacity: '0.87'
+    });
+
+    const tap = ev => {
+      ev.stopPropagation();
+      if (ev.type==='touchend') ev.preventDefault();
+      onFieldClick(f.id);
+    };
+    poly.addEventListener('click', tap);
+    poly.addEventListener('touchend', tap);
+    g.appendChild(poly);
+
+    // Number
+    g.appendChild(mkSvg('text', {
+      x: cx, y: cy - fsize*0.25, 'text-anchor':'middle', 'dominant-baseline':'central',
+      fill:'#fff', 'font-size': fsize, 'font-weight':'700',
+      style:'filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))'
+    }, String(f.number)));
+
+    // Icons
+    const icons = [];
+    if (f.isStart) icons.push('🏁');
+    if (f.isGoal)  icons.push('🏆');
+    if (f.bonusType==='roll_again') icons.push('🎲');
+    if (f.bonusType==='free_move')  icons.push('🎁');
+    if (f.bonusType==='swap')       icons.push('🔄');
+    if (board.ladders.some(l=>l.from===f.id)) icons.push('🪜');
+    if (board.snakes.some(s=>s.from===f.id))  icons.push('🐍');
+    if (icons.length) {
+      g.appendChild(mkSvg('text', {
+        x: cx, y: cy + fsize*0.65, 'text-anchor':'middle', 'dominant-baseline':'central',
+        'font-size': Math.max(1.1, fsize*0.6),
+        style:'filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))'
+      }, icons.join('')));
+    }
+
+    // Vertex handles for selected field
+    if (isSel && tool==='select') {
+      f.points.forEach(([x,y], vi) => {
+        const h = mkSvg('circle', {cx:x,cy:y,r:'1.1',fill:'#fff',stroke:'#222','stroke-width':'0.22',style:'cursor:move'});
+        h.addEventListener('mousedown', ev=>{ev.stopPropagation(); startDrag(fi,vi,'mouse');});
+        h.addEventListener('touchstart', ev=>{ev.stopPropagation(); ev.preventDefault(); startDrag(fi,vi,'touch');}, {passive:false});
+        g.appendChild(h);
+      });
+    }
+
+    svg.appendChild(g);
+  });
+}
+
+function renderConns(svg) {
+  const pairs = [
+    ...board.ladders.map(c=>({...c,type:'ladder'})),
+    ...board.snakes.map(c=>({...c,type:'snake'}))
+  ];
+  pairs.forEach(({from,to,type}) => {
+    const ff = byId(from), tf = byId(to);
+    if (!ff||!tf||ff.points.length<3||tf.points.length<3) return;
+    const [ax,ay]=centroid(ff.points), [bx,by]=centroid(tf.points);
+    const color = type==='ladder' ? '#43A047' : '#C62828';
+    svg.appendChild(mkSvg('line',{x1:ax,y1:ay,x2:bx,y2:by,stroke:color,'stroke-width':'1.1',opacity:'0.88','marker-end':'url(#arr-'+type+')'}));
+    const mx=(ax+bx)/2, my=(ay+by)/2;
+    svg.appendChild(mkSvg('text',{x:mx,y:my-2.2,'text-anchor':'middle','font-size':'4',style:'filter:drop-shadow(0 1px 4px rgba(0,0,0,.8))','pointer-events':'none'}, type==='ladder'?'🪜':'🐍'));
+  });
+}
+
+function renderPreview(svg) {
+  if (!drawPts.length) return;
+  for (let i=1;i<drawPts.length;i++) {
+    const [px,py]=drawPts[i-1],[x,y]=drawPts[i];
+    svg.appendChild(mkSvg('line',{x1:px,y1:py,x2:x,y2:y,stroke:'#f7971e','stroke-width':'0.45','stroke-dasharray':'1.5 0.7'}));
+  }
+  drawPts.forEach(([x,y],i) => {
+    const r = (i===0&&drawPts.length>=3) ? '1.3':'0.72';
+    svg.appendChild(mkSvg('circle',{cx:x,cy:y,r,fill:'#f7971e',stroke:'#fff','stroke-width':'0.22'}));
+  });
+  if (previewPt) {
+    const [lx,ly]=drawPts[drawPts.length-1];
+    svg.appendChild(mkSvg('line',{x1:lx,y1:ly,x2:previewPt[0],y2:previewPt[1],stroke:'#f7971e','stroke-width':'0.4','stroke-dasharray':'1.2 0.8',opacity:'0.65'}));
+    if (drawPts.length>=3) {
+      const [fx,fy]=drawPts[0];
+      if (Math.hypot(previewPt[0]-fx,previewPt[1]-fy)<3)
+        svg.appendChild(mkSvg('circle',{cx:fx,cy:fy,r:'2',fill:'none',stroke:'#f7971e','stroke-width':'0.55',opacity:'0.9'}));
+    }
+  }
+}
+
+// ── SVG Events ─────────────────────────────────────────────────
+function initEvents() {
+  const svg = document.getElementById('board-svg');
+  svg.addEventListener('click', ev => {
+    if (tool!=='draw') {
+      if (ev.target===svg||ev.target.id==='board-svg') { selId=null; connFrom=null; updProps(); updList(); render(); }
+      return;
+    }
+    onDrawClick(...svgXY(ev));
+  });
+  svg.addEventListener('dblclick', ev => {
+    if (tool==='draw' && drawPts.length>=3) { ev.preventDefault(); closePoly(); }
+  });
+  svg.addEventListener('mousemove', ev => {
+    previewPt = svgXY(ev);
+    if (drawPts.length>0) render();
+    if (dragInfo) { board.fields[dragInfo.fi].points[dragInfo.vi]=previewPt; render(); }
+  });
+  svg.addEventListener('touchstart', ev => {
+    if (tool!=='draw') return;
+    ev.preventDefault();
+    onDrawClick(...svgXY(ev));
+  }, {passive:false});
+}
+
+function onDrawClick(x,y) {
+  if (drawPts.length>=3) {
+    const [fx,fy]=drawPts[0];
+    if (Math.hypot(x-fx,y-fy)<3) { closePoly(); return; }
+  }
+  drawPts.push([x,y]);
+  render();
+}
+
+function onFieldClick(id) {
+  if (tool==='select') {
+    selId = selId===id ? null : id;
+    updProps(); updList(); render();
+  } else if (tool==='ladder'||tool==='snake') {
+    if (!connFrom) {
+      connFrom=id;
+      status((tool==='ladder'?'🪜':'🐍')+' Zielfeld klicken…');
+      render();
+    } else if (connFrom===id) {
+      connFrom=null;
+      status((tool==='ladder'?'🪜 Startfeld der Leiter':'🐍 Startfeld der Schlange')+' klicken…');
+      render();
+    } else {
+      const arr = tool==='ladder' ? board.ladders : board.snakes;
+      const di = arr.findIndex(c=>c.from===connFrom);
+      if (di>=0) arr.splice(di,1);
+      arr.push({from:connFrom,to:id});
+      connFrom=null;
+      status((tool==='ladder'?'🪜 Startfeld der Leiter':'🐍 Startfeld der Schlange')+' klicken…');
+      updConns(); render();
+    }
+  }
+}
+
+function closePoly() {
+  if (drawPts.length<3) { drawPts=[]; previewPt=null; render(); return; }
+  const f = {
+    id: 'f'+(_nid++), number: board.fields.length+1,
+    points: drawPts.slice(), difficulty:'leicht', bonusType:null,
+    isStart: board.fields.length===0, isGoal: false
+  };
+  board.fields.push(f);
+  drawPts=[]; previewPt=null; selId=f.id;
+  updList(); updProps(); render();
+}
+
+// ── Vertex drag ────────────────────────────────────────────────
+function startDrag(fi, vi, type) {
+  dragInfo = {fi,vi};
+  if (type==='mouse') {
+    const up = ()=>{ dragInfo=null; document.removeEventListener('mouseup',up); render(); };
+    document.addEventListener('mouseup',up);
+  } else {
+    const mv = ev=>{ ev.preventDefault(); board.fields[fi].points[vi]=svgXY(ev); render(); };
+    const up = ()=>{ dragInfo=null; document.removeEventListener('touchmove',mv); document.removeEventListener('touchend',up); render(); };
+    document.addEventListener('touchmove',mv,{passive:false});
+    document.addEventListener('touchend',up);
+  }
+}
+
+// ── Tool switch ────────────────────────────────────────────────
+function setTool(t) {
+  tool=t; drawPts=[]; previewPt=null; connFrom=null;
+  document.querySelectorAll('.tbtn[id^=btn-]').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+t); if(btn) btn.classList.add('active');
+  document.getElementById('board-svg').setAttribute('class','t-'+t);
+  const msgs = {
+    select:'⬆ Feld anklicken. Weiße Punkte ziehen zum Formen.',
+    draw:'✏ Klicken = Eckpunkt setzen. Ersten Punkt oder Doppelklick = Abschließen. ESC = Abbrechen.',
+    ladder:'🪜 Startfeld der Leiter klicken…',
+    snake:'🐍 Startfeld der Schlange klicken…'
+  };
+  status(msgs[t]||'');
+  render();
+}
+
+// ── Field list ─────────────────────────────────────────────────
+function updList() {
+  const list=document.getElementById('field-list');
+  const empty=document.getElementById('field-empty');
+  document.getElementById('field-count').textContent=board.fields.length;
+  list.innerHTML='';
+  if (!board.fields.length) { empty.style.display=''; return; }
+  empty.style.display='none';
+  board.fields.forEach((f,i)=>{
+    const item=document.createElement('div');
+    item.className='fi'+(f.id===selId?' sel':'');
+    const dot=document.createElement('div'); dot.className='fi-dot'; dot.style.background=fieldColor(f);
+    const num=document.createElement('span'); num.className='fi-n'; num.textContent=f.number;
+    const nm=document.createElement('span'); nm.className='fi-nm';
+    nm.textContent=f.isStart?'🏁 Start':f.isGoal?'🏆 Ziel':(f.bonusType?{roll_again:'🎲 Nochmal',free_move:'🎁 Freizug',swap:'🔄 Tauschen'}[f.bonusType]:f.difficulty);
+    const acts=document.createElement('div'); acts.className='fi-acts';
+    const uBtn=document.createElement('button'); uBtn.className='fi-btn'; uBtn.textContent='↑'; uBtn.title='Nach oben'; uBtn.disabled=i===0;
+    uBtn.addEventListener('click',ev=>{ev.stopPropagation();moveField(i,-1);});
+    const dBtn=document.createElement('button'); dBtn.className='fi-btn'; dBtn.textContent='↓'; dBtn.title='Nach unten'; dBtn.disabled=i===board.fields.length-1;
+    dBtn.addEventListener('click',ev=>{ev.stopPropagation();moveField(i,1);});
+    const xBtn=document.createElement('button'); xBtn.className='fi-btn del'; xBtn.textContent='✕'; xBtn.title='Löschen';
+    xBtn.addEventListener('click',ev=>{ev.stopPropagation();delField(f.id);});
+    acts.append(uBtn,dBtn,xBtn);
+    item.append(dot,num,nm,acts);
+    item.addEventListener('click',()=>{ selId=f.id; updProps(); updList(); render(); });
+    list.appendChild(item);
+  });
+}
+
+function updProps() {
+  const panel=document.getElementById('sec-props');
+  const f=byId(selId);
+  if (!f) { panel.style.display='none'; return; }
+  panel.style.display='block';
+  document.getElementById('prop-diff').value=f.difficulty||'leicht';
+  document.getElementById('prop-bonus').value=f.bonusType||'';
+  document.getElementById('prop-start').checked=!!f.isStart;
+  document.getElementById('prop-goal').checked=!!f.isGoal;
+}
+
+function applyProp(key, val) {
+  const f=byId(selId); if (!f) return;
+  if (key==='isStart'&&val) { board.fields.forEach(ff=>ff.isStart=false); f.isStart=true; }
+  else if (key==='isGoal'&&val) { board.fields.forEach(ff=>ff.isGoal=false); f.isGoal=true; }
+  else f[key]=val;
+  updList(); updProps(); render();
+}
+
+function moveField(idx, dir) {
+  const ni=idx+dir;
+  if (ni<0||ni>=board.fields.length) return;
+  [board.fields[idx],board.fields[ni]]=[board.fields[ni],board.fields[idx]];
+  board.fields.forEach((f,i)=>f.number=i+1);
+  updList(); render();
+}
+
+function delField(id) {
+  board.fields=board.fields.filter(f=>f.id!==id);
+  board.ladders=board.ladders.filter(c=>c.from!==id&&c.to!==id);
+  board.snakes=board.snakes.filter(c=>c.from!==id&&c.to!==id);
+  board.fields.forEach((f,i)=>f.number=i+1);
+  if (selId===id) selId=null;
+  updList(); updProps(); updConns(); render();
+}
+
+function deleteSelField() { if (selId) delField(selId); }
+
+// ── Connections ────────────────────────────────────────────────
+function updConns() {
+  const list=document.getElementById('conn-list');
+  list.innerHTML='';
+  const all=[...board.ladders.map(c=>({...c,type:'ladder'})),...board.snakes.map(c=>({...c,type:'snake'}))];
+  if (!all.length) { list.innerHTML='<p class="hint">Noch keine Verbindungen.</p>'; return; }
+  all.forEach(c=>{
+    const ff=byId(c.from),tf=byId(c.to); if(!ff||!tf) return;
+    const div=document.createElement('div'); div.className='conn-i';
+    const sp=document.createElement('span'); sp.textContent=(c.type==='ladder'?'🪜':'🐍')+' Feld '+ff.number+' → '+tf.number;
+    const btn=document.createElement('button'); btn.textContent='✕'; btn.title='Entfernen';
+    btn.addEventListener('click',()=>{ removeConn(c.type,c.from,c.to); });
+    div.append(sp,btn); list.appendChild(div);
+  });
+}
+
+function removeConn(type,from,to) {
+  const arr=type==='ladder'?board.ladders:board.snakes;
+  const i=arr.findIndex(c=>c.from===from&&c.to===to); if(i>=0) arr.splice(i,1);
+  updConns(); render();
+}
+
+// ── Background ─────────────────────────────────────────────────
+function handleBgUpload(e) {
+  const file=e.target.files[0]; if (!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>compressSetBg(ev.target.result);
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function loadBgFromUrl() {
+  const url=document.getElementById('bg-url').value.trim(); if (!url) return;
+  compressSetBg(url);
+}
+
+function compressSetBg(src) {
+  const img=new Image();
+  img.onload=()=>{
+    try {
+      const maxW=1400, s=Math.min(1,maxW/img.naturalWidth);
+      const c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*s); c.height=Math.round(img.naturalHeight*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      applyBg(c.toDataURL('image/jpeg',0.82), c.width/c.height);
+    } catch(err) { applyBg(src, img.naturalWidth/img.naturalHeight||16/9); }
+  };
+  img.onerror=()=>toast('Bild konnte nicht geladen werden.',true);
+  if (!src.startsWith('data:')) img.crossOrigin='anonymous';
+  img.src=src;
+}
+
+function applyBg(src, ratio) {
+  board.backgroundImage=src; board.aspectRatio=ratio||16/9;
+  const wrap=document.getElementById('board-wrap'); wrap.style.aspectRatio=board.aspectRatio;
+  const bg=document.getElementById('board-bg'); bg.src=src; bg.style.display='block';
+  document.getElementById('board-ph').style.display='none';
+  document.getElementById('btn-clear-bg').style.display='';
+  document.getElementById('upload-lbl').textContent='📷 Bild wechseln';
+  document.getElementById('bg-url').value='';
+  render();
+}
+
+function clearBg() {
+  board.backgroundImage=null; board.aspectRatio=16/9;
+  document.getElementById('board-wrap').style.aspectRatio='16/9';
+  const bg=document.getElementById('board-bg'); bg.src=''; bg.style.display='none';
+  document.getElementById('board-ph').style.display='';
+  document.getElementById('btn-clear-bg').style.display='none';
+  document.getElementById('upload-lbl').textContent='📷 Bild hochladen';
+  render();
+}
+
+// ── Save / Load ────────────────────────────────────────────────
+function newBoard() {
+  if (board.fields.length>0 && !confirm('Aktuelles Brett verwerfen?')) return;
+  board={id:null,name:'Mein Brett',backgroundImage:null,aspectRatio:16/9,fields:[],ladders:[],snakes:[]};
+  _nid=1; selId=null; connFrom=null; drawPts=[];
+  document.getElementById('board-name').value='Mein Brett';
+  clearBg(); updList(); updProps(); updConns(); render();
+}
+
+function saveBoard() {
+  if (!board.name.trim()) board.name='Mein Brett';
+  if (!board.id) board.id='board-'+Date.now();
+  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
+  const i=boards.findIndex(b=>b.id===board.id);
+  if (i>=0) boards[i]=board; else boards.push(board);
+  localStorage.setItem('ls_custom_boards',JSON.stringify(boards));
+  toast('Brett gespeichert ✓');
+}
+
+function openLoadModal() {
+  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
+  const listEl=document.getElementById('modal-list');
+  listEl.innerHTML='';
+  if (!boards.length) { listEl.innerHTML='<p class="hint">Keine gespeicherten Bretter.</p>'; }
+  else {
+    boards.slice().reverse().forEach(b=>{
+      const item=document.createElement('div'); item.className='modal-item';
+      const info=document.createElement('div');
+      info.innerHTML='<strong>'+esc(b.name||'Brett')+'</strong><br><small style="color:var(--text2)">'+b.fields.length+' Felder · '+(b.ladders.length+b.snakes.length)+' Verbindungen</small>';
+      const acts=document.createElement('div'); acts.className='modal-item-acts';
+      const lb=document.createElement('button'); lb.textContent='Laden';
+      lb.addEventListener('click',()=>{ loadBoard(b); closeModal(); });
+      const db=document.createElement('button'); db.className='d-btn'; db.textContent='✕'; db.title='Löschen';
+      db.addEventListener('click',()=>{ deleteSaved(b.id); openLoadModal(); });
+      acts.append(lb,db); item.append(info,acts); listEl.appendChild(item);
+    });
+  }
+  document.getElementById('modal-load').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-load').classList.remove('open'); }
+
+function deleteSaved(id) {
+  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
+  localStorage.setItem('ls_custom_boards',JSON.stringify(boards.filter(b=>b.id!==id)));
+}
+
+function loadBoard(saved) {
+  board=JSON.parse(JSON.stringify(saved));
+  _nid=board.fields.reduce((m,f)=>{ const n=parseInt(f.id.slice(1)); return isNaN(n)?m:Math.max(m,n+1); },1);
+  selId=null; connFrom=null; drawPts=[];
+  document.getElementById('board-name').value=board.name||'';
+  if (board.backgroundImage) {
+    const bg=document.getElementById('board-bg'); bg.src=board.backgroundImage; bg.style.display='block';
+    document.getElementById('board-ph').style.display='none';
+    document.getElementById('btn-clear-bg').style.display='';
+    document.getElementById('upload-lbl').textContent='📷 Bild wechseln';
+    document.getElementById('board-wrap').style.aspectRatio=board.aspectRatio||16/9;
+  } else { clearBg(); }
+  updList(); updProps(); updConns(); render(); toast('Brett geladen ✓');
+}
+
+function exportBoard() {
+  if (!board.id) board.id='board-'+Date.now();
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(board,null,2)],{type:'application/json'}));
+  a.download=(board.name||'brett').replace(/[^a-z0-9_-]/gi,'_')+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function handleImport(e) {
+  const file=e.target.files[0]; if (!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try {
+      const d=JSON.parse(ev.target.result);
+      if (!d.fields||!Array.isArray(d.fields)) { toast('Ungültiges Format',true); return; }
+      d.id=null; loadBoard(d);
+    } catch { toast('Fehler beim Importieren',true); }
+  };
+  r.readAsText(file); e.target.value='';
+}
+
+// ── Theme ──────────────────────────────────────────────────────
+(function(){
+  const KEY='spiele_theme';
+  function apply(dark){ document.body.classList.toggle('dark',dark); document.getElementById('btn-theme').textContent=dark?'☀️':'🌙'; }
+  window.toggleTheme=function(){ const n=!document.body.classList.contains('dark'); localStorage.setItem(KEY,n?'dark':'light'); apply(n); };
+  apply(localStorage.getItem(KEY)==='dark');
+})();
+
+// ── Keyboard ───────────────────────────────────────────────────
+document.addEventListener('keydown', e=>{
+  if (e.key==='Escape') {
+    if (drawPts.length>0) { drawPts=[]; previewPt=null; render(); }
+    else if (connFrom) { connFrom=null; render(); }
+    else if (selId) { selId=null; updProps(); updList(); render(); }
+  }
+  if (e.key==='Delete'&&selId) deleteSelField();
+});
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', ()=>{
+  initEvents();
+  setTool('draw');
+  updList(); updConns();
+});
+
+// Global exports for inline handlers
+window.applyProp = applyProp;
+window.deleteSelField = deleteSelField;
+window.setTool = setTool;
+window.saveBoard = saveBoard;
+window.newBoard = newBoard;
+window.openLoadModal = openLoadModal;
+window.closeModal = closeModal;
+window.exportBoard = exportBoard;
+window.handleImport = handleImport;
+window.handleBgUpload = handleBgUpload;
+window.loadBgFromUrl = loadBgFromUrl;
+window.clearBg = clearBg;
+window.toggleTheme = toggleTheme;
+</script>
+</body>
+</html>

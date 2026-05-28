@@ -192,6 +192,32 @@ const ANIMALS = [
 const LADDERS = { 4: 14, 9: 31, 21: 42, 28: 84, 51: 67 };
 const SNAKES  = { 16: 6, 47: 26, 62: 19, 93: 73, 98: 87 };
 
+// Custom board support (populated from localStorage when a designer-brett is loaded)
+let _customBoard = null;
+
+function getFieldCount() {
+  return (gameState.board && gameState.board.length > 1) ? gameState.board.length - 1 : FIELD_COUNT;
+}
+
+function _cbCentroid(pts) {
+  return [pts.reduce((s,p)=>s+p[0],0)/pts.length, pts.reduce((s,p)=>s+p[1],0)/pts.length];
+}
+
+function _cbSvgEl(tag, attrs, txt) {
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  if (attrs) for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+
+function _cbFieldColor(field, isFirst, isLast) {
+  if (isFirst) return '#1565C0';
+  if (isLast)  return '#6A1B9A';
+  const bonus = {roll_again:'#0277BD', free_move:'#33691E', swap:'#880E4F'};
+  if (field.bonusType && bonus[field.bonusType]) return bonus[field.bonusType];
+  return {leicht:'#2E7D32', mittel:'#E65100', schwer:'#B71C1C'}[field.difficulty] || '#455A64';
+}
+
 const TIMER_SECONDS = { leicht: 30, mittel: 45, schwer: 60 };
 const POINTS = { leicht: 10, mittel: 20, schwer: 30 };
 
@@ -214,6 +240,7 @@ let fragenBank = null;
 let rawCategories = [];
 let selectedCategoryIds = new Set();
 let activeFragenBank = null;
+let selectedCustomBoardId = null; // set in setup screen, cleared on reset
 
 let gameState = {
   meta: { gameCode: '', title: 'Schlangen & Leitern', createdAt: '' },
@@ -731,6 +758,17 @@ function proceedFromCategories() {
   gameState.pendingDice = null;
   gameState.liveQuestion = null;
   gameState.activeCategoryIds = [...selectedCategoryIds];
+
+  // Load custom board if selected
+  if (selectedCustomBoardId) {
+    const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+    _customBoard = boards.find(b => b.id === selectedCustomBoardId) || null;
+    gameState.customBoardId = selectedCustomBoardId;
+  } else {
+    _customBoard = null;
+    gameState.customBoardId = null;
+  }
+
   generateBoard();
 
   const code = LsStorage.getCode();
@@ -750,8 +788,7 @@ function proceedFromCategories() {
     updateDiceButton(true);
     startSSESubscription();
     showCodeBanner();
-    drawLaddersAndSnakes();
-    window.addEventListener('resize', drawLaddersAndSnakes);
+    if (!_customBoard) { drawLaddersAndSnakes(); window.addEventListener('resize', drawLaddersAndSnakes); }
   } else {
     gameState.phase = 'dice-order';
     LsStorage.save(gameState);
@@ -763,6 +800,10 @@ function proceedFromCategories() {
 
 // ── Board Generation ─────────────────────────────────────────
 function generateBoard() {
+  if (_customBoard && _customBoard.fields && _customBoard.fields.length > 0) {
+    generateCustomBoard();
+    return;
+  }
   const board = new Array(FIELD_COUNT + 1);
 
   // Assign difficulties
@@ -808,6 +849,37 @@ function generateBoard() {
     }
   }
 
+  gameState.board = board;
+}
+
+function generateCustomBoard() {
+  const fields = _customBoard.fields.slice().sort((a,b) => a.number - b.number);
+  const maxN = Math.max(...fields.map(f => f.number));
+
+  const fieldById = {};
+  fields.forEach(f => { fieldById[f.id] = f; });
+
+  const ladderMap = {}, snakeMap = {};
+  (_customBoard.ladders || []).forEach(({from, to}) => {
+    const ff = fieldById[from], tf = fieldById[to];
+    if (ff && tf) ladderMap[ff.number] = tf.number;
+  });
+  (_customBoard.snakes || []).forEach(({from, to}) => {
+    const ff = fieldById[from], tf = fieldById[to];
+    if (ff && tf) snakeMap[ff.number] = tf.number;
+  });
+
+  const board = new Array(maxN + 1).fill(null);
+  fields.forEach(f => {
+    board[f.number] = {
+      number: f.number,
+      difficulty: f.difficulty || 'leicht',
+      bonusType: f.bonusType || null,
+      ladderTo: ladderMap[f.number] || null,
+      snakeTo: snakeMap[f.number] || null,
+      points: f.points
+    };
+  });
   gameState.board = board;
 }
 
@@ -999,6 +1071,7 @@ function fieldToGridPosition(fieldNum) {
 }
 
 function renderBoard() {
+  if (_customBoard) { renderCustomBoardSVG(); return; }
   const grid = document.getElementById('board-grid');
   grid.innerHTML = '';
 
@@ -1088,6 +1161,7 @@ function renderBoard() {
 }
 
 function updatePieces() {
+  if (_customBoard) { renderCustomBoardSVG(); return; }
   // Clear all pieces
   for (let f = 1; f <= FIELD_COUNT; f++) {
     const container = document.getElementById('pieces-' + f);
@@ -1117,8 +1191,131 @@ function updatePieces() {
   }
 }
 
+// ── Custom Board SVG Renderer ────────────────────────────────
+function renderCustomBoardSVG() {
+  const container = document.querySelector('.board-container');
+  const grid = document.getElementById('board-grid');
+  const svg = document.getElementById('svg-overlay');
+  if (!container || !svg) return;
+
+  // One-time setup: hide grid, stretch SVG over full container
+  if (!container.classList.contains('is-custom')) {
+    container.classList.add('is-custom');
+    container.style.setProperty('--custom-ar', String(_customBoard.aspectRatio || 1.777));
+    grid.style.display = 'none';
+    svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+  }
+
+  svg.innerHTML = '';
+
+  // Arrow markers
+  const defs = _cbSvgEl('defs');
+  ['ladder','snake'].forEach(type => {
+    const m = _cbSvgEl('marker', {id:'cb-'+type, markerWidth:'7', markerHeight:'7', refX:'6', refY:'3.5', orient:'auto'});
+    m.appendChild(_cbSvgEl('path', {d:'M0,0 L0,7 L7,3.5 z', fill: type==='ladder'?'#43A047':'#C62828'}));
+    defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  // Background image
+  if (_customBoard.backgroundImage) {
+    svg.appendChild(_cbSvgEl('image', {
+      href: _customBoard.backgroundImage,
+      x:0, y:0, width:100, height:100,
+      preserveAspectRatio: 'xMidYMid slice'
+    }));
+  }
+
+  // Connections (below fields)
+  const fieldById = {};
+  (_customBoard.fields || []).forEach(f => { fieldById[f.id] = f; });
+
+  const drawConn = (from, to, type) => {
+    const ff = fieldById[from], tf = fieldById[to];
+    if (!ff || !tf || !ff.points || !tf.points) return;
+    const [ax,ay] = _cbCentroid(ff.points), [bx,by] = _cbCentroid(tf.points);
+    const color = type==='ladder' ? '#43A047' : '#C62828';
+    svg.appendChild(_cbSvgEl('line', {x1:ax,y1:ay,x2:bx,y2:by,stroke:color,'stroke-width':'1.2',opacity:'0.9','marker-end':'url(#cb-'+type+')'}));
+    svg.appendChild(_cbSvgEl('text', {x:(ax+bx)/2,y:(ay+by)/2-2.5,'text-anchor':'middle','font-size':'4',style:'filter:drop-shadow(0 1px 4px rgba(0,0,0,.9))','pointer-events':'none'}, type==='ladder'?'🪜':'🐍'));
+  };
+  (_customBoard.ladders||[]).forEach(({from,to}) => drawConn(from,to,'ladder'));
+  (_customBoard.snakes||[]).forEach(({from,to}) => drawConn(from,to,'snake'));
+
+  // Fields
+  const board = gameState.board;
+  const maxN = board.length - 1;
+  const currentTeam = gameState.phase==='playing' ? getCurrentTeam() : null;
+
+  for (let i = 1; i <= maxN; i++) {
+    const field = board[i];
+    if (!field || !field.points || field.points.length < 3) continue;
+
+    const isFirst = i === 1, isLast = i === maxN;
+    const isCurrent = currentTeam && currentTeam.position === i;
+    const xs = field.points.map(p=>p[0]), ys = field.points.map(p=>p[1]);
+    const w = Math.max(...xs)-Math.min(...xs), h = Math.max(...ys)-Math.min(...ys);
+    const fsize = Math.max(1.4, Math.min(3.8, Math.min(w,h)*0.32));
+    const [cx,cy] = _cbCentroid(field.points);
+
+    const g = _cbSvgEl('g');
+    g.appendChild(_cbSvgEl('polygon', {
+      points: field.points.map(p=>p.join(',')).join(' '),
+      fill: _cbFieldColor(field, isFirst, isLast),
+      stroke: isCurrent ? '#FFD700' : 'rgba(255,255,255,0.45)',
+      'stroke-width': isCurrent ? '0.7' : '0.25',
+      opacity: '0.87'
+    }));
+
+    g.appendChild(_cbSvgEl('text', {
+      x:cx, y:cy - fsize*0.25, 'text-anchor':'middle', 'dominant-baseline':'central',
+      fill:'#fff', 'font-size':fsize, 'font-weight':'700',
+      style:'filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))'
+    }, String(i)));
+
+    const icons = [];
+    if (isFirst)  icons.push('🏁');
+    if (isLast)   icons.push('🏆');
+    if (field.bonusType==='roll_again') icons.push('🎲');
+    if (field.bonusType==='free_move')  icons.push('🎁');
+    if (field.bonusType==='swap')       icons.push('🔄');
+    if (field.ladderTo) icons.push('🪜');
+    if (field.snakeTo)  icons.push('🐍');
+    if (icons.length) {
+      g.appendChild(_cbSvgEl('text', {
+        x:cx, y:cy+fsize*0.65, 'text-anchor':'middle', 'dominant-baseline':'central',
+        'font-size':Math.max(1.1,fsize*0.58), style:'filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))'
+      }, icons.join('')));
+    }
+    svg.appendChild(g);
+  }
+
+  // Team pieces — group by position
+  const byPos = {};
+  gameState.teams.forEach((team,idx) => {
+    if (team.position >= 1 && team.position <= maxN) {
+      (byPos[team.position] = byPos[team.position]||[]).push({team,idx});
+    }
+  });
+  Object.entries(byPos).forEach(([pos, entries]) => {
+    const field = board[+pos];
+    if (!field || !field.points) return;
+    const [cx,cy] = _cbCentroid(field.points);
+    const n = entries.length;
+    entries.forEach(({team}, i) => {
+      const ox = n > 1 ? (i - (n-1)/2) * 2.5 : 0;
+      svg.appendChild(_cbSvgEl('text', {
+        x:cx+ox, y:cy+0.4, 'text-anchor':'middle', 'dominant-baseline':'central',
+        'font-size':'4', style:'filter:drop-shadow(0 1px 3px rgba(0,0,0,.9))'
+      }, team.emoji));
+    });
+  });
+}
+
 // ── SVG Ladders & Snakes ─────────────────────────────────────
 function drawLaddersAndSnakes() {
+  if (_customBoard) return;
   const svg = document.getElementById('svg-overlay');
   const grid = document.getElementById('board-grid');
   if (!svg || !grid) return;
@@ -1592,9 +1789,10 @@ function continueAfterQuestion() {
 function moveTeam() {
   const team = getCurrentTeam();
   const dice = gameState.pendingDice;
+  const maxField = getFieldCount();
   const newPos = team.position + dice;
 
-  if (newPos > 100) {
+  if (newPos > maxField) {
     // Too high - stay in place
     updateActiveBanner();
     nextTurn();
@@ -1606,7 +1804,7 @@ function moveTeam() {
   updateTeamList();
 
   // Check win
-  if (newPos === 100) {
+  if (newPos === maxField) {
     setTimeout(() => showWinner(), 500);
     return;
   }
@@ -1637,7 +1835,7 @@ function afterLanding() {
   const field = gameState.board[team.position];
 
   // Check win after ladder
-  if (team.position === 100) {
+  if (team.position === getFieldCount()) {
     setTimeout(() => showWinner(), 300);
     return;
   }
@@ -1899,6 +2097,14 @@ async function _gsEnter(code) {
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = gs;
 
+  // Restore custom board from localStorage if this game used one
+  if (gs.customBoardId) {
+    const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+    _customBoard = boards.find(b => b.id === gs.customBoardId) || null;
+  } else {
+    _customBoard = null;
+  }
+
   if (gs.phase === 'playing') {
     if (gs.activeCategoryIds && fragenBank) {
       selectedCategoryIds = new Set(gs.activeCategoryIds);
@@ -1910,8 +2116,7 @@ async function _gsEnter(code) {
     updateActiveBanner();
     updateDiceButton(false);
     showCodeBanner();
-    drawLaddersAndSnakes();
-    window.addEventListener('resize', drawLaddersAndSnakes);
+    if (!_customBoard) { drawLaddersAndSnakes(); window.addEventListener('resize', drawLaddersAndSnakes); }
     startSSESubscription();
 
   } else if (gs.phase === 'dice-order') {
@@ -1953,6 +2158,49 @@ async function createNewGame() {
   showCodeBanner();
 }
 
+// ── Custom Board Picker ───────────────────────────────────────
+function openCustomBoardPicker() {
+  const modal = document.getElementById('cb-modal');
+  const list = document.getElementById('cb-modal-list');
+  if (!modal || !list) return;
+  const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+  list.innerHTML = '';
+  if (boards.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary,#a8a8b3);font-style:italic;font-size:0.85rem;">Keine Bretter gespeichert. Erstelle eines im Brett-Designer.</p>';
+  } else {
+    boards.slice().reverse().forEach(b => {
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer;';
+      item.innerHTML = '<span style="font-size:1.1rem;">🗺️</span><div style="flex:1"><div style="font-weight:700;font-size:0.9rem;color:var(--text-primary,#fff);">' + escapeHtml(b.name || 'Brett') + '</div><div style="font-size:0.78rem;color:var(--text-secondary,#a8a8b3);">' + b.fields.length + ' Felder · ' + (b.ladders.length + b.snakes.length) + ' Verbindungen</div></div>';
+      item.addEventListener('mouseenter', () => item.style.borderColor = 'var(--accent,#e94560)');
+      item.addEventListener('mouseleave', () => item.style.borderColor = 'rgba(255,255,255,0.1)');
+      item.addEventListener('click', () => {
+        selectedCustomBoardId = b.id;
+        const nameEl = document.getElementById('custom-board-name');
+        if (nameEl) nameEl.textContent = b.name || 'Brett';
+        const preview = document.getElementById('custom-board-preview');
+        if (preview) preview.style.display = 'flex';
+        const btn = document.getElementById('btn-custom-board');
+        if (btn) btn.textContent = 'Brett ändern…';
+        modal.style.display = 'none';
+      });
+      list.appendChild(item);
+    });
+  }
+  modal.style.display = 'flex';
+}
+
+function clearCustomBoard() {
+  selectedCustomBoardId = null;
+  const preview = document.getElementById('custom-board-preview');
+  if (preview) preview.style.display = 'none';
+  const btn = document.getElementById('btn-custom-board');
+  if (btn) btn.textContent = 'Brett wählen…';
+}
+
+window.openCustomBoardPicker = openCustomBoardPicker;
+window.clearCustomBoard = clearCustomBoard;
+
 // onclick-Strings in gs-game-card verwenden window._gsEnter / window._gsDelete
 window._gsEnter = _gsEnter;
 window._gsDelete = _gsDelete;
@@ -1973,6 +2221,16 @@ function resetToSetup() {
   gameState.liveQuestion = null;
   LsStorage.setCode(null);
   window.removeEventListener('resize', drawLaddersAndSnakes);
+  // Clean up custom board state
+  _customBoard = null;
+  selectedCustomBoardId = null;
+  const container = document.querySelector('.board-container');
+  if (container) {
+    container.classList.remove('is-custom');
+    container.style.removeProperty('--custom-ar');
+  }
+  const grid = document.getElementById('board-grid');
+  if (grid) grid.style.display = '';
   const banner = document.getElementById('ls-code-banner');
   if (banner) banner.remove();
   window.history.replaceState({}, '', 'index.html');

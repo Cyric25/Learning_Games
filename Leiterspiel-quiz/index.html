@@ -55,6 +55,7 @@
     <div style="margin-top:1.5rem;display:flex;gap:1.2rem;align-items:center;flex-wrap:wrap;justify-content:center;">
       <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;text-decoration:none;">← Zurück zur Übersicht</a>
       <a href="solo.html" style="padding:0.5rem 1.2rem;background:linear-gradient(135deg,#f7971e,#E34F20);color:#fff;border-radius:10px;font-size:0.9rem;font-weight:700;text-decoration:none;">🎲 Solo spielen</a>
+      <a href="designer.html" style="padding:0.5rem 1.2rem;background:var(--bg-sidebar,#1a2744);color:var(--accent,#e94560);border:1.5px solid var(--accent,#e94560);border-radius:10px;font-size:0.9rem;font-weight:700;text-decoration:none;">🎨 Brett-Designer</a>
     </div>
   </div>
 
@@ -120,6 +121,20 @@
             <div class="settings-row-title">🎨 Erscheinungsbild</div>
           </div>
           <button class="setup-btn setup-btn-ghost" id="btn-theme" onclick="toggleTheme()" style="padding:0.4rem 0.9rem;font-size:0.9rem;">🌙 Darkmode</button>
+        </div>
+
+        <!-- Custom Board -->
+        <div class="settings-row" id="custom-board-row">
+          <div>
+            <div class="settings-row-title">🗺️ Spielfeld</div>
+            <div class="settings-row-desc">Eigenes Brett aus dem Designer verwenden</div>
+          </div>
+          <button class="setup-btn setup-btn-ghost" id="btn-custom-board" onclick="openCustomBoardPicker()" style="padding:0.4rem 0.9rem;font-size:0.9rem;">Brett wählen…</button>
+        </div>
+        <div id="custom-board-preview" style="display:none;margin-bottom:0.8rem;padding:0.5rem 0.8rem;background:rgba(0,0,0,0.04);border-radius:8px;border:1.5px solid var(--accent);display:flex;align-items:center;gap:0.6rem;">
+          <span style="font-size:1.1rem;">🗺️</span>
+          <span id="custom-board-name" style="font-weight:700;color:var(--accent);flex:1;"></span>
+          <button onclick="clearCustomBoard()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:0.85rem;padding:0.2rem 0.4rem;">✕</button>
         </div>
 
       </div>
@@ -266,8 +281,20 @@
     </div>
   </div>
 
+  <!-- Custom Board Picker Modal -->
+  <div id="cb-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-sidebar,#16213e);border-radius:14px;padding:1.4rem;width:min(460px,92vw);max-height:80vh;display:flex;flex-direction:column;gap:0.9rem;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+      <div style="font-size:1.05rem;font-weight:700;color:var(--text-primary,#fff);">🗺️ Custom Brett auswählen</div>
+      <div id="cb-modal-list" style="overflow-y:auto;display:flex;flex-direction:column;gap:0.45rem;max-height:50vh;"></div>
+      <div style="display:flex;gap:0.6rem;justify-content:flex-end;">
+        <a href="designer.html" style="padding:0.38rem 0.9rem;border-radius:7px;border:1.5px solid var(--accent,#e94560);color:var(--accent,#e94560);font-size:0.82rem;font-weight:600;text-decoration:none;">+ Neues Brett erstellen</a>
+        <button onclick="document.getElementById('cb-modal').style.display='none'" style="padding:0.38rem 0.9rem;border-radius:7px;border:1px solid rgba(128,128,128,0.3);background:none;color:var(--text-secondary,#a8a8b3);cursor:pointer;font-size:0.82rem;">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Scripts ─────────────────────────────────────────── -->
-  <script src="js/leiterspiel.js?v=3"></script>
+  <script src="js/leiterspiel.js?v=4"></script>
 
   <!-- Teacher Mode -->
   <script>
