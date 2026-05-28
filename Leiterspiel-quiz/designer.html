@@ -98,10 +98,10 @@
     .hint { color: var(--text2); font-size: 0.78rem; font-style: italic; }
 
     /* Canvas area */
-    #canvas-area { flex: 1; overflow: auto; display: flex; align-items: center;
-      justify-content: center; padding: 1.2rem; background: var(--bg); }
+    #canvas-area { flex: 1; overflow: auto; display: flex; flex-direction: column;
+      align-items: center; padding: 1.2rem; background: var(--bg); }
     #board-wrap { position: relative; width: 100%; max-width: 920px; aspect-ratio: 16/9;
-      background: #1a1a2e; border-radius: 8px; overflow: hidden;
+      margin: auto; background: #1a1a2e; border-radius: 8px; overflow: hidden;
       box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
     #board-bg { display: none; width: 100%; height: 100%; object-fit: fill; }
     #board-ph { position: absolute; inset: 0; display: flex; flex-direction: column;
