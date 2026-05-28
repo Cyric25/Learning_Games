@@ -311,6 +311,32 @@ function buildSetupUI() {
   buildSymbolModeUI();
   buildSymbolsUI();
   buildTimerUI();
+  buildQuestionModeUI();
+}
+
+function buildQuestionModeUI() {
+  const row = document.getElementById('question-mode-row'); if (!row) return;
+  row.innerHTML = '';
+  const opts = [
+    { label: '🔀 Gemischt', desc: 'MC + Offene Fragen', v: 'mixed' },
+    { label: '🅰 Nur Multiple Choice', desc: 'Schüler spielen selbstständig', v: 'mc' },
+    { label: '💬 Nur Offene Fragen', desc: 'Spielleiter bewertet immer', v: 'open' }
+  ];
+  const group = document.createElement('div');
+  group.className = 'qmode-group';
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'qmode-btn' + (opt.v === _cfg.questionMode ? ' active' : '');
+    btn.innerHTML = opt.label + '<span class="qmode-desc">' + opt.desc + '</span>';
+    btn.onclick = () => {
+      _cfg.questionMode = opt.v;
+      group.querySelectorAll('.qmode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateCategoryInfo();
+    };
+    group.appendChild(btn);
+  });
+  row.appendChild(group);
 }
 
 function buildMazeSourceUI() {
@@ -570,10 +596,19 @@ function toggleAllCategories(on) {
   updateCategoryInfo();
 }
 
+function filterByMode(questions) {
+  const mode = _cfg.questionMode || 'mixed';
+  if (mode === 'mixed') return questions;
+  return questions.filter(q => {
+    const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+    return mode === 'mc' ? isMC : !isMC;
+  });
+}
+
 function updateCategoryInfo() {
   const el = document.getElementById('cat-select-info');
   if (!el) return;
-  const aktiv = allQuestions.filter(q => activeCategories.has(q.kategorieId));
+  const aktiv = filterByMode(allQuestions.filter(q => activeCategories.has(q.kategorieId)));
   const n = aktiv.length;
   const btn = document.querySelector('#category-screen .setup-btn:not(.setup-btn-ghost)');
 
@@ -595,7 +630,7 @@ function updateCategoryInfo() {
   if (btn) btn.disabled = !ok;
 }
 
-let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele', mazeSource: 'random' };
+let _cfg = { teamCount: 4, symbolsPerTeam: 7, timerSeconds: 20, mazeSize: 12, allSymbols: false, doorPreset: 'viele', mazeSource: 'random', questionMode: 'mixed' };
 
 function getDoorCount(preset, size) {
   const presets = {
@@ -617,7 +652,7 @@ function proceedToCategories() {
 // ── proceedFromCategories (Category-Screen → Spiel starten) ───────
 function proceedFromCategories() {
   if (activeCategories.size === 0) { updateCategoryInfo(); return; }
-  const avail = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  const avail = filterByMode(allQuestions.filter(q => activeCategories.has(q.kategorieId))).length;
   if (avail < 20) { updateCategoryInfo(); return; }
   const needed = _cfg.teamCount * _cfg.symbolsPerTeam;
   if (avail < needed) {
@@ -672,7 +707,7 @@ async function startGame() {
   const errEl = document.getElementById('setup-error'); errEl.textContent = '';
 
   if (activeCategories.size === 0) { errEl.textContent = 'Bitte mindestens eine Kategorie auswählen.'; return; }
-  const avail = allQuestions.filter(q => activeCategories.has(q.kategorieId)).length;
+  const avail = filterByMode(allQuestions.filter(q => activeCategories.has(q.kategorieId))).length;
   const needed = _cfg.teamCount * _cfg.symbolsPerTeam;
   if (avail < needed) { errEl.textContent = `Zu wenig Fragen (${avail}/${needed}).`; return; }
 
@@ -687,7 +722,7 @@ async function startGame() {
   const seed = Date.now() & 0x7fffffff;
   const useSaved = _cfg.mazeSource === 'library' && mazeLibrary.length > 0;
   const size = useSaved ? (mazeLibrary[0]?.size || 12) : (_cfg.mazeSize || 12);
-  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols, doorPreset: _cfg.doorPreset, mazeSource: _cfg.mazeSource };
+  const config = { teamCount: _cfg.teamCount, symbolsPerTeam: _cfg.symbolsPerTeam, timerSeconds: _cfg.timerSeconds, kategorien: [...activeCategories], mazeSize: size, allSymbols: _cfg.allSymbols, doorPreset: _cfg.doorPreset, mazeSource: _cfg.mazeSource, questionMode: _cfg.questionMode };
 
   let mazeResult;
   if (useSaved) {

@@ -621,11 +621,18 @@ function isMultiCorrect(q) {
 // ── Frage ─────────────────────────────────────────────────────────
 let _mcPending = new Set(); // aktuelle Multi-Correct Auswahl
 
+function matchesMode(q) {
+  const mode = remoteState.config?.questionMode || 'mixed';
+  if (mode === 'mixed') return true;
+  const isMC = q.type === 'mc' || q.type === 'multiple_choice';
+  return mode === 'mc' ? isMC : !isMC;
+}
+
 function showQuestionModal() {
   const cats = remoteState.config?.kategorien || [...activeCategories];
   const used = new Set(remoteState.usedQuestionIds || []);
-  let pool = allQuestions.filter(q => cats.includes(q.kategorieId) && !used.has(q.id));
-  if (!pool.length) pool = allQuestions.filter(q => cats.includes(q.kategorieId));
+  let pool = allQuestions.filter(q => cats.includes(q.kategorieId) && matchesMode(q) && !used.has(q.id));
+  if (!pool.length) pool = allQuestions.filter(q => cats.includes(q.kategorieId) && matchesMode(q));
   if (!pool.length) { resolveQuestionResult(false); return; }
   const q = pool[Math.floor(Math.random() * pool.length)];
   questionContext.question = q;
@@ -649,49 +656,14 @@ function showQuestionModal() {
   const optEl = document.getElementById('q-options');
   const openSec = document.getElementById('q-open-section');
 
-  if (questionContext.type === 'door') {
-    // TÜRFRAGE: nur Lehrkraft bewertet — Spieler sieht nur den Fragetext
-    optEl.style.display = 'none';
-    openSec.style.display = '';
-    document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-show-answer').style.display = 'none';
-    document.getElementById('q-open-actions').style.display = 'none';
-    const prevWait = document.getElementById('q-teacher-wait');
-    if (prevWait) prevWait.remove();
-    const waitEl = document.createElement('div');
-    waitEl.id = 'q-teacher-wait';
-    waitEl.style.cssText = 'text-align:center;padding:0.5rem 0;color:var(--text-secondary);font-style:italic;font-size:0.9rem;';
-    waitEl.textContent = '⏳ Lehrkraft bewertet…';
-    openSec.appendChild(waitEl);
+  const prevWait = document.getElementById('q-teacher-wait');
+  if (prevWait) prevWait.remove();
 
-    // Korrekte Antwort für das Lehrkraft-Modal bestimmen
-    let correctAnswer = '';
-    if (q.type === 'multiple_choice' && q.options?.length) {
-      if (Array.isArray(q.correctIndices) && q.correctIndices.length > 0) {
-        correctAnswer = q.correctIndices.map(i => q.options[i]).join(', ');
-      } else {
-        correctAnswer = q.options[q.correctIndex ?? 0] || '';
-      }
-    } else {
-      correctAnswer = q.answer || q.hint || '';
-    }
-
-    _waitingForTeacher = true;
-    const aqState = JSON.parse(JSON.stringify(remoteState));
-    aqState.activeQuestion = {
-      id: q.id, question: q.question, answer: correctAnswer,
-      teamIdx: myTeamId, contextType: 'door',
-      target: Object.assign({}, questionContext.target), questionResult: null
-    };
-    postState(aqState);
-    startTimer(0); // kein Timer für lehrkraft-bewertete Türfragen
-
-  } else if (q.type === 'multiple_choice' && q.options?.length) {
-    // SYMBOLFRAGE + MC: Spieler antwortet selbst
+  if (q.type === 'multiple_choice' && q.options?.length) {
+    // MC: Spieler antwortet selbst (Tür und Symbol)
     optEl.style.display = ''; openSec.style.display = 'none'; optEl.innerHTML = '';
 
     if (isMultiCorrect(q)) {
-      // Multi-Correct: Toggle-Buttons + Bestätigen-Button
       _mcPending = new Set();
       q.options.forEach((opt, i) => {
         const btn = document.createElement('button');
@@ -725,7 +697,6 @@ function showQuestionModal() {
       });
     }
 
-    // Frage für Lehrkraft + Tafelmodus sichtbar machen
     const correctOpts = isMultiCorrect(q)
       ? q.correctIndices.map(i => q.options[i])
       : [q.options[q.correctIndex ?? 0]];
@@ -738,29 +709,22 @@ function showQuestionModal() {
       questionResult: null, needsTeacherEval: false
     };
     postState(mcAqState);
-
     startTimer(remoteState.config?.timerSeconds || 0);
 
   } else {
-    // SYMBOLFRAGE + OFFEN: Lehrkraft bewertet
+    // Offen: Spieler bewertet selbst — Lösung anzeigen + Richtig/Falsch (Tür und Symbol)
     optEl.style.display = 'none'; openSec.style.display = '';
     document.getElementById('q-open-answer').textContent = q.answer || '';
     document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-show-answer').style.display = 'none';
+    document.getElementById('q-show-answer').style.display = '';
     document.getElementById('q-open-actions').style.display = 'none';
-    const prevWait = document.getElementById('q-teacher-wait');
-    if (prevWait) prevWait.remove();
-    const waitEl = document.createElement('div');
-    waitEl.id = 'q-teacher-wait';
-    waitEl.style.cssText = 'text-align:center;padding:0.5rem 0;color:var(--text-secondary);font-style:italic;font-size:0.9rem;';
-    waitEl.textContent = '⏳ Lehrkraft bewertet…';
-    openSec.appendChild(waitEl);
-    _waitingForTeacher = true;
+
     const openState = JSON.parse(JSON.stringify(remoteState));
     openState.activeQuestion = {
       id: q.id, question: q.question, answer: q.answer || q.hint || '',
       teamIdx: myTeamId, contextType: questionContext.type,
-      target: Object.assign({}, questionContext.target), questionResult: null
+      target: Object.assign({}, questionContext.target),
+      questionResult: null, needsTeacherEval: false
     };
     postState(openState);
     startTimer(remoteState.config?.timerSeconds || 0);
