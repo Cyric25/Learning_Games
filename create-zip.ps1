@@ -40,7 +40,8 @@ $excludePaths = @(
     '\risiko-quiz\data\games\',         # aktive Spielstände
     '\Leiterspiel-quiz\data\games\',    # aktive Spielstände
     '\Labyrint-Quiz\data\games\',       # aktive Spielstände
-    '\schiffeversenken\data\games\'     # aktive Spielstände
+    '\schiffeversenken\data\games\',    # aktive Spielstände
+    '\data\labyrinth-designer\'         # eigene Labyrinthe (Designer-Bibliothek)
 )
 $excludeFiles = @(
     '.zip-version'   # interner Versionszähler
