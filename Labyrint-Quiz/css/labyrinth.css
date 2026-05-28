@@ -940,6 +940,23 @@ body.dark .answer-btn.wrong   { background:#7f1d1d; color:#f87171; }
 .open-actions { display:none; gap:0.8rem; justify-content:center; }
 .open-actions.visible { display:flex; }
 
+.teacher-wait-msg {
+  text-align: center;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1.5px dashed var(--accent);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.6rem;
+  animation: pulse-wait 1.8s ease-in-out infinite;
+}
+@keyframes pulse-wait {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
 .btn-correct, .btn-wrong {
   padding: 0.6rem 1.5rem;
   border-radius: 4px;

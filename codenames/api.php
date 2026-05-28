@@ -11,8 +11,8 @@ header('Cache-Control: no-store, no-cache');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
 $action   = trim($_GET['action'] ?? '');
-$gamesDir = __DIR__ . '/data/games';
-$wlDir    = __DIR__ . '/data/wordlists';
+$gamesDir = __DIR__ . '/../data/games/codenames';
+$wlDir    = __DIR__ . '/../data/codenames';
 
 foreach ([$gamesDir, $wlDir] as $d) {
     if (!is_dir($d)) @mkdir($d, 0755, true);

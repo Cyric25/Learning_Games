@@ -308,6 +308,18 @@ function onRemoteUpdate(data) {
     return;
   }
 
+  // Lehrkraft hat offene Frage bewertet → Ergebnis annehmen
+  if (_waitingForTeacher &&
+      data.activeQuestion?.id === questionContext?.question?.id &&
+      data.activeQuestion.questionResult !== null &&
+      data.activeQuestion.questionResult !== undefined) {
+    _waitingForTeacher = false;
+    remoteState = data;
+    clearTimer();
+    resolveQuestionResult(data.activeQuestion.questionResult);
+    return;
+  }
+
   // Veraltete Echos eigener Saves ignorieren (nur Canvas aktualisieren)
   if (data._ts && data._ts < _lastStateTs) {
     applyStateToGrid(localGrid, data.symbols || []);
@@ -708,19 +720,27 @@ function showQuestionModal() {
     startTimer(remoteState.config?.timerSeconds || 0);
 
   } else {
-    // Offen: Spieler bewertet selbst — Lösung anzeigen + Richtig/Falsch (Tür und Symbol)
+    // Offen: Lehrkraft bewertet — Timer ist Bedenkzeit, danach wartet Schüler
     optEl.style.display = 'none'; openSec.style.display = '';
-    document.getElementById('q-open-answer').textContent = q.answer || '';
     document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-show-answer').style.display = '';
+    document.getElementById('q-show-answer').style.display = 'none';
     document.getElementById('q-open-actions').style.display = 'none';
+
+    const waitEl = document.createElement('div');
+    waitEl.id = 'q-teacher-wait';
+    waitEl.className = 'teacher-wait-msg';
+    waitEl.style.display = 'none';
+    waitEl.textContent = '⏳ Warte auf Spielleiter…';
+    openSec.appendChild(waitEl);
+
+    _waitingForTeacher = true;
 
     const openState = JSON.parse(JSON.stringify(remoteState));
     openState.activeQuestion = {
       id: q.id, question: q.question, answer: q.answer || q.hint || '',
       teamIdx: myTeamId, contextType: questionContext.type,
       target: Object.assign({}, questionContext.target),
-      questionResult: null, needsTeacherEval: false
+      questionResult: null, needsTeacherEval: true
     };
     postState(openState);
     startTimer(remoteState.config?.timerSeconds || 0);
@@ -769,12 +789,15 @@ function showOpenAnswer() {
 function resolveOpen(correct) { clearTimer(); resolveQuestionResult(correct); }
 
 function resolveQuestionResult(correct) {
+  _waitingForTeacher = false;
   const ctx = questionContext;
   const resultEl = document.getElementById('q-result');
   const myTeam = remoteState.teams[myTeamId];
 
   document.querySelectorAll('.answer-btn').forEach(b => b.disabled = true);
   document.getElementById('q-open-actions').style.display = 'none';
+  const waitEl = document.getElementById('q-teacher-wait');
+  if (waitEl) waitEl.style.display = 'none';
 
   if (correct) {
     resultEl.className = 'modal-result result-correct';
@@ -886,8 +909,9 @@ function startTimer(seconds) {
         // MC: Zeit abgelaufen → automatisch als falsch werten
         resolveQuestionResult(false);
       } else {
-        // Offene Frage: Bedenkzeit vorbei → Lösung einblenden, Schüler bewertet selbst
-        showOpenAnswer();
+        // Offene Frage: Bedenkzeit vorbei → auf Lehrkraft warten
+        const waitEl = document.getElementById('q-teacher-wait');
+        if (waitEl) waitEl.style.display = '';
         if (txt) txt.textContent = '⏰';
       }
     }
@@ -916,7 +940,7 @@ function showSpectatorQuestion(aq, activeTeam) {
       <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
       <div class="spec-q-context">${contextIcon} ${contextLabel}</div>
       <div class="spec-q-text">${_escHtml(aq.question)}</div>
-      <div class="spec-q-wait">⏳ Team beantwortet…</div>
+      <div class="spec-q-wait">${aq.needsTeacherEval ? '⏳ Lehrkraft bewertet…' : '⏳ Team beantwortet…'}</div>
     </div>`;
 }
 
