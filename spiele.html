@@ -883,15 +883,20 @@
 
   function getEnabledGames() {
     const stored = localStorage.getItem(GAMES_KEY);
-    if (!stored) return DEFAULT_ENABLED;
+    if (!stored) return DEFAULT_ENABLED.slice();
+    return JSON.parse(stored);
+  }
+
+  // Neue Spiele einmalig beim ersten Laden aktivieren (nicht bei jedem Lesen)
+  function migrateNewGames() {
+    const stored = localStorage.getItem(GAMES_KEY);
+    if (!stored) return; // Noch kein gespeicherter Stand — DEFAULT_ENABLED wird verwendet
     const list = JSON.parse(stored);
-    // Neue Spiele automatisch aktivieren, falls noch nicht in der gespeicherten Liste
     var changed = false;
     NEW_GAMES.forEach(function(id) {
       if (list.indexOf(id) === -1) { list.push(id); changed = true; }
     });
     if (changed) saveEnabledGames(list);
-    return list;
   }
 
   function saveEnabledGames(list) {
@@ -1032,6 +1037,7 @@
   // ── Init ─────────────────────────────────────────────────
   applyTheme(localStorage.getItem(STORAGE_KEY) === 'dark');
   applyMode(sessionStorage.getItem(SESSION_KEY) === '1');
+  migrateNewGames(); // Neue Spiele einmalig aktivieren (nicht bei jedem Lesen)
   applyGameVisibility();
   loadGlobalSettings();
 </script>
