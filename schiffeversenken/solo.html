@@ -916,7 +916,12 @@ function doAITurn() {
   if (!coord) { aiTurnPending = false; return; }
 
   aiShotSet.add(coord);
-  const hit = !!myShipGrid[coord];
+
+  // Würfelwurf: 1-3 = KI verfehlt, 4-6 = trifft normal
+  const dice = Math.ceil(Math.random() * 6);
+  const diceEmoji = ['⚀','⚁','⚂','⚃','⚄','⚅'][dice - 1];
+  const wouldHit = !!myShipGrid[coord];
+  const hit = wouldHit && dice >= 4;
 
   if (hit) {
     aiHitSet.add(coord);
@@ -931,11 +936,11 @@ function doAITurn() {
         ai.currentHits = [];
         ai.direction   = null;
         ai.queue       = [];
-        showAIToast(`🤖 KI schießt ${coord} — 💥 ${ship.size}er-Schiff versenkt!`);
+        showAIToast(`🤖 ${diceEmoji} KI schießt ${coord} — 💥 ${ship.size}er-Schiff versenkt!`);
       } else {
         ai.mode = 'target';
         aiRebuildQueue();
-        showAIToast(`🤖 KI schießt ${coord} — 💥 Treffer!`);
+        showAIToast(`🤖 ${diceEmoji} KI schießt ${coord} — 💥 Treffer!`);
       }
     }
   } else {
@@ -943,7 +948,8 @@ function doAITurn() {
       // Miss im Target-Modus: Queue neu aufbauen (mit aktuellem Wissen)
       aiRebuildQueue();
     }
-    showAIToast(`🤖 KI schießt ${coord} — 💧 Wasser`);
+    const suffix = wouldHit && dice < 4 ? '🎲 Würfelpech — daneben!' : '💧 Wasser';
+    showAIToast(`🤖 ${diceEmoji} KI schießt ${coord} — ${suffix}`);
   }
 
   updateStats();
