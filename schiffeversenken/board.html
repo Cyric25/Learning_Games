@@ -123,6 +123,7 @@
       font-size: .65rem; position: relative; flex-shrink: 0; overflow: hidden;
     }
     .grid-cell.miss::after { content:'✕'; font-size:1.1rem; font-weight:900; opacity:1; }
+    .grid-cell.ship-hit { border-color: rgba(255,255,255,.4); }
     .grid-cell.sunk {
       background-image: repeating-linear-gradient(
         45deg, transparent, transparent 4px,
@@ -495,13 +496,25 @@ function makeBoardCell(col, row, size) {
 
   if (entry) {
     const wasShot = entry.shotByTeamIdx !== null && entry.shotByTeamIdx !== undefined;
+    const hasShip = entry.shipTeamIdx !== null && entry.shipTeamIdx !== undefined;
 
-    if (wasShot) {
+    if (wasShot && hasShip) {
+      // Treffer: Schiff-Teamfarbe
+      const shipTeam = boardState.teams[entry.shipTeamIdx];
+      const isSunk = shipTeam && shipTeam.ships.every(s =>
+        !s.coords.includes(key) || s.sunk
+      );
+      cell.style.background = shipTeam?.color || '#e74c3c';
+      cell.style.opacity = isSunk ? '0.55' : '1';
+      cell.classList.add('ship-hit');
+      if (isSunk) cell.classList.add('sunk');
+    } else if (wasShot) {
+      // Miss: ✕ in Schützenfarbe
       const shotTeam = boardState.teams[entry.shotByTeamIdx];
-      cell.classList.add('miss'); // ✕ via ::after
+      cell.classList.add('miss');
       cell.style.color = shotTeam?.color || '#aaa';
     }
-    // Schiffpositionen werden nicht angezeigt
+    // Ungetroffene Schiffpositionen werden nicht angezeigt
   }
 
   // Aktive Koordinate
