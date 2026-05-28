@@ -282,6 +282,39 @@
 <div id="toast"></div>
 
 <script>
+// ── Board Storage (API + localStorage Fallback) ────────────────
+const _LS_KEY = 'ls_custom_boards';
+const _API    = '../api.php?f=ls-boards';
+let _serverOk = null;
+
+async function _checkServer() {
+  if (_serverOk !== null) return _serverOk;
+  if (window.location.protocol === 'file:') { _serverOk = false; return false; }
+  try {
+    await fetch(_API, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+    _serverOk = true;
+  } catch { _serverOk = false; }
+  return _serverOk;
+}
+
+async function _boardsLoad() {
+  if (await _checkServer()) {
+    try {
+      const r = await fetch(_API);
+      if (r.ok) return await r.json();
+    } catch {}
+  }
+  try { return JSON.parse(localStorage.getItem(_LS_KEY) || '[]'); } catch { return []; }
+}
+
+async function _boardsSave(boards) {
+  const json = JSON.stringify(boards);
+  localStorage.setItem(_LS_KEY, json);
+  if (await _checkServer()) {
+    try { await fetch(_API, { method: 'POST', body: json, headers: { 'Content-Type': 'application/json' } }); } catch {}
+  }
+}
+
 // ── State ──────────────────────────────────────────────────────
 let board = {
   id: null, name: 'Mein Brett', backgroundImage: null, aspectRatio: 16/9,
@@ -715,19 +748,21 @@ function newBoard() {
   clearBg(); updList(); updProps(); updConns(); render();
 }
 
-function saveBoard() {
+async function saveBoard() {
   if (!board.name.trim()) board.name='Mein Brett';
   if (!board.id) board.id='board-'+Date.now();
-  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
+  const boards = await _boardsLoad();
   const i=boards.findIndex(b=>b.id===board.id);
   if (i>=0) boards[i]=board; else boards.push(board);
-  localStorage.setItem('ls_custom_boards',JSON.stringify(boards));
+  await _boardsSave(boards);
   toast('Brett gespeichert ✓');
 }
 
-function openLoadModal() {
-  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
+async function openLoadModal() {
   const listEl=document.getElementById('modal-list');
+  listEl.innerHTML='<p class="hint">Lade…</p>';
+  document.getElementById('modal-load').classList.add('open');
+  const boards = await _boardsLoad();
   listEl.innerHTML='';
   if (!boards.length) { listEl.innerHTML='<p class="hint">Keine gespeicherten Bretter.</p>'; }
   else {
@@ -739,18 +774,18 @@ function openLoadModal() {
       const lb=document.createElement('button'); lb.textContent='Laden';
       lb.addEventListener('click',()=>{ loadBoard(b); closeModal(); });
       const db=document.createElement('button'); db.className='d-btn'; db.textContent='✕'; db.title='Löschen';
-      db.addEventListener('click',()=>{ deleteSaved(b.id); openLoadModal(); });
+      db.addEventListener('click',()=>{ deleteSaved(b.id); });
       acts.append(lb,db); item.append(info,acts); listEl.appendChild(item);
     });
   }
-  document.getElementById('modal-load').classList.add('open');
 }
 
 function closeModal() { document.getElementById('modal-load').classList.remove('open'); }
 
-function deleteSaved(id) {
-  const boards=JSON.parse(localStorage.getItem('ls_custom_boards')||'[]');
-  localStorage.setItem('ls_custom_boards',JSON.stringify(boards.filter(b=>b.id!==id)));
+async function deleteSaved(id) {
+  const boards = await _boardsLoad();
+  await _boardsSave(boards.filter(b=>b.id!==id));
+  openLoadModal();
 }
 
 function loadBoard(saved) {

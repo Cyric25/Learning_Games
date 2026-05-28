@@ -136,6 +136,24 @@ const LsStorage = {
   }
 };
 
+// ── Board Library Storage (API + localStorage Fallback) ──────
+const _LS_BOARDS_KEY = 'ls_custom_boards';
+const _LS_BOARDS_API = '../api.php?f=ls-boards';
+let _lsBoardsServerOk = null;
+
+async function _lsBoardsLoad() {
+  if (_lsBoardsServerOk === null && window.location.protocol !== 'file:') {
+    try {
+      await fetch(_LS_BOARDS_API, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+      _lsBoardsServerOk = true;
+    } catch { _lsBoardsServerOk = false; }
+  }
+  if (_lsBoardsServerOk) {
+    try { const r = await fetch(_LS_BOARDS_API); if (r.ok) return await r.json(); } catch {}
+  }
+  try { return JSON.parse(localStorage.getItem(_LS_BOARDS_KEY) || '[]'); } catch { return []; }
+}
+
 // ── copyCode ──────────────────────────────────────────────────
 function copyCode(el) {
   if (!el) return;
@@ -728,7 +746,7 @@ function proceedToCategories() {
 }
 
 // ── Proceed to Game (from category screen) ───────────────────
-function proceedFromCategories() {
+async function proceedFromCategories() {
   if (selectedCategoryIds.size === 0) {
     updateCatSelectInfo();
     return;
@@ -761,7 +779,7 @@ function proceedFromCategories() {
 
   // Load custom board if selected
   if (selectedCustomBoardId) {
-    const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+    const boards = await _lsBoardsLoad();
     _customBoard = boards.find(b => b.id === selectedCustomBoardId) || null;
     gameState.customBoardId = selectedCustomBoardId;
   } else {
@@ -2097,9 +2115,9 @@ async function _gsEnter(code) {
   window.history.replaceState({}, '', 'index.html?code=' + code);
   gameState = gs;
 
-  // Restore custom board from localStorage if this game used one
+  // Restore custom board from server/localStorage if this game used one
   if (gs.customBoardId) {
-    const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+    const boards = await _lsBoardsLoad();
     _customBoard = boards.find(b => b.id === gs.customBoardId) || null;
   } else {
     _customBoard = null;
@@ -2159,11 +2177,13 @@ async function createNewGame() {
 }
 
 // ── Custom Board Picker ───────────────────────────────────────
-function openCustomBoardPicker() {
+async function openCustomBoardPicker() {
   const modal = document.getElementById('cb-modal');
   const list = document.getElementById('cb-modal-list');
   if (!modal || !list) return;
-  const boards = JSON.parse(localStorage.getItem('ls_custom_boards') || '[]');
+  list.innerHTML = '<p style="color:var(--text-secondary,#a8a8b3);font-style:italic;font-size:0.85rem;">Lade…</p>';
+  modal.style.display = 'flex';
+  const boards = await _lsBoardsLoad();
   list.innerHTML = '';
   if (boards.length === 0) {
     list.innerHTML = '<p style="color:var(--text-secondary,#a8a8b3);font-style:italic;font-size:0.85rem;">Keine Bretter gespeichert. Erstelle eines im Brett-Designer.</p>';

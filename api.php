@@ -526,6 +526,27 @@ if ($key === 'labyrinth-sse') {
     exit;
 }
 
+// ── Leiterspiel Designer Board Library: ?f=ls-boards ────────────────
+if ($key === 'ls-boards') {
+    $dir = __DIR__ . '/data/leiterspiel-designer';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $libPath = $dir . '/boards.json';
+    header('Content-Type: application/json; charset=utf-8');
+    header('Access-Control-Allow-Origin: *');
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($libPath) ? file_get_contents($libPath) : '[]';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = file_get_contents('php://input');
+        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
+        }
+        file_put_contents($libPath, $body, LOCK_EX) !== false
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    }
+    exit;
+}
+
 // ── Labyrinth Designer Maze Library: ?f=lab-mazes ────────────────
 if ($key === 'lab-mazes') {
     $dir = __DIR__ . '/data/labyrinth-designer';
