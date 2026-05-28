@@ -2207,7 +2207,6 @@ async function openCustomBoardPicker() {
       list.appendChild(item);
     });
   }
-  modal.style.display = 'flex';
 }
 
 function clearCustomBoard() {
