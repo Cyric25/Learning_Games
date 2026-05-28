@@ -300,9 +300,9 @@
     const H = grid.length, W = grid[0]?.length || H;
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++)
-        if (grid[y][x].type === 'symbol' || grid[y][x].type === 'door') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
+        if (grid[y][x].type === 'symbol') { grid[y][x].type = 'path'; delete grid[y][x].symTeamId; }
     symbols.forEach(s => { if (!s.found) { grid[s.y][s.x].type = 'symbol'; grid[s.y][s.x].symTeamId = s.teamId; } });
-    doors.forEach(d => { if (!d.open) grid[d.y][d.x].type = 'door'; });
+    // doors use cellX/cellY and are rendered directly by MazeRenderer — no grid manipulation needed
   }
 
   function applyBoardState(state) {
