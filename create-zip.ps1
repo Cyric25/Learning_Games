@@ -41,6 +41,7 @@ $excludePaths = @(
     '\Leiterspiel-quiz\data\games\',    # aktive Spielstände
     '\Labyrint-Quiz\data\games\',       # aktive Spielstände
     '\schiffeversenken\data\games\',    # aktive Spielstände
+    '\codenames\data\',                 # Codenames DB (Wortlisten + Spielstände)
     '\data\labyrinth-designer\'         # eigene Labyrinthe (Designer-Bibliothek)
 )
 $excludeFiles = @(
