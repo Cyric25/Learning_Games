@@ -166,19 +166,15 @@ function Build-UploadZip([string[]]$relPaths, [string]$label = 'Delta') {
 # ====================================================================
 
 function Build-FullArchiv() {
-    $vFile   = Join-Path $source '.zip-version'
-    $current = Join-Path $fullDir 'Spiele.zip'
+    $vFile = Join-Path $source '.zip-version'
 
     $v = 1
     if (Test-Path $vFile) { $v = [int](Get-Content $vFile -Raw).Trim() + 1 }
 
-    if (Test-Path $current) {
-        $arch = "Spiele_v{0:D3}.zip" -f ($v - 1)
-        Rename-Item $current (Join-Path $fullDir $arch)
-        Write-Host "    Archiviert: $arch" -ForegroundColor DarkGray
-    }
+    $archName = "Spiele_v{0:D3}.zip" -f $v
+    $archPath = Join-Path $fullDir $archName
 
-    $zip   = [System.IO.Compression.ZipFile]::Open($current, 'Create')
+    $zip   = [System.IO.Compression.ZipFile]::Open($archPath, 'Create')
     $count = 0
     foreach ($f in AllFiles) {
         AddToZip $zip $f.FullName (RelPath $f.FullName)
@@ -187,8 +183,8 @@ function Build-FullArchiv() {
     $zip.Dispose()
     $v | Set-Content $vFile
 
-    $kb = [math]::Round((Get-Item $current).Length / 1KB, 1)
-    Write-Host "  backups/FULL/Spiele.zip  v$v - $count Dateien ($kb KB)" -ForegroundColor Green
+    $kb = [math]::Round((Get-Item $archPath).Length / 1KB, 1)
+    Write-Host "  backups/FULL/$archName  - $count Dateien ($kb KB)" -ForegroundColor Green
 
     $old = Get-ChildItem $fullDir -Filter 'Spiele_v*.zip' | Sort-Object Name
     if ($old.Count -gt 10) {
