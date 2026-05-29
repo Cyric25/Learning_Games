@@ -78,7 +78,6 @@ let timerInterval = null;
 let diceAnimId = null;
 let _lastStateTs = 0;      // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
 let _waitingForTeacher = false;  // Student wartet auf Lehrkraft-Bewertung (offene Frage)
-let _doorAnimating = false;      // Tür-Öffnungsanimation läuft — SSE-Renders pausieren
 let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -318,12 +317,6 @@ function onRemoteUpdate(data) {
     remoteState = data;
     clearTimer();
     resolveQuestionResult(data.activeQuestion.questionResult);
-    return;
-  }
-
-  // Tür-Animation läuft → State merken, Render pausieren
-  if (_doorAnimating) {
-    remoteState = data;
     return;
   }
 
@@ -839,15 +832,13 @@ function continueAfterQuestion() {
   if (ctx.question) used.add(ctx.question.id);
   newState.usedQuestionIds = [...used];
 
-  // ctx.door ist eine Referenz auf das Tür-Objekt in remoteState (angle noch 0)
-  let doorToAnimate = null;
+  let isDoorPass = false;
 
   if (ctx.type === 'door' && wasCorrect) {
-    const door = newState.doors.find(d => d.id === ctx.door.id);
-    if (door) { door.angle = (door.angle || 0) ? 0 : 90; door.openedBy = myTeamId; }
+    // Tür bleibt bei angle=0 — schließt sich optisch hinter dem Team
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
-    doorToAnimate = ctx.door; // Referenz in remoteState, angle noch 0
+    isDoorPass = true;
   } else if (ctx.type === 'symbol' && wasCorrect) {
     const sym = newState.symbols.find(s => s.x === ctx.target.x && s.y === ctx.target.y && !s.found);
     if (sym) { sym.found = true; sym.foundBy = myTeamId; }
@@ -856,7 +847,6 @@ function continueAfterQuestion() {
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
 
-    // Check win
     if (newState.teams[myTeamId].symbolsFound >= (newState.config?.symbolsPerTeam || 7)) {
       newState.teams[myTeamId].score += 50;
       newState.phase = 'finished';
@@ -866,7 +856,6 @@ function continueAfterQuestion() {
     }
   }
 
-  // Tür/Symbol trifft → restliche Züge verfallen, Zug endet immer
   newState.phase = 'rolling';
   newState.diceValue = 0;
   newState.stepsRemaining = 0;
@@ -876,6 +865,7 @@ function continueAfterQuestion() {
   postState(newState);
 
   function doAdvance() {
+    renderCanvas(newState);
     if (newState.currentTeamIdx !== myTeamId) {
       showWaiting(newState.teams[newState.currentTeamIdx]);
     } else {
@@ -883,22 +873,30 @@ function continueAfterQuestion() {
     }
   }
 
-  // Tür-Öffnungsanimation: remoteState.doors enthält die Tür noch bei angle=0
-  if (doorToAnimate && renderer) {
-    _doorAnimating = true;
+  // Tür-Animation: verschwinden → Team bewegt sich durch → auftauchen
+  if (isDoorPass && renderer && ctx.door) {
+    const animTeams = (remoteState.teams || []).map(t => ({...t}));
+    const animDoor  = (remoteState.doors  || []).find(d => d.id === ctx.door.id);
     const animRS = {
       phase: remoteState.phase,
-      teams: remoteState.teams,
+      teams: animTeams,
       currentTeamIdx: remoteState.currentTeamIdx,
       allSymbols: newState.symbols || [],
       doors: remoteState.doors,
       _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
     };
     renderer.render(animRS);
-    renderer.animateDoor(doorToAnimate, 90, 600, () => {
-      _doorAnimating = false;
-      renderCanvas(newState);
-      doAdvance();
+
+    const fromX = animTeams[myTeamId].x;
+    const fromY = animTeams[myTeamId].y;
+
+    // 1. Tür verschwindet (200ms)
+    renderer.animateDoorAlpha(animDoor, 0, 200, () => {
+      // 2. Team bewegt sich durch (250ms)
+      renderer.animateMove(myTeamId, fromX, fromY, ctx.target.x, ctx.target.y, () => {
+        // 3. Tür taucht hinter dem Team auf (350ms)
+        renderer.animateDoorAlpha(animDoor, 1, 350, doAdvance);
+      });
     });
     return;
   }

@@ -185,14 +185,18 @@ class MazeRenderer {
 
   // ── Rotating door (wall segment) ──────────────────────────────
   _drawDoor(ctx, door, c, cs, ox, oy) {
+    const alpha = door._alpha !== undefined ? door._alpha : 1;
+    if (alpha <= 0) return;
+
     const { ax, ay, baseRad } = this._doorGeometry(door, cs, ox, oy);
     const openRad = door.rotDir * (door.angle || 0) * Math.PI / 180;
 
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.translate(ax, ay);
     ctx.rotate(baseRad + openRad);
 
-    const isFlipped = (door.angle || 0) >= 45;
+    const isFlipped = (door.angle || 0) !== 0;
     const lw = Math.max(3, cs * 0.13);
     ctx.strokeStyle = isFlipped ? '#a0702a' : '#8B4513';
     ctx.lineWidth = lw;
@@ -406,23 +410,23 @@ class MazeRenderer {
     requestAnimationFrame(tick);
   }
 
-  // ── Door open/close animation ──────────────────────────────────
-  // door: reference to door object in this.gameState.doors
-  // toAngle: target angle in degrees (90 = open, 0 = closed)
-  animateDoor(door, toAngle, durationMs, cb) {
-    const fromAngle = door.angle || 0;
-    if (fromAngle === toAngle) { if (cb) cb(); return; }
-    const duration = durationMs || 500;
+  // ── Door fade animation (verschwinden / auftauchen) ───────────
+  // door: Referenz auf ein Tür-Objekt in this.gameState.doors
+  // toAlpha: 0 = unsichtbar, 1 = voll sichtbar
+  animateDoorAlpha(door, toAlpha, durationMs, cb) {
+    const fromAlpha = door._alpha !== undefined ? door._alpha : 1;
+    if (fromAlpha === toAlpha) { if (cb) cb(); return; }
+    const duration = durationMs || 250;
     const start = performance.now();
 
     const tick = (now) => {
       const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic (natural swing)
-      door.angle = fromAngle + (toAngle - fromAngle) * ease;
+      const ease = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t); // ease-in-out
+      door._alpha = fromAlpha + (toAlpha - fromAlpha) * ease;
       this.render(this.gameState);
       if (t < 1) requestAnimationFrame(tick);
       else {
-        door.angle = toAngle;
+        door._alpha = toAlpha;
         this.render(this.gameState);
         if (cb) cb();
       }

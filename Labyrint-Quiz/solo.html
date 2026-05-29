@@ -1037,18 +1037,25 @@
     if (ctx.question) soloState.usedQuestionIds.add(ctx.question.id);
 
     if (ctx.type==='door'&&wasCorrect) {
+      // Tür bleibt bei angle=0 — schließt sich optisch hinter dem Spieler
       const door=soloState.doors.find(d=>d.id===ctx.door.id);
-      soloState.team.x=ctx.target.x; soloState.team.y=ctx.target.y;
       soloState.phase='rolling'; soloState.stepsRemaining=0;
       if (door&&renderer) {
-        const targetAngle=door.angle?0:90;
-        door.openedBy=0;
-        // door.angle bleibt bei 0 — animateDoor animiert ab aktuellem Wert
-        renderSoloCanvas();
-        renderer.animateDoor(door,targetAngle,600,()=>{ renderSoloCanvas(); showRolling(); });
+        const fromX=soloState.team.x, fromY=soloState.team.y;
+        const toX=ctx.target.x, toY=ctx.target.y;
+        renderSoloCanvas(); // renderer.gameState = soloState-Render mit door._alpha=1
+        // 1. Tür verschwindet
+        renderer.animateDoorAlpha(door,0,200,()=>{
+          // 2. Spieler bewegt sich durch
+          renderer.animateMove(0,fromX,fromY,toX,toY,()=>{
+            soloState.team.x=toX; soloState.team.y=toY;
+            // 3. Tür taucht hinter dem Spieler auf
+            renderer.animateDoorAlpha(door,1,350,()=>{ renderSoloCanvas(); showRolling(); });
+          });
+        });
         return;
       }
-      if (door) { door.angle=door.angle?0:90; door.openedBy=0; }
+      soloState.team.x=ctx.target.x; soloState.team.y=ctx.target.y;
       renderSoloCanvas(); showRolling();
       return;
     }

@@ -840,37 +840,6 @@ let _teacherEvalQuestionId = null;
 
 function applyRemoteState(data) {
   if (!data?.meta || !localGrid) return;
-
-  // Türen mit geändertem Winkel animieren (Lehrkraft-Board)
-  if (renderer && gameState?.doors) {
-    const animDoors = [];
-    for (const newDoor of (data.doors || [])) {
-      const oldDoor = gameState.doors.find(d => d.id === newDoor.id);
-      if (oldDoor && (oldDoor.angle || 0) !== (newDoor.angle || 0))
-        animDoors.push({ door: oldDoor, targetAngle: newDoor.angle || 0 });
-    }
-    if (animDoors.length > 0) {
-      const oldDoors = gameState.doors; // Referenz sichern vor gameState-Überschreiben
-      gameState = data;
-      applyStateToGrid(localGrid, data.symbols || []);
-      _updateTeacherPanels(data);
-      // Render-State mit alten Türobjekten (angle noch 0) + neuen Teams/Symbolen
-      const animRS = {
-        phase: data.phase, teams: data.teams, currentTeamIdx: data.currentTeamIdx,
-        allSymbols: data.symbols || [], doors: oldDoors,
-        _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
-      };
-      renderer.render(animRS);
-      let pending = animDoors.length;
-      for (const { door, targetAngle } of animDoors) {
-        renderer.animateDoor(door, targetAngle, 600, () => {
-          if (--pending === 0) renderBoard();
-        });
-      }
-      return;
-    }
-  }
-
   gameState = data;
   applyStateToGrid(localGrid, data.symbols || []);
   _updateTeacherPanels(data);
