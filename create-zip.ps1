@@ -3,14 +3,14 @@
 # Erstellt ZIPs fuer den Upload auf den Webserver.
 #
 # Modi:
-#   .\create-zip.ps1              -> Delta: nur geaenderte Spiele + delta.zip + Spiele.zip
-#   .\create-zip.ps1 -Full        -> Alle Spiel-ZIPs neu erstellen + Spiele.zip
+#   .\create-zip.ps1              -> Delta: backups/Spiele.zip (geaenderte Dateien) + backups/FULL/Spiele.zip (komplett)
+#   .\create-zip.ps1 -Full        -> backups/Spiele.zip (alles) + backups/FULL/Spiele.zip (komplett) + alle Spiel-ZIPs
 #   .\create-zip.ps1 -Game memory -> Nur ein einzelnes Spiel-ZIP neu erstellen
 #
 # Ausgabe:
-#   backups/Spiele.zip            <- Vollstaendiges Paket (immer, versioniert)
+#   backups/Spiele.zip            <- Upload-Paket (Delta oder Full) - dieses auf den Server hochladen
+#   backups/FULL/Spiele.zip       <- Vollstaendiges Archiv (immer, versioniert)
 #   dist/<Spiel>.zip              <- Pro Spiel (bei Aenderungen / -Full / -Game)
-#   dist/delta_YYYYMMDD_HHMM.zip  <- Nur geaenderte Dateien (Delta-/Standard-Modus)
 
 param(
     [switch]$Full,
@@ -19,9 +19,10 @@ param(
 
 $source  = $PSScriptRoot
 $backups = Join-Path $source 'backups'
+$fullDir = Join-Path $backups 'FULL'
 $dist    = Join-Path $source 'dist'
 
-foreach ($d in @($backups, $dist)) {
+foreach ($d in @($backups, $fullDir, $dist)) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }
 }
 
@@ -31,7 +32,7 @@ Add-Type -Assembly System.IO.Compression.FileSystem
 # KONFIGURATION
 # ====================================================================
 
-# Ausschluesse gelten fuer ALLE ZIPs (Spiele.zip + Spiel-ZIPs + delta.zip)
+# Ausschluesse gelten fuer ALLE ZIPs
 $excludePaths = @(
     '\backups\',
     '\dist\',
@@ -127,19 +128,53 @@ function GameForPath([string]$relPath) {
 }
 
 # ====================================================================
-# SPIELE.ZIP - vollstaendiges Paket (immer erstellt)
+# UPLOAD-ZIP (backups/Spiele.zip) - Delta oder Full
 # ====================================================================
 
-function Build-SpielZip() {
+function Build-UploadZip([string[]]$relPaths, [string]$label = 'Delta') {
+    $zipPath = Join-Path $backups 'Spiele.zip'
+
+    if (-not $relPaths -or $relPaths.Count -eq 0) {
+        Write-Host '  backups/Spiele.zip  - keine Aenderungen (nicht erstellt)' -ForegroundColor DarkGray
+        return
+    }
+
+    if (Test-Path $zipPath) { Remove-Item $zipPath }
+    $zip   = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+    $count = 0
+    foreach ($rel in $relPaths) {
+        $full = Join-Path $source ($rel -replace '/', '\')
+        if ((Test-Path $full) -and (-not (IsExcluded $full))) {
+            AddToZip $zip $full $rel
+            $count++
+        }
+    }
+    $zip.Dispose()
+
+    if ($count -eq 0) {
+        Remove-Item $zipPath
+        Write-Host '  backups/Spiele.zip  - keine uploadbaren Aenderungen' -ForegroundColor DarkGray
+        return
+    }
+
+    $kb = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
+    Write-Host "  backups/Spiele.zip  [$label] $count Dateien ($kb KB)  <- hochladen" -ForegroundColor Yellow
+}
+
+# ====================================================================
+# FULL-ARCHIV (backups/FULL/Spiele.zip) - immer vollstaendig, versioniert
+# ====================================================================
+
+function Build-FullArchiv() {
     $vFile   = Join-Path $source '.zip-version'
-    $current = Join-Path $backups 'Spiele.zip'
+    $current = Join-Path $fullDir 'Spiele.zip'
 
     $v = 1
     if (Test-Path $vFile) { $v = [int](Get-Content $vFile -Raw).Trim() + 1 }
 
     if (Test-Path $current) {
         $arch = "Spiele_v{0:D3}.zip" -f ($v - 1)
-        Rename-Item $current (Join-Path $backups $arch)
+        Rename-Item $current (Join-Path $fullDir $arch)
         Write-Host "    Archiviert: $arch" -ForegroundColor DarkGray
     }
 
@@ -153,9 +188,9 @@ function Build-SpielZip() {
     $v | Set-Content $vFile
 
     $kb = [math]::Round((Get-Item $current).Length / 1KB, 1)
-    Write-Host "  backups/Spiele.zip  v$v - $count Dateien ($kb KB)" -ForegroundColor Green
+    Write-Host "  backups/FULL/Spiele.zip  v$v - $count Dateien ($kb KB)" -ForegroundColor Green
 
-    $old = Get-ChildItem $backups -Filter 'Spiele_v*.zip' | Sort-Object Name
+    $old = Get-ChildItem $fullDir -Filter 'Spiele_v*.zip' | Sort-Object Name
     if ($old.Count -gt 10) {
         $old | Select-Object -First ($old.Count - 10) | ForEach-Object {
             Remove-Item $_.FullName
@@ -240,48 +275,6 @@ function Set-Baseline([string]$head) {
 }
 
 # ====================================================================
-# DELTA-ZIP - nur geaenderte Dateien
-# ====================================================================
-
-function Build-DeltaZip([string[]]$relPaths) {
-    if (-not $relPaths -or $relPaths.Count -eq 0) {
-        Write-Host '  dist/delta_*.zip   - keine Aenderungen' -ForegroundColor DarkGray
-        return
-    }
-
-    $ts      = Get-Date -Format 'yyyyMMdd_HHmm'
-    $zipPath = Join-Path $dist "delta_$ts.zip"
-    $zip     = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
-    $count   = 0
-
-    foreach ($rel in $relPaths) {
-        $full = Join-Path $source ($rel -replace '/', '\')
-        if ((Test-Path $full) -and (-not (IsExcluded $full))) {
-            AddToZip $zip $full $rel
-            $count++
-        }
-    }
-    $zip.Dispose()
-
-    if ($count -eq 0) {
-        Remove-Item $zipPath
-        Write-Host '  dist/delta_*.zip   - keine uploadbaren Aenderungen' -ForegroundColor DarkGray
-        return
-    }
-
-    $kb = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
-    Write-Host "  dist/delta_$ts.zip - $count Dateien ($kb KB)" -ForegroundColor Yellow
-
-    $old = Get-ChildItem $dist -Filter 'delta_*.zip' | Sort-Object Name
-    if ($old.Count -gt 5) {
-        $old | Select-Object -First ($old.Count - 5) | ForEach-Object {
-            Remove-Item $_.FullName
-            Write-Host "    Geloescht (alt): $($_.Name)" -ForegroundColor DarkGray
-        }
-    }
-}
-
-# ====================================================================
 # HAUPTPROGRAMM
 # ====================================================================
 
@@ -306,14 +299,19 @@ if ($Full) {
     Write-Host '[ Full-Rebuild ]' -ForegroundColor Magenta
     Write-Host ''
 
-    Write-Host '[ Spiele.zip ]' -ForegroundColor Magenta
-    Build-SpielZip
-    Write-Host ''
-
     Write-Host '[ Spiel-ZIPs (alle) ]' -ForegroundColor Magenta
     foreach ($name in $gameMap.Keys) {
         Build-GameZip $name
     }
+    Write-Host ''
+
+    Write-Host '[ Upload-ZIP (vollstaendig) ]' -ForegroundColor Magenta
+    $allRel = @(AllFiles | ForEach-Object { RelPath $_.FullName })
+    Build-UploadZip $allRel 'Full'
+    Write-Host ''
+
+    Write-Host '[ Archiv (FULL) ]' -ForegroundColor Magenta
+    Build-FullArchiv
 
     $head = (git -C $source rev-parse HEAD 2>$null)
     if ($head) {
@@ -363,9 +361,7 @@ if ($changed.Count -eq 0) {
     if ($affectedGames.Count -gt 0) {
         Write-Host "  Betroffene Spiele: $($affectedGames -join ', ')" -ForegroundColor White
         Write-Host ''
-    }
 
-    if ($affectedGames.Count -gt 0) {
         Write-Host '[ Spiel-ZIPs (nur geaenderte Spiele) ]' -ForegroundColor Magenta
         foreach ($name in $affectedGames) {
             if ($name -ne 'root') {
@@ -376,14 +372,14 @@ if ($changed.Count -eq 0) {
         }
         Write-Host ''
     }
-
-    Write-Host '[ Delta-ZIP (nur geaenderte Dateien) ]' -ForegroundColor Magenta
-    Build-DeltaZip $changed
-    Write-Host ''
 }
 
-Write-Host '[ Spiele.zip (vollstaendig) ]' -ForegroundColor Magenta
-Build-SpielZip
+Write-Host '[ Upload-ZIP (geaenderte Dateien) ]' -ForegroundColor Magenta
+Build-UploadZip $changed 'Delta'
+Write-Host ''
+
+Write-Host '[ Archiv (FULL) ]' -ForegroundColor Magenta
+Build-FullArchiv
 
 Set-Baseline $delta.head
 $hLabel = $delta.head.Substring(0, [Math]::Min(7, $delta.head.Length))
