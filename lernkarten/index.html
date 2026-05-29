@@ -180,6 +180,29 @@
     .badge-new  { background: rgba(22,163,74,0.12);  color: var(--success); }
     .badge-done { background: rgba(100,116,139,0.12); color: var(--text-secondary); }
 
+    /* ─── Hierarchische Kategorien ───────────────────── */
+    .cat-group { margin-bottom: 6px; }
+    .cat-group-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; background: var(--bg-card);
+      border-radius: 10px; cursor: pointer;
+      border: 1.5px solid var(--border);
+      transition: background 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .cat-group-header:hover { background: var(--bg-option-hover); }
+    .cat-group-header.partial  { border-color: var(--warning); }
+    .cat-group-header.all-checked { border-color: var(--accent); }
+    .cat-toggle {
+      font-size: 0.6rem; color: var(--text-secondary);
+      flex-shrink: 0; display: inline-block;
+      transition: transform 0.2s;
+    }
+    .cat-toggle.open { transform: rotate(90deg); }
+    .cat-group-name { flex: 1; font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+    .cat-group-children { display: none; flex-direction: column; gap: 5px; padding: 4px 0 2px 18px; }
+    .cat-group-children.open { display: flex; }
+
     .no-data {
       color: var(--text-secondary);
       font-size: 0.88rem;
@@ -623,6 +646,7 @@
   var allCards       = [];
   var catGroups      = [];
   var selectedCatIds = new Set();
+  var openGroups     = new Set();
   var currentSource  = 'memory';
   var newCardsLimit  = 20;
 
@@ -860,10 +884,109 @@
 
   function rebuildForSource() {
     catGroups      = buildCatGroups(getSourceCards());
-    selectedCatIds = new Set(catGroups.map(function(g) { return g.id; }));
+    openGroups     = new Set();
+    selectedCatIds = new Set();
     renderCatList();
     refreshStats();
     refreshStartBtn();
+  }
+
+  function buildHierarchy(groups) {
+    var topMap = {}, topOrder = [];
+    groups.forEach(function(g) {
+      var idx = g.name.indexOf(' › ');
+      var topName = idx >= 0 ? g.name.slice(0, idx) : g.name;
+      if (!topMap[topName]) { topMap[topName] = { name: topName, items: [] }; topOrder.push(topName); }
+      topMap[topName].items.push({
+        id: g.id,
+        displayName: idx >= 0 ? g.name.slice(idx + 3) : g.name,
+        isNested: idx >= 0,
+        due: g.due, newCount: g.newCount, done: g.done
+      });
+    });
+    return topOrder.map(function(n) { return topMap[n]; });
+  }
+
+  function makeBadgesHtml(due, newCount, done) {
+    var h = '';
+    if (due > 0)      h += '<span class="badge badge-due">⏰ ' + due + '</span>';
+    if (newCount > 0) h += '<span class="badge badge-new">✨ ' + newCount + '</span>';
+    if (!due && !newCount && done > 0) h += '<span class="badge badge-done">✓ ' + done + '</span>';
+    return h;
+  }
+
+  function buildCatItemEl(item) {
+    var label = document.createElement('label');
+    label.className = 'cat-item' + (selectedCatIds.has(item.id) ? ' checked' : '');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = selectedCatIds.has(item.id); cb.dataset.catId = item.id;
+    cb.addEventListener('change', (function(id) {
+      return function() {
+        if (this.checked) selectedCatIds.add(id); else selectedCatIds.delete(id);
+        refreshStats(); refreshStartBtn(); renderCatList();
+      };
+    })(item.id));
+    var name = document.createElement('span');
+    name.className = 'cat-item-name'; name.textContent = item.displayName;
+    var badges = document.createElement('div');
+    badges.className = 'cat-badges';
+    badges.innerHTML = makeBadgesHtml(item.due, item.newCount, item.done);
+    label.appendChild(cb); label.appendChild(name); label.appendChild(badges);
+    return label;
+  }
+
+  function buildCatGroupEl(group) {
+    var topName = group.name, items = group.items;
+    var isOpen = openGroups.has(topName);
+    var allChk = items.every(function(it) { return selectedCatIds.has(it.id); });
+    var anyChk = items.some(function(it)  { return selectedCatIds.has(it.id); });
+    var totDue = 0, totNew = 0, totDone = 0;
+    items.forEach(function(it) { totDue += it.due; totNew += it.newCount; totDone += it.done; });
+
+    var groupEl = document.createElement('div');
+    groupEl.className = 'cat-group';
+
+    var header = document.createElement('div');
+    header.className = 'cat-group-header' + (allChk ? ' all-checked' : anyChk ? ' partial' : '');
+
+    var toggle = document.createElement('span');
+    toggle.className = 'cat-toggle' + (isOpen ? ' open' : '');
+    toggle.textContent = '▶';
+
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = allChk; cb.indeterminate = anyChk && !allChk;
+    cb.style.cssText = 'accent-color:var(--accent);width:15px;height:15px;flex-shrink:0;cursor:pointer;';
+    cb.addEventListener('change', (function(its) {
+      return function(e) {
+        e.stopPropagation();
+        var chk = this.checked;
+        its.forEach(function(it) { if (chk) selectedCatIds.add(it.id); else selectedCatIds.delete(it.id); });
+        refreshStats(); refreshStartBtn(); renderCatList();
+      };
+    })(items));
+
+    var nameEl = document.createElement('span');
+    nameEl.className = 'cat-group-name'; nameEl.textContent = topName;
+
+    var badges = document.createElement('div');
+    badges.className = 'cat-badges';
+    badges.innerHTML = makeBadgesHtml(totDue, totNew, totDone);
+
+    header.appendChild(toggle); header.appendChild(cb); header.appendChild(nameEl); header.appendChild(badges);
+    header.addEventListener('click', (function(tn) {
+      return function(e) {
+        if (e.target.tagName === 'INPUT') return;
+        if (openGroups.has(tn)) openGroups.delete(tn); else openGroups.add(tn);
+        renderCatList();
+      };
+    })(topName));
+    groupEl.appendChild(header);
+
+    var children = document.createElement('div');
+    children.className = 'cat-group-children' + (isOpen ? ' open' : '');
+    items.forEach(function(it) { children.appendChild(buildCatItemEl(it)); });
+    groupEl.appendChild(children);
+    return groupEl;
   }
 
   function renderCatList() {
@@ -874,41 +997,11 @@
     }
     var list = document.createElement('div');
     list.className = 'cat-list';
-    catGroups.forEach(function(g) {
-      var item = document.createElement('label');
-      item.className = 'cat-item' + (selectedCatIds.has(g.id) ? ' checked' : '');
-
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = selectedCatIds.has(g.id);
-      cb.dataset.catId = g.id;
-      cb.addEventListener('change', (function(gId, labelEl) {
-        return function() {
-          if (this.checked) selectedCatIds.add(gId);
-          else              selectedCatIds.delete(gId);
-          labelEl.classList.toggle('checked', this.checked);
-          refreshStats();
-          refreshStartBtn();
-        };
-      })(g.id, item));
-
-      var name = document.createElement('span');
-      name.className = 'cat-item-name';
-      name.textContent = g.name;
-
-      var badges = document.createElement('div');
-      badges.className = 'cat-badges';
-      if (g.due > 0)
-        badges.innerHTML += '<span class="badge badge-due">⏰ ' + g.due + '</span>';
-      if (g.newCount > 0)
-        badges.innerHTML += '<span class="badge badge-new">✨ ' + g.newCount + '</span>';
-      if (g.due === 0 && g.newCount === 0 && g.done > 0)
-        badges.innerHTML += '<span class="badge badge-done">✓ ' + g.done + '</span>';
-
-      item.appendChild(cb);
-      item.appendChild(name);
-      item.appendChild(badges);
-      list.appendChild(item);
+    buildHierarchy(catGroups).forEach(function(group) {
+      if (group.items.length === 1 && !group.items[0].isNested)
+        list.appendChild(buildCatItemEl(group.items[0]));
+      else
+        list.appendChild(buildCatGroupEl(group));
     });
     wrap.innerHTML = '';
     wrap.appendChild(list);
