@@ -78,6 +78,7 @@ let timerInterval = null;
 let diceAnimId = null;
 let _lastStateTs = 0;      // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
 let _waitingForTeacher = false;  // Student wartet auf Lehrkraft-Bewertung (offene Frage)
+let _doorAnimating = false;      // Tür-Öffnungsanimation läuft — SSE-Renders pausieren
 let renderer = null;
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -317,6 +318,12 @@ function onRemoteUpdate(data) {
     remoteState = data;
     clearTimer();
     resolveQuestionResult(data.activeQuestion.questionResult);
+    return;
+  }
+
+  // Tür-Animation läuft → State merken, Render pausieren
+  if (_doorAnimating) {
+    remoteState = data;
     return;
   }
 
@@ -832,11 +839,15 @@ function continueAfterQuestion() {
   if (ctx.question) used.add(ctx.question.id);
   newState.usedQuestionIds = [...used];
 
+  // ctx.door ist eine Referenz auf das Tür-Objekt in remoteState (angle noch 0)
+  let doorToAnimate = null;
+
   if (ctx.type === 'door' && wasCorrect) {
     const door = newState.doors.find(d => d.id === ctx.door.id);
     if (door) { door.angle = (door.angle || 0) ? 0 : 90; door.openedBy = myTeamId; }
     newState.teams[myTeamId].x = ctx.target.x;
     newState.teams[myTeamId].y = ctx.target.y;
+    doorToAnimate = ctx.door; // Referenz in remoteState, angle noch 0
   } else if (ctx.type === 'symbol' && wasCorrect) {
     const sym = newState.symbols.find(s => s.x === ctx.target.x && s.y === ctx.target.y && !s.found);
     if (sym) { sym.found = true; sym.foundBy = myTeamId; }
@@ -864,11 +875,35 @@ function continueAfterQuestion() {
   applyStateToGrid(localGrid, newState.symbols || []);
   postState(newState);
 
-  if (newState.currentTeamIdx !== myTeamId) {
-    showWaiting(newState.teams[newState.currentTeamIdx]);
-  } else {
-    applyState(newState);
+  function doAdvance() {
+    if (newState.currentTeamIdx !== myTeamId) {
+      showWaiting(newState.teams[newState.currentTeamIdx]);
+    } else {
+      applyState(newState);
+    }
   }
+
+  // Tür-Öffnungsanimation: remoteState.doors enthält die Tür noch bei angle=0
+  if (doorToAnimate && renderer) {
+    _doorAnimating = true;
+    const animRS = {
+      phase: remoteState.phase,
+      teams: remoteState.teams,
+      currentTeamIdx: remoteState.currentTeamIdx,
+      allSymbols: newState.symbols || [],
+      doors: remoteState.doors,
+      _validFree: new Set(), _validDoor: new Set(), _validSym: new Set()
+    };
+    renderer.render(animRS);
+    renderer.animateDoor(doorToAnimate, 90, 600, () => {
+      _doorAnimating = false;
+      renderCanvas(newState);
+      doAdvance();
+    });
+    return;
+  }
+
+  doAdvance();
 }
 
 // ── Spielende ─────────────────────────────────────────────────────

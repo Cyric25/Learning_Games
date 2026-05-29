@@ -1038,9 +1038,22 @@
 
     if (ctx.type==='door'&&wasCorrect) {
       const door=soloState.doors.find(d=>d.id===ctx.door.id);
-      if (door) { door.angle=door.angle?0:90; door.openedBy=0; }
       soloState.team.x=ctx.target.x; soloState.team.y=ctx.target.y;
-    } else if (ctx.type==='symbol'&&wasCorrect) {
+      soloState.phase='rolling'; soloState.stepsRemaining=0;
+      if (door&&renderer) {
+        const targetAngle=door.angle?0:90;
+        door.openedBy=0;
+        // door.angle bleibt bei 0 — animateDoor animiert ab aktuellem Wert
+        renderSoloCanvas();
+        renderer.animateDoor(door,targetAngle,600,()=>{ renderSoloCanvas(); showRolling(); });
+        return;
+      }
+      if (door) { door.angle=door.angle?0:90; door.openedBy=0; }
+      renderSoloCanvas(); showRolling();
+      return;
+    }
+
+    if (ctx.type==='symbol'&&wasCorrect) {
       const sym=soloState.symbols.find(s=>s.x===ctx.target.x&&s.y===ctx.target.y&&!s.found);
       if (sym) { sym.found=true; sym.foundBy=0; }
       soloState.team.score+=10;

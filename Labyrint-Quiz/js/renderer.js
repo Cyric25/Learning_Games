@@ -192,7 +192,7 @@ class MazeRenderer {
     ctx.translate(ax, ay);
     ctx.rotate(baseRad + openRad);
 
-    const isFlipped = (door.angle || 0) !== 0;
+    const isFlipped = (door.angle || 0) >= 45;
     const lw = Math.max(3, cs * 0.13);
     ctx.strokeStyle = isFlipped ? '#a0702a' : '#8B4513';
     ctx.lineWidth = lw;
@@ -399,6 +399,30 @@ class MazeRenderer {
       else {
         teams[teamIdx].x = toX;
         teams[teamIdx].y = toY;
+        this.render(this.gameState);
+        if (cb) cb();
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // ── Door open/close animation ──────────────────────────────────
+  // door: reference to door object in this.gameState.doors
+  // toAngle: target angle in degrees (90 = open, 0 = closed)
+  animateDoor(door, toAngle, durationMs, cb) {
+    const fromAngle = door.angle || 0;
+    if (fromAngle === toAngle) { if (cb) cb(); return; }
+    const duration = durationMs || 500;
+    const start = performance.now();
+
+    const tick = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic (natural swing)
+      door.angle = fromAngle + (toAngle - fromAngle) * ease;
+      this.render(this.gameState);
+      if (t < 1) requestAnimationFrame(tick);
+      else {
+        door.angle = toAngle;
         this.render(this.gameState);
         if (cb) cb();
       }
