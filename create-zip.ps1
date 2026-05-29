@@ -139,26 +139,27 @@ function Build-UploadZip([string[]]$relPaths, [string]$label = 'Delta') {
         return
     }
 
-    if (Test-Path $zipPath) { Remove-Item $zipPath }
-    $zip   = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
-    $count = 0
-    foreach ($rel in $relPaths) {
-        $full = Join-Path $source ($rel -replace '/', '\')
-        if ((Test-Path $full) -and (-not (IsExcluded $full))) {
-            AddToZip $zip $full $rel
-            $count++
-        }
-    }
-    $zip.Dispose()
+    # Uploadbare Dateien VOR dem Erstellen der ZIP pruefen
+    $eligible = @($relPaths | Where-Object {
+        $full = Join-Path $source ($_ -replace '/', '\')
+        (Test-Path $full) -and (-not (IsExcluded $full))
+    })
 
-    if ($count -eq 0) {
-        Remove-Item $zipPath
+    if ($eligible.Count -eq 0) {
         Write-Host '  backups/Spiele.zip  - keine uploadbaren Aenderungen' -ForegroundColor DarkGray
         return
     }
 
+    if (Test-Path $zipPath) { Remove-Item $zipPath }
+    $zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+    foreach ($rel in $eligible) {
+        $full = Join-Path $source ($rel -replace '/', '\')
+        AddToZip $zip $full $rel
+    }
+    $zip.Dispose()
+
     $kb = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
-    Write-Host "  backups/Spiele.zip  [$label] $count Dateien ($kb KB)  <- hochladen" -ForegroundColor Yellow
+    Write-Host "  backups/Spiele.zip  [$label] $($eligible.Count) Dateien ($kb KB)  <- hochladen" -ForegroundColor Yellow
 }
 
 # ====================================================================
