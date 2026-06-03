@@ -618,7 +618,7 @@ function renderSubBlock(sub, cat, container) {
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasSubsubs && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasSubsubs && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
         <button class="btn btn-success btn-sm" onclick="addSubSubcategory('${cat.id}', '${sub.id}')">+ 2.UK</button>
-        <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}')">+ Frage</button>
+        ${!hasSubsubs ? `<button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}')">+ Frage</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="removeSubcategory('${cat.id}', '${sub.id}')">✕</button>
       </div>
     </div>`;
@@ -659,7 +659,7 @@ function renderSubSubBlock(subsub, sub, cat, container) {
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasL4 && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasL4 && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
         <button class="btn btn-success btn-sm" onclick="addLevel4('${cat.id}', '${sub.id}', '${subsub.id}')">+ 3.UK</button>
-        <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}', null, '${subsub.id}')">+ Frage</button>
+        ${!hasL4 ? `<button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}', '${sub.id}', null, '${subsub.id}')">+ Frage</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="removeSubSubcategory('${cat.id}', '${sub.id}', '${subsub.id}')">✕</button>
       </div>
     </div>`;
@@ -1078,6 +1078,7 @@ async function saveQuestion() {
   }
   const targetNode = findNodeForSave(catId, subcatId, subsubcatId || null, l4catId || null);
   if (!targetNode) { showAlert('qm-alert', 'danger', 'Zielknoten nicht gefunden.'); return; }
+  if ((targetNode.subcategories || []).length > 0) { showAlert('qm-alert', 'danger', 'Fragen können nicht direkt in Kategorien mit Unterkategorien gespeichert werden. Bitte zuerst eine Unterkategorie wählen.'); return; }
   // Build the update object
   function applyQFields(q) {
     q.difficulty = diff; q.type = type; q.question = qText; q.answer = answer;
