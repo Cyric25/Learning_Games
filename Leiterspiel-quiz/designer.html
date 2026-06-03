@@ -110,6 +110,7 @@
     #board-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     #board-svg.t-select { cursor: default; }
     #board-svg.t-draw   { cursor: crosshair; }
+    #board-svg.t-rect   { cursor: crosshair; }
     #board-svg.t-ladder, #board-svg.t-snake { cursor: pointer; }
 
     /* Status bar */
@@ -155,6 +156,7 @@
   <div class="tsep"></div>
   <button class="tbtn" id="btn-select" onclick="setTool('select')">⬆ Auswählen</button>
   <button class="tbtn" id="btn-draw" onclick="setTool('draw')">✏ Feld zeichnen</button>
+  <button class="tbtn" id="btn-rect" onclick="setTool('rect')">▭ Rechteck</button>
   <button class="tbtn ladder" id="btn-ladder" onclick="setTool('ladder')">🪜 Leiter</button>
   <button class="tbtn snake" id="btn-snake" onclick="setTool('snake')">🐍 Schlange</button>
   <div class="tsep"></div>
@@ -243,6 +245,7 @@
       <div class="ptitle">Hilfe</div>
       <div style="font-size:0.76rem;color:var(--text2);line-height:1.65;">
         <p><b>✏ Zeichnen:</b> Klicken = Eckpunkt. Ersten Punkt oder Doppelklick = Abschließen. ESC = Abbrechen.</p>
+        <p style="margin-top:0.45rem;"><b>▭ Rechteck:</b> Klicken und ziehen = Rechteck aufziehen. ESC = Abbrechen.</p>
         <p style="margin-top:0.45rem;"><b>⬆ Auswählen:</b> Feld anklicken, weiße Punkte ziehen zum Bearbeiten.</p>
         <p style="margin-top:0.45rem;"><b>🪜/🐍:</b> Startfeld → Zielfeld klicken.</p>
         <p style="margin-top:0.45rem;"><b>Reihenfolge:</b> ↑↓ Buttons bestimmen die Spielpfad-Nummern.</p>
@@ -328,6 +331,7 @@ let _nid = 1;
 let tool = 'draw';
 let drawPts = [];
 let previewPt = null;
+let rectStart = null;   // {x,y} start corner when rect tool is dragging
 let selId = null;       // selected field id
 let connFrom = null;    // id of "from" field in ladder/snake mode
 let dragInfo = null;    // {fi, vi}
@@ -483,6 +487,12 @@ function renderConns(svg) {
 }
 
 function renderPreview(svg) {
+  if (rectStart && previewPt) {
+    const [x1,y1]=rectStart, [x2,y2]=previewPt;
+    const pts=[[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
+    svg.appendChild(mkSvg('polygon',{points:pts.map(p=>p.join(',')).join(' '),fill:'rgba(247,151,30,0.15)',stroke:'#f7971e','stroke-width':'0.45','stroke-dasharray':'1.5 0.7'}));
+    pts.forEach(([px,py])=>svg.appendChild(mkSvg('circle',{cx:px,cy:py,r:'0.72',fill:'#f7971e',stroke:'#fff','stroke-width':'0.22'})));
+  }
   if (!drawPts.length) return;
   for (let i=1;i<drawPts.length;i++) {
     const [px,py]=drawPts[i-1],[x,y]=drawPts[i];
@@ -507,6 +517,7 @@ function renderPreview(svg) {
 function initEvents() {
   const svg = document.getElementById('board-svg');
   svg.addEventListener('click', ev => {
+    if (tool==='rect') return; // rect uses mousedown/mouseup
     if (tool!=='draw') {
       if (ev.target===svg||ev.target.id==='board-svg') { selId=null; connFrom=null; updProps(); updList(); render(); }
       return;
@@ -516,15 +527,48 @@ function initEvents() {
   svg.addEventListener('dblclick', ev => {
     if (tool==='draw' && drawPts.length>=3) { ev.preventDefault(); closePoly(); }
   });
+  svg.addEventListener('mousedown', ev => {
+    if (tool!=='rect') return;
+    ev.preventDefault();
+    rectStart = svgXY(ev);
+    previewPt = rectStart.slice();
+    render();
+    const onUp = () => {
+      if (rectStart && previewPt) {
+        const dx = Math.abs(previewPt[0]-rectStart[0]);
+        const dy = Math.abs(previewPt[1]-rectStart[1]);
+        if (dx>0.5 && dy>0.5) closeRect();
+        else { rectStart=null; render(); }
+      }
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mouseup', onUp);
+  });
   svg.addEventListener('mousemove', ev => {
     previewPt = svgXY(ev);
-    if (drawPts.length>0) render();
+    if (drawPts.length>0 || rectStart) render();
     if (dragInfo) { board.fields[dragInfo.fi].points[dragInfo.vi]=previewPt; render(); }
   });
   svg.addEventListener('touchstart', ev => {
-    if (tool!=='draw') return;
-    ev.preventDefault();
-    onDrawClick(...svgXY(ev));
+    if (tool==='draw') { ev.preventDefault(); onDrawClick(...svgXY(ev)); }
+    else if (tool==='rect') {
+      ev.preventDefault();
+      rectStart = svgXY(ev);
+      previewPt = rectStart.slice();
+      render();
+    }
+  }, {passive:false});
+  svg.addEventListener('touchmove', ev => {
+    if (tool==='rect' && rectStart) { ev.preventDefault(); previewPt=svgXY(ev); render(); }
+  }, {passive:false});
+  svg.addEventListener('touchend', ev => {
+    if (tool==='rect' && rectStart) {
+      ev.preventDefault();
+      if (previewPt) {
+        const dx=Math.abs(previewPt[0]-rectStart[0]), dy=Math.abs(previewPt[1]-rectStart[1]);
+        if (dx>0.5 && dy>0.5) closeRect(); else { rectStart=null; render(); }
+      }
+    }
   }, {passive:false});
 }
 
@@ -574,6 +618,20 @@ function closePoly() {
   updList(); updProps(); render();
 }
 
+function closeRect() {
+  if (!rectStart || !previewPt) return;
+  const [x1,y1]=rectStart, [x2,y2]=previewPt;
+  const pts=[[x1,y1],[x2,y1],[x2,y2],[x1,y2]];
+  const f = {
+    id:'f'+(_nid++), number:board.fields.length+1,
+    points:pts, difficulty:'leicht', bonusType:null,
+    isStart:board.fields.length===0, isGoal:false
+  };
+  board.fields.push(f);
+  rectStart=null; previewPt=null; selId=f.id;
+  updList(); updProps(); render();
+}
+
 // ── Vertex drag ────────────────────────────────────────────────
 function startDrag(fi, vi, type) {
   dragInfo = {fi,vi};
@@ -590,13 +648,14 @@ function startDrag(fi, vi, type) {
 
 // ── Tool switch ────────────────────────────────────────────────
 function setTool(t) {
-  tool=t; drawPts=[]; previewPt=null; connFrom=null;
+  tool=t; drawPts=[]; previewPt=null; connFrom=null; rectStart=null;
   document.querySelectorAll('.tbtn[id^=btn-]').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('btn-'+t); if(btn) btn.classList.add('active');
   document.getElementById('board-svg').setAttribute('class','t-'+t);
   const msgs = {
     select:'⬆ Feld anklicken. Weiße Punkte ziehen zum Formen.',
     draw:'✏ Klicken = Eckpunkt setzen. Ersten Punkt oder Doppelklick = Abschließen. ESC = Abbrechen.',
+    rect:'▭ Klicken und ziehen um ein Rechteck zu zeichnen. ESC = Abbrechen.',
     ladder:'🪜 Startfeld der Leiter klicken…',
     snake:'🐍 Startfeld der Schlange klicken…'
   };
@@ -840,6 +899,7 @@ function handleImport(e) {
 document.addEventListener('keydown', e=>{
   if (e.key==='Escape') {
     if (drawPts.length>0) { drawPts=[]; previewPt=null; render(); }
+    else if (rectStart) { rectStart=null; previewPt=null; render(); }
     else if (connFrom) { connFrom=null; render(); }
     else if (selId) { selId=null; updProps(); updList(); render(); }
   }
