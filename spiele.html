@@ -957,12 +957,7 @@
       if (r.ok) {
         const d = await r.json();
         if (d.enabledGames && Array.isArray(d.enabledGames)) {
-          // NEW_GAMES auch in globale Settings mergen (neue Spiele werden immer sichtbar)
-          const merged = d.enabledGames.slice();
-          NEW_GAMES.forEach(function(id) {
-            if (merged.indexOf(id) === -1) merged.push(id);
-          });
-          globalEnabledGames = merged;
+          globalEnabledGames = d.enabledGames;
           applyGameVisibility();
         }
       }
