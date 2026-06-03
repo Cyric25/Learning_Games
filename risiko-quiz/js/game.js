@@ -688,7 +688,9 @@ function getSlotQuestionsForDiff(slot, diff) {
   const cat = gameData.categories.find(c => c.id === slot.categoryId);
   if (!cat) return [];
   if (slot.type === 'category') {
-    return (cat.subcategories || []).flatMap(s => getAllQuestionsInNode(s, diff));
+    const subs = cat.subcategories || [];
+    if (!subs.length) return getAllQuestionsInNode(cat, diff);
+    return subs.flatMap(s => getAllQuestionsInNode(s, diff));
   }
   const sub = (cat.subcategories || []).find(s => s.id === slot.subcategoryId);
   if (!sub) return [];
