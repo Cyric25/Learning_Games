@@ -96,15 +96,19 @@ const LsStorage = {
 
   subscribe(code, cb) {
     code = code.toUpperCase();
-    let stopped = false, src = null, timer = null;
+    let stopped = false, src = null, timer = null, lastJson = '';
+
+    // Nur bei tatsächlicher Änderung weiterreichen (verhindert Dauer-Re-Renders)
+    const emit = (raw) => {
+      if (raw === lastJson) return;
+      lastJson = raw;
+      try { const d = JSON.parse(raw); if (d && d.meta) cb(this._deser(d)); } catch {}
+    };
 
     const startSSE = () => {
       if (stopped) return;
       src = new EventSource('../api.php?f=ls-sse&code='+code);
-      src.onmessage = e => {
-        if (stopped) return;
-        try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {}
-      };
+      src.onmessage = e => { if (!stopped) emit(e.data); };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
       src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
     };
@@ -114,10 +118,10 @@ const LsStorage = {
         if (stopped) return;
         try {
           const r = await fetch('../api.php?f=ls-game&code='+code);
-          if (r.ok) { const d=await r.json(); if(d&&d.meta) cb(this._deser(d)); }
+          if (r.ok) emit(await r.text());
         } catch {}
       };
-      fn(); timer = setInterval(fn, 300);
+      fn(); timer = setInterval(fn, 1000);
     };
     const startLocalPoll = () => {
       if (stopped||timer) return;
@@ -436,7 +440,7 @@ function _buildCatNode(container, cat, icon, depth) {
     item.dataset.catId = cat.id;
     item.innerHTML =
       '<span class="cat-select-icon">' + (icon || '📁') + '</span>' +
-      '<span class="cat-select-name">' + cat.name + '</span>' +
+      '<span class="cat-select-name">' + escapeHtml(cat.name) + '</span>' +
       '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
       '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
     item.onclick = () => {
@@ -466,7 +470,7 @@ function _buildCatNode(container, cat, icon, depth) {
   header.innerHTML =
     '<span class="cat-group-chevron">▶</span>' +
     '<span class="cat-group-icon">' + icon + '</span>' +
-    '<span class="cat-group-name">' + cat.name + '</span>' +
+    '<span class="cat-group-name">' + escapeHtml(cat.name) + '</span>' +
     '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
     '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
       '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
@@ -939,7 +943,7 @@ function renderDiceOrderList() {
 
     row.innerHTML =
       '<span class="dice-order-emoji">' + team.emoji + '</span>' +
-      '<span class="dice-order-name">' + team.name + '</span>' +
+      '<span class="dice-order-name">' + escapeHtml(team.name) + '</span>' +
       '<span class="dice-order-result">' + (diceOrderState.rolls[i] !== null ? DICE_FACES[diceOrderState.rolls[i] - 1] + ' ' + diceOrderState.rolls[i] : '—') + '</span>';
     list.appendChild(row);
   });
@@ -950,7 +954,7 @@ function renderDiceOrderList() {
     orderDiv.style.cssText = 'margin-top:16px;padding:12px;background:var(--bg-field);border-radius:12px;';
     orderDiv.innerHTML = '<strong>Reihenfolge:</strong> ' +
       gameState.turnOrder.map((idx, pos) =>
-        (pos + 1) + '. ' + gameState.teams[idx].emoji + ' ' + gameState.teams[idx].name
+        (pos + 1) + '. ' + gameState.teams[idx].emoji + ' ' + escapeHtml(gameState.teams[idx].name)
       ).join(' → ');
     list.appendChild(orderDiv);
   }
@@ -1490,7 +1494,7 @@ function renderTeamList() {
     card.innerHTML =
       '<span class="team-emoji">' + team.emoji + '</span>' +
       '<div class="team-info">' +
-        '<div class="team-name">' + team.name + '</div>' +
+        '<div class="team-name">' + escapeHtml(team.name) + '</div>' +
         '<div class="team-pos">Feld <strong>' + team.position + '</strong></div>' +
       '</div>';
     list.appendChild(card);
@@ -1762,8 +1766,25 @@ function resolveOpen(correct) {
   resolveQuestion(correct);
 }
 
-function resolveQuestion(correct) {
+async function resolveQuestion(correct) {
+  if (questionResolved) return;
   questionResolved = true;
+
+  // Schüler-initiierte Frage (per SSE geöffnet): frisch laden. Hat das
+  // Schülergerät die Frage bereits selbst ausgewertet, hier abbrechen —
+  // sonst werden Punkte/Bewegung doppelt angewendet (Last-Write-Wins).
+  if (gameState.liveQuestion && _lastSSELiveQId !== null &&
+      gameState.liveQuestion.id === _lastSSELiveQId) {
+    try {
+      const fresh = await LsStorage.load(LsStorage.getCode());
+      if (fresh && (fresh.phase === 'finished' || !fresh.liveQuestion || fresh.liveQuestion.resolved)) {
+        clearInterval(timerInterval);
+        document.getElementById('question-modal').classList.remove('open');
+        return; // Board-Update kommt über den SSE-Pfad (lq-cleared)
+      }
+    } catch { }
+  }
+
   const team = getCurrentTeam();
   const field = gameState.board[team.position];
 
@@ -1910,7 +1931,7 @@ function showBonusModal(type) {
         const btn = document.createElement('button');
         btn.className = 'swap-team-btn';
         btn.innerHTML = '<span style="font-size:1.3rem">' + team.emoji + '</span> ' +
-          team.name + ' <span style="color:var(--text-light);font-size:0.85rem">(Feld ' + team.position + ')</span>';
+          escapeHtml(team.name) + ' <span style="color:var(--text-light);font-size:0.85rem">(Feld ' + team.position + ')</span>';
         btn.onclick = () => executeSwap(idx);
         swapDiv.appendChild(btn);
       });
@@ -1970,8 +1991,9 @@ function freeMove() {
       gameState.pendingDice = result;
 
       const team = getCurrentTeam();
+      const maxField = getFieldCount(); // Custom-Boards haben ≠100 Felder
       const newPos = team.position + result;
-      if (newPos > 100) {
+      if (newPos > maxField) {
         nextTurn();
         return;
       }
@@ -1980,7 +2002,7 @@ function freeMove() {
       updatePieces();
       updateTeamList();
 
-      if (newPos === 100) {
+      if (newPos === maxField) {
         setTimeout(() => showWinner(), 500);
         return;
       }
@@ -2136,9 +2158,20 @@ async function _gsEnter(code) {
     renderBoard();
     renderTeamList();
     updateActiveBanner();
-    updateDiceButton(false);
     showCodeBanner();
     if (!_customBoard) { drawLaddersAndSnakes(); window.addEventListener('resize', drawLaddersAndSnakes); }
+    // Nach Reload: laufende Frage wiederherstellen statt Würfel dauerhaft zu sperren
+    if (gs.liveQuestion && !gs.liveQuestion.resolved) {
+      _lastSSELiveQId = gs.liveQuestion.id;
+      questionResolved = false;
+      currentQuestion = gs.liveQuestion.question;
+      updateDiceButton(false);
+      askQuestion(gs.liveQuestion.question);
+    } else {
+      // Hängengebliebene aufgelöste Frage verwerfen und Würfeln erlauben
+      if (gs.liveQuestion) { gameState.liveQuestion = null; LsStorage.save(gameState); }
+      updateDiceButton(true);
+    }
     startSSESubscription();
 
   } else if (gs.phase === 'dice-order') {
@@ -2297,6 +2330,38 @@ let _lastSSEPhase = null;
 let _lastSSELiveQId = null;
 
 function onSSEUpdate(newGs) {
+  // Remote-Sieg: Schülergerät hat phase='finished' gespeichert. Ohne diese
+  // Behandlung bleibt das Frage-Modal samt Timer offen, und der spätere
+  // Timer-Ablauf speichert den lokalen (veralteten) Stand mit phase='playing'
+  // zurück — der Sieg des Schülers würde rückgängig gemacht.
+  if (newGs.phase === 'finished' && gameState && gameState.phase === 'playing') {
+    clearInterval(timerInterval);
+    questionResolved = true;
+    _lastSSELiveQId = null;
+    const modal = document.getElementById('question-modal');
+    if (modal && modal.classList.contains('open')) modal.classList.remove('open');
+    // Positionen/Scores des Siegzugs übernehmen
+    (newGs.teams || []).forEach((t, i) => {
+      if (gameState.teams[i]) {
+        gameState.teams[i].position = t.position;
+        gameState.teams[i].score = t.score;
+        gameState.teams[i].correctCount = t.correctCount;
+        gameState.teams[i].wrongCount = t.wrongCount;
+      }
+    });
+    gameState.liveQuestion = null;
+    gameState.pendingDice = null;
+    // currentTurnIdx auf das Siegerteam stellen, damit showWinner() es anzeigt
+    const maxField = getFieldCount();
+    const winTeamIdx = gameState.teams.findIndex(t => t.position === maxField);
+    const winTurnIdx = winTeamIdx >= 0 ? gameState.turnOrder.indexOf(winTeamIdx) : -1;
+    if (winTurnIdx >= 0) gameState.currentTurnIdx = winTurnIdx;
+    updatePieces();
+    updateTeamList();
+    showWinner();
+    return;
+  }
+
   // Only react when we're in game/dice-order phase and the update came from ANOTHER device
   if (newGs.phase !== 'playing' && newGs.phase !== 'dice-order') return;
 

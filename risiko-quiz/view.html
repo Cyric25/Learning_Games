@@ -388,7 +388,12 @@ function onGameStateUpdate(gs) {
     document.getElementById('poll-dot').classList.remove('err');
 
     if (!gs?.meta) { myTeamId = null; showNoGame('Warte auf Spielstart…'); return; }
-    if (gs.status === 'finished') { showEndScreen(gs); return; }
+    if (gs.status === 'finished') {
+      // Kategorien anreichern, sonst zeigt getStats "0 von 0 Fragen gespielt"
+      gs.categories = questionsCache?.categories || [];
+      showEndScreen(gs);
+      return;
+    }
 
     if (myTeamId !== null && myTeamId !== 'spectator') {
       if (!gs.teams?.find(t => t.id === myTeamId)) myTeamId = null;
@@ -885,8 +890,13 @@ function startSQTimer(lq, total) {
   const ringFill = document.getElementById('sq-ring-fill');
   const numEl   = document.getElementById('sq-timer-num');
   let soundPlayed = false;
+  // openedAt stammt von der Lehrergerät-Uhr — beim ersten Empfang auf die
+  // lokale Uhr normalisieren, sonst zeigt eine abweichende Geräteuhr
+  // sofort 0 Sekunden an (reine Anzeige, Wertung macht das Lehrergerät)
+  const startedLocal = Math.min(Date.now(), lq.openedAt || Date.now());
+  const base = (Date.now() - startedLocal > total * 1000) ? Date.now() : startedLocal;
   function tick() {
-    const elapsed = Math.floor((Date.now() - lq.openedAt) / 1000);
+    const elapsed = Math.floor((Date.now() - base) / 1000);
     const remaining = Math.max(0, total - elapsed);
     numEl.textContent = remaining;
     ringFill.style.strokeDashoffset = CIRC * (1 - remaining / total);

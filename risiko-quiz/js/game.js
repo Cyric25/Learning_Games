@@ -67,6 +67,13 @@ function updateGameCodeDisplays() {
 function copyCode(el) {
   const code = StorageManager.getGameCode();
   if (!code) return;
+  // navigator.clipboard existiert nur in Secure Contexts (HTTPS/localhost)
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    const orig = el.textContent;
+    el.textContent = code + ' (bitte notieren)';
+    setTimeout(() => { el.textContent = orig; }, 2000);
+    return;
+  }
   navigator.clipboard.writeText(code).then(() => {
     const orig = el.textContent;
     el.textContent = '✓ Kopiert!';
@@ -141,7 +148,7 @@ async function createNewGame() {
   const errorEl = document.getElementById('join-error');
   errorEl.style.display = 'none';
   try {
-    const gameCode = GameModel.generateToken();
+    const gameCode = await GameModel.generateUniqueGameCode();
     const game = GameModel.createGame({ gameCode });
     StorageManager.setGameCode(gameCode);
     await StorageManager.saveGameState(game);
@@ -205,6 +212,14 @@ async function loadGame(code) {
   if (v.errors.length) {
     showSetupScreen('Spiel unvollständig: ' + v.errors[0]);
     return;
+  }
+
+  // Reload während offener Frage: hängengebliebene liveQuestion verwerfen,
+  // sonst zeigen alle Schülergeräte dauerhaft das Frage-Overlay einer Frage,
+  // die auf dem Lehrergerät nicht mehr offen ist.
+  if (gameData.liveQuestion) {
+    gameData.liveQuestion = null;
+    autosave();
   }
 
   startGame();
@@ -485,10 +500,13 @@ function toggleTeamSelection(teamId, checked) {
   });
 }
 
+let renameTeamSaveTimer = null;
 function renameTeam(teamId, val) {
   const team = gameData.teams.find(t => t.id == teamId);
   if (team) { team.name = val; }
-  autosave();
+  // Debounce: nicht bei jedem Tastendruck den kompletten Spielstand POSTen
+  clearTimeout(renameTeamSaveTimer);
+  renameTeamSaveTimer = setTimeout(autosave, 600);
 }
 
 function confirmTeams() {
@@ -853,9 +871,11 @@ function openQuestion(slot, questionId) {
           if (modalResolved) return;
           if (pendingMultiSel.has(i)) { pendingMultiSel.delete(i); btn.classList.remove('mc-selected-pending'); }
           else { pendingMultiSel.add(i); btn.classList.add('mc-selected-pending'); }
-          // Sync zu liveQuestion (Zwischenstand)
+          // Sync zu liveQuestion (Zwischenstand) — auch selectedMcIndices,
+          // damit view.html alle gewählten Optionen gelb markiert
           if (gameData.liveQuestion) {
             gameData.liveQuestion.selectedMcIndex = [...pendingMultiSel][0] ?? null;
+            gameData.liveQuestion.selectedMcIndices = [...pendingMultiSel];
             autosave();
           }
         });
@@ -921,21 +941,29 @@ function openQuestion(slot, questionId) {
   autosave();
   startTeamActionPoll();
 
-  // Timer zurücksetzen und starten
+  // Timer zurücksetzen und starten — nur wenn Timer aktiviert ist.
+  // Ohne diese Prüfung wertet das Lehrergerät nach Ablauf automatisch
+  // "falsch", obwohl die Schüler gar keinen Timer sehen.
   const settings = gameData.meta.settings;
-  timerRemaining = settings.timerSeconds;
-  const numberEl = document.getElementById('timer-number');
-  const ringFill = document.getElementById('timer-ring-fill');
   const timerEl  = document.getElementById('modal-timer');
-  if (numberEl) numberEl.textContent = timerRemaining;
-  if (ringFill) {
-    ringFill.style.transition = 'none';
-    ringFill.style.strokeDashoffset = '0';
-    void ringFill.getBoundingClientRect();
-    ringFill.style.transition = '';
+  if (settings.timerEnabled === false) {
+    clearInterval(timerInterval);
+    if (timerEl) timerEl.style.display = 'none';
+  } else {
+    if (timerEl) timerEl.style.display = '';
+    timerRemaining = settings.timerSeconds;
+    const numberEl = document.getElementById('timer-number');
+    const ringFill = document.getElementById('timer-ring-fill');
+    if (numberEl) numberEl.textContent = timerRemaining;
+    if (ringFill) {
+      ringFill.style.transition = 'none';
+      ringFill.style.strokeDashoffset = '0';
+      void ringFill.getBoundingClientRect();
+      ringFill.style.transition = '';
+    }
+    if (timerEl) timerEl.className = '';
+    startTimer();
   }
-  if (timerEl) timerEl.className = '';
-  startTimer();
 
   document.getElementById('question-modal').classList.add('open');
 }
@@ -991,7 +1019,20 @@ function startTimer() {
   }, 1000);
 }
 
-function timerExpired() {
+async function timerExpired() {
+  if (modalResolved) return;
+  // Kurz vor der Wertung frischen Stand laden: Hat der Schüler in letzter
+  // Sekunde geantwortet (Save noch unterwegs), zählt seine Antwort — nicht
+  // der Timer-Ablauf auf dem Lehrergerät.
+  try {
+    const fresh = await StorageManager.loadGameState();
+    const flq = fresh?.liveQuestion;
+    if (!modalResolved && flq && flq.id === currentQuestionId &&
+        flq.autoResolved && typeof flq.autoCorrect === 'boolean') {
+      handleTeamAction(fresh);
+      return;
+    }
+  } catch { }
   if (modalResolved) return;
   playTimerSound();
   const q = GameModel.findQuestion(gameData, currentQuestionId);
@@ -1207,6 +1248,9 @@ function startStealPhase(originalTeamId) {
   }
 
   renderStealButtons();
+  // renderStealButtons() ruft bei 0 berechtigten Teams sofort endStealPhase()
+  // auf — dann hier abbrechen, statt die Sektion wieder einzublenden
+  if (!stealPhase) return;
   renderStealCandidates(gameData.liveQuestion?.stealCandidates || []);
   document.getElementById('modal-steal-section').style.display = '';
 
@@ -1605,10 +1649,16 @@ function formatTime(sec) {
   return `${m}:${s}`;
 }
 
+function stopCellActionPoll() {
+  clearInterval(cellActionInterval);
+  cellActionInterval = null;
+}
+
 // ── End Screen ────────────────────────────────────────────────
 function showEndScreen() {
   gameData.status = 'finished';
   autosave();
+  stopCellActionPoll();
 
   const stats = GameModel.getStats(gameData);
   document.getElementById('end-subtitle').textContent =

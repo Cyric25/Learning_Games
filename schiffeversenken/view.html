@@ -452,13 +452,14 @@ async function loadQuestions() {
   return c ? JSON.parse(c) : { categories: [] };
 }
 function flattenQuestions(cats) {
+  // True-Leaf-Regel: Nur echte Blätter (questions && keine subcategories)
+  // liefern Fragen — konsistent mit dem Kategorien-Selektor in index.html
   const result = [];
   function walk(cat) {
     const subs = cat.subcategories || [];
     const hasQ = (cat.questions||[]).length > 0;
     if (hasQ && !subs.length) { cat.questions.forEach(q => result.push({...q, kategorieId: cat.id, kategorieName: cat.name})); return; }
     subs.forEach(s => walk(s));
-    if (hasQ) cat.questions.forEach(q => result.push({...q, kategorieId: cat.id, kategorieName: cat.name}));
   }
   cats.forEach(c => walk(c));
   return result;
@@ -608,6 +609,9 @@ async function doJoin() {
     }
   }
   showTeamSelect(state);
+  // Subscription schon jetzt starten: Wer vor Spielstart beitritt, bekommt
+  // sonst nie Updates (leere/statische Teamliste bis zur Code-Neueingabe)
+  startSSE();
 }
 window.doJoin = doJoin;
 
@@ -652,6 +656,23 @@ async function selectTeam(id, stateHint) {
   ns.takenTeams = [...taken];
   await BsStorage.save(ns);
   remoteState = ns;
+
+  // Verifizieren: Bei gleichzeitigen Beitritten kann ein parallel laufender
+  // Save unseren Eintrag überschrieben haben (Last-Write-Wins) → einmal
+  // nachladen und ggf. erneut eintragen, sonst wirkt es wie ein Kick.
+  try {
+    const check = await BsStorage.load(gameCode);
+    if (check && Array.isArray(check.takenTeams) && !check.takenTeams.includes(id)) {
+      const ns2 = JSON.parse(JSON.stringify(check, (k,v) => v instanceof Set ? [...v] : v));
+      ns2.usedQuestionIds = new Set(ns2.usedQuestionIds||[]);
+      ns2.takenTeams = [...new Set([...(check.takenTeams||[]), id])];
+      await BsStorage.save(ns2);
+      remoteState = ns2;
+    } else if (check) {
+      remoteState = check;
+    }
+  } catch {}
+
   myTeamId = id;
   localStorage.setItem('bs_myteam_' + gameCode, id);
   startGameView();
@@ -689,8 +710,17 @@ function onRemoteUpdate(data) {
     return;
   }
 
+  // Guard VOR der Übernahme: Während der Ergebnisanzeige darf ein
+  // verspäteter (alter) Poll-Stand den lokal fortgeschriebenen Zustand
+  // nicht ersetzen — sonst erscheint die alte Frage kurz erneut.
+  if (submittingShot) return;
   remoteState = data;
-  if (submittingShot) return; // Ergebnisanzeige läuft, kein Re-Render
+
+  // Noch in der Teamauswahl: Liste live aktualisieren (belegte Teams, Spielstart)
+  if (myTeamId === null) {
+    if (document.getElementById('screen-team')?.classList.contains('active')) showTeamSelect(data);
+    return;
+  }
 
   if (data.phase === 'setup') { showWaitScreen(); return; }
   if (data.phase === 'finished') {
@@ -798,16 +828,21 @@ function renderGameView() {
   // Question Overlay
   if (lq && !lq.resolved) {
     const isMyShot = lq.teamIdx === myTeamId;
-    if (isMyShot) {
-      showQuestionOverlay(lq);
-    } else {
-      showSpectatorQuestion(lq);
+    // Overlay/Timer nur bei NEUER Frage aufbauen — sonst setzt jedes
+    // State-Update (SSE-Echo, Teambeitritt, Poll) den Countdown zurück
+    // und ersetzt die Antwort-Buttons unter dem Finger
+    if (lq.id !== _shownLqId) {
+      _shownLqId = lq.id;
+      if (isMyShot) showQuestionOverlay(lq);
+      else showSpectatorQuestion(lq);
     }
   } else {
     if (submittingShot) return;
+    _shownLqId = null;
     document.getElementById('q-overlay').classList.add('hidden');
   }
 }
+let _shownLqId = null;
 
 // ── Player Grid ───────────────────────────────────────────────────
 function renderPlayerGrid() {
@@ -992,7 +1027,7 @@ function advanceTurn(ns, lq) {
       ns.winner = alive.length === 1 ? alive[0] : null;
     } else {
       const prevIdx = alive.indexOf(lq.teamIdx);
-      ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : remoteState.currentTurnIndex + 1) % alive.length;
+      ns.currentTurnIndex = (prevIdx >= 0 ? prevIdx + 1 : ns.currentTurnIndex + 1) % alive.length;
     }
   }
 }

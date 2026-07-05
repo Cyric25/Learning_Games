@@ -33,6 +33,35 @@ function san(string $s, int $max = 100): string {
     return mb_substr(trim($s), 0, $max);
 }
 
+// PIN strikt validieren — verhindert Path Traversal über den Dateipfad
+function requirePin($raw): string {
+    $pin = strtoupper(san((string)$raw, 6));
+    if (!preg_match('/^[A-Z0-9]{4,6}$/', $pin)) err('invalid_pin');
+    return $pin;
+}
+
+// Wortlisten-ID validieren (leer erlaubt) — wird in Dateipfaden verwendet
+function sanWordlistId($raw): string {
+    $id = san((string)$raw, 40);
+    if ($id !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $id)) return '';
+    return $id;
+}
+
+// Exklusiver Lock pro Spiel für den gesamten Read-Modify-Write-Zyklus.
+// Ohne diesen Lock kann z.B. ein Heartbeat (load → save) einen parallel
+// laufenden guess_card überschreiben (aufgedeckte Karte wieder verdeckt).
+// Der Lock wird bei Skriptende automatisch freigegeben.
+$GLOBALS['gameLockFp'] = null;
+function lockGame(string $pin, string $dir): void {
+    if ($GLOBALS['gameLockFp']) return; // bereits gelockt
+    $fp = @fopen($dir . '/' . $pin . '.lock', 'c');
+    if ($fp && flock($fp, LOCK_EX)) {
+        $GLOBALS['gameLockFp'] = $fp;
+    } elseif ($fp) {
+        fclose($fp);
+    }
+}
+
 function generatePin(): string {
     $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     $out = '';
@@ -60,7 +89,10 @@ function saveGame(array &$game, string $dir): bool {
     $game['updated_at'] = time();
     $json = json_encode($game, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     $path = $dir . '/' . $pin . '.json';
-    if (file_put_contents($path, $json, LOCK_EX) === false) return false;
+    // Atomar via tmp+rename: parallele Reader (get_state) sehen nie halbe Dateien
+    $tmp = $path . '.tmp.' . getmypid();
+    if (file_put_contents($tmp, $json, LOCK_EX) === false) return false;
+    if (!@rename($tmp, $path)) { @unlink($tmp); return false; }
 
     // Update registry
     $regPath = $dir . '/index.json';
@@ -93,6 +125,7 @@ function cleanupGames(string $dir): void {
         $age = time() - ($info['updated_at'] ?? $info['created_at'] ?? 0);
         if ($age > 86400) {
             @unlink($dir . '/' . $pin . '.json');
+            @unlink($dir . '/' . $pin . '.lock');
             unset($reg[$pin]);
             $changed = true;
         }
@@ -180,7 +213,7 @@ case 'create_game': {
     $playerName = san($b['player_name'] ?? 'Host', 30);
     $teamRed    = san($b['team_red']  ?? ($language === 'de' ? 'Rot'  : 'Red'),  30);
     $teamBlue   = san($b['team_blue'] ?? ($language === 'de' ? 'Blau' : 'Blue'), 30);
-    $wordlistId = san($b['wordlist_id'] ?? '', 30);
+    $wordlistId = sanWordlistId($b['wordlist_id'] ?? '');
 
     cleanupGames($gamesDir);
 
@@ -230,11 +263,11 @@ case 'create_game': {
 case 'join_game': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b = jsonBody();
-    $pin        = strtoupper(san($b['pin'] ?? '', 6));
+    $pin        = requirePin($b['pin'] ?? '');
     $playerName = san($b['player_name'] ?? 'Spieler', 30);
     $existId    = san($b['player_id'] ?? '', 15);
 
-    if (!$pin) err('pin_required');
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] === 'finished') err('game_finished');
@@ -282,12 +315,13 @@ case 'join_game': {
 case 'select_role': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
     $team     = in_array($b['team'] ?? '', ['red', 'blue']) ? $b['team'] : null;
     $role     = in_array($b['role'] ?? '', ['spymaster', 'operative', 'spectator']) ? $b['role'] : null;
 
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'lobby') err('game_already_started');
@@ -336,9 +370,8 @@ case 'select_role': {
 
 // ── get_state ─────────────────────────────────────────────────────────────
 case 'get_state': {
-    $pin      = strtoupper(san($_GET['pin'] ?? '', 6));
+    $pin      = requirePin($_GET['pin'] ?? '');
     $playerId = san($_GET['player_id'] ?? '', 15);
-    if (!$pin) err('pin_required');
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     echo json_encode(filterState($game, $playerId));
@@ -349,9 +382,10 @@ case 'get_state': {
 case 'update_settings': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'lobby') err('game_already_started');
@@ -359,7 +393,7 @@ case 'update_settings': {
 
     if (isset($b['team_red']))    $game['teams']['red']['name']  = san($b['team_red'], 30);
     if (isset($b['team_blue']))   $game['teams']['blue']['name'] = san($b['team_blue'], 30);
-    if (isset($b['wordlist_id'])) $game['wordlist_id']           = san($b['wordlist_id'], 30);
+    if (isset($b['wordlist_id'])) $game['wordlist_id']           = sanWordlistId($b['wordlist_id']);
     if (isset($b['custom_words']) && is_array($b['custom_words'])) {
         $game['custom_words'] = array_values(array_filter(
             array_map(fn($w) => san((string)$w, 60), $b['custom_words']),
@@ -375,9 +409,10 @@ case 'update_settings': {
 case 'start_game': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'lobby') err('game_already_started');
@@ -387,7 +422,7 @@ case 'start_game': {
     $words = [];
     if (count($game['custom_words'] ?? []) === 25) {
         $words = $game['custom_words'];
-    } elseif (!empty($game['wordlist_id'])) {
+    } elseif (!empty($game['wordlist_id']) && preg_match('/^[a-zA-Z0-9_\-]+$/', $game['wordlist_id'])) {
         $wlPath = $GLOBALS['wlDir'] . '/' . $game['wordlist_id'] . '.json';
         if (file_exists($wlPath)) {
             $wl    = @json_decode(file_get_contents($wlPath), true);
@@ -431,12 +466,13 @@ case 'start_game': {
 case 'submit_clue': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
     $word     = san($b['word'] ?? '', 50);
     $number   = max(0, min(9, (int)($b['number'] ?? 0)));
-    if (!$pin || !$playerId || !$word) err('params_required');
+    if (!$playerId || !$word) err('params_required');
 
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'active') err('game_not_active');
@@ -476,11 +512,12 @@ case 'submit_clue': {
 case 'guess_card': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b         = jsonBody();
-    $pin       = strtoupper(san($b['pin'] ?? '', 6));
+    $pin       = requirePin($b['pin'] ?? '');
     $playerId  = san($b['player_id'] ?? '', 15);
     $cardIndex = (int)($b['card_index'] ?? -1);
-    if (!$pin || !$playerId || $cardIndex < 0 || $cardIndex > 24) err('params_required');
+    if (!$playerId || $cardIndex < 0 || $cardIndex > 24) err('params_required');
 
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'active') err('game_not_active');
@@ -555,10 +592,11 @@ case 'guess_card': {
 case 'end_turn': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
 
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if ($game['status'] !== 'active') err('game_not_active');
@@ -582,10 +620,11 @@ case 'end_turn': {
 case 'heartbeat': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
 
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
 
@@ -601,10 +640,11 @@ case 'heartbeat': {
 case 'reset_game': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
     $b        = jsonBody();
-    $pin      = strtoupper(san($b['pin'] ?? '', 6));
+    $pin      = requirePin($b['pin'] ?? '');
     $playerId = san($b['player_id'] ?? '', 15);
-    if (!$pin || !$playerId) err('params_required');
+    if (!$playerId) err('params_required');
 
+    lockGame($pin, $gamesDir);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
     if (!isHost($game, $playerId)) err('not_host');

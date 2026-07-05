@@ -77,7 +77,15 @@ const GameSync = {
   },
   _startPoll(code, cb) {
     if (this._poll) return;
-    this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 300);
+    let last = '';
+    this._poll = setInterval(async () => {
+      const d = await this.load(code);
+      if (!d) return;
+      const j = JSON.stringify(d);
+      if (j === last) return; // nur bei Änderung rendern
+      last = j;
+      cb(d);
+    }, 1000);
   },
   unsubscribe() {
     this._session++;
@@ -520,7 +528,7 @@ function _buildCatNode(container, cat, icon, depth) {
     item.dataset.catId = cat.id;
     item.innerHTML =
       '<span class="cat-select-icon">' + (icon || '📁') + '</span>' +
-      '<span class="cat-select-name">' + cat.name + '</span>' +
+      '<span class="cat-select-name">' + escapeHtml(cat.name) + '</span>' +
       '<span class="cat-select-count">' + qCount + ' Fr.</span>' +
       '<div class="cat-select-check">' + (sel ? '✓' : '') + '</div>';
     item.onclick = () => {
@@ -551,7 +559,7 @@ function _buildCatNode(container, cat, icon, depth) {
   header.innerHTML =
     '<span class="cat-group-chevron">▶</span>' +
     '<span class="cat-group-icon">' + icon + '</span>' +
-    '<span class="cat-group-name">' + cat.name + '</span>' +
+    '<span class="cat-group-name">' + escapeHtml(cat.name) + '</span>' +
     '<span class="cat-group-count">' + qCount + ' Fragen</span>' +
     '<label class="cat-group-toggle" onclick="event.stopPropagation()">' +
       '<input type="checkbox" class="cat-group-cb"' + (allSel ? ' checked' : '') + '>' +
@@ -1000,7 +1008,7 @@ function renderTeamList() {
     const fig = document.createElement('span'); fig.className = 'team-figure'; fig.textContent = t.emoji;
     const info = document.createElement('div'); info.className = 'team-info';
     const connDot = isTaken ? '<span class="team-conn-dot" title="Gerät verbunden">●</span> ' : '';
-    info.innerHTML = `<div class="team-name">${connDot}${t.name}</div><div class="team-score">${t.score} Pkt</div>`;
+    info.innerHTML = `<div class="team-name">${connDot}${escapeHtml(t.name)}</div><div class="team-score">${t.score} Pkt</div>`;
 
     const bar = document.createElement('div'); bar.className = 'team-sym-bar';
     (gameState.symbols || []).filter(s => s.teamId === t.id).forEach(s => {
@@ -1026,7 +1034,10 @@ function renderTeamList() {
 
 async function kickTeam(teamId) {
   if (!gameState || !gameCode) return;
-  const newState = JSON.parse(JSON.stringify(gameState));
+  // Frisch laden statt lokalen (evtl. hinterherhinkenden) Stand zu
+  // überschreiben — sonst revertiert der Kick-Save parallel laufende Züge
+  const base = (await GameSync.load(gameCode)) || gameState;
+  const newState = JSON.parse(JSON.stringify(base));
   newState.takenTeams = (newState.takenTeams || []).filter(id => id !== teamId);
   gameState = newState;
   await GameSync.save(gameCode, newState);
@@ -1060,13 +1071,13 @@ function showGameCode() {
 function showResult() {
   const sorted = [...gameState.teams].sort((a, b) => b.symbolsFound - a.symbolsFound || b.score - a.score);
   document.getElementById('result-winner').innerHTML =
-    `${sorted[0].emoji} <strong>${sorted[0].name}</strong> hat gewonnen mit ${sorted[0].symbolsFound} Symbolen!`;
+    `${sorted[0].emoji} <strong>${escapeHtml(sorted[0].name)}</strong> hat gewonnen mit ${sorted[0].symbolsFound} Symbolen!`;
   const tbody = document.getElementById('result-ranking-body');
   tbody.innerHTML = '';
   sorted.forEach((t, i) => {
     const tr = document.createElement('tr');
     if (i === 0) tr.className = 'winner-row';
-    tr.innerHTML = `<td>${i+1}.</td><td>${t.emoji} ${t.name}</td><td>${t.symbolsFound} / ${gameState.config.symbolsPerTeam}</td>`;
+    tr.innerHTML = `<td>${i+1}.</td><td>${t.emoji} ${escapeHtml(t.name)}</td><td>${t.symbolsFound} / ${gameState.config.symbolsPerTeam}</td>`;
     tbody.appendChild(tr);
   });
   showScreen('result-screen');

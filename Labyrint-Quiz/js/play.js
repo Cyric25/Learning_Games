@@ -56,7 +56,15 @@ const GameSync = {
   },
   _startPoll(code, cb) {
     if (this._poll) return;
-    this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 400);
+    let last = '';
+    this._poll = setInterval(async () => {
+      const d = await this.load(code);
+      if (!d) return;
+      const j = JSON.stringify(d);
+      if (j === last) return; // nur bei Änderung rendern
+      last = j;
+      cb(d);
+    }, 500);
   },
   unsubscribe() {
     this._session++;
@@ -76,7 +84,10 @@ let activeCategories = new Set();
 let questionContext = null;
 let timerInterval = null;
 let diceAnimId = null;
-let _lastStateTs = 0;      // Timestamp des letzten eigenen Saves — filtert veraltete SSE-Echos
+let _lastStateRev = 0;     // Monoton steigender Zähler des letzten eigenen Saves —
+                           // filtert veraltete SSE-Echos. Bewusst KEIN Date.now():
+                           // Uhren verschiedener Geräte weichen ab und würden
+                           // fremde Updates dauerhaft als "veraltet" verwerfen.
 let _waitingForTeacher = false;  // Student wartet auf Lehrkraft-Bewertung (offene Frage)
 let renderer = null;
 
@@ -152,6 +163,15 @@ async function joinGame() {
   }
 
   showTeamSelect(state);
+  // Subscription schon in der Teamauswahl: sonst sieht ein früh beigetretener
+  // Schüler weder neu belegte Teams noch den Spielstart
+  GameSync.subscribe(gameCode, (data) => {
+    if (myTeamId !== null) return; // startPlayView übernimmt ab Teamwahl
+    remoteState = data;
+    if (document.getElementById('team-select-screen')?.classList.contains('active')) {
+      showTeamSelect(data);
+    }
+  });
 }
 
 // ── Team auswählen ────────────────────────────────────────────────
@@ -166,7 +186,7 @@ function showTeamSelect(state) {
     btn.className = 'team-select-btn' + (isTaken ? ' taken' : '');
     btn.style.borderColor = t.color;
     btn.disabled = isTaken;
-    btn.innerHTML = `<span class="ts-emoji">${t.emoji}</span><span class="ts-name">${t.name}${isTaken ? ' <span class="ts-taken">belegt</span>' : ''}</span><span class="ts-icon">${t.symbolIcon}</span>`;
+    btn.innerHTML = `<span class="ts-emoji">${t.emoji}</span><span class="ts-name">${_escHtml(t.name)}${isTaken ? ' <span class="ts-taken">belegt</span>' : ''}</span><span class="ts-icon">${t.symbolIcon}</span>`;
     if (!isTaken) btn.onclick = () => selectTeam(t.id);
     list.appendChild(btn);
   });
@@ -197,6 +217,22 @@ async function selectTeam(id) {
   newState.takenTeams = [...taken];
   await GameSync.save(gameCode, newState);
   remoteState = newState;
+
+  // Verifizieren: Bei gleichzeitigen Beitritten kann ein parallel laufender
+  // Save unseren Eintrag überschrieben haben (Last-Write-Wins) → nachladen
+  // und ggf. erneut eintragen, sonst wirkt es wie ein sofortiger Kick.
+  try {
+    const check = await GameSync.load(gameCode);
+    if (check && Array.isArray(check.takenTeams) && !check.takenTeams.includes(id)) {
+      const retry = JSON.parse(JSON.stringify(check));
+      retry.takenTeams = [...new Set([...(check.takenTeams || []), id])];
+      await GameSync.save(gameCode, retry);
+      remoteState = retry;
+    } else if (check) {
+      remoteState = check;
+    }
+  } catch {}
+
   myTeamId = id;
   localStorage.setItem('lab_myteam_' + gameCode, id);
   startPlayView();
@@ -321,11 +357,12 @@ function onRemoteUpdate(data) {
   }
 
   // Veraltete Echos eigener Saves ignorieren (nur Canvas aktualisieren)
-  if (data._ts && data._ts < _lastStateTs) {
+  if (data._rev && data._rev < _lastStateRev) {
     applyStateToGrid(localGrid, data.symbols || []);
     renderCanvas(data);
     return;
   }
+  if (data._rev) _lastStateRev = Math.max(_lastStateRev, data._rev);
 
   remoteState = data;
   applyStateToGrid(localGrid, data.symbols || []);
@@ -425,7 +462,7 @@ function showWaiting(currentTeam) {
   area.innerHTML = `
     <div class="wait-screen">
       <div class="wait-emoji">${currentTeam?.emoji || '⏳'}</div>
-      <div class="wait-text">${currentTeam?.name || '?'} ist dran…</div>
+      <div class="wait-text">${_escHtml(currentTeam?.name || '?')} ist dran…</div>
     </div>`;
 }
 
@@ -435,7 +472,7 @@ function showRolling(state) {
   const myTeam = state.teams[myTeamId];
   area.innerHTML = `
     <div class="turn-screen">
-      <div class="turn-title">Dein Zug, ${myTeam.name}!</div>
+      <div class="turn-title">Dein Zug, ${_escHtml(myTeam.name)}!</div>
       <div class="dice-pair">
         <div class="dice-display" id="dice-1">🎲</div>
         <div class="dice-display" id="dice-2">🎲</div>
@@ -915,9 +952,9 @@ function showFinished(state) {
   area.innerHTML = `
     <div class="finished-screen">
       <div class="finished-trophy">${isWinner ? '🏆' : '🎖️'}</div>
-      <div class="finished-title">${isWinner ? 'Ihr habt gewonnen!' : winner.name + ' hat gewonnen!'}</div>
-      <div class="finished-my-score">${myTeam.emoji} ${myTeam.name}: ${myTeam.symbolsFound} Symbole · ${myTeam.score} Pkt</div>
-      <div class="finished-ranking">${sorted.map((t,i) => `<div class="rank-row ${t.id===myTeamId?'rank-me':''}">${i+1}. ${t.emoji} ${t.name} — ${t.symbolsFound} Symbole</div>`).join('')}</div>
+      <div class="finished-title">${isWinner ? 'Ihr habt gewonnen!' : _escHtml(winner.name) + ' hat gewonnen!'}</div>
+      <div class="finished-my-score">${myTeam.emoji} ${_escHtml(myTeam.name)}: ${myTeam.symbolsFound} Symbole · ${myTeam.score} Pkt</div>
+      <div class="finished-ranking">${sorted.map((t,i) => `<div class="rank-row ${t.id===myTeamId?'rank-me':''}">${i+1}. ${t.emoji} ${_escHtml(t.name)} — ${t.symbolsFound} Symbole</div>`).join('')}</div>
       <button class="btn-action" onclick="location.href='play.html'">Neues Spiel</button>
     </div>`;
 }
@@ -954,9 +991,10 @@ function clearTimer() { if (timerInterval) { clearInterval(timerInterval); timer
 
 // ── State posten ──────────────────────────────────────────────────
 function postState(newState) {
-  const ts = Date.now();
-  newState._ts = ts;
-  _lastStateTs = ts;
+  // Monoton steigender Zähler statt Client-Timestamp (Uhren-Skew!)
+  const rev = Math.max(_lastStateRev, remoteState?._rev || 0, newState._rev || 0) + 1;
+  newState._rev = rev;
+  _lastStateRev = rev;
   remoteState = newState;
   applyStateToGrid(localGrid, newState.symbols || []);
   renderCanvas(newState);
@@ -970,7 +1008,7 @@ function showSpectatorQuestion(aq, activeTeam) {
   const contextLabel = aq.contextType === 'door' ? 'Tür öffnen' : 'Symbol einsammeln';
   area.innerHTML = `
     <div class="spec-q-screen">
-      <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
+      <div class="spec-q-team">${activeTeam?.emoji || ''} ${_escHtml(activeTeam?.name || '')}</div>
       <div class="spec-q-context">${contextIcon} ${contextLabel}</div>
       <div class="spec-q-text">${_escHtml(aq.question)}</div>
       <div class="spec-q-wait">${aq.needsTeacherEval ? '⏳ Lehrkraft bewertet…' : '⏳ Team beantwortet…'}</div>
@@ -982,7 +1020,7 @@ function showSpectatorResult(aq, activeTeam) {
   const correct = aq.questionResult;
   area.innerHTML = `
     <div class="spec-q-screen">
-      <div class="spec-q-team">${activeTeam?.emoji || ''} ${activeTeam?.name || ''}</div>
+      <div class="spec-q-team">${activeTeam?.emoji || ''} ${_escHtml(activeTeam?.name || '')}</div>
       <div class="spec-q-text">${_escHtml(aq.question)}</div>
       <div class="spec-q-result ${correct ? 'spec-correct' : 'spec-wrong'}">
         ${correct ? '✓ Richtig!' : '✗ Falsch!'}

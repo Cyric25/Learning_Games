@@ -56,18 +56,24 @@ const QpStorage = {
   },
   subscribe(code, cb) {
     code = code.toUpperCase();
-    let stopped = false, src = null, timer = null;
+    let stopped = false, src = null, timer = null, lastJson = '';
+    // Nur bei tatsächlicher Änderung weiterreichen (verhindert Dauer-Re-Renders)
+    const emit = (raw) => {
+      if (raw === lastJson) return;
+      lastJson = raw;
+      try { const d = JSON.parse(raw); if (d && d.meta) cb(this._deser(d)); } catch {}
+    };
     const startSSE = () => {
       if (stopped) return;
       src = new EventSource('../api.php?f=qp-sse&code='+code);
-      src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+      src.onmessage = e => { if(!stopped) emit(e.data); };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
       src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
     };
     const startPoll = () => {
       if(stopped||timer) return;
-      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
-      fn(); timer = setInterval(fn, 300);
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok) emit(await r.text()); } catch {} };
+      fn(); timer = setInterval(fn, 1000);
     };
     const startLocalPoll = () => {
       if(stopped||timer) return; let last='';
@@ -281,6 +287,15 @@ async function _gsEnter(code) {
     // Restore open question modal if pending
     if (qpLiveQ && !qpLiveQ.resolved) {
       showQuestionModalFromState(qpLiveQ);
+    } else if (qpLiveQ && qpLiveQ.resolved) {
+      // Lehrkraft-Reload während bereits beantworteter Frage: den
+      // ausstehenden Zug direkt abschließen, sonst bleibt qpLiveQ für
+      // immer gesetzt und die Schwierigkeits-Buttons sind dauerhaft gesperrt
+      pendingQuestionResult = {
+        question: qpLiveQ.question, resolved: true,
+        correct: qpLiveQ.correct, advanceAmount: qpLiveQ.advanceAmount
+      };
+      continueAfterQuestion();
     }
   } else if (gs.phase === 'finished') {
     showGameSelector();
@@ -368,46 +383,54 @@ function startSSESubscription(code) {
 }
 
 function applyRemoteAnswer(lq) {
+  if (lq.question.typ === 'offen') return; // offene Fragen wertet die Lehrkraft im Modal
+
   const modal = document.getElementById('question-modal');
-  if (!modal.classList.contains('open')) return;
+  const modalOpen = modal.classList.contains('open');
 
-  if (lq.question.typ !== 'offen') {
-    const allBtns = document.querySelectorAll('#q-options .answer-btn');
-    allBtns.forEach(b => b.classList.add('disabled'));
-    const cs = correctSet(lq.question);
-    allBtns.forEach((b, i) => {
-      if (cs.has(i)) b.classList.add('correct');
-      else if (i === lq.selectedMcIndex && !lq.correct) b.classList.add('wrong');
-    });
+  // Spiellogik unabhängig von der Modal-Sichtbarkeit ausführen — sonst
+  // friert das Spiel ein, wenn das Modal (z.B. nach Reload) zu ist
+  const team = teams[lq.teamIdx];
+  if (lq.correct && team) team.correctCount = (team.correctCount || 0) + 1;
+  else if (team) team.wrongCount = (team.wrongCount || 0) + 1;
 
-    const resultEl = document.getElementById('q-result');
-    resultEl.textContent = lq.correct ? '✓ Richtig!' : '✗ Falsch!';
-    resultEl.className = 'modal-result visible ' + (lq.correct ? 'correct-result' : 'wrong-result');
-
-    const team = teams[lq.teamIdx];
-    if (lq.correct && team) team.correctCount = (team.correctCount || 0) + 1;
-    else if (team) team.wrongCount = (team.wrongCount || 0) + 1;
-
-    const explEl = document.getElementById('q-explanation');
-    if (lq.question.erklaerung) {
-      document.getElementById('q-explanation-text').textContent = lq.question.erklaerung;
-      explEl.classList.add('visible');
-    }
-
-    document.getElementById('q-continue').classList.add('visible');
-    if (pendingQuestionResult) {
-      pendingQuestionResult.resolved = true;
-      pendingQuestionResult.correct = lq.correct;
-    } else {
-      pendingQuestionResult = { question: lq.question, resolved: true, correct: lq.correct, advanceAmount: lq.advanceAmount };
-    }
-
-    setTimeout(() => {
-      if (document.getElementById('question-modal').classList.contains('open')) {
-        continueAfterQuestion();
-      }
-    }, 1500);
+  if (pendingQuestionResult) {
+    pendingQuestionResult.resolved = true;
+    pendingQuestionResult.correct = lq.correct;
+  } else {
+    pendingQuestionResult = { question: lq.question, resolved: true, correct: lq.correct, advanceAmount: lq.advanceAmount };
   }
+
+  if (!modalOpen) {
+    continueAfterQuestion();
+    return;
+  }
+
+  const allBtns = document.querySelectorAll('#q-options .answer-btn');
+  allBtns.forEach(b => b.classList.add('disabled'));
+  const cs = correctSet(lq.question);
+  allBtns.forEach((b, i) => {
+    if (cs.has(i)) b.classList.add('correct');
+    else if (i === lq.selectedMcIndex && !lq.correct) b.classList.add('wrong');
+  });
+
+  const resultEl = document.getElementById('q-result');
+  resultEl.textContent = lq.correct ? '✓ Richtig!' : '✗ Falsch!';
+  resultEl.className = 'modal-result visible ' + (lq.correct ? 'correct-result' : 'wrong-result');
+
+  const explEl = document.getElementById('q-explanation');
+  if (lq.question.erklaerung) {
+    document.getElementById('q-explanation-text').textContent = lq.question.erklaerung;
+    explEl.classList.add('visible');
+  }
+
+  document.getElementById('q-continue').classList.add('visible');
+
+  setTimeout(() => {
+    if (document.getElementById('question-modal').classList.contains('open')) {
+      continueAfterQuestion();
+    }
+  }, 1500);
 }
 
 // ── Convert Risiko-Quiz → QuizPfad ────────────────────────────
@@ -496,7 +519,7 @@ function renderCategorySelector() {
     item.innerHTML =
       '<div class="cat-select-color" style="background:' + kat.farbe + ';"></div>' +
       '<span class="cat-select-icon">' + kat.icon + '</span>' +
-      '<span class="cat-select-name">' + kat.name + '</span>' +
+      '<span class="cat-select-name">' + escapeHtml(kat.name) + '</span>' +
       '<span class="cat-select-count">' + qCount + ' Fragen</span>' +
       '<div class="cat-select-check">✓</div>';
     item.onclick = () => {
@@ -1247,7 +1270,7 @@ function renderLegend() {
   activeFragenBank.kategorien.forEach(kat => {
     const item = document.createElement('div');
     item.className = 'legend-item';
-    item.innerHTML = '<div class="legend-color" style="background:' + kat.farbe + ';"></div><span class="legend-name">' + kat.icon + ' ' + kat.name + '</span>';
+    item.innerHTML = '<div class="legend-color" style="background:' + kat.farbe + ';"></div><span class="legend-name">' + kat.icon + ' ' + escapeHtml(kat.name) + '</span>';
     list.appendChild(item);
   });
   BONUS_TYPES.forEach(bt => {

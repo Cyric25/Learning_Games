@@ -65,18 +65,26 @@ const BsStorage = {
 
   subscribe(code, cb) {
     code = code.toUpperCase();
-    let stopped = false, src = null, timer = null;
+    let stopped = false, src = null, timer = null, lastJson = '';
+    // Nur bei tatsächlicher Änderung weiterreichen — verhindert, dass der
+    // 500ms-Poll bei jedem Tick das komplette Grid neu rendert und den
+    // MC-Timer zurücksetzt
+    const emit = (raw) => {
+      if (raw === lastJson) return;
+      lastJson = raw;
+      try { const d = JSON.parse(raw); if (d && d.meta) cb(this._deser(d)); } catch {}
+    };
     const startSSE = () => {
       if (stopped) return;
       src = new EventSource('../api.php?f=bs-sse&code='+code);
-      src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+      src.onmessage = e => { if(!stopped) emit(e.data); };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
       src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
     };
     const startPoll = () => {
       if(stopped||timer) return;
-      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=bs-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
-      fn(); timer = setInterval(fn, 300);
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=bs-game&code='+code); if(r.ok) emit(await r.text()); } catch {} };
+      fn(); timer = setInterval(fn, 500);
     };
     const startLocalPoll = () => {
       if(stopped||timer) return; let last='';

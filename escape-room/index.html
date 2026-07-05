@@ -1349,17 +1349,36 @@
     }
 
     // Saves one game — always syncs localStorage, also writes to API if available
+    // Rückgabe: true wenn mindestens ein Speicherziel erfolgreich war
     async function saveGame(game) {
-      localStorage.setItem('escaperoom_library', JSON.stringify(library));
+      let localOk = true;
+      try {
+        localStorage.setItem('escaperoom_library', JSON.stringify(library));
+      } catch (e) {
+        // QuotaExceededError: Base64-Bilder sprengen schnell die ~5 MB.
+        // Ohne catch würde auch der Server-Save übersprungen und der
+        // Verlust bliebe unbemerkt.
+        localOk = false;
+      }
+      let apiOk = false;
       if (_useApi) {
         try {
-          await fetch('../api.php?f=er-game&id=' + game.id, {
+          const r = await fetch('../api.php?f=er-game&id=' + game.id, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(game)
           });
+          apiOk = r.ok;
         } catch(e) {}
       }
+      if (!localOk && !apiOk) {
+        alert('⚠️ Speichern fehlgeschlagen!\nDer Browser-Speicher ist voll (zu viele/zu große Bilder) und kein Server erreichbar.\nBitte Bilder verkleinern oder Spiel als JSON exportieren.');
+        return false;
+      }
+      if (!localOk) {
+        console.warn('localStorage voll — Spiel nur auf dem Server gespeichert.');
+      }
+      return true;
     }
 
     // Deletes one game — always syncs localStorage, also deletes from API if available
@@ -1397,6 +1416,12 @@
     window.confirmLeaveGame = function() {
       if (confirm('Spiel verlassen?\nDein Fortschritt wird gespeichert — du kannst später weitermachen.')) {
         stopTimer();
+        destroyPnlmViewer(); // 360°-Viewer nicht im Hintergrund weiterlaufen lassen (Akku!)
+        // Pausenzeitpunkt merken, damit die Uhr beim Fortsetzen weiterläuft statt abzulaufen
+        if (currentTeam && currentTeam.startTime && !currentTeam.finalTime) {
+          currentTeam.pausedAt = Date.now();
+          saveTeamState();
+        }
         document.getElementById('leave-game-btn').classList.add('hidden');
         document.getElementById('puzzle-card-btn').style.display = 'none';
         showView('view-player-home');
@@ -1474,6 +1499,11 @@
       currentTeam = null;
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       destroyPnlmViewer();
+      // Spieler-Buttons explizit verstecken — showAdminView togglet sie nicht,
+      // sonst schwebt "← Verlassen" über der Admin-Oberfläche
+      document.getElementById('leave-game-btn')?.classList.add('hidden');
+      const pcBtn = document.getElementById('puzzle-card-btn');
+      if (pcBtn) pcBtn.style.display = 'none';
       showAdminView('admin-library');
     };
 
@@ -1559,7 +1589,10 @@
 
     function saveTeamState() {
       if (!currentTeam) return;
-      localStorage.setItem(teamKey(currentTeam.gameId, currentTeam.teamName), JSON.stringify(currentTeam));
+      if (isTestMode) return; // Test-Läufe der Lehrkraft nicht als echte Spielstände speichern
+      try {
+        localStorage.setItem(teamKey(currentTeam.gameId, currentTeam.teamName), JSON.stringify(currentTeam));
+      } catch (e) { /* Quota voll — Fortschritt nur im Speicher */ }
     }
 
     window.startGame = function() {
@@ -1584,6 +1617,14 @@
       currentTeam = loadTeamState(currentGame.id, name);
       if (!currentTeam) return;
       timeUpShown = false;
+
+      // Pausierte Zeit nicht mitzählen: startTime um die Pausendauer
+      // verschieben (sonst ist die Zeit nach Verlassen+Fortsetzen sofort um)
+      if (currentTeam.pausedAt) {
+        currentTeam.startTime += Date.now() - currentTeam.pausedAt;
+        currentTeam.pausedAt = null;
+        saveTeamState();
+      }
 
       if (currentTeam.completedRooms.length >= currentGame.rooms.length) {
         showGameComplete();
@@ -1642,7 +1683,7 @@
         '<span class="subject-badge">' + esc(room.subject || '') + '</span>' +
         '<h2>' + esc(room.name) + '</h2>' +
         '<p class="room-description">' + esc(room.description) + '</p>' +
-        (room.backgroundImage ? '<img src="' + esc(room.backgroundImage) + '" style="max-width:100%;border-radius:12px;margin-top:16px;" alt="">' : '') +
+        (room.backgroundImage ? '<img src="' + escAttr(room.backgroundImage) + '" style="max-width:100%;border-radius:12px;margin-top:16px;" alt="">' : '') +
         '<div class="mt-24"><button class="btn-gold" onclick="enterRoomQuestions()">Raum betreten</button></div>';
     }
 
@@ -1728,7 +1769,9 @@
 
       if (q.type === 'multiple_choice') {
         (q.options || []).forEach((opt, i) => {
-          html += '<button class="option-btn" onclick="checkMC(this, ' + i + ', \'' + esc(q.correctAnswer).replace(/'/g, "\\'") + '\')">' + esc(opt) + '</button>';
+          // Kein Antwort-Parameter im onclick: die richtige Antwort stünde
+          // sonst für Schüler sichtbar im DOM (checkMC nutzt q.correctAnswer)
+          html += '<button class="option-btn" onclick="checkMC(this, ' + i + ')">' + esc(opt) + '</button>';
         });
       } else if (q.type === 'text_input') {
         html += '<div style="display:flex;gap:8px;">' +
@@ -1752,7 +1795,7 @@
     // ══════════════════════════════════════════════════════
     // PLAYER: Answer Checking
     // ══════════════════════════════════════════════════════
-    window.checkMC = function(btn, idx, correctAnswer) {
+    window.checkMC = function(btn, idx) {
       const room = currentGame.rooms[currentRoomIdx];
       const q = room.questions[currentQuestionIdx];
       const selected = q.options[idx];
@@ -1782,11 +1825,12 @@
       if (!answer) return;
 
       let correct, given;
+      const correctRaw = String(q.correctAnswer ?? ''); // fehlende Antwort → kein Crash
       if (q.caseSensitive) {
-        correct = q.correctAnswer.trim();
+        correct = correctRaw.trim();
         given = answer;
       } else {
-        correct = q.correctAnswer.trim().toLowerCase();
+        correct = correctRaw.trim().toLowerCase();
         given = answer.toLowerCase();
       }
 
@@ -1822,7 +1866,9 @@
     function onCorrectAnswer(q) {
       const room = currentGame.rooms[currentRoomIdx];
       const progress = currentTeam.roomProgress[room.id];
-      progress.solvedQuestions.push(q.id);
+      // Duplikat-Check: Doppelklick auf "Prüfen" darf die Frage nicht doppelt
+      // zählen — sonst gilt der Raum vorzeitig als gelöst
+      if (!progress.solvedQuestions.includes(q.id)) progress.solvedQuestions.push(q.id);
       saveTeamState();
 
       // In explorer mode, this is handled by hotspot-specific answer checkers
@@ -1891,7 +1937,7 @@
 
       let html = '';
       if (room.backgroundImage) {
-        html += '<img class="explorer-bg" src="' + esc(room.backgroundImage) + '" alt="" draggable="false" onload="_applyImgRatio(this)">';
+        html += '<img class="explorer-bg" src="' + escAttr(room.backgroundImage) + '" alt="" draggable="false" onload="_applyImgRatio(this)">';
       } else {
         html += '<div class="room-explorer-fallback">' + esc(room.name) + '</div>';
       }
@@ -2230,7 +2276,9 @@
     function onHotspotCorrect(q) {
       const room = currentGame.rooms[currentRoomIdx];
       const progress = currentTeam.roomProgress[room.id];
-      progress.solvedQuestions.push(q.id);
+      // Duplikat-Check: Doppelklick auf "Prüfen" darf die Frage nicht doppelt
+      // zählen — sonst gilt der Raum vorzeitig als gelöst
+      if (!progress.solvedQuestions.includes(q.id)) progress.solvedQuestions.push(q.id);
       saveTeamState();
 
       setTimeout(() => {
@@ -2293,7 +2341,8 @@
       const input = document.getElementById('hs-text-answer');
       const answer = input.value.trim();
       if (!answer) return;
-      const correct = q.caseSensitive ? q.correctAnswer.trim() : q.correctAnswer.trim().toLowerCase();
+      const correctRawHs = String(q.correctAnswer ?? '');
+      const correct = q.caseSensitive ? correctRawHs.trim() : correctRawHs.trim().toLowerCase();
       const given = q.caseSensitive ? answer : answer.toLowerCase();
       if (given === correct) { input.style.borderColor = 'var(--success)'; onHotspotCorrect(q); }
       else { input.style.borderColor = 'var(--danger)'; input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); onHotspotWrong(q); }
@@ -2406,7 +2455,9 @@
       if (!q || q.type !== 'line_connect') return;
       const required = q.connections || [];
       if (required.length === 0) return;
-      const allCorrect = required.every(conn =>
+      // Auch überzählige Linien prüfen — sonst ist "alle mit allen verbinden"
+      // immer richtig
+      const allCorrect = _lcLines.length === required.length && required.every(conn =>
         _lcLines.some(l => (l.from===conn.from&&l.to===conn.to)||(l.from===conn.to&&l.to===conn.from))
       );
       if (allCorrect) {
@@ -2436,7 +2487,7 @@
         '<h3>🗺 Rätselkarte</h3>';
 
       if (pc.type === 'image' && pc.content) {
-        html += '<img src="' + esc(pc.content) + '" alt="Rätselkarte">';
+        html += '<img src="' + escAttr(pc.content) + '" alt="Rätselkarte">';
       } else if (pc.type === 'text' && pc.content) {
         html += '<div class="puzzle-card-text">' + esc(pc.content) + '</div>';
       }
@@ -2515,6 +2566,10 @@
     function goToPadlock() {
       destroyPnlmViewer();
       const room = currentGame.rooms[currentRoomIdx];
+      // Normalisieren: JSON-Importe können unlockCode als Zahl enthalten —
+      // (4823).length ist undefined und '4823' === 4823 wäre nie true
+      room.unlockCode = String(room.unlockCode ?? '');
+      if (!room.unlockCode) room.unlockCode = '0000';
       document.getElementById('unlock-title').textContent = room.name;
       // Auto-detect lock type: 5+ digits → digital, otherwise padlock (can be overridden by room.lockType)
       if (room.lockType) {
@@ -2693,12 +2748,19 @@
     // ══════════════════════════════════════════════════════
     function showGameComplete() {
       stopTimer();
-      const elapsed = getElapsed();
+      // Endzeit nur beim ERSTEN Abschluss festhalten — ein späteres
+      // "Fortsetzen" darf die Bestzeit nicht durch Wall-Clock-Zeit ersetzen
+      const firstCompletion = currentTeam.finalTime === undefined || currentTeam.finalTime === null;
+      if (firstCompletion) {
+        currentTeam.finalTime = getElapsed();
+        saveTeamState();
+      }
+      const elapsed = currentTeam.finalTime;
       document.getElementById('complete-team').textContent = currentTeam.teamName;
       document.getElementById('complete-time').textContent = formatTime(elapsed);
 
-      // Save score
-      saveScore(currentGame.id, currentTeam.teamName, elapsed);
+      // Save score (nur beim Erstabschluss, nicht im Test-Modus)
+      if (firstCompletion && !isTestMode) saveScore(currentGame.id, currentTeam.teamName, elapsed);
       renderScoreboard(currentGame.id);
 
       showView('view-game-complete');
@@ -3063,11 +3125,40 @@
     };
 
     function downloadJSON(obj, filename) {
-      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      // iOS/Safari: Blob-Download via <a download> funktioniert dort nicht
+      // zuverlässig → data-URI-Fallback (aus standalone.html übernommen)
+      const json = JSON.stringify(obj, null, 2);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const a = document.createElement('a');
+      if (isIOS) {
+        a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+        a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        return;
+      }
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
       a.href = url; a.download = filename; a.click();
-      URL.revokeObjectURL(url);
+      // Sofortiges Revoke kann den Download in Firefox/Safari abbrechen
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+
+    // Import-Normalisierung: Feldtypen absichern (unlockCode als Zahl,
+    // fehlende Arrays), sonst sind Räume später unöffenbar
+    function normalizeImportedGame(data) {
+      (data.rooms || []).forEach(room => {
+        if (room.unlockCode !== undefined && room.unlockCode !== null) {
+          room.unlockCode = String(room.unlockCode);
+        }
+        if (!Array.isArray(room.questions)) room.questions = [];
+        if (!Array.isArray(room.hotspots)) room.hotspots = [];
+        room.questions.forEach(q => {
+          if (q.correctAnswer !== undefined && q.correctAnswer !== null) q.correctAnswer = String(q.correctAnswer);
+          if (q.codeDigit !== undefined && q.codeDigit !== null) q.codeDigit = String(q.codeDigit);
+        });
+      });
+      return data;
     }
 
     window.importGameFile = function(event) {
@@ -3078,6 +3169,7 @@
         try {
           const data = JSON.parse(e.target.result);
           if (data.game && data.rooms) {
+            normalizeImportedGame(data);
             data.id = 'game_' + Date.now();
             if (data.published === undefined) data.published = false;
             if (!data.passwordProtection) data.passwordProtection = {};
@@ -3364,7 +3456,7 @@
       if (btn) btn.classList.add('active');
     };
 
-    window.saveCurrentGame = function() {
+    window.saveCurrentGame = async function() {
       editingGame.game.title = document.getElementById('ed-title').value.trim() || 'Unbenannt';
       editingGame.game.description = document.getElementById('ed-desc').value.trim();
       editingGame.game.totalTimer = parseInt(document.getElementById('ed-timer').value) * 60 || 2400;
@@ -3378,9 +3470,12 @@
       saved.id = editingGameId;
       const idx = library.findIndex(g => g.id === editingGameId);
       if (idx >= 0) library[idx] = saved; else library.push(saved);
-      saveGame(saved);
+      // Erfolg abwarten — "Gespeichert!" darf nicht erscheinen, wenn die
+      // Quota voll ist und auch der Server-Save scheiterte
+      const ok = await saveGame(saved);
       document.getElementById('editor-title').textContent = editingGame.game.title;
-      showAdminStatus('Gespeichert!', 'success');
+      if (ok) showAdminStatus('Gespeichert!', 'success');
+      else showAdminStatus('⚠️ Speichern fehlgeschlagen (Speicher voll)!', 'danger');
     };
 
     window.exportCurrentGame = function() {

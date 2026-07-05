@@ -779,6 +779,7 @@
 
   // ── Stopwatch ─────────────────────────────────────────────────────
   function startStopwatch() {
+    stopStopwatch(); // laufenden Interval stoppen — sonst tickt die Uhr nach Neustart doppelt
     stopwatchSecs = 0;
     updateStopwatchDisplay();
     stopwatchInterval = setInterval(() => { stopwatchSecs++; updateStopwatchDisplay(); }, 1000);

@@ -12,6 +12,17 @@ class MazeRenderer {
     this._animId = null;
     this._colors = null;
     this._colorsTheme = null;
+    // Bei Fenstergröße/Rotation neu skalieren und rendern — sonst bleibt
+    // das Labyrinth nach Geräterotation abgeschnitten oder winzig
+    this._resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        if (!this.maze) return;
+        this.resize();
+        if (this.gameState) this.render(this.gameState);
+      }, 200);
+    });
   }
 
   // ── Color cache ────────────────────────────────────────────────

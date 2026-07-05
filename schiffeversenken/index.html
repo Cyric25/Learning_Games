@@ -545,7 +545,11 @@ function renderTurnBanner() {
   if (gameState.liveQuestion) {
     const t = gameState.teams[gameState.liveQuestion.teamIdx];
     const coord = gameState.liveQuestion.coordinate;
-    banner.innerHTML = `${t.emoji} <strong>${escapeHtml(t.name)}</strong> schießt auf <strong>${coord}</strong>`;
+    // Abbrechen-Button: Ohne ihn steht das Spiel dauerhaft still, wenn ein
+    // Schülergerät mit offener MC-Frage abstürzt (liveQuestion bleibt gesetzt)
+    banner.innerHTML = `${t.emoji} <strong>${escapeHtml(t.name)}</strong> schießt auf <strong>${coord}</strong> ` +
+      `<button onclick="abortLiveQuestion()" style="margin-left:10px;padding:2px 10px;font-size:.8rem;` +
+      `background:none;border:1px solid rgba(220,38,38,.5);color:#dc2626;border-radius:6px;cursor:pointer;">✕ Frage abbrechen</button>`;
     banner.className = 'turn-banner active-turn';
   } else {
     const alive = gameState.turnOrder.filter(i => !gameState.teams[i].eliminated);
@@ -613,7 +617,6 @@ function makeSLCell(col, row) {
     } else if (wasShot && !hasShip) {
       // Miss: kleiner Kreis in Schützenfarbe
       cell.classList.add('miss');
-      cell.querySelector ? null : null;
       cell.style.setProperty('color', shotTeam?.color || '#888');
       cell.title = `Miss (${shotTeam?.emoji||''} ${shotTeam?.name||''})`;
     } else if (!wasShot && hasShip) {
@@ -685,7 +688,10 @@ function renderShipBadges(team) {
 // ── Kick Team ─────────────────────────────────────────────────────
 async function kickTeam(teamId) {
   if (!gameState) return;
-  const ns = JSON.parse(JSON.stringify(gameState, (k, v) => v instanceof Set ? [...v] : v));
+  // Frisch laden statt lokalen (evtl. hinterherhinkenden) Stand zu
+  // überschreiben — sonst revertiert der Kick-Save parallel laufende Züge
+  const base = (await BsStorage.load(BsStorage.getCode())) || gameState;
+  const ns = JSON.parse(JSON.stringify(base, (k, v) => v instanceof Set ? [...v] : v));
   ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
   ns.takenTeams = (ns.takenTeams||[]).filter(id => id !== teamId);
   gameState = ns;
@@ -800,6 +806,16 @@ async function resolveOpen(correct) {
   await processShot(correct);
 }
 window.resolveOpen = resolveOpen;
+
+// Hängende Frage abbrechen (z.B. Schülergerät abgestürzt): kein Schuss,
+// Zug geht ans nächste Team
+async function abortLiveQuestion() {
+  if (!gameState || !gameState.liveQuestion || processingShot) return;
+  if (!confirm('Laufende Frage abbrechen? Das Team verliert seinen Schuss.')) return;
+  processingShot = true;
+  await processShot(false);
+}
+window.abortLiveQuestion = abortLiveQuestion;
 
 async function processShot(correct) {
   hideQuestionModal();

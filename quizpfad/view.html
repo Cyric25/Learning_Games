@@ -326,6 +326,10 @@
     sub = QpStorage.subscribe(gameCode, applyGameState);
   }
 
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   function showTeamSelect(gs) {
     document.getElementById('team-code-display').textContent = gameCode;
     const list = document.getElementById('team-select-list');
@@ -337,7 +341,7 @@
       const btn = document.createElement('button');
       btn.className = 'team-select-btn' + (isTaken ? ' taken' : '');
       btn.disabled = isTaken;
-      btn.innerHTML = `<div class="ts-dot" style="background:${t.color}"></div>${t.name}${isTaken ? '<span class="ts-taken">belegt</span>' : ''}`;
+      btn.innerHTML = `<div class="ts-dot" style="background:${t.color}"></div>${esc(t.name)}${isTaken ? '<span class="ts-taken">belegt</span>' : ''}`;
       if (!isTaken) btn.onclick = () => selectTeam(i);
       list.appendChild(btn);
     });
@@ -381,7 +385,7 @@
       document.getElementById('wait-code').textContent = gameCode;
       const badge = document.getElementById('wait-team-badge');
       if (team) {
-        badge.innerHTML = `<div class="wait-team-badge" style="background:${team.color}">${team.name}</div>`;
+        badge.innerHTML = `<div class="wait-team-badge" style="background:${team.color}">${esc(team.name)}</div>`;
       }
       showScreen('screen-wait');
     }
@@ -488,7 +492,7 @@
       if (isActive) div.style.borderColor = t.color;
       div.innerHTML =
         `<div class="team-dot" style="background:${t.color}">${i+1}</div>` +
-        `<div class="team-info"><div class="team-name">${t.name}</div><div class="team-pos">Feld ${t.position}/${fc-1}</div></div>`;
+        `<div class="team-info"><div class="team-name">${esc(t.name)}</div><div class="team-pos">Feld ${t.position}/${fc-1}</div></div>`;
       grid.appendChild(div);
     });
 
@@ -553,19 +557,55 @@
       opts.style.display = 'flex';
       openLabel.style.display = 'none';
 
+      // Multi-Correct: Auswahl-Toggle + Bestätigen-Button (sonst wäre jede
+      // Einzelantwort bei ≥2 richtigen Indizes automatisch falsch)
+      const isMulti = Array.isArray(q.correctIndices) && q.correctIndices.length > 1;
+      const pendingSel = new Set();
+      const canAnswer = isMyTurn && !lq.resolved && !answeredCurrentQ;
+
       (q.antworten || []).forEach((ans, i) => {
         const div = document.createElement('button');
         div.className = 'q-opt';
         div.textContent = ans;
-        div.disabled = !isMyTurn || lq.resolved || answeredCurrentQ;
-        if (isMyTurn && !lq.resolved && !answeredCurrentQ) {
-          div.onclick = () => submitAnswer(i, q, lq, teams);
+        div.disabled = !canAnswer;
+        if (canAnswer) {
+          div.onclick = isMulti
+            ? () => {
+                if (pendingSel.has(i)) { pendingSel.delete(i); div.style.boxShadow = ''; }
+                else { pendingSel.add(i); div.style.boxShadow = 'inset 0 0 0 3px #f4a261'; }
+              }
+            : () => submitAnswer(i, q, lq, teams);
         }
         opts.appendChild(div);
       });
+
+      if (isMulti && canAnswer) {
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'q-opt';
+        confirmBtn.textContent = '✓ Auswahl bestätigen';
+        confirmBtn.style.cssText = 'background:var(--accent,#2a9d8f);color:#fff;font-weight:700;';
+        confirmBtn.onclick = () => submitMultiAnswer([...pendingSel], q, lq);
+        opts.appendChild(confirmBtn);
+      }
     }
 
     overlay.classList.add('open');
+  }
+
+  // Antwort speichern — mit frischem Load statt (potenziell veraltetem)
+  // remoteState, damit keine parallel geänderten Felder (takenTeams etc.)
+  // überschrieben werden (Lost-Update-Schutz)
+  async function saveAnswer(lq, correct, idx, indices) {
+    const fresh = (await QpStorage.load(gameCode)) || remoteState;
+    if (!fresh || !fresh.liveQuestion || fresh.liveQuestion.id !== lq.id) return;
+    if (fresh.liveQuestion.resolved) return;
+    const newGs = JSON.parse(JSON.stringify(QpStorage._ser(fresh)));
+    newGs.liveQuestion.resolved = true;
+    newGs.liveQuestion.correct = correct;
+    newGs.liveQuestion.selectedMcIndex = idx;
+    if (indices) newGs.liveQuestion.selectedMcIndices = indices;
+    QpStorage.save(QpStorage._deser(newGs));
+    remoteState = QpStorage._deser(newGs);
   }
 
   async function submitAnswer(idx, q, lq, teams) {
@@ -587,15 +627,24 @@
       if (i === idx) b.classList.add(correct ? 'correct' : 'wrong');
     });
 
-    // Save result to game state
-    if (!remoteState) return;
-    const newGs = JSON.parse(JSON.stringify(QpStorage._ser(remoteState)));
-    if (newGs.liveQuestion && newGs.liveQuestion.id === lq.id) {
-      newGs.liveQuestion.resolved = true;
-      newGs.liveQuestion.correct = correct;
-      newGs.liveQuestion.selectedMcIndex = idx;
-      QpStorage.save(QpStorage._deser(newGs));
-    }
+    await saveAnswer(lq, correct, idx, null);
+  }
+
+  async function submitMultiAnswer(selectedArr, q, lq) {
+    if (answeredCurrentQ || lq.resolved || !selectedArr.length) return;
+    answeredCurrentQ = true;
+
+    const correctArr = [...q.correctIndices].sort((a,b)=>a-b);
+    const sel = [...selectedArr].sort((a,b)=>a-b);
+    const correct = correctArr.length === sel.length && correctArr.every((v,i)=>v===sel[i]);
+
+    const btns = document.querySelectorAll('#q-options .q-opt');
+    btns.forEach((b, i) => {
+      b.disabled = true;
+      if (selectedArr.includes(i)) b.classList.add(correct ? 'correct' : 'wrong');
+    });
+
+    await saveAnswer(lq, correct, sel[0] ?? null, sel);
   }
 
   function updateQuestionResult(lq) {

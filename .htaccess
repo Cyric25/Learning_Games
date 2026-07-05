@@ -1,4 +1,9 @@
 Options -Indexes
 
-# Disable output buffering for SSE
-SetEnvIf Request_URI "api\.php.*f=sse" no-gzip=1
+# Disable output buffering/compression for SSE (alle Spiel-Prefixe).
+# Hinweis: SetEnvIf Request_URI sieht den Query-String nicht — daher RewriteCond.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-)?sse(&|$)
+RewriteRule ^api\.php$ - [E=no-gzip:1,E=dont-vary:1]
+</IfModule>

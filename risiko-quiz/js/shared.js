@@ -184,6 +184,18 @@ const StorageManager = {
     let stopped = false;
     let eventSource = null;
     let pollInterval = null;
+    let sseErrors = 0;
+    let lastJson = '';
+
+    // Callback nur bei tatsächlicher Änderung aufrufen (verhindert
+    // Dauer-Re-Renders bei Polling und SSE-Wiederholungen)
+    const emit = (data) => {
+      if (!data || !data.meta) return;
+      const json = JSON.stringify(data);
+      if (json === lastJson) return;
+      lastJson = json;
+      callback(data);
+    };
 
     const startSSE = () => {
       if (stopped) return;
@@ -192,21 +204,27 @@ const StorageManager = {
 
       eventSource.onmessage = (e) => {
         if (stopped) return;
-        try {
-          const data = JSON.parse(e.data);
-          if (data.meta) callback(data);
-        } catch { }
+        sseErrors = 0;
+        try { emit(JSON.parse(e.data)); } catch { }
       };
 
       eventSource.addEventListener('reconnect', () => {
-        // Server hat die Verbindung nach 30s beendet, reconnect automatisch
+        // Server beendet den Stream planmäßig nach 30s → neu verbinden
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        if (!stopped) setTimeout(startSSE, 500);
       });
 
       eventSource.onerror = () => {
         if (stopped) return;
-        // SSE fehlgeschlagen → Fallback auf Polling
         if (eventSource) { eventSource.close(); eventSource = null; }
-        startPolling();
+        sseErrors++;
+        if (sseErrors < 3) {
+          // Transienter Fehler → SSE erneut versuchen
+          setTimeout(startSSE, 1000 * sseErrors);
+        } else {
+          // Wiederholt fehlgeschlagen → Polling-Fallback
+          startPolling();
+        }
       };
     };
 
@@ -216,11 +234,11 @@ const StorageManager = {
         if (stopped) return;
         try {
           const gs = await this.loadGameStateByCode(code);
-          if (gs) callback(gs);
+          if (gs) emit(gs);
         } catch { }
       };
       doPoll();
-      pollInterval = setInterval(doPoll, 300);
+      pollInterval = setInterval(doPoll, 1000);
     };
 
     // Start: SSE wenn Server verfügbar, sonst Polling
@@ -277,6 +295,25 @@ const GameModel = {
 
   generateToken() {
     return Math.random().toString(36).substring(2, 6).toUpperCase();
+  },
+
+  // Spielcode ohne verwechselbare Zeichen (kein O/I/0/1)
+  generateGameCode() {
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let out = '';
+    for (let i = 0; i < 4; i++) out += ch[Math.floor(Math.random() * ch.length)];
+    return out;
+  },
+
+  // Prüft gegen die Registry, damit zwei Klassen nicht denselben Code bekommen
+  async generateUniqueGameCode() {
+    let registry = {};
+    try { registry = await StorageManager.loadGamesRegistry() || {}; } catch { }
+    for (let i = 0; i < 20; i++) {
+      const code = this.generateGameCode();
+      if (!registry[code]) return code;
+    }
+    return this.generateGameCode();
   },
 
   isTeamEliminated(team) {

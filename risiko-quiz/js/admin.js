@@ -47,6 +47,9 @@ async function showGameSelector() {
   entries.sort((a, b) => (b[1].updatedAt || b[1].createdAt || '').localeCompare(a[1].updatedAt || a[1].createdAt || ''));
 
   list.innerHTML = entries.map(([code, info]) => {
+    // Registry ist unauthentifiziert beschreibbar — Codes strikt validieren,
+    // bevor sie in Inline-onclick-Handler interpoliert werden (XSS-Schutz)
+    if (!/^[A-Z0-9]{4,6}$/.test(code)) return '';
     const status = info.status === 'running' ? '🟢 Läuft' :
                    info.status === 'finished' ? '🏁 Beendet' :
                    info.status === 'paused' ? '⏸ Pausiert' : '⚙ Setup';
@@ -76,7 +79,7 @@ async function showGameSelector() {
 }
 
 async function createNewGame() {
-  const gameCode = GameModel.generateToken();
+  const gameCode = await GameModel.generateUniqueGameCode();
   const game = GameModel.createGame({ gameCode });
   StorageManager.setGameCode(gameCode);
   await StorageManager.saveGameState(game);
@@ -135,6 +138,7 @@ async function enterGame(code) {
 function copyGameCode() {
   const code = StorageManager.getGameCode();
   if (code) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) return; // nur in Secure Contexts
     navigator.clipboard.writeText(code).then(() => {
       const badge = document.getElementById('game-code-badge');
       const orig = badge.textContent;
@@ -343,8 +347,7 @@ function renderCategories() {
             onclick="collapsedCats.set('${cat.id}', !collapsedCats.get('${cat.id}')); renderCategories();"
             title="${catCollapsed ? 'Aufklappen' : 'Einklappen'}">${catCollapsed ? '▶' : '▼'}</button>
           <input class="cat-name-edit" type="text" value="${escHtml(cat.name)}"
-            onchange="updateCatName('${cat.id}', this.value)"
-            oninput="updateCatName('${cat.id}', this.value)">
+            onchange="updateCatName('${cat.id}', this.value)">
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <span style="color:var(--text-secondary);font-size:0.85rem;">${subcats.length} Unterkat${subcats.length !== 1 ? 's' : ''}</span>
@@ -392,8 +395,7 @@ function renderSubBlock(sub, cat, container) {
           title="${subCollapsed ? 'Aufklappen' : 'Einklappen'}">${subCollapsed ? '▶' : '▼'}</button>
         <input class="cat-name-edit" type="text" value="${escHtml(sub.name)}"
           style="font-size:1rem;font-weight:600;"
-          onchange="updateSubcatName('${cat.id}', '${sub.id}', this.value)"
-          oninput="updateSubcatName('${cat.id}', '${sub.id}', this.value)">
+          onchange="updateSubcatName('${cat.id}', '${sub.id}', this.value)">
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasSubsubs && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasSubsubs && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
@@ -445,8 +447,7 @@ function renderSubSubBlock(subsub, sub, cat, container) {
           title="${subsubCollapsed ? 'Aufklappen' : 'Einklappen'}">${subsubCollapsed ? '▶' : '▼'}</button>
         <input class="cat-name-edit" type="text" value="${escHtml(subsub.name)}"
           style="font-size:0.95rem;font-weight:600;"
-          onchange="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)"
-          oninput="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)">
+          onchange="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)">
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasL4 && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasL4 && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
@@ -479,8 +480,7 @@ function renderSubSubBlock(subsub, sub, cat, container) {
         <div class="cat-header" style="background:rgba(255,255,255,0.02);">
           <input class="cat-name-edit" type="text" value="${escHtml(l4.name)}"
             style="font-size:0.9rem;font-weight:600;"
-            onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)"
-            oninput="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
+            onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
           <div style="display:flex;gap:0.5rem;align-items:center;">
             ${l4Missing.length ? `<span class="warning-badge">⚠ ${l4Missing.join(', ')} fehlt</span>` : '<span style="color:var(--success);font-size:0.85rem;">✓</span>'}
             <button class="btn btn-success btn-sm" onclick="openQuestionModal('${cat.id}','${sub.id}',null,'${subsub.id}','${l4.id}')">+ Frage</button>
@@ -1184,7 +1184,8 @@ function escHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── Event Binding ─────────────────────────────────────────────

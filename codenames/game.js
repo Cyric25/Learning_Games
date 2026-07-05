@@ -877,6 +877,16 @@ function renderClueArea(gs) {
   const area = document.getElementById('clue-area');
   if (!area) return;
 
+  // Eingabewerte + Fokus über den Rebuild retten — der Poll rendert alle
+  // 1,5s neu und würde sonst das Hinweis-Feld des Spymasters beim Tippen
+  // leeren und den Fokus stehlen
+  const prevWord  = document.getElementById('clue-word-input');
+  const prevNum   = document.getElementById('clue-num-input');
+  const savedWord = prevWord ? prevWord.value : null;
+  const savedNum  = prevNum ? prevNum.value : null;
+  const focusedId = document.activeElement ? document.activeElement.id : null;
+  const savedSel  = (focusedId === 'clue-word-input' && prevWord) ? prevWord.selectionStart : null;
+
   const isSpy  = myRole === 'spymaster';
   const isOp   = myRole === 'operative';
   const isSpec = myRole === 'spectator' || (!myRole);
@@ -926,6 +936,21 @@ function renderClueArea(gs) {
   }
 
   area.innerHTML = html;
+
+  // Werte + Fokus wiederherstellen
+  const newWord = document.getElementById('clue-word-input');
+  const newNum  = document.getElementById('clue-num-input');
+  if (newWord && savedWord !== null) newWord.value = savedWord;
+  if (newNum && savedNum !== null) newNum.value = savedNum;
+  if (focusedId === 'clue-word-input' || focusedId === 'clue-num-input') {
+    const el = document.getElementById(focusedId);
+    if (el) {
+      el.focus();
+      if (savedSel !== null && el.setSelectionRange) {
+        try { el.setSelectionRange(savedSel, savedSel); } catch {}
+      }
+    }
+  }
 }
 
 // ── Game actions ───────────────────────────────────────────────────────────

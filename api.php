@@ -4,11 +4,13 @@
 //         api.php?f=games          (Registry aller Spiele)
 //         api.php?f=game&code=XXXX (Spielstand pro Spiel)
 //         api.php?f=sse&code=XXXX  (Server-Sent Events Stream)
+// Weitere Spiele nutzen dieselben Endpunkte mit Prefix (ls-, bs-, qp-, labyrinth-).
 
 $key = trim($_GET['f'] ?? '', '/');
 
-// ── SSE-Endpunkt (eigene Header, kein JSON) ──────────────────────
-if ($key === 'sse') {
+// ── Gemeinsame Helfer ─────────────────────────────────────────────
+
+function requireValidCode() {
     $code = strtoupper(trim($_GET['code'] ?? ''));
     if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
         http_response_code(400);
@@ -16,22 +18,47 @@ if ($key === 'sse') {
         echo json_encode(['error' => 'invalid code']);
         exit;
     }
-    $path = __DIR__ . '/data/games/risiko-quiz/' . $code . '.json';
+    return $code;
+}
 
-    // SSE-Header
+// Atomares Schreiben: erst Temp-Datei, dann rename().
+// Leser sehen dadurch nie eine halb geschriebene Datei.
+function atomicWrite($path, $data) {
+    $tmp = $path . '.tmp.' . getmypid();
+    if (file_put_contents($tmp, $data, LOCK_EX) === false) return false;
+    if (!@rename($tmp, $path)) { @unlink($tmp); return false; }
+    return true;
+}
+
+function readJsonBody() {
+    $body = file_get_contents('php://input');
+    if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
+        http_response_code(400);
+        echo json_encode(['error' => 'invalid JSON']);
+        exit;
+    }
+    return $body;
+}
+
+// SSE-Stream für eine Spielstand-Datei.
+// - Signatur (mtime+size+md5) statt nur mtime: erkennt auch mehrere Saves
+//   innerhalb derselben Sekunde (filemtime hat 1s-Auflösung).
+// - Keepalive-Kommentar alle 2s, damit connection_aborted() abgebrochene
+//   Clients erkennt und den PHP-Worker freigibt (wichtig bei 25+ Geräten).
+function sseStream($path) {
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache');
     header('Connection: keep-alive');
     header('Access-Control-Allow-Origin: *');
     header('X-Accel-Buffering: no'); // nginx
 
-    // Disable output buffering
     @ini_set('output_buffering', 'off');
     @ini_set('zlib.output_compression', false);
     while (ob_get_level()) ob_end_flush();
 
-    $lastMtime = 0;
+    $lastSig = '';
     $start = time();
+    $lastPing = 0;
     $maxDuration = 30; // seconds
 
     while (true) {
@@ -44,27 +71,172 @@ if ($key === 'sse') {
 
         if (file_exists($path)) {
             clearstatcache(true, $path);
-            $mtime = filemtime($path);
-            if ($mtime > $lastMtime) {
-                $lastMtime = $mtime;
-                $data = file_get_contents($path);
-                echo "data: " . $data . "\n\n";
-                @flush();
+            $sig = @filemtime($path) . ':' . @filesize($path) . ':' . @md5_file($path);
+            if ($sig !== $lastSig) {
+                $lastSig = $sig;
+                $data = @file_get_contents($path);
+                if ($data !== false && $data !== '') {
+                    echo "data: " . $data . "\n\n";
+                    @flush();
+                }
             }
         }
 
-        usleep(150000); // 300ms
+        if ((time() - $lastPing) >= 2) {
+            $lastPing = time();
+            echo ":ka\n\n";
+            @flush();
+        }
+
+        usleep(300000); // 300ms
     }
     exit;
 }
 
+// ── Cleanup: Spiele älter als 24h löschen ─────────────────────────
+function cleanupExpiredGames($gamesDir) {
+    $registryPath = $gamesDir . '/index.json';
+    if (!file_exists($registryPath)) return;
+
+    $fp = fopen($registryPath, 'c+');
+    if (!$fp || !flock($fp, LOCK_EX)) { if ($fp) fclose($fp); return; }
+
+    $content = stream_get_contents($fp);
+    $registry = json_decode($content, true) ?: [];
+    $changed = false;
+    $now = time();
+    $maxAge = 24 * 60 * 60; // 24 Stunden
+
+    foreach ($registry as $code => $info) {
+        $timestamp = $info['updatedAt'] ?? $info['createdAt'] ?? null;
+        if (!$timestamp) continue;
+        $age = $now - strtotime($timestamp);
+        if ($age > $maxAge) {
+            $gamePath = $gamesDir . '/' . $code . '.json';
+            if (file_exists($gamePath)) @unlink($gamePath);
+            unset($registry[$code]);
+            $changed = true;
+        }
+    }
+
+    if ($changed) {
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        fflush($fp);
+    }
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
+function updateRegistryEntry($gamesDir, $code, $body, $defaultTitle) {
+    $registryPath = $gamesDir . '/index.json';
+    $retries = 3;
+    while ($retries-- > 0) {
+        $fp = fopen($registryPath, 'c+');
+        if (!$fp) break;
+        if (flock($fp, LOCK_EX)) {
+            $registry = json_decode(stream_get_contents($fp), true) ?: [];
+            $gameData = json_decode($body, true);
+            $registry[$code] = [
+                'title'     => $gameData['meta']['title'] ?? $defaultTitle,
+                'status'    => $gameData['phase'] ?? 'setup',
+                'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
+                'updatedAt' => date('c'),
+            ];
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            fflush($fp);
+            flock($fp, LOCK_UN);
+            fclose($fp);
+            break;
+        }
+        fclose($fp);
+        usleep(50000);
+    }
+}
+
+function removeRegistryEntry($gamesDir, $code) {
+    $registryPath = $gamesDir . '/index.json';
+    if (!file_exists($registryPath)) return;
+    $fp = fopen($registryPath, 'c+');
+    if ($fp && flock($fp, LOCK_EX)) {
+        $registry = json_decode(stream_get_contents($fp), true) ?: [];
+        unset($registry[$code]);
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    } elseif ($fp) {
+        fclose($fp);
+    }
+}
+
+// Registry-Endpunkt (?f=…-games): GET mit Cleanup, POST kompletter Snapshot
+function registryEndpoint($gamesDir) {
+    if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
+    $registryPath = $gamesDir . '/index.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        cleanupExpiredGames($gamesDir);
+        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = readJsonBody();
+        atomicWrite($registryPath, $body)
+            ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    }
+    exit;
+}
+
+// Per-Game-Endpunkt (?f=…-game&code=XXXX): GET/POST/DELETE
+function gameEndpoint($gamesDir, $defaultTitle) {
+    $code = requireValidCode();
+    if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
+    $path = $gamesDir . '/' . $code . '.json';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        echo file_exists($path) ? file_get_contents($path) : '{}';
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $body = readJsonBody();
+        $ok = atomicWrite($path, $body);
+        if ($ok) updateRegistryEntry($gamesDir, $code, $body, $defaultTitle);
+        $ok ? print(json_encode(['ok' => true]))
+            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        if (file_exists($path)) @unlink($path);
+        removeRegistryEntry($gamesDir, $code);
+        echo json_encode(['ok' => true]);
+    }
+    exit;
+}
+
+// ── Verzeichnisse pro Spiel ───────────────────────────────────────
+$gameDirs = [
+    ''           => [__DIR__ . '/data/games/risiko-quiz',        'Spiel'],
+    'ls-'        => [__DIR__ . '/data/games/leiterspiel',        'Spiel'],
+    'bs-'        => [__DIR__ . '/schiffeversenken/data/games',   'Spiel'],
+    'labyrinth-' => [__DIR__ . '/data/games/labyrinth',          'Labyrinth-Quiz'],
+    'qp-'        => [__DIR__ . '/data/games/quizpfad',           'QuizPfad'],
+];
+
+// ── SSE-Endpunkte (eigene Header, kein JSON) ─────────────────────
+foreach ($gameDirs as $prefix => [$dir, $title]) {
+    if ($key === $prefix . 'sse') {
+        $code = requireValidCode();
+        sseStream($dir . '/' . $code . '.json');
+    }
+}
+
 // ── Standard JSON-API ─────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
-
-$gamesDir = __DIR__ . '/data/games/risiko-quiz';
 
 // Statische Dateien (Legacy + Questions)
 $files = [
@@ -86,367 +258,10 @@ try {
     }
 } catch (Exception $e) { /* Migration fehlgeschlagen – ignorieren */ }
 
-// ── Cleanup: Spiele älter als 24h löschen ───────────────────────────
-function cleanupExpiredGames($gamesDir) {
-    $registryPath = $gamesDir . '/index.json';
-    if (!file_exists($registryPath)) return;
-
-    $fp = fopen($registryPath, 'c+');
-    if (!$fp || !flock($fp, LOCK_EX)) { if ($fp) fclose($fp); return; }
-
-    $content = stream_get_contents($fp);
-    $registry = json_decode($content, true) ?: [];
-    $changed = false;
-    $now = time();
-    $maxAge = 24 * 60 * 60; // 24 Stunden
-
-    foreach ($registry as $code => $info) {
-        $timestamp = $info['updatedAt'] ?? $info['createdAt'] ?? null;
-        if (!$timestamp) continue;
-        $age = $now - strtotime($timestamp);
-        if ($age > $maxAge) {
-            // Spieldatei löschen
-            $gamePath = $gamesDir . '/' . $code . '.json';
-            if (file_exists($gamePath)) @unlink($gamePath);
-            unset($registry[$code]);
-            $changed = true;
-        }
-    }
-
-    if ($changed) {
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        fflush($fp);
-    }
-    flock($fp, LOCK_UN);
-    fclose($fp);
-}
-
-// ── Registry: ?f=games ────────────────────────────────────────────
-if ($key === 'games') {
-    if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
-    $registryPath = $gamesDir . '/index.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Cleanup abgelaufener Spiele bei jedem Registry-Abruf
-        cleanupExpiredGames($gamesDir);
-        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400);
-            echo json_encode(['error' => 'invalid JSON']);
-            exit;
-        }
-        file_put_contents($registryPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── Per-Game: ?f=game&code=XXXX ───────────────────────────────────
-if ($key === 'game') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'invalid code']);
-        exit;
-    }
-    if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
-    $path = $gamesDir . '/' . $code . '.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($path) ? file_get_contents($path) : '{}';
-
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400);
-            echo json_encode(['error' => 'invalid JSON']);
-            exit;
-        }
-        // Save game state
-        $ok = file_put_contents($path, $body, LOCK_EX) !== false;
-
-        // Update registry entry
-        if ($ok) {
-            $registryPath = $gamesDir . '/index.json';
-            $retries = 3;
-            while ($retries-- > 0) {
-                $fp = fopen($registryPath, 'c+');
-                if (!$fp) break;
-                if (flock($fp, LOCK_EX)) {
-                    $content = stream_get_contents($fp);
-                    $registry = json_decode($content, true) ?: [];
-                    $gameData = json_decode($body, true);
-                    $registry[$code] = [
-                        'title'     => $gameData['meta']['title'] ?? 'Spiel ' . $code,
-                        'status'    => $gameData['phase'] ?? 'setup',
-                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                        'updatedAt' => date('c'),
-                    ];
-                    ftruncate($fp, 0);
-                    rewind($fp);
-                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                    fflush($fp);
-                    flock($fp, LOCK_UN);
-                    fclose($fp);
-                    break;
-                }
-                fclose($fp);
-                usleep(50000);
-            }
-        }
-
-        $ok ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        // Delete game file
-        if (file_exists($path)) @unlink($path);
-
-        // Remove from registry
-        $registryPath = $gamesDir . '/index.json';
-        if (file_exists($registryPath)) {
-            $fp = fopen($registryPath, 'c+');
-            if ($fp && flock($fp, LOCK_EX)) {
-                $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                unset($registry[$code]);
-                ftruncate($fp, 0);
-                rewind($fp);
-                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                fflush($fp);
-                flock($fp, LOCK_UN);
-                fclose($fp);
-            }
-        }
-        echo json_encode(['ok' => true]);
-    }
-    exit;
-}
-
-// ── Leiterspiel SSE: ?f=ls-sse&code=XXXX ─────────────────────────
-if ($key === 'ls-sse') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $lsPath = __DIR__ . '/data/games/leiterspiel/' . $code . '.json';
-    header('Content-Type: text/event-stream; charset=utf-8');
-    header('Cache-Control: no-cache'); header('Connection: keep-alive');
-    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
-    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
-    while (ob_get_level()) ob_end_flush();
-    $lastMtime = 0; $start = time();
-    while (true) {
-        if (connection_aborted()) break;
-        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
-        if (file_exists($lsPath)) {
-            clearstatcache(true, $lsPath);
-            $mtime = filemtime($lsPath);
-            if ($mtime > $lastMtime) {
-                $lastMtime = $mtime;
-                echo "data: " . file_get_contents($lsPath) . "\n\n"; @flush();
-            }
-        }
-        usleep(150000);
-    }
-    exit;
-}
-
-// ── Leiterspiel Games Registry: ?f=ls-games ──────────────────────
-if ($key === 'ls-games') {
-    $lsDir = __DIR__ . '/data/games/leiterspiel';
-    if (!is_dir($lsDir)) mkdir($lsDir, 0755, true);
-    $registryPath = $lsDir . '/index.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        cleanupExpiredGames($lsDir);
-        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($registryPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── Leiterspiel Per-Game: ?f=ls-game&code=XXXX ───────────────────
-if ($key === 'ls-game') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $lsDir = __DIR__ . '/data/games/leiterspiel';
-    if (!is_dir($lsDir)) mkdir($lsDir, 0755, true);
-    $lsPath = $lsDir . '/' . $code . '.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($lsPath) ? file_get_contents($lsPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        $ok = file_put_contents($lsPath, $body, LOCK_EX) !== false;
-        if ($ok) {
-            $registryPath = $lsDir . '/index.json';
-            $retries = 3;
-            while ($retries-- > 0) {
-                $fp = fopen($registryPath, 'c+');
-                if (!$fp) break;
-                if (flock($fp, LOCK_EX)) {
-                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                    $gameData = json_decode($body, true);
-                    $registry[$code] = [
-                        'title'     => $gameData['meta']['title'] ?? 'Spiel ' . $code,
-                        'status'    => $gameData['phase'] ?? 'setup',
-                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                        'updatedAt' => date('c'),
-                    ];
-                    ftruncate($fp, 0); rewind($fp);
-                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-                    break;
-                }
-                fclose($fp); usleep(50000);
-            }
-        }
-        $ok ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        if (file_exists($lsPath)) @unlink($lsPath);
-        $registryPath = $lsDir . '/index.json';
-        if (file_exists($registryPath)) {
-            $fp = fopen($registryPath, 'c+');
-            if ($fp && flock($fp, LOCK_EX)) {
-                $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                unset($registry[$code]);
-                ftruncate($fp, 0); rewind($fp);
-                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-            }
-        }
-        echo json_encode(['ok' => true]);
-    }
-    exit;
-}
-
-// ── Schiffeversenken SSE: ?f=bs-sse&code=XXXX ────────────────────
-if ($key === 'bs-sse') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $bsPath = __DIR__ . '/schiffeversenken/data/games/' . $code . '.json';
-    header('Content-Type: text/event-stream; charset=utf-8');
-    header('Cache-Control: no-cache'); header('Connection: keep-alive');
-    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
-    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
-    while (ob_get_level()) ob_end_flush();
-    $lastMtime = 0; $start = time();
-    while (true) {
-        if (connection_aborted()) break;
-        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
-        if (file_exists($bsPath)) {
-            clearstatcache(true, $bsPath);
-            $mtime = filemtime($bsPath);
-            if ($mtime > $lastMtime) {
-                $lastMtime = $mtime;
-                echo "data: " . file_get_contents($bsPath) . "\n\n"; @flush();
-            }
-        }
-        usleep(150000);
-    }
-    exit;
-}
-
-// ── Schiffeversenken Games Registry: ?f=bs-games ─────────────────
-if ($key === 'bs-games') {
-    $bsDir = __DIR__ . '/schiffeversenken/data/games';
-    if (!is_dir($bsDir)) mkdir($bsDir, 0755, true);
-    $registryPath = $bsDir . '/index.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        cleanupExpiredGames($bsDir);
-        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($registryPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── Schiffeversenken Per-Game: ?f=bs-game&code=XXXX ──────────────
-if ($key === 'bs-game') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $bsDir = __DIR__ . '/schiffeversenken/data/games';
-    if (!is_dir($bsDir)) mkdir($bsDir, 0755, true);
-    $bsPath = $bsDir . '/' . $code . '.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($bsPath) ? file_get_contents($bsPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        $ok = file_put_contents($bsPath, $body, LOCK_EX) !== false;
-        if ($ok) {
-            $registryPath = $bsDir . '/index.json';
-            $retries = 3;
-            while ($retries-- > 0) {
-                $fp = fopen($registryPath, 'c+');
-                if (!$fp) break;
-                if (flock($fp, LOCK_EX)) {
-                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                    $gameData = json_decode($body, true);
-                    $registry[$code] = [
-                        'title'     => $gameData['meta']['title'] ?? 'Spiel ' . $code,
-                        'status'    => $gameData['phase'] ?? 'setup',
-                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                        'updatedAt' => date('c'),
-                    ];
-                    ftruncate($fp, 0); rewind($fp);
-                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-                    break;
-                }
-                fclose($fp); usleep(50000);
-            }
-        }
-        $ok ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        if (file_exists($bsPath)) @unlink($bsPath);
-        $registryPath = $bsDir . '/index.json';
-        if (file_exists($registryPath)) {
-            $fp = fopen($registryPath, 'c+');
-            if ($fp && flock($fp, LOCK_EX)) {
-                $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                unset($registry[$code]);
-                ftruncate($fp, 0); rewind($fp);
-                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-            }
-        }
-        echo json_encode(['ok' => true]);
-    }
-    exit;
+// ── Registry- und Per-Game-Endpunkte für alle Spiele ─────────────
+foreach ($gameDirs as $prefix => [$dir, $title]) {
+    if ($key === $prefix . 'games') registryEndpoint($dir);
+    if ($key === $prefix . 'game')  gameEndpoint($dir, $title === 'Spiel' ? 'Spiel ' . strtoupper(trim($_GET['code'] ?? '')) : $title);
 }
 
 // ── Escape Room Library: ?f=er-library ───────────────────────────
@@ -481,13 +296,8 @@ if ($key === 'er-game') {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($path) ? file_get_contents($path) : 'null';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400);
-            echo json_encode(['error' => 'invalid JSON']);
-            exit;
-        }
-        file_put_contents($path, $body, LOCK_EX) !== false
+        $body = readJsonBody();
+        atomicWrite($path, $body)
             ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
@@ -497,50 +307,16 @@ if ($key === 'er-game') {
     exit;
 }
 
-// ── Labyrinth SSE: ?f=labyrinth-sse&code=XXXX ────────────────────
-if ($key === 'labyrinth-sse') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $lPath = __DIR__ . '/data/games/labyrinth/' . $code . '.json';
-    header('Content-Type: text/event-stream; charset=utf-8');
-    header('Cache-Control: no-cache'); header('Connection: keep-alive');
-    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
-    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
-    while (ob_get_level()) ob_end_flush();
-    $lastMtime = 0; $start = time();
-    while (true) {
-        if (connection_aborted()) break;
-        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
-        if (file_exists($lPath)) {
-            clearstatcache(true, $lPath);
-            $mtime = filemtime($lPath);
-            if ($mtime > $lastMtime) {
-                $lastMtime = $mtime;
-                echo "data: " . file_get_contents($lPath) . "\n\n"; @flush();
-            }
-        }
-        usleep(150000);
-    }
-    exit;
-}
-
 // ── Leiterspiel Designer Board Library: ?f=ls-boards ────────────────
 if ($key === 'ls-boards') {
     $dir = __DIR__ . '/data/leiterspiel-designer';
     if (!is_dir($dir)) mkdir($dir, 0755, true);
     $libPath = $dir . '/boards.json';
-    header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($libPath) ? file_get_contents($libPath) : '[]';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($libPath, $body, LOCK_EX) !== false
+        $body = readJsonBody();
+        atomicWrite($libPath, $body)
             ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     }
@@ -552,211 +328,13 @@ if ($key === 'lab-mazes') {
     $dir = __DIR__ . '/data/labyrinth-designer';
     if (!is_dir($dir)) mkdir($dir, 0755, true);
     $libPath = $dir . '/mazes.json';
-    header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($libPath) ? file_get_contents($libPath) : '[]';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($libPath, $body, LOCK_EX) !== false
+        $body = readJsonBody();
+        atomicWrite($libPath, $body)
             ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── Labyrinth Games Registry: ?f=labyrinth-games ─────────────────
-if ($key === 'labyrinth-games') {
-    $lDir = __DIR__ . '/data/games/labyrinth';
-    if (!is_dir($lDir)) mkdir($lDir, 0755, true);
-    $registryPath = $lDir . '/index.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        cleanupExpiredGames($lDir);
-        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($registryPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── Labyrinth Per-Game: ?f=labyrinth-game&code=XXXX ──────────────
-if ($key === 'labyrinth-game') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $lDir  = __DIR__ . '/data/games/labyrinth';
-    if (!is_dir($lDir)) mkdir($lDir, 0755, true);
-    $lPath = $lDir . '/' . $code . '.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($lPath) ? file_get_contents($lPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        $ok = file_put_contents($lPath, $body, LOCK_EX) !== false;
-        if ($ok) {
-            $registryPath = $lDir . '/index.json';
-            $retries = 3;
-            while ($retries-- > 0) {
-                $fp = fopen($registryPath, 'c+');
-                if (!$fp) break;
-                if (flock($fp, LOCK_EX)) {
-                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                    $gameData = json_decode($body, true);
-                    $registry[$code] = [
-                        'title'     => $gameData['meta']['title'] ?? 'Labyrinth-Quiz',
-                        'status'    => $gameData['phase'] ?? 'setup',
-                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                        'updatedAt' => date('c'),
-                    ];
-                    ftruncate($fp, 0); rewind($fp);
-                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-                    break;
-                }
-                fclose($fp); usleep(50000);
-            }
-        }
-        $ok ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        if (file_exists($lPath)) @unlink($lPath);
-        $registryPath = $lDir . '/index.json';
-        if (file_exists($registryPath)) {
-            $fp = fopen($registryPath, 'c+');
-            if ($fp && flock($fp, LOCK_EX)) {
-                $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                unset($registry[$code]);
-                ftruncate($fp, 0); rewind($fp);
-                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-            }
-        }
-        echo json_encode(['ok' => true]);
-    }
-    exit;
-}
-
-// ── QuizPfad SSE: ?f=qp-sse&code=XXXX ───────────────────────────
-if ($key === 'qp-sse') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $qpPath = __DIR__ . '/data/games/quizpfad/' . $code . '.json';
-    header('Content-Type: text/event-stream; charset=utf-8');
-    header('Cache-Control: no-cache'); header('Connection: keep-alive');
-    header('Access-Control-Allow-Origin: *'); header('X-Accel-Buffering: no');
-    @ini_set('output_buffering', 'off'); @ini_set('zlib.output_compression', false);
-    while (ob_get_level()) ob_end_flush();
-    $lastMtime = 0; $start = time();
-    while (true) {
-        if (connection_aborted()) break;
-        if ((time() - $start) >= 30) { echo "event: reconnect\ndata: {}\n\n"; @flush(); break; }
-        if (file_exists($qpPath)) {
-            clearstatcache(true, $qpPath);
-            $mtime = filemtime($qpPath);
-            if ($mtime > $lastMtime) {
-                $lastMtime = $mtime;
-                echo "data: " . file_get_contents($qpPath) . "\n\n"; @flush();
-            }
-        }
-        usleep(150000);
-    }
-    exit;
-}
-
-// ── QuizPfad Games Registry: ?f=qp-games ─────────────────────────
-if ($key === 'qp-games') {
-    $qpDir = __DIR__ . '/data/games/quizpfad';
-    if (!is_dir($qpDir)) mkdir($qpDir, 0755, true);
-    $registryPath = $qpDir . '/index.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        cleanupExpiredGames($qpDir);
-        echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        file_put_contents($registryPath, $body, LOCK_EX) !== false
-            ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    }
-    exit;
-}
-
-// ── QuizPfad Per-Game: ?f=qp-game&code=XXXX ──────────────────────
-if ($key === 'qp-game') {
-    $code = strtoupper(trim($_GET['code'] ?? ''));
-    if (!preg_match('/^[A-Z0-9]{4,6}$/', $code)) {
-        http_response_code(400); echo json_encode(['error' => 'invalid code']); exit;
-    }
-    $qpDir = __DIR__ . '/data/games/quizpfad';
-    if (!is_dir($qpDir)) mkdir($qpDir, 0755, true);
-    $qpPath = $qpDir . '/' . $code . '.json';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($qpPath) ? file_get_contents($qpPath) : '{}';
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $body = file_get_contents('php://input');
-        if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
-        }
-        $ok = file_put_contents($qpPath, $body, LOCK_EX) !== false;
-        if ($ok) {
-            $registryPath = $qpDir . '/index.json';
-            $retries = 3;
-            while ($retries-- > 0) {
-                $fp = fopen($registryPath, 'c+');
-                if (!$fp) break;
-                if (flock($fp, LOCK_EX)) {
-                    $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                    $gameData = json_decode($body, true);
-                    $registry[$code] = [
-                        'title'     => $gameData['meta']['title'] ?? 'QuizPfad',
-                        'status'    => $gameData['phase'] ?? 'setup',
-                        'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                        'updatedAt' => date('c'),
-                    ];
-                    ftruncate($fp, 0); rewind($fp);
-                    fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-                    break;
-                }
-                fclose($fp); usleep(50000);
-            }
-        }
-        $ok ? print(json_encode(['ok' => true]))
-            : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        if (file_exists($qpPath)) @unlink($qpPath);
-        $registryPath = $qpDir . '/index.json';
-        if (file_exists($registryPath)) {
-            $fp = fopen($registryPath, 'c+');
-            if ($fp && flock($fp, LOCK_EX)) {
-                $registry = json_decode(stream_get_contents($fp), true) ?: [];
-                unset($registry[$code]);
-                ftruncate($fp, 0); rewind($fp);
-                fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-            }
-        }
-        echo json_encode(['ok' => true]);
     }
     exit;
 }
@@ -770,17 +348,53 @@ if ($key === 'drafts') {
         echo file_exists($draftsPath) ? file_get_contents($draftsPath) : '[]';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body = file_get_contents('php://input');
+        // Flooding-Schutz: einzelner Vorschlag darf nicht riesig sein
+        if (strlen($body) > 20000) {
+            http_response_code(413); echo json_encode(['error' => 'too large']); exit;
+        }
         $draft = json_decode($body, true);
-        if ($draft === null && json_last_error() !== JSON_ERROR_NONE) {
+        if (!is_array($draft)) {
             http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit;
         }
+        // Whitelist + Normalisierung: nur bekannte Felder mit gültigen Typen übernehmen
+        $str = fn($v, $max) => mb_substr(trim(is_string($v) ? $v : ''), 0, $max);
+        $type = in_array($draft['type'] ?? '', ['mc', 'open'], true) ? $draft['type'] : 'open';
+        $diff = (int)($draft['difficulty'] ?? 100);
+        if (!in_array($diff, [100, 200, 300, 400, 500], true)) $diff = 100;
+        $options = [];
+        foreach (array_slice(is_array($draft['options'] ?? null) ? $draft['options'] : [], 0, 8) as $opt) {
+            $options[] = $str($opt, 500);
+        }
+        $correctIndices = [];
+        foreach (array_slice(is_array($draft['correctIndices'] ?? null) ? $draft['correctIndices'] : [], 0, 8) as $ci) {
+            if (is_int($ci) || ctype_digit((string)$ci)) $correctIndices[] = (int)$ci;
+        }
+        $id = $str($draft['id'] ?? '', 64);
+        if (!preg_match('/^[A-Za-z0-9_\-\.]{1,64}$/', $id)) $id = uniqid('draft-');
+        $clean = [
+            'id'                => $id,
+            'submittedAt'       => date('c'),
+            'submitter'         => $str($draft['submitter'] ?? '', 100) ?: null,
+            'type'              => $type,
+            'question'          => $str($draft['question'] ?? '', 2000),
+            'answer'            => $str($draft['answer'] ?? '', 2000),
+            'options'           => $options,
+            'correctIndex'      => isset($draft['correctIndex']) && $draft['correctIndex'] !== null ? (int)$draft['correctIndex'] : null,
+            'hint'              => $str($draft['hint'] ?? '', 1000),
+            'suggestedCategory' => $str($draft['suggestedCategory'] ?? '', 200),
+            'difficulty'        => $diff,
+        ];
+        if ($correctIndices) $clean['correctIndices'] = $correctIndices;
+
         $fp = fopen($draftsPath, 'c+');
         if (!$fp || !flock($fp, LOCK_EX)) {
             if ($fp) fclose($fp);
             http_response_code(500); echo json_encode(['error' => 'lock error']); exit;
         }
         $existing = json_decode(stream_get_contents($fp), true) ?: [];
-        $existing[] = $draft;
+        $existing[] = $clean;
+        // Flooding-Schutz: maximal 500 Vorschläge, älteste fliegen raus
+        if (count($existing) > 500) $existing = array_slice($existing, -500);
         ftruncate($fp, 0); rewind($fp);
         fwrite($fp, json_encode($existing, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         fflush($fp); flock($fp, LOCK_UN); fclose($fp);
@@ -824,17 +438,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo file_exists($path) ? file_get_contents($path) : '{}';
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $body = file_get_contents('php://input');
-    if (json_decode($body) === null && json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(['error' => 'invalid JSON']);
-        exit;
-    }
+    $body = readJsonBody();
     $dir = dirname($path);
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
-    file_put_contents($path, $body) !== false
+    // Backup-Rotation vor Überschreiben (Schutz gegen versehentliches Leeren)
+    if (file_exists($path) && @filesize($path) > 30) {
+        @copy($path, $path . '.bak');
+    }
+    atomicWrite($path, $body)
         ? print(json_encode(['ok' => true]))
         : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
 }

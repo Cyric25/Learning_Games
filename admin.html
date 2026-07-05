@@ -479,8 +479,27 @@ const collapsedSubsubs = new Map();
 const collapsedL4s = new Map();
 
 // ── Init ─────────────────────────────────────────────────────────
+// IDs landen in Inline-Handlern (onclick="…'${cat.id}'…") — fremde IDs aus
+// JSON-Import oder Server müssen daher auf sichere Zeichen beschränkt werden.
+function sanitizeQuestionBank(qb) {
+  if (!qb || !Array.isArray(qb.categories)) return { categories: [] };
+  const fixId = (id, prefix) => {
+    const s = String(id || '');
+    return /^[A-Za-z0-9_\-\.]{1,80}$/.test(s)
+      ? s
+      : prefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  };
+  const walk = (node, prefix) => {
+    node.id = fixId(node.id, prefix);
+    (node.questions || []).forEach(q => { q.id = fixId(q.id, 'q'); });
+    (node.subcategories || []).forEach(s => walk(s, 'subcat'));
+  };
+  qb.categories.forEach(c => walk(c, 'cat'));
+  return qb;
+}
+
 async function init() {
-  questionBank = await StorageManager.loadQuestions();
+  questionBank = sanitizeQuestionBank(await StorageManager.loadQuestions());
   renderCategories();
   updateStats();
   bindEvents();
@@ -571,8 +590,7 @@ function renderCategories() {
             onclick="collapsedCats.set('${cat.id}', !collapsedCats.get('${cat.id}')); renderCategories();"
             title="${catCollapsed ? 'Aufklappen' : 'Einklappen'}">${catCollapsed ? '▶' : '▼'}</button>
           <input class="cat-name-edit" type="text" value="${escHtml(cat.name)}"
-            onchange="updateCatName('${cat.id}', this.value)"
-            oninput="updateCatName('${cat.id}', this.value)">
+            onchange="updateCatName('${cat.id}', this.value)">
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <span style="color:var(--text-secondary);font-size:0.85rem;">${subcats.length} Unterkat${subcats.length !== 1 ? 's' : ''}</span>
@@ -612,8 +630,7 @@ function renderSubBlock(sub, cat, container) {
           title="${subCollapsed ? 'Aufklappen' : 'Einklappen'}">${subCollapsed ? '▶' : '▼'}</button>
         <input class="cat-name-edit" type="text" value="${escHtml(sub.name)}"
           style="font-size:1rem;font-weight:600;"
-          onchange="updateSubcatName('${cat.id}', '${sub.id}', this.value)"
-          oninput="updateSubcatName('${cat.id}', '${sub.id}', this.value)">
+          onchange="updateSubcatName('${cat.id}', '${sub.id}', this.value)">
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasSubsubs && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasSubsubs && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
@@ -653,8 +670,7 @@ function renderSubSubBlock(subsub, sub, cat, container) {
           title="${subsubCollapsed ? 'Aufklappen' : 'Einklappen'}">${subsubCollapsed ? '▶' : '▼'}</button>
         <input class="cat-name-edit" type="text" value="${escHtml(subsub.name)}"
           style="font-size:0.95rem;font-weight:600;"
-          onchange="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)"
-          oninput="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)">
+          onchange="updateSubSubcatName('${cat.id}', '${sub.id}', '${subsub.id}', this.value)">
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;">
         ${!hasL4 && missing.length ? `<span class="warning-badge">⚠ ${missing.join(', ')} fehlt</span>` : (!hasL4 && directQCount > 0 ? '<span style="color:var(--success);font-size:0.85rem;">✓</span>' : '')}
@@ -684,8 +700,7 @@ function renderSubSubBlock(subsub, sub, cat, container) {
               title="${l4Collapsed ? 'Aufklappen' : 'Einklappen'}">${l4Collapsed ? '▶' : '▼'}</button>
             <input class="cat-name-edit" type="text" value="${escHtml(l4.name)}"
               style="font-size:0.9rem;font-weight:600;"
-              onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)"
-              oninput="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
+              onchange="updateLevel4Name('${cat.id}','${sub.id}','${subsub.id}','${l4.id}', this.value)">
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
             ${l4Missing.length ? `<span class="warning-badge">⚠ ${l4Missing.join(', ')} fehlt</span>` : '<span style="color:var(--success);font-size:0.85rem;">✓</span>'}
@@ -990,7 +1005,7 @@ function renderMcOptions(options, correctIndex) {
     }
     const textIn = document.createElement('input');
     textIn.type = 'text'; textIn.className = 'mc-opt-input';
-    textIn.value = escHtml(opt); textIn.placeholder = 'Option ' + (i + 1);
+    textIn.value = opt; textIn.placeholder = 'Option ' + (i + 1);
     textIn.addEventListener('input', updateMcAnswerText);
     const rmBtn = document.createElement('button');
     rmBtn.className = 'btn btn-danger btn-sm';
@@ -1368,7 +1383,7 @@ function bindEvents() {
     try {
       const data = await StorageManager.importFromFile(this.files[0]);
       if (!data.categories) { showAlert('save-alert', 'danger', 'Ungültige Fragen-Datei (kein "categories"-Feld).'); return; }
-      questionBank = data;
+      questionBank = sanitizeQuestionBank(data);
       const ok = await saveQuestionsToServer(); renderCategories(); updateStats();
       if (ok) showAlert('save-alert', 'success', `Fragen geladen: ${data.categories.length} Kategorien.`);
       else showAlert('save-alert', 'warning', `Fragen geladen – Server-Speichern fehlgeschlagen.`);
@@ -1450,6 +1465,9 @@ function renderDraftsList() {
 
     drafts.forEach(draft => {
       const date = draft.submittedAt ? new Date(draft.submittedAt).toLocaleDateString('de-DE') : '';
+      // Nutzer-kontrollierte Felder normalisieren (Drafts kommen unauthentifiziert von Schülern)
+      const dtype = draft.type === 'mc' ? 'mc' : 'open';
+      const ddiff = parseInt(draft.difficulty, 10) || 100;
       let answerPreview = '';
       if (draft.type === 'mc' && draft.options && draft.options.length) {
         const correctSet = Array.isArray(draft.correctIndices) && draft.correctIndices.length > 0
@@ -1466,8 +1484,8 @@ function renderDraftsList() {
       card.innerHTML = `
         <div class="draft-info">
           <div class="draft-meta">
-            <span class="type-badge type-${draft.type}">${draft.type === 'mc' ? 'MC' : 'Offen'}</span>
-            <span class="draft-meta-tag">${draft.difficulty}</span>
+            <span class="type-badge type-${dtype}">${dtype === 'mc' ? 'MC' : 'Offen'}</span>
+            <span class="draft-meta-tag">${ddiff}</span>
             ${draft.submitter ? `<span class="draft-meta-tag">von ${escHtml(draft.submitter)}</span>` : ''}
             ${date ? `<span style="font-size:0.78rem;color:var(--text-secondary);margin-left:auto;">${escHtml(date)}</span>` : ''}
           </div>
@@ -1689,7 +1707,7 @@ function dmRenderMcOptions(options, correctIndex) {
     }
     const textIn = document.createElement('input');
     textIn.type = 'text'; textIn.className = 'dm-mc-opt';
-    textIn.value = escHtml(opt); textIn.placeholder = 'Option ' + (i + 1);
+    textIn.value = opt; textIn.placeholder = 'Option ' + (i + 1);
     textIn.style.cssText = 'flex:1;word-break:break-word;white-space:normal;';
     const rmBtn = document.createElement('button');
     rmBtn.className = 'btn btn-danger btn-sm';

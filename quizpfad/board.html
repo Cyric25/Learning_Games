@@ -337,6 +337,10 @@
     sub = QpStorage.subscribe(code, applyState);
   }
 
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   function applyState(gs) {
     if (gs.phase === 'finished') {
       const winner = (gs.teams || []).reduce((best, t) => t.position > (best ? best.position : -1) ? t : best, null);
@@ -347,7 +351,15 @@
       return;
     }
 
-    if (gs.phase !== 'playing' || !gs.board || !gs.board.length) return;
+    if (gs.phase !== 'playing' || !gs.board || !gs.board.length) {
+      // Setup-Phase: Wartehinweis statt leerer Seite (Join-Screen ist schon zu)
+      document.getElementById('screen-board').classList.add('active');
+      const banner = document.getElementById('active-banner');
+      if (banner) { banner.textContent = '⏳ Warte auf Spielstart…'; banner.style.background = ''; }
+      const codeEl = document.getElementById('board-code');
+      if (codeEl && gs.meta) codeEl.textContent = gs.meta.gameCode || QpStorage.getCode();
+      return;
+    }
 
     document.getElementById('screen-board').classList.add('active');
     renderBoard(gs);
@@ -368,7 +380,7 @@
     const active = teams[cur];
     const banner = document.getElementById('active-banner');
     if (active) {
-      banner.textContent = active.name + ' ist dran!';
+      banner.textContent = active.name + ' ist dran!'; // textContent → sicher
       banner.style.background = active.color;
     }
 
@@ -444,7 +456,7 @@
       card.innerHTML =
         `<div class="team-piece" style="background:${t.color}">${i+1}</div>` +
         `<div class="team-info">` +
-          `<div class="team-name">${t.name}</div>` +
+          `<div class="team-name">${esc(t.name)}</div>` +
           `<div class="team-pos">Feld ${t.position}/${fc-1}</div>` +
           `<div class="team-progress-bar"><div class="team-progress-fill" style="width:${progress}%;background:${t.color}"></div></div>` +
         `</div>`;
@@ -479,7 +491,7 @@
             if (correct.includes(i)) cls += ' correct';
             else if (i === lq.selectedMcIndex) cls += ' wrong';
           }
-          return `<div class="${cls}">${ans}</div>`;
+          return `<div class="${cls}">${esc(ans)}</div>`;
         }).join('') +
       '</div>';
     }
@@ -493,10 +505,10 @@
 
     card.innerHTML =
       `<div class="q-card-header">` +
-        `<span class="q-card-team" style="background:${team ? team.color : '#888'}">${team ? team.name : ''}</span>` +
+        `<span class="q-card-team" style="background:${team ? team.color : '#888'}">${team ? esc(team.name) : ''}</span>` +
         `<span class="q-card-diff">${diffStr}</span>` +
       `</div>` +
-      `<div class="q-card-text">${q.frage || ''}</div>` +
+      `<div class="q-card-text">${esc(q.frage || '')}</div>` +
       optsHtml +
       resultHtml;
   }

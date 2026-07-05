@@ -452,7 +452,12 @@ async function loadFragenBank() {
 function convertRQ(rqData) {
   const fragen = [];
   function collect(node) {
-    if (node.questions && node.questions.length) {
+    // True-Leaf-Regel (wie leiterspiel.js): Nur echte Blätter zählen —
+    // Knoten mit questions UND subcategories sind keine Blätter, sonst
+    // divergiert der Fragenpool zwischen Lehrer- und Schülergerät.
+    const subs = node.subcategories || [];
+    const isLeaf = subs.length === 0;
+    if (node.questions && node.questions.length && isLeaf) {
       node.questions.forEach(q => {
         const sw = q.difficulty<=200?'leicht': q.difficulty<=300?'mittel':'schwer';
         const isMc = q.type==='mc' && q.options && q.options.length;
@@ -483,12 +488,21 @@ function pickQuestion(gs) {
   const diff = field ? field.difficulty : 'leicht';
   const used = gs.usedQuestionIds;
 
-  let pool = activeFragenBank.filter(q => q.schwierigkeit===diff && !used.has(q.id));
-  if (!pool.length) pool = activeFragenBank.filter(q => !used.has(q.id));
+  // Kategorieauswahl der Lehrkraft respektieren — sonst zieht das
+  // Schülergerät Fragen aus abgewählten Kategorien
+  const active = Array.isArray(gs.activeCategoryIds) && gs.activeCategoryIds.length
+    ? new Set(gs.activeCategoryIds) : null;
+  const bank = active
+    ? activeFragenBank.filter(q => active.has(q.kategorie))
+    : activeFragenBank;
+  const source = bank.length ? bank : activeFragenBank;
+
+  let pool = source.filter(q => q.schwierigkeit===diff && !used.has(q.id));
+  if (!pool.length) pool = source.filter(q => !used.has(q.id));
   if (!pool.length) {
     gs.usedQuestionIds = new Set();
-    pool = activeFragenBank.filter(q => q.schwierigkeit===diff);
-    if (!pool.length) pool = activeFragenBank;
+    pool = source.filter(q => q.schwierigkeit===diff);
+    if (!pool.length) pool = source;
   }
   return pool[Math.floor(Math.random()*pool.length)];
 }
@@ -659,11 +673,14 @@ function fieldToPos(n) {
 function renderBoard(gs) {
   const grid = document.getElementById('board-grid');
   if (!gs.board || !gs.board.length) return;
+  // Custom-Boards können ≠100 Felder haben — dynamisch statt hartkodiert,
+  // sonst crasht gs.board[f] bei kürzeren Brettern
+  const maxF = gs.board.length - 1;
 
   if (!grid.children.length) {
     // Build board cells once
-    for (let f = 1; f <= 100; f++) {
-      const field = gs.board[f];
+    for (let f = 1; f <= maxF; f++) {
+      const field = gs.board[f] || {};
       const pos = fieldToPos(f);
       const div = document.createElement('div');
       div.className = 'board-field';
@@ -671,7 +688,7 @@ function renderBoard(gs) {
       div.style.gridRow = pos.gridRow;
       div.style.gridColumn = pos.gridCol;
       if (f===1) div.classList.add('field-start');
-      else if (f===100) div.classList.add('field-goal');
+      else if (f===maxF) div.classList.add('field-goal');
       else if (field.bonusType==='roll_again') div.classList.add('bonus-roll');
       else if (field.bonusType==='free_move')  div.classList.add('bonus-free');
       else if (field.bonusType==='swap')       div.classList.add('bonus-swap');
@@ -688,7 +705,7 @@ function renderBoard(gs) {
         const icon = document.createElement('span');
         icon.className = 'field-bonus-badge'; icon.textContent = '🏁';
         div.appendChild(icon);
-      } else if (f === 100) {
+      } else if (f === maxF) {
         const icon = document.createElement('span');
         icon.className = 'field-bonus-badge'; icon.textContent = '🏆';
         div.appendChild(icon);
@@ -722,14 +739,14 @@ function renderBoard(gs) {
   }
 
   // Update pieces
-  for (let f = 1; f <= 100; f++) {
+  for (let f = 1; f <= maxF; f++) {
     const c = document.getElementById('vp-'+f);
     if (c) c.innerHTML = '';
   }
   document.querySelectorAll('.board-field.current-field').forEach(el => el.classList.remove('current-field'));
 
   gs.teams.forEach((team, ti) => {
-    if (team.position < 1 || team.position > 100) return;
+    if (team.position < 1 || team.position > maxF) return;
     const c = document.getElementById('vp-'+team.position);
     if (!c) return;
     const sp = document.createElement('span');
@@ -769,8 +786,17 @@ function drawOverlay(gs) {
     return e;
   }
 
+  // Leitern/Schlangen aus dem tatsächlichen Board ableiten (Custom-Boards!),
+  // nicht aus den Standard-Konstanten
+  const ladders = {}, snakes = {};
+  gs.board.forEach((field, f) => {
+    if (!field) return;
+    if (field.ladderTo) ladders[f] = field.ladderTo;
+    if (field.snakeTo)  snakes[f]  = field.snakeTo;
+  });
+
   // Leitern
-  Object.entries(LADDERS).forEach(([from, to]) => {
+  Object.entries(ladders).forEach(([from, to]) => {
     const a = center(+from), b = center(+to);
     if (!a||!b) return;
     svg.appendChild(el('line', {x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:'#16a34a','stroke-width':'3',opacity:'.7','stroke-linecap':'round'}));
@@ -778,7 +804,7 @@ function drawOverlay(gs) {
     svg.appendChild(el('circle', {cx:b.x,cy:b.y,r:'4',fill:'#14532d',opacity:'.9'}));
   });
   // Schlangen
-  Object.entries(SNAKES).forEach(([from, to]) => {
+  Object.entries(snakes).forEach(([from, to]) => {
     const a = center(+from), b = center(+to);
     if (!a||!b) return;
     const dx=b.x-a.x, dy=b.y-a.y, len=Math.sqrt(dx*dx+dy*dy);
@@ -793,6 +819,13 @@ function drawOverlay(gs) {
     svg.appendChild(el('circle', {cx:a.x,cy:a.y,r:'5',fill:'#dc2626',opacity:'.9'}));
   });
 }
+
+// Overlay bei Größenänderung/Rotation neu zeichnen (sonst verrutschen Linien)
+let _overlayResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_overlayResizeTimer);
+  _overlayResizeTimer = setTimeout(() => { if (typeof lastGs !== 'undefined' && lastGs) drawOverlay(lastGs); }, 200);
+});
 
 // ── Banners & Status ──────────────────────────────────────
 function updateActiveBanner(gs) {
@@ -1118,10 +1151,11 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
     document.getElementById('q-expl').style.display = '';
   }
 
-  // Handle movement
+  // Handle movement (Custom-Boards können ≠100 Felder haben)
+  const maxF = freshGs.board.length - 1;
   if (correct) {
     const newPos = team.position + lq.diceResult;
-    if (newPos <= 100) {
+    if (newPos <= maxF) {
       team.position = newPos;
       const f = freshGs.board[newPos];
       if (f && f.ladderTo) team.position = f.ladderTo;
@@ -1130,7 +1164,7 @@ async function doSelectMcAnswer(idx, q, lq, gs) {
   }
 
   // Check for win
-  if (team.position === 100) {
+  if (team.position === maxF) {
     freshGs.phase = 'finished';
     freshGs.liveQuestion = null;
     freshGs.pendingDice = null;
@@ -1203,10 +1237,11 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
     document.getElementById('q-expl').style.display = '';
   }
 
-  // Handle movement
+  // Handle movement (Custom-Boards können ≠100 Felder haben)
+  const maxF = freshGs.board.length - 1;
   if (correct) {
     const newPos = team.position + lq.diceResult;
-    if (newPos <= 100) {
+    if (newPos <= maxF) {
       team.position = newPos;
       const f = freshGs.board[newPos];
       if (f && f.ladderTo) team.position = f.ladderTo;
@@ -1215,7 +1250,7 @@ async function doSelectMcMultiAnswer(selectedArr, q, lq, gs) {
   }
 
   // Check for win
-  if (team.position === 100) {
+  if (team.position === maxF) {
     freshGs.phase = 'finished';
     freshGs.liveQuestion = null;
     freshGs.pendingDice = null;
