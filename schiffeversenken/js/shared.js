@@ -33,6 +33,45 @@ const BsStorage = {
       try { await fetch('../api.php?f=bs-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
   },
 
+  // Optimistisches Speichern mit Compare-and-Swap: sendet _baseRev; bei 409
+  // (jemand anderes hat zwischenzeitlich geschrieben) liefert der Server den
+  // aktuellen Stand zurück. Nur für umkämpfte Schreibpfade (Beitritt/Kick).
+  async mutate(code, fn, tries = 6) {
+    code = (code||this._code||'').toUpperCase();
+    if (!code) return null;
+    let state = await this.load(code);
+    if (!state) return null;
+    for (let i = 0; i < tries; i++) {
+      const draft = this._deser(JSON.parse(JSON.stringify(this._ser(state))));
+      fn(draft);
+      if (!(await this.checkServer())) {
+        // Kein Server → lokal speichern, kein Konflikt möglich
+        await this.save(draft);
+        return draft;
+      }
+      const payload = this._ser(draft);
+      payload._baseRev = state._rev || 0;
+      try {
+        const r = await fetch('../api.php?f=bs-game&code='+code, {
+          method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}
+        });
+        if (r.status === 409) {
+          const cur = await r.json();
+          if (cur && cur.meta) { state = this._deser(cur); continue; } // neu mergen
+          return null;
+        }
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          if (j.rev) draft._rev = j.rev;
+          localStorage.setItem('bs_gs_'+code, JSON.stringify(this._ser(draft)));
+          return draft;
+        }
+      } catch {}
+      return null;
+    }
+    return null; // zu viele Konflikte
+  },
+
   async load(code) {
     code = (code||this._code||'').toUpperCase();
     if (!code) return null;

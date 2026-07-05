@@ -31,6 +31,38 @@ const GameSync = {
     if (!this.hasServer()) return;
     try { await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state) }); } catch {}
   },
+  // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
+  // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
+  // Stand nach und wir mergen erneut, statt fremde Änderungen zu überschreiben.
+  async mutate(code, fn, tries = 6) {
+    let state = await this.load(code);
+    if (!state) return null;
+    for (let i = 0; i < tries; i++) {
+      const draft = JSON.parse(JSON.stringify(state));
+      fn(draft);
+      if (!this.hasServer()) { await this.save(code, draft); return draft; }
+      const payload = JSON.parse(JSON.stringify(draft));
+      payload._baseRev = state._rev || 0;
+      try {
+        const r = await fetch(this._url('game', code), {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        if (r.status === 409) {
+          const cur = await r.json();
+          if (cur && cur.meta) { state = cur; continue; }
+          return null;
+        }
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          if (j.rev) draft._rev = j.rev;
+          try { localStorage.setItem('lab_' + code, JSON.stringify(draft)); } catch {}
+          return draft;
+        }
+      } catch {}
+      return null;
+    }
+    return null;
+  },
   subscribe(code, cb) {
     this.unsubscribe();
     const sid = ++this._session;
@@ -202,37 +234,25 @@ function showTeamSelect(state) {
 }
 
 async function selectTeam(id) {
-  // Frischen Stand laden um Race-Condition zu vermeiden; remoteState als Fallback
-  const fresh = (await GameSync.load(gameCode)) || remoteState;
-  if (!fresh) return;
-  const taken = new Set(fresh.takenTeams || []);
-  if (taken.has(id)) {
-    // Zwischenzeitlich belegt – Liste neu aufbauen
-    remoteState = fresh;
-    showTeamSelect(fresh);
+  // Compare-and-Swap: bei parallelem Beitritt retryt der Server-Konflikt
+  // automatisch, statt den fremden Eintrag zu überschreiben
+  let teamStillFree = true;
+  const result = await GameSync.mutate(gameCode, (draft) => {
+    const t = new Set(draft.takenTeams || []);
+    if (t.has(id)) { teamStillFree = false; return; }
+    t.add(id);
+    draft.takenTeams = [...t];
+  });
+  if (!result) { // Netzwerkfehler / zu viele Konflikte → Liste neu laden
+    const check = await GameSync.load(gameCode);
+    if (check) { remoteState = check; showTeamSelect(check); }
     return;
   }
-  taken.add(id);
-  const newState = JSON.parse(JSON.stringify(fresh));
-  newState.takenTeams = [...taken];
-  await GameSync.save(gameCode, newState);
-  remoteState = newState;
-
-  // Verifizieren: Bei gleichzeitigen Beitritten kann ein parallel laufender
-  // Save unseren Eintrag überschrieben haben (Last-Write-Wins) → nachladen
-  // und ggf. erneut eintragen, sonst wirkt es wie ein sofortiger Kick.
-  try {
-    const check = await GameSync.load(gameCode);
-    if (check && Array.isArray(check.takenTeams) && !check.takenTeams.includes(id)) {
-      const retry = JSON.parse(JSON.stringify(check));
-      retry.takenTeams = [...new Set([...(check.takenTeams || []), id])];
-      await GameSync.save(gameCode, retry);
-      remoteState = retry;
-    } else if (check) {
-      remoteState = check;
-    }
-  } catch {}
-
+  remoteState = result;
+  if (!teamStillFree || !(result.takenTeams||[]).includes(id)) {
+    showTeamSelect(result); // Team wurde zwischenzeitlich belegt
+    return;
+  }
   myTeamId = id;
   localStorage.setItem('lab_myteam_' + gameCode, id);
   startPlayView();

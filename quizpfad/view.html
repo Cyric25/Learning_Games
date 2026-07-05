@@ -237,6 +237,42 @@
       if (await this.checkServer())
         try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
     },
+    // Optimistisches Speichern mit Compare-and-Swap (Beitritt): sendet _baseRev;
+    // bei 409 mergt der Server-Konflikt neu, statt fremde Einträge zu überschreiben.
+    async mutate(code, fn, tries = 6) {
+      code = (code||this._code||'').toUpperCase();
+      if (!code) return null;
+      let state = await this.load(code);
+      if (!state) return null;
+      for (let i = 0; i < tries; i++) {
+        const draft = this._deser(JSON.parse(JSON.stringify(this._ser(state))));
+        fn(draft);
+        if (!(await this.checkServer())) {
+          localStorage.setItem('qp_gs_'+code, JSON.stringify(this._ser(draft)));
+          return draft;
+        }
+        const payload = this._ser(draft);
+        payload._baseRev = state._rev || 0;
+        try {
+          const r = await fetch('../api.php?f=qp-game&code='+code, {
+            method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}
+          });
+          if (r.status === 409) {
+            const cur = await r.json();
+            if (cur && cur.meta) { state = this._deser(cur); continue; }
+            return null;
+          }
+          if (r.ok) {
+            const j = await r.json().catch(() => ({}));
+            if (j.rev) draft._rev = j.rev;
+            localStorage.setItem('qp_gs_'+code, JSON.stringify(this._ser(draft)));
+            return draft;
+          }
+        } catch {}
+        return null;
+      }
+      return null;
+    },
     async load(code) {
       code = (code||this._code||'').toUpperCase();
       if (!code) return null;
@@ -358,19 +394,25 @@
   }
 
   async function selectTeam(id) {
-    const fresh = (await QpStorage.load(gameCode)) || remoteState;
-    if (!fresh) return;
-    const taken = new Set(fresh.takenTeams || []);
-    if (taken.has(id)) {
-      remoteState = fresh;
-      showTeamSelect(fresh);
+    // Compare-and-Swap: bei parallelem Beitritt retryt der Server-Konflikt
+    // automatisch, statt den fremden Eintrag zu überschreiben
+    let teamStillFree = true;
+    const result = await QpStorage.mutate(gameCode, (draft) => {
+      const taken = new Set(draft.takenTeams || []);
+      if (taken.has(id)) { teamStillFree = false; return; }
+      taken.add(id);
+      draft.takenTeams = [...taken];
+    });
+    if (!result) {
+      const fresh = (await QpStorage.load(gameCode)) || remoteState;
+      if (fresh) { remoteState = fresh; showTeamSelect(fresh); }
       return;
     }
-    taken.add(id);
-    const newState = JSON.parse(JSON.stringify(QpStorage._ser(fresh)));
-    newState.takenTeams = [...taken];
-    await QpStorage.save(QpStorage._deser(newState));
-    remoteState = QpStorage._deser(newState);
+    remoteState = result;
+    if (!teamStillFree || !(result.takenTeams||[]).includes(id)) {
+      showTeamSelect(result); // Team zwischenzeitlich belegt
+      return;
+    }
     myTeamId = id;
     localStorage.setItem('qp_myteam_' + gameCode, id);
     startGameView(remoteState);

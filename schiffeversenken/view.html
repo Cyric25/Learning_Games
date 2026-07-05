@@ -646,33 +646,27 @@ function showTeamSelect(state) {
 }
 
 async function selectTeam(id, stateHint) {
-  const fresh = (await BsStorage.load(gameCode)) || stateHint;
-  if (!fresh) return;
-  const taken = new Set(fresh.takenTeams || []);
-  if (taken.has(id)) { remoteState = fresh; showTeamSelect(fresh); return; }
-  taken.add(id);
-  const ns = JSON.parse(JSON.stringify(fresh, (k,v) => v instanceof Set ? [...v] : v));
-  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
-  ns.takenTeams = [...taken];
-  await BsStorage.save(ns);
-  remoteState = ns;
-
-  // Verifizieren: Bei gleichzeitigen Beitritten kann ein parallel laufender
-  // Save unseren Eintrag überschrieben haben (Last-Write-Wins) → einmal
-  // nachladen und ggf. erneut eintragen, sonst wirkt es wie ein Kick.
-  try {
-    const check = await BsStorage.load(gameCode);
-    if (check && Array.isArray(check.takenTeams) && !check.takenTeams.includes(id)) {
-      const ns2 = JSON.parse(JSON.stringify(check, (k,v) => v instanceof Set ? [...v] : v));
-      ns2.usedQuestionIds = new Set(ns2.usedQuestionIds||[]);
-      ns2.takenTeams = [...new Set([...(check.takenTeams||[]), id])];
-      await BsStorage.save(ns2);
-      remoteState = ns2;
-    } else if (check) {
-      remoteState = check;
-    }
-  } catch {}
-
+  // Compare-and-Swap: mutate lädt frisch, trägt uns ein und speichert mit
+  // _baseRev — bei parallelem Beitritt eines anderen Teams retryt der Server-
+  // Konflikt automatisch statt den anderen Eintrag zu überschreiben.
+  let teamStillFree = true;
+  const result = await BsStorage.mutate(gameCode, (draft) => {
+    const taken = new Set(draft.takenTeams || []);
+    if (taken.has(id)) { teamStillFree = false; return; }
+    taken.add(id);
+    draft.takenTeams = [...taken];
+  });
+  if (!result) { // Netzwerkfehler / zu viele Konflikte → Liste neu laden
+    const fresh = (await BsStorage.load(gameCode)) || stateHint;
+    if (fresh) { remoteState = fresh; showTeamSelect(fresh); }
+    return;
+  }
+  remoteState = result;
+  if (!teamStillFree || !(result.takenTeams||[]).includes(id)) {
+    // Team wurde zwischenzeitlich von jemand anderem belegt
+    showTeamSelect(result);
+    return;
+  }
   myTeamId = id;
   localStorage.setItem('bs_myteam_' + gameCode, id);
   startGameView();

@@ -27,6 +27,43 @@ const QpStorage = {
     if (await this.checkServer())
       try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
   },
+  // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
+  // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
+  // Stand nach und wir mergen erneut, statt fremde Änderungen zu überschreiben.
+  async mutate(code, fn, tries = 6) {
+    code = (code||this._code||'').toUpperCase();
+    if (!code) return null;
+    let state = await this.load(code);
+    if (!state) return null;
+    for (let i = 0; i < tries; i++) {
+      const draft = this._deser(JSON.parse(JSON.stringify(this._ser(state))));
+      fn(draft);
+      if (!(await this.checkServer())) {
+        localStorage.setItem('qp_gs_'+code, JSON.stringify(this._ser(draft)));
+        return draft;
+      }
+      const payload = this._ser(draft);
+      payload._baseRev = state._rev || 0;
+      try {
+        const r = await fetch('../api.php?f=qp-game&code='+code, {
+          method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}
+        });
+        if (r.status === 409) {
+          const cur = await r.json();
+          if (cur && cur.meta) { state = this._deser(cur); continue; }
+          return null;
+        }
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          if (j.rev) draft._rev = j.rev;
+          localStorage.setItem('qp_gs_'+code, JSON.stringify(this._ser(draft)));
+          return draft;
+        }
+      } catch {}
+      return null;
+    }
+    return null;
+  },
   async load(code) {
     code = (code||this._code||'').toUpperCase();
     if (!code) return null;
@@ -1253,11 +1290,15 @@ function nextTurn() {
 }
 
 // ── takenTeams Management ────────────────────────────────────
-function kickTeam(teamId) {
+async function kickTeam(teamId) {
   if (!takenTeams) return;
-  takenTeams = takenTeams.filter(id => id !== teamId);
-  const gs = buildCurrentGameState();
-  QpStorage.save(gs);
+  // Compare-and-Swap statt Ganzstand-Save: revertiert keine parallel
+  // laufenden Züge (Server mergt bei Konflikt und retryt)
+  const result = await QpStorage.mutate(QpStorage.getCode(), (draft) => {
+    draft.takenTeams = (draft.takenTeams || []).filter(id => id !== teamId);
+  });
+  if (result) takenTeams = result.takenTeams || [];
+  else takenTeams = takenTeams.filter(id => id !== teamId);
   renderSidebar();
 }
 window.kickTeam = kickTeam;

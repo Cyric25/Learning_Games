@@ -114,6 +114,7 @@ function cleanupExpiredGames($gamesDir) {
         if ($age > $maxAge) {
             $gamePath = $gamesDir . '/' . $code . '.json';
             if (file_exists($gamePath)) @unlink($gamePath);
+            @unlink($gamePath . '.lock'); // CAS-Lockdatei mit aufräumen
             unset($registry[$code]);
             $changed = true;
         }
@@ -193,6 +194,14 @@ function registryEndpoint($gamesDir) {
 }
 
 // Per-Game-Endpunkt (?f=…-game&code=XXXX): GET/POST/DELETE
+//
+// Optimistische Nebenläufigkeitskontrolle (Compare-and-Swap):
+//   - Jeder gespeicherte Spielstand trägt ein server-verwaltetes `_rev`.
+//   - Sendet der Client `_baseRev` (die Version, die er zuletzt gesehen hat),
+//     prüft der Server unter flock, ob sie noch aktuell ist. Bei Abweichung →
+//     HTTP 409 + aktueller Stand im Body, damit der Client neu mergen kann.
+//   - Ohne `_baseRev` (autoritative Schreiber, Legacy-Clients) wird direkt
+//     geschrieben — voll rückwärtskompatibel.
 function gameEndpoint($gamesDir, $defaultTitle) {
     $code = requireValidCode();
     if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
@@ -202,12 +211,41 @@ function gameEndpoint($gamesDir, $defaultTitle) {
         echo file_exists($path) ? file_get_contents($path) : '{}';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body = readJsonBody();
-        $ok = atomicWrite($path, $body);
-        if ($ok) updateRegistryEntry($gamesDir, $code, $body, $defaultTitle);
-        $ok ? print(json_encode(['ok' => true]))
+        $incoming = json_decode($body, true);
+        if (!is_array($incoming)) { http_response_code(400); echo json_encode(['error' => 'invalid JSON']); exit; }
+        $baseRev = array_key_exists('_baseRev', $incoming) ? (int)$incoming['_baseRev'] : null;
+        unset($incoming['_baseRev']); // interne Feld, nicht persistieren
+
+        // Compare-and-Swap unter Lock: lesen → prüfen → schreiben ist atomar
+        $lock = fopen($path . '.lock', 'c');
+        if ($lock) flock($lock, LOCK_EX);
+
+        $storedRev = 0;
+        if (file_exists($path)) {
+            $cur = json_decode(@file_get_contents($path), true);
+            if (is_array($cur)) $storedRev = (int)($cur['_rev'] ?? 0);
+        }
+
+        if ($baseRev !== null && $baseRev !== $storedRev) {
+            // Konflikt: der Client baut auf einer veralteten Version auf
+            if ($lock) { flock($lock, LOCK_UN); fclose($lock); }
+            http_response_code(409);
+            header('X-Current-Rev: ' . $storedRev);
+            echo file_exists($path) ? file_get_contents($path) : '{}';
+            exit;
+        }
+
+        $incoming['_rev'] = $storedRev + 1;
+        $out = json_encode($incoming, JSON_UNESCAPED_UNICODE);
+        $ok = atomicWrite($path, $out);
+        if ($lock) { flock($lock, LOCK_UN); fclose($lock); }
+
+        if ($ok) updateRegistryEntry($gamesDir, $code, $out, $defaultTitle);
+        $ok ? print(json_encode(['ok' => true, 'rev' => $incoming['_rev']]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         if (file_exists($path)) @unlink($path);
+        @unlink($path . '.lock');
         removeRegistryEntry($gamesDir, $code);
         echo json_encode(['ok' => true]);
     }

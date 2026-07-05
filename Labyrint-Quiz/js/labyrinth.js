@@ -31,6 +31,38 @@ const GameSync = {
     if (!this.hasServer()) return;
     try { await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state) }); } catch {}
   },
+  // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
+  // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
+  // Stand nach und wir mergen erneut, statt fremde Änderungen zu überschreiben.
+  async mutate(code, fn, tries = 6) {
+    let state = await this.load(code);
+    if (!state) return null;
+    for (let i = 0; i < tries; i++) {
+      const draft = JSON.parse(JSON.stringify(state));
+      fn(draft);
+      if (!this.hasServer()) { await this.save(code, draft); return draft; }
+      const payload = JSON.parse(JSON.stringify(draft));
+      payload._baseRev = state._rev || 0;
+      try {
+        const r = await fetch(this._url('game', code), {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        if (r.status === 409) {
+          const cur = await r.json();
+          if (cur && cur.meta) { state = cur; continue; }
+          return null;
+        }
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          if (j.rev) draft._rev = j.rev;
+          try { localStorage.setItem('lab_' + code, JSON.stringify(draft)); } catch {}
+          return draft;
+        }
+      } catch {}
+      return null;
+    }
+    return null;
+  },
   async loadGamesRegistry() {
     if (this.hasServer()) {
       try { const r = await fetch(this._url('games')); if (r.ok) return await r.json(); } catch {}
@@ -1034,13 +1066,12 @@ function renderTeamList() {
 
 async function kickTeam(teamId) {
   if (!gameState || !gameCode) return;
-  // Frisch laden statt lokalen (evtl. hinterherhinkenden) Stand zu
-  // überschreiben — sonst revertiert der Kick-Save parallel laufende Züge
-  const base = (await GameSync.load(gameCode)) || gameState;
-  const newState = JSON.parse(JSON.stringify(base));
-  newState.takenTeams = (newState.takenTeams || []).filter(id => id !== teamId);
-  gameState = newState;
-  await GameSync.save(gameCode, newState);
+  // Compare-and-Swap statt Ganzstand-Save: revertiert keine parallel
+  // laufenden Züge, weil der Server bei Konflikt neu mergt und retryt
+  const result = await GameSync.mutate(gameCode, (draft) => {
+    draft.takenTeams = (draft.takenTeams || []).filter(id => id !== teamId);
+  });
+  if (result) gameState = result;
   renderTeamList();
 }
 window.kickTeam = kickTeam;

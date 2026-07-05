@@ -688,14 +688,12 @@ function renderShipBadges(team) {
 // ── Kick Team ─────────────────────────────────────────────────────
 async function kickTeam(teamId) {
   if (!gameState) return;
-  // Frisch laden statt lokalen (evtl. hinterherhinkenden) Stand zu
-  // überschreiben — sonst revertiert der Kick-Save parallel laufende Züge
-  const base = (await BsStorage.load(BsStorage.getCode())) || gameState;
-  const ns = JSON.parse(JSON.stringify(base, (k, v) => v instanceof Set ? [...v] : v));
-  ns.usedQuestionIds = new Set(ns.usedQuestionIds||[]);
-  ns.takenTeams = (ns.takenTeams||[]).filter(id => id !== teamId);
-  gameState = ns;
-  await BsStorage.save(gameState);
+  // Compare-and-Swap statt Ganzstand-Save: revertiert keine parallel
+  // laufenden Züge, weil der Server bei Konflikt neu mergt und retryt
+  const result = await BsStorage.mutate(BsStorage.getCode(), (draft) => {
+    draft.takenTeams = (draft.takenTeams||[]).filter(id => id !== teamId);
+  });
+  if (result) gameState = result;
   renderTeamStatusList();
 }
 window.kickTeam = kickTeam;
