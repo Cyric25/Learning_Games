@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Vollständige Projektdokumentation:** `docs/` (Einstieg: `docs/README.md`).
+> Diese Datei bleibt die verbindliche Kurzreferenz (Styling-Paletten,
+> Copy-Paste-Muster, MD-Dialekte). Für Architektur, API, Datenformate und
+> Erweiterung siehe `docs/`.
+
+## ⚠️ Vor JEDER Erweiterung: Spezifikation abfragen
+
+Wenn ein **neues Spiel** oder eine **größere Erweiterung** gewünscht wird, zuerst
+die Spezifikation abfragen — **bevor** geplant oder implementiert wird. Nicht mit
+Defaults „einfach loslegen". Mindestens klären: (1) Mehrspieler/Multi-Device oder
+Einzelspieler? (2) Welche Ansichten — Lehrergerät, Schülergerät, Tafelansicht
+(`board.html`), Solo? (3) Zentrale Fragendatenbank ja/nein? (4) Team-Modell
+(feste Teams, exklusiver Beitritt, Kick)? (5) Wer wertet aus (MC automatisch /
+Lehrkraft)? (6) Persistenz/Reentry? (7) Editor/Designer? (8) Theme.
+Vollständiger Fragebogen: `docs/entwicklung.md → §0`.
+
 ## Projektübersicht
 
 Interaktive Unterrichtsspiele für Klassenzimmer / digitale Tafel. Kein Build-System, keine externen Abhängigkeiten.
