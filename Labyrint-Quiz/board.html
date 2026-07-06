@@ -204,11 +204,20 @@
       const base = location.pathname.includes('/Labyrint-Quiz/') ? '../api.php' : './api.php';
       return base + '?f=labyrinth-' + s + (code ? '&code=' + encodeURIComponent(code) : '');
     },
+    // XSS-Schutz: color/emoji/symbolIcon aus Remote-State klemmen (per Code beschreibbar)
+    _san(d) {
+      if (d && Array.isArray(d.teams)) d.teams.forEach(t => {
+        if (!t) return;
+        if ('color' in t) t.color = (typeof t.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(t.color)) ? t.color : '#888';
+        ['emoji', 'symbolIcon'].forEach(k => { if (k in t) { const e = String(t[k] == null ? '' : t[k]); t[k] = (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; } });
+      });
+      return d;
+    },
     async load(code) {
       if (this.hasServer()) {
-        try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return d; } } catch {}
+        try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return this._san(d); } } catch {}
       }
-      try { const s = localStorage.getItem('lab_' + code); return s ? JSON.parse(s) : null; } catch { return null; }
+      try { const s = localStorage.getItem('lab_' + code); return s ? this._san(JSON.parse(s)) : null; } catch { return null; }
     },
     subscribe(code, cb) {
       this.unsubscribe();
@@ -217,7 +226,7 @@
         if (this._session !== sid) return;
         const es = new EventSource(this._url('sse', code));
         this._es = es;
-        es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
+        es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(this._san(d)); } catch {} };
         es.addEventListener('reconnect', () => { es.close(); this._es = null; if (this._session === sid) setTimeout(connect, 200); });
         es.onerror = () => {
           es.close(); this._es = null;
@@ -235,7 +244,15 @@
     },
     _startPoll(code, cb) {
       if (this._poll) return;
-      this._poll = setInterval(async () => { const d = await this.load(code); if (d) cb(d); }, 400);
+      let last = '';
+      this._poll = setInterval(async () => {
+        const d = await this.load(code);
+        if (!d) return;
+        const j = JSON.stringify(d);
+        if (j === last) return; // nur bei Änderung rendern (Canvas + DOM!)
+        last = j;
+        cb(d);
+      }, 1000);
     },
     unsubscribe() {
       this._session++;
@@ -280,6 +297,7 @@
   function buildBoardGrid(state) {
     const { seed, config, symbols, doors } = state;
     const canvas = document.getElementById('board-canvas');
+    if (boardRenderer) boardRenderer.destroy();
     boardRenderer = new MazeRenderer(canvas);
     let result;
     if (state.mazeData?.grid) {

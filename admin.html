@@ -1414,7 +1414,7 @@ async function apiLoadDrafts() {
 
 async function apiDeleteDraft(id) {
   if (window.location.protocol !== 'file:') {
-    try { await fetch('./api.php?f=draft&id=' + encodeURIComponent(id), { method: 'DELETE' }); } catch(e) {}
+    try { await fetch('./api.php?f=draft&id=' + encodeURIComponent(id), { method: 'DELETE', headers: { 'X-Admin-Key': 'LP-Spiele-2026' } }); } catch(e) {}
   }
   localStorage.setItem('rq_drafts', JSON.stringify(
     JSON.parse(localStorage.getItem('rq_drafts') || '[]').filter(d => d.id !== id)

@@ -809,8 +809,24 @@ window.resolveOpen = resolveOpen;
 // Zug geht ans nächste Team
 async function abortLiveQuestion() {
   if (!gameState || !gameState.liveQuestion || processingShot) return;
+  const lqId = gameState.liveQuestion.id;
   if (!confirm('Laufende Frage abbrechen? Das Team verliert seinen Schuss.')) return;
   processingShot = true;
+  // Frisch laden: Ist die Schüler-Antwort inzwischen eingetroffen (Frage
+  // weg oder andere id), NICHT abbrechen — sonst doppelter advanceTurn
+  // bzw. überschriebener Treffer
+  try {
+    const fresh = await BsStorage.load(BsStorage.getCode());
+    if (fresh && fresh.meta) {
+      if (!fresh.liveQuestion || fresh.liveQuestion.id !== lqId) {
+        gameState = fresh;
+        processingShot = false;
+        renderGame();
+        return;
+      }
+      gameState = fresh;
+    }
+  } catch {}
   await processShot(false);
 }
 window.abortLiveQuestion = abortLiveQuestion;
@@ -896,13 +912,15 @@ function showWinnerScreen(winnerId) {
   showScreen('winner-screen');
 }
 
-function confirmEndGame() {
+async function confirmEndGame() {
   if (!confirm('Spiel wirklich beenden?')) return;
   if (gameState) {
     const ns = deepCopy(gameState);
     ns.phase = 'finished';
     gameState = ns;
-    BsStorage.save(gameState);
+    // Save abwarten BEVOR resetToSelector den Code auf null setzt — sonst
+    // erreicht phase='finished' den Server nie und die Schüler hängen fest
+    await BsStorage.save(gameState);
   }
   resetToSelector();
 }

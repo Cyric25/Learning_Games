@@ -92,12 +92,50 @@ async function init() {
       window.history.replaceState({}, '', window.location.pathname);
     }
     showJoinScreen();
+    // Lehrer-Reentry: Nach F5/Crash wäre das laufende Spiel sonst verloren
+    // (joinGame() führt immer zur Schüleransicht). Gemerkten Code prüfen
+    // und einen "Fortsetzen"-Button anbieten.
+    offerTeacherResume();
     return;
   }
 
   // Code aus URL entfernen damit Zurück-Navigation sauber ist
   window.history.replaceState({}, '', window.location.pathname);
   await loadGame(urlCode.toUpperCase());
+}
+
+const TEACHER_CODE_KEY = 'rq_last_teacher_code';
+
+// Prüft, ob ein gemerktes Spielleiter-Spiel noch existiert, und zeigt dann
+// den "Fortsetzen"-Button im Join-Screen
+async function offerTeacherResume() {
+  let code = null;
+  try { code = localStorage.getItem(TEACHER_CODE_KEY); } catch { }
+  if (!code || !/^[A-Z0-9]{4,6}$/.test(code)) return;
+  try {
+    StorageManager.setGameCode(code);
+    const gs = await StorageManager.loadGameState();
+    StorageManager.setGameCode(null);
+    if (!gs || !gs.meta || gs.status === 'finished') {
+      try { localStorage.removeItem(TEACHER_CODE_KEY); } catch { }
+      return;
+    }
+    const btn = document.getElementById('btn-resume-teacher');
+    if (btn) {
+      btn.textContent = '▶ Spiel ' + code + ' als Spielleiter fortsetzen';
+      btn.style.display = '';
+    }
+  } catch {
+    StorageManager.setGameCode(null);
+  }
+}
+
+async function resumeTeacherGame() {
+  let code = null;
+  try { code = localStorage.getItem(TEACHER_CODE_KEY); } catch { }
+  if (!code) return;
+  document.getElementById('join-screen').style.display = 'none';
+  await loadGame(code);
 }
 
 function showJoinScreen() {
@@ -151,12 +189,13 @@ async function createNewGame() {
     const gameCode = await GameModel.generateUniqueGameCode();
     const game = GameModel.createGame({ gameCode });
     StorageManager.setGameCode(gameCode);
+    try { localStorage.setItem(TEACHER_CODE_KEY, gameCode); } catch { }
     await StorageManager.saveGameState(game);
     document.getElementById('join-screen').style.display = 'none';
 
     // Fragen laden und direkt mit dem erstellten Spiel arbeiten (nicht nochmal vom Server laden)
     const qb = await StorageManager.loadQuestions();
-    gameData = { ...game, categories: qb.categories };
+    gameData = { ...game, categories: GameModel.normalizePlayableQuestions(qb.categories) };
     updateGameCodeDisplays();
 
     if (gameData.categories.length === 0) {
@@ -173,6 +212,8 @@ async function createNewGame() {
 
 async function loadGame(code) {
   StorageManager.setGameCode(code);
+  // Für Lehrer-Reentry nach Reload merken (init() entfernt ?code= aus der URL)
+  try { localStorage.setItem(TEACHER_CODE_KEY, code); } catch { }
 
   const [qb, gs] = await Promise.all([
     StorageManager.loadQuestions(),
@@ -182,7 +223,7 @@ async function loadGame(code) {
   const state = gs || GameModel.createGame({ gameCode: code });
   if (!state.session) GameModel.resetSession(state);
   // Merge: categories aus questions.json + state aus gamestate.json
-  gameData = { ...state, categories: qb.categories };
+  gameData = { ...state, categories: GameModel.normalizePlayableQuestions(qb.categories) };
 
   // Absicherung: Alte Spiele ohne Standard-Teams → nachträglich erzeugen
   if (!gameData.teams || gameData.teams.length === 0) {

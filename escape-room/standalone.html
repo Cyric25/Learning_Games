@@ -917,7 +917,7 @@
   <!-- View: Room Explorer (hotspot mode) -->
   <div id="view-room-explorer" class="view">
     <div class="player-container" style="max-width:1000px;">
-      <div id="timer-el-explorer" class="timer-display"></div>
+      <div id="timer-el-explorer" class="timer-display hidden"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span id="explorer-room-name" style="color:var(--gold);font-family:'Cinzel',serif;font-size:1.1rem;"></span>
         <span id="explorer-progress" style="color:var(--text-muted);font-size:0.85rem;"></span>
@@ -1004,7 +1004,7 @@
       <p id="complete-time" style="color:var(--gold);font-family:'Cinzel',serif;font-size:1.6rem;margin-top:8px;"></p>
       <div class="scoreboard" id="scoreboard"></div>
       <div class="mt-24 flex justify-center gap-8 flex-wrap">
-        <button class="btn-gold" onclick="showView('view-game-select');currentGame=null;currentTeam=null;">Neues Spiel</button>
+        <button class="btn-gold" onclick="resetToGameSelect()">Neues Spiel</button>
       </div>
     </div>
   </div>
@@ -1246,7 +1246,7 @@
         try {
           const r = await fetch('../api.php?f=er-game&id=' + game.id, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'LP-Spiele-2026' },
             body: JSON.stringify(game)
           });
           apiOk = r.ok;
@@ -1262,7 +1262,7 @@
     async function deleteGameFile(id) {
       try { localStorage.setItem('escaperoom_library', JSON.stringify(library)); } catch(e) {}
       if (_useApi) {
-        try { await fetch('../api.php?f=er-game&id=' + id, { method: 'DELETE' }); } catch(e) {}
+        try { await fetch('../api.php?f=er-game&id=' + id, { method: 'DELETE', headers: { 'X-Admin-Key': 'LP-Spiele-2026' } }); } catch(e) {}
       }
     }
 
@@ -1286,6 +1286,15 @@
 
       if (viewId === 'view-game-select') renderGameSelect();
       if (viewId === 'view-game-complete') launchConfetti();
+    };
+
+    // IIFE-Export: setzt die IIFE-internen Variablen zurück (Inline-onclick
+    // würde sonst nur window-Globals anlegen — bekanntes Projektmuster)
+    window.resetToGameSelect = function() {
+      stopTimer();
+      currentGame = null;
+      currentTeam = null;
+      showView('view-game-select');
     };
 
     window.confirmLeaveGame = function() {
@@ -1384,6 +1393,7 @@
 
     function saveTeamState() {
       if (!currentTeam) return;
+      currentTeam.lastSavedAt = Date.now(); // für Pause-Erkennung bei Tab-Schließen
       try {
         localStorage.setItem(teamKey(currentTeam.gameId, currentTeam.teamName), JSON.stringify(currentTeam));
       } catch (e) { /* Quota voll — Fortschritt nur im Speicher */ }
@@ -1392,6 +1402,10 @@
     window.startGame = function() {
       const name = document.getElementById('team-name-input').value.trim();
       if (!name) { document.getElementById('team-name-input').focus(); return; }
+
+      // Bestehenden Spielstand nicht kommentarlos überschreiben
+      const existing = loadTeamState(currentGame.id, name);
+      if (existing && !confirm('Für dieses Team existiert bereits ein Spielstand. Wirklich NEU starten? Der bisherige Fortschritt geht verloren.')) return;
 
       currentTeam = {
         gameId: currentGame.id,
@@ -1418,6 +1432,11 @@
         currentTeam.startTime += Date.now() - currentTeam.pausedAt;
         currentTeam.pausedAt = null;
         saveTeamState();
+      } else if (currentTeam.lastSavedAt && Date.now() - currentTeam.lastSavedAt > 60000 && !currentTeam.finalTime) {
+        // Tab wurde einfach geschlossen (kein "Verlassen"-Klick): die Lücke
+        // seit dem letzten Save als Pause werten, sonst frisst sie die Spielzeit
+        currentTeam.startTime += Date.now() - currentTeam.lastSavedAt;
+        saveTeamState();
       }
 
       if (currentTeam.completedRooms.length >= currentGame.rooms.length) {
@@ -1438,11 +1457,15 @@
     // PLAYER: Room Flow
     // ══════════════════════════════════════════════════════
     function enterRoom(roomIdx) {
+      // Ungültigen Index klemmen statt direkt auf "Geschafft!" zu springen
+      if (!currentGame.rooms[roomIdx]) {
+        if (currentGame.rooms.length > 0 && roomIdx !== 0) { enterRoom(0); return; }
+        showGameComplete(); return;
+      }
       currentRoomIdx = roomIdx;
       currentQuestionIdx = 0;
 
       const room = currentGame.rooms[roomIdx];
-      if (!room) { showGameComplete(); return; }
 
       // Init room progress
       if (!currentTeam.roomProgress[room.id]) {
@@ -1758,7 +1781,8 @@
     }
 
     function isHotspotSolved(hs, progress) {
-      if (!hs.questionIds || hs.questionIds.length === 0) return false;
+      // Puzzle-Hotspot ohne Fragen als gelöst werten (sonst Exit nie öffenbar)
+      if (!hs.questionIds || hs.questionIds.length === 0) return true;
       return hs.questionIds.every(qid => progress.solvedQuestions.includes(qid));
     }
 
@@ -2505,8 +2529,9 @@
     // ══════════════════════════════════════════════════════
     function startTimer() {
       if (timerInterval) return;
-      const el = document.getElementById('timer-el');
-      el.classList.remove('hidden');
+      // Beide Timer-Anzeigen bespielen (Fragen-View + Explorer/Hotspot-Räume)
+      const els = [document.getElementById('timer-el'), document.getElementById('timer-el-explorer')].filter(Boolean);
+      els.forEach(el => el.classList.remove('hidden'));
 
       timerInterval = setInterval(() => {
         const elapsed = getElapsed();
@@ -2514,11 +2539,11 @@
         const remaining = totalTimer - elapsed;
 
         if (remaining > 0) {
-          el.textContent = '⏱ ' + formatTime(remaining);
-          el.classList.toggle('urgent', remaining < 300);
+          const txt = '⏱ ' + formatTime(remaining);
+          els.forEach(el => { el.textContent = txt; el.classList.toggle('urgent', remaining < 300); });
         } else {
-          el.textContent = '⏱ +' + formatTime(Math.abs(remaining));
-          el.classList.add('urgent');
+          const txt = '⏱ +' + formatTime(Math.abs(remaining));
+          els.forEach(el => { el.textContent = txt; el.classList.add('urgent'); });
           if (!timeUpShown) {
             timeUpShown = true;
             const modal = document.getElementById('time-up-modal');
@@ -2532,7 +2557,9 @@
     function stopTimer() {
       clearInterval(timerInterval);
       timerInterval = null;
-      document.getElementById('timer-el').classList.add('hidden');
+      ['timer-el', 'timer-el-explorer'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.classList.add('hidden');
+      });
     }
 
     function getElapsed() {
@@ -2812,11 +2839,17 @@
 
     function downloadJSON(obj, filename) {
       const json = JSON.stringify(obj, null, 2);
-      // Safari iOS: a.download on blob URLs not supported → open as data URI
+      // Safari iOS: a.download auf Blob-URLs unzuverlässig → data-URI-Link.
+      // window.open('data:...') wird von modernen Browsern BLOCKIERT — daher
+      // <a download> mit data-URI (wie in index.html).
       const isSafariIOS = /iP(ad|hone|od)/.test(navigator.userAgent) && /WebKit/.test(navigator.userAgent);
       if (isSafariIOS) {
-        const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
-        window.open(dataUrl, '_blank');
+        const a0 = document.createElement('a');
+        a0.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+        a0.download = filename;
+        document.body.appendChild(a0);
+        a0.click();
+        document.body.removeChild(a0);
         return;
       }
       const blob = new Blob([json], { type: 'application/json' });
@@ -2841,6 +2874,20 @@
         room.questions.forEach(q => {
           if (q.correctAnswer !== undefined && q.correctAnswer !== null) q.correctAnswer = String(q.correctAnswer);
           if (q.codeDigit !== undefined && q.codeDigit !== null) q.codeDigit = String(q.codeDigit);
+          // line_connect: Punkt-IDs auf sichere Zeichen zwingen (landen in
+          // onclick-JS-Strings; HTML-Escaping schützt dort nicht)
+          if (Array.isArray(q.points)) {
+            q.points.forEach((pt, i) => {
+              const old = pt.id;
+              if (typeof pt.id !== 'string' || !/^[A-Za-z0-9_\-]{1,40}$/.test(pt.id)) {
+                pt.id = 'pt_' + i + '_' + Math.random().toString(36).slice(2, 8);
+                (q.connections || []).forEach(c => {
+                  if (c.from === old) c.from = pt.id;
+                  if (c.to === old) c.to = pt.id;
+                });
+              }
+            });
+          }
         });
       });
       return data;
@@ -3137,7 +3184,7 @@
       if (btn) btn.classList.add('active');
     };
 
-    window.saveCurrentGame = function() {
+    window.saveCurrentGame = async function() {
       editingGame.game.title = document.getElementById('ed-title').value.trim() || 'Unbenannt';
       editingGame.game.description = document.getElementById('ed-desc').value.trim();
       editingGame.game.totalTimer = parseInt(document.getElementById('ed-timer').value) * 60 || 2400;
@@ -3151,9 +3198,12 @@
       saved.id = editingGameId;
       const idx = library.findIndex(g => g.id === editingGameId);
       if (idx >= 0) library[idx] = saved; else library.push(saved);
-      saveGame(saved);
+      // Erfolg abwarten — "Gespeichert!" darf nicht erscheinen, wenn die
+      // Quota voll ist (standalone hat keinen Server als Rettung)
+      const ok = await saveGame(saved);
       document.getElementById('editor-title').textContent = editingGame.game.title;
-      showAdminStatus('Gespeichert!', 'success');
+      if (ok) showAdminStatus('Gespeichert!', 'success');
+      else showAdminStatus('⚠️ Speichern fehlgeschlagen (Speicher voll)!', 'danger');
     };
 
     window.exportCurrentGame = function() {
@@ -3335,7 +3385,15 @@
 
         el.querySelectorAll('.room-field').forEach(field => {
           const f = field.dataset.field;
-          if (f) room[f] = field.value;
+          if (!f) return;
+          if (f === 'unlockCode') {
+            // Padlock/Keypad können nur Ziffern — Buchstaben machen den Raum unöffenbar
+            const digits = String(field.value).replace(/\D/g, '');
+            if (digits !== field.value) field.value = digits;
+            room[f] = digits;
+          } else {
+            room[f] = field.value;
+          }
         });
 
         // Sync puzzle card
@@ -3371,15 +3429,42 @@
           hs.requires = Array.from(reqsEl).map(c => c.value);
         });
 
+        // requires-Zyklen auflösen (A→B→A = Raum-Deadlock)
+        (function breakRequireCycles(hotspots) {
+          const byId = {};
+          hotspots.forEach(h => { byId[h.id] = h; });
+          hotspots.forEach(start => {
+            const seen = new Set([start.id]);
+            const stack = [...(start.requires || [])];
+            while (stack.length) {
+              const id = stack.pop();
+              if (id === start.id) {
+                start.requires = [];
+                if (typeof showAdminStatus === 'function') showAdminStatus('⚠️ Zirkuläre Abhängigkeit bei "' + (start.label || start.id) + '" entfernt (hätte den Raum unlösbar gemacht).', 'danger');
+                break;
+              }
+              if (seen.has(id)) continue;
+              seen.add(id);
+              const h = byId[id];
+              if (h) (h.requires || []).forEach(r => stack.push(r));
+            }
+          });
+        })(room.hotspots || []);
+
         // Sync questions
         const qList = el.querySelectorAll('.question-editor');
         qList.forEach((qEl, qIdx) => {
           if (!room.questions[qIdx]) return;
           const q = room.questions[qIdx];
-          q.type = qEl.querySelector('.q-type-select')?.value || q.type;
-          q.text = qEl.querySelector('.q-text')?.value || q.text;
-          q.codeDigit = qEl.querySelector('.q-digit')?.value || q.codeDigit;
-          q.hint = qEl.querySelector('.q-hint')?.value || q.hint;
+          // Ternary statt ||: sonst lässt sich ein Feld nie LEEREN
+          const typeEl2 = qEl.querySelector('.q-type-select');
+          const textEl2 = qEl.querySelector('.q-text');
+          const digitEl2 = qEl.querySelector('.q-digit');
+          const hintEl2 = qEl.querySelector('.q-hint');
+          q.type = typeEl2 ? typeEl2.value : q.type;
+          q.text = textEl2 ? textEl2.value : q.text;
+          q.codeDigit = digitEl2 ? digitEl2.value.replace(/\D/g, '') : q.codeDigit;
+          q.hint = hintEl2 ? hintEl2.value : q.hint;
           const imgUrlEl = qEl.querySelector('.q-img-url');
           const vidUrlEl = qEl.querySelector('.q-vid-url');
           if (imgUrlEl) q.questionImage = imgUrlEl.value;
@@ -4261,7 +4346,7 @@
     }
 
     function escAttr(str) {
-      return esc(str).replace(/"/g, '&quot;');
+      return esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     window.enterAdminMode = function() {

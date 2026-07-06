@@ -380,20 +380,33 @@ const LsStorage = {
   _ser(gs) {
     return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]};
   },
-  _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}; },
+  _deser(d) {
+    const st = {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};
+    // XSS-Schutz: emoji aus Remote-State klemmen (per Code beschreibbar)
+    if (Array.isArray(st.teams)) st.teams.forEach(t => {
+      if (t && 'emoji' in t) { const e = String(t.emoji == null ? '' : t.emoji); t.emoji = (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; }
+    });
+    return st;
+  },
   async checkServer() {
-    if (this._serverOk !== null) return this._serverOk;
-    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    if (window.location.protocol === 'file:') return false;
+    // Positiv dauerhaft cachen; negativ nur 15s — ein einzelner Timeout im
+    // Schul-WLAN darf das Gerät nicht dauerhaft offline schalten
+    if (this._serverOk === true) return true;
+    if (this._serverOk === false && Date.now() - (this._serverCheckedAt || 0) < 15000) return false;
     try { await fetch('../api.php?f=ls-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)}); this._serverOk = true; }
-    catch { this._serverOk = false; }
+    catch { this._serverOk = false; this._serverCheckedAt = Date.now(); }
     return this._serverOk;
   },
   async save(gs) {
     if (!this._code) return;
-    const json = JSON.stringify(this._ser(gs));
-    localStorage.setItem('ls_gs_'+this._code, json);
+    const code = this._code; // gegen Code-Wechsel während await binden
+    const full = this._ser(gs);
+    localStorage.setItem('ls_gs_'+code, JSON.stringify(full));
     if (await this.checkServer()) {
-      try { await fetch('../api.php?f=ls-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+      // takenTeams wird server-seitig gemerged (nur mutate/Beitritt schreibt es)
+      const { takenTeams, ...payload } = full;
+      try { await fetch('../api.php?f=ls-game&code='+code, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}); } catch {}
     }
   },
   async load(code) {
@@ -411,17 +424,24 @@ const LsStorage = {
   },
   subscribe(code, cb) {
     code = code.toUpperCase();
-    let stopped=false, src=null, timer=null;
+    let stopped=false, src=null, timer=null, lastJson='';
+    // Nur bei tatsächlicher Änderung weiterreichen — sonst rendert der
+    // Poll-Fallback jede Sekunde das komplette Board neu (Flackern)
+    const emit = (raw) => {
+      if (raw === lastJson) return;
+      lastJson = raw;
+      try { const d = JSON.parse(raw); if (d && d.meta) cb(this._deser(d)); } catch {}
+    };
     const startSSE = () => {
       if (stopped) return;
       src = new EventSource('../api.php?f=ls-sse&code='+code);
-      src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+      src.onmessage = e => { if(!stopped) emit(e.data); };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
       src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
     };
     const startPoll = () => {
       if(stopped||timer) return;
-      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=ls-game&code='+code); if(r.ok){const d=await r.json(); if(d&&d.meta) cb(this._deser(d));} } catch {} };
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=ls-game&code='+code); if(r.ok) emit(await r.text()); } catch {} };
       fn(); timer = setInterval(fn,1000);
     };
     const startLocalPoll = () => {
@@ -618,6 +638,9 @@ function leaveGame() {
   gameCode = null;
   lastGs = null;
   LsStorage.setCode(null);
+  // Brett verwerfen — beim nächsten Beitritt wird das neue Board gebaut
+  const grid = document.getElementById('board-grid');
+  if (grid) { grid.innerHTML = ''; delete grid.dataset.boardSig; }
   showScreen('screen-join');
 }
 
@@ -645,6 +668,9 @@ function renderAll(gs) {
 
   // Finished
   if (gs.phase === 'finished') {
+    // Offenes Frage-Overlay schließen — bei remote beendetem Spiel (eigener
+    // Zug, Lehrkraft wertete aus) gäbe es sonst keinen Klickpfad mehr heraus
+    if (!_closingAfterResult) closeQuestion();
     document.getElementById('active-banner').textContent = '🏆 Spiel beendet!';
     document.getElementById('active-banner').className = 'active-banner';
     updateTeamStatus(gs);
@@ -676,6 +702,15 @@ function renderBoard(gs) {
   // Custom-Boards können ≠100 Felder haben — dynamisch statt hartkodiert,
   // sonst crasht gs.board[f] bei kürzeren Brettern
   const maxF = gs.board.length - 1;
+
+  // Board-Signatur: Bei Spielwechsel unter gleichem/anderem Code das alte
+  // Brett verwerfen (Zellen werden sonst nur einmal gebaut und zeigen
+  // falsche Schwierigkeiten/Boni des vorherigen Spiels)
+  const boardSig = (gs.meta?.gameCode || '') + '|' + (gs.meta?.createdAt || '') + '|' + gs.board.length;
+  if (grid.dataset.boardSig !== boardSig) {
+    grid.innerHTML = '';
+    grid.dataset.boardSig = boardSig;
+  }
 
   if (!grid.children.length) {
     // Build board cells once

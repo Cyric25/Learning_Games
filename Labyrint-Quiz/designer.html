@@ -374,7 +374,7 @@ function getLib() { try { return JSON.parse(localStorage.getItem('lab_maze_libra
 function setLib(lib) {
   localStorage.setItem('lab_maze_library', JSON.stringify(lib));
   if (location.protocol !== 'file:')
-    fetch('../api.php?f=lab-mazes', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lib)}).catch(()=>{});
+    fetch('../api.php?f=lab-mazes', {method:'POST',headers:{'Content-Type':'application/json', 'X-Admin-Key': 'LP-Spiele-2026'},body:JSON.stringify(lib)}).catch(()=>{});
 }
 
 function saveMaze() {

@@ -1,5 +1,12 @@
 /* quizpfad.js – Spiellogik */
 
+// XSS-Schutz: color aus Remote-State klemmen (State ist per Code beschreibbar)
+function _qpSafeColor(c) { return typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888'; }
+function _qpSanitizeTeams(st) {
+  if (st && Array.isArray(st.teams)) st.teams.forEach(t => { if (t && 'color' in t) t.color = _qpSafeColor(t.color); });
+  return st;
+}
+
 // ── QpStorage ────────────────────────────────────────────────
 const QpStorage = {
   _code: null, _serverOk: null,
@@ -10,22 +17,29 @@ const QpStorage = {
     return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
   },
   async checkServer() {
-    if (this._serverOk !== null) return this._serverOk;
-    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    if (window.location.protocol === 'file:') return false;
+    // Positiv dauerhaft cachen; negativ nur 15s — ein einzelner Timeout im
+    // Schul-WLAN darf das Gerät nicht dauerhaft offline schalten
+    if (this._serverOk === true) return true;
+    if (this._serverOk === false && Date.now() - (this._serverCheckedAt || 0) < 15000) return false;
     try {
       await fetch('../api.php?f=qp-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
       this._serverOk = true;
-    } catch { this._serverOk = false; }
+    } catch { this._serverOk = false; this._serverCheckedAt = Date.now(); }
     return this._serverOk;
   },
   _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]};},
-  _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};},
+  _deser(d) { return _qpSanitizeTeams({...d, usedQuestionIds: new Set(d.usedQuestionIds||[])});},
   async save(gs) {
     if (!this._code) return;
-    const json = JSON.stringify(this._ser(gs));
-    localStorage.setItem('qp_gs_'+this._code, json);
-    if (await this.checkServer())
-      try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+    const code = this._code; // gegen Code-Wechsel während await binden
+    const full = this._ser(gs);
+    localStorage.setItem('qp_gs_'+code, JSON.stringify(full));
+    if (await this.checkServer()) {
+      // takenTeams nur über mutate() schreiben (Server merged das Feld)
+      const { takenTeams, ...payload } = full;
+      try { await fetch('../api.php?f=qp-game&code='+code, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}); } catch {}
+    }
   },
   // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
   // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
@@ -89,7 +103,7 @@ const QpStorage = {
   async deleteGame(code) {
     localStorage.removeItem('qp_gs_' + code.toUpperCase());
     if (await this.checkServer())
-      try { await fetch('../api.php?f=qp-game&code='+code, {method:'DELETE'}); } catch {}
+      try { await fetch('../api.php?f=qp-game&code='+code, {method:'DELETE', headers:{'X-Admin-Key': 'LP-Spiele-2026'}}); } catch {}
   },
   subscribe(code, cb) {
     code = code.toUpperCase();
@@ -412,7 +426,8 @@ function startSSESubscription(code) {
       renderSidebar();
       updateTurnBanner();
       if (gameOver) {
-        const winner = teams.reduce((b,t,i) => t.position > (b ? teams[b].position : -1) ? i : b, 0);
+        // b ist ein Index — Startwert 0 ist falsy, daher direkt vergleichen
+        const winner = teams.reduce((b,t,i) => t.position > teams[b].position ? i : b, 0);
         setTimeout(() => showWinner(winner), 600);
       }
     }
@@ -1081,6 +1096,7 @@ function continueAfterQuestion() {
     document.getElementById('question-modal').classList.remove('open');
     const winner = pendingQuestionResult.duelWinner;
     pendingQuestionResult = null;
+    qpLiveQ = null; // Duell beendet → Views schließen das Overlay (nextTurn/showWinner speichern)
     if (winner !== null && winner !== undefined) {
       const newPos = Math.min(teams[winner].position + 1, board.length - 1);
       teams[winner].position = newPos;
@@ -1180,6 +1196,22 @@ function startDuel(team1Idx, team2Idx) {
 
   const field = board[teams[team1Idx].position];
   pendingQuestionResult = { question, field, resolved: false, isDuel: true, team1Idx, team2Idx, duelPhase: 1 };
+
+  // Duell für Schüler-/Tafelansichten publizieren (read-only: teamIdx -1 →
+  // kein Gerät ist "dran") und die gezogene Frage sofort persistieren —
+  // sonst zeigen die Views "Warte auf Frage…" und ein Reload vergisst die
+  // verbrauchte Frage
+  qpLiveQ = {
+    id: 'duel-' + Date.now(),
+    teamIdx: -1,
+    question,
+    difficulty: question.difficulty,
+    advanceAmount: 1,
+    isDuel: true,
+    resolved: false, correct: null, selectedMcIndex: null
+  };
+  QpStorage.save(buildCurrentGameState());
+
   showDuelQuestion(question, team1Idx, team2Idx, 1);
 }
 

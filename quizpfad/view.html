@@ -220,22 +220,34 @@
     setCode(c) { this._code = c ? c.toUpperCase() : null; },
     getCode()  { return this._code; },
     async checkServer() {
-      if (this._serverOk !== null) return this._serverOk;
-      if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+      if (window.location.protocol === 'file:') return false;
+      // Positiv dauerhaft cachen; negativ nur 15s — ein einzelner Timeout im
+      // Schul-WLAN darf das Gerät nicht dauerhaft offline schalten
+      if (this._serverOk === true) return true;
+      if (this._serverOk === false && Date.now() - (this._serverCheckedAt || 0) < 15000) return false;
       try {
         await fetch('../api.php?f=qp-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
         this._serverOk = true;
-      } catch { this._serverOk = false; }
+      } catch { this._serverOk = false; this._serverCheckedAt = Date.now(); }
       return this._serverOk;
     },
     _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]}; },
-    _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}; },
+    _deser(d) {
+      const st = {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};
+      // XSS-Schutz: color aus Remote-State klemmen (per Code beschreibbar)
+      if (Array.isArray(st.teams)) st.teams.forEach(t => { if (t && 'color' in t && !/^#[0-9a-fA-F]{3,8}$/.test(t.color)) t.color = '#888'; });
+      return st;
+    },
     async save(gs) {
       if (!this._code) return;
-      const json = JSON.stringify(this._ser(gs));
-      localStorage.setItem('qp_gs_'+this._code, json);
-      if (await this.checkServer())
-        try { await fetch('../api.php?f=qp-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+      const code = this._code; // gegen Code-Wechsel während await binden
+      const full = this._ser(gs);
+      localStorage.setItem('qp_gs_'+code, JSON.stringify(full));
+      if (await this.checkServer()) {
+        // takenTeams nur über mutate() schreiben (Server merged das Feld)
+        const { takenTeams, ...payload } = full;
+        try { await fetch('../api.php?f=qp-game&code='+code, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}); } catch {}
+      }
     },
     // Optimistisches Speichern mit Compare-and-Swap (Beitritt): sendet _baseRev;
     // bei 409 mergt der Server-Konflikt neu, statt fremde Einträge zu überschreiben.
@@ -284,17 +296,23 @@
     },
     subscribe(code, cb) {
       code = code.toUpperCase();
-      let stopped = false, src = null, timer = null;
+      let stopped = false, src = null, timer = null, lastJson = '';
+      // Nur bei tatsächlicher Änderung weiterreichen (kein Dauer-Re-Render)
+      const emit = (raw) => {
+        if (raw === lastJson) return;
+        lastJson = raw;
+        try { const d = JSON.parse(raw); if (d && d.meta) cb(this._deser(d)); } catch {}
+      };
       const startSSE = () => {
         if (stopped) return;
         src = new EventSource('../api.php?f=qp-sse&code='+code);
-        src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._deser(d)); } catch {} };
+        src.onmessage = e => { if(!stopped) emit(e.data); };
         src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
         src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
       };
       const startPoll = () => {
         if(stopped||timer) return;
-        const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._deser(d));} } catch {} };
+        const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=qp-game&code='+code); if(r.ok) emit(await r.text()); } catch {} };
         fn(); timer = setInterval(fn, 1000);
       };
       const startLocalPoll = () => {

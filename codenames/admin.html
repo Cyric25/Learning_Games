@@ -222,7 +222,7 @@ async function apiPost(action, data = {}) {
   const url = new URL('./api.php', location.href);
   url.searchParams.set('action', action);
   try {
-    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', 'X-Admin-Key': 'LP-Spiele-2026'}, body:JSON.stringify(data)});
     return await r.json();
   } catch { return {error:'network'}; }
 }

@@ -318,7 +318,7 @@ async function _boardsSave(boards) {
   const json = JSON.stringify(boards);
   localStorage.setItem(_LS_KEY, json);
   if (await _checkServer()) {
-    try { await fetch(_API, { method: 'POST', body: json, headers: { 'Content-Type': 'application/json' } }); } catch {}
+    try { await fetch(_API, { method: 'POST', body: json, headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'LP-Spiele-2026' } }); } catch {}
   }
 }
 

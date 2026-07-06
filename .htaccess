@@ -1,9 +1,17 @@
 Options -Indexes
 
-# Disable output buffering/compression for SSE (alle Spiel-Prefixe).
-# Hinweis: SetEnvIf Request_URI sieht den Query-String nicht — daher RewriteCond.
 <IfModule mod_rewrite.c>
 RewriteEngine On
+
+# Disable output buffering/compression for SSE (alle Spiel-Prefixe).
+# Hinweis: SetEnvIf Request_URI sieht den Query-String nicht — daher RewriteCond.
 RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-)?sse(&|$)
 RewriteRule ^api\.php$ - [E=no-gzip:1,E=dont-vary:1]
+
+# Spielstände/Drafts nur über api.php: Direktzugriff verbieten. Sonst leakt
+# z.B. GET /data/games/codenames/<PIN>.json das komplette Kartenlayout
+# (Spymaster-Geheimnis) und alle player_ids. WICHTIG: data/questions.json,
+# data/memory/pairs.json und data/quizpfad-fragen.json bleiben absichtlich
+# lesbar (statischer Fallback der Clients).
+RewriteRule ^(data/games/|schiffeversenken/data/games/|data/drafts\.json|data/risiko-gamestate\.json) - [F]
 </IfModule>

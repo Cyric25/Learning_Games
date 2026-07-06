@@ -396,7 +396,9 @@ async function apiPost(action, data = {}) {
   try {
     const r = await fetch(url.toString(), {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      // X-Admin-Key wird nur von den wordlist-Endpunkten geprüft (Hürde
+      // gegen DevTools-Vandalismus, kein Geheimnis)
+      headers: {'Content-Type':'application/json', 'X-Admin-Key': 'LP-Spiele-2026'},
       body: JSON.stringify(data),
     });
     if (!r.ok) {
@@ -417,9 +419,17 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
+let _refreshing = false;
 async function doRefresh() {
   if (!myPin) return;
-  const gs = await apiGet('get_state', {pin: myPin, player_id: myPlayerId || ''});
+  if (_refreshing) return; // Overlap-Schutz: langsamer Server (>1,5s) → sonst
+  _refreshing = true;      // überschreibt eine späte alte Antwort neuen State
+  let gs;
+  try {
+    gs = await apiGet('get_state', {pin: myPin, player_id: myPlayerId || ''});
+  } finally {
+    _refreshing = false;
+  }
   if (!gs || gs.error) return;
 
   // Sync my role/team from server state
@@ -735,7 +745,9 @@ function renderRoleSelector(gs) {
 function renderPlayerList(gs) {
   const ul = document.getElementById('player-list');
   if (!ul) return;
-  const now = Date.now() / 1000;
+  // Server-Zeit bevorzugen: last_seen ist Server-Unixzeit — mit der Client-Uhr
+  // verglichen wären bei Uhren-Abweichung alle dauerhaft on-/offline
+  const now = gs.server_now || (Date.now() / 1000);
   ul.innerHTML = (gs.players || []).map(p => {
     const online  = (now - (p.last_seen || 0)) < 15;
     const teamCls = p.team || '';

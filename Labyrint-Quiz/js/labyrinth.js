@@ -20,16 +20,31 @@ const GameSync = {
     const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     return Array.from({length:4}, () => ch[Math.floor(Math.random()*ch.length)]).join('');
   },
+  // XSS-Schutz: color/emoji/symbolIcon aus Remote-State klemmen (per Code beschreibbar)
+  _san(d) {
+    if (d && Array.isArray(d.teams)) d.teams.forEach(t => {
+      if (!t) return;
+      if ('color' in t) t.color = (typeof t.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(t.color)) ? t.color : '#888';
+      ['emoji', 'symbolIcon'].forEach(k => { if (k in t) { const e = String(t[k] == null ? '' : t[k]); t[k] = (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; } });
+    });
+    return d;
+  },
   async load(code) {
     if (this.hasServer()) {
-      try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return d; } } catch {}
+      try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return this._san(d); } } catch {}
     }
-    try { const s = localStorage.getItem('lab_' + code); return s ? JSON.parse(s) : null; } catch { return null; }
+    try { const s = localStorage.getItem('lab_' + code); return s ? this._san(JSON.parse(s)) : null; } catch { return null; }
   },
   async save(code, state) {
     try { localStorage.setItem('lab_' + code, JSON.stringify(state)); } catch {}
-    if (!this.hasServer()) return;
-    try { await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state) }); } catch {}
+    if (!this.hasServer()) return null;
+    // takenTeams nur über mutate() schreiben (Server merged das Feld)
+    const { takenTeams, ...payload } = state;
+    try {
+      const r = await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) return await r.json().catch(() => null); // {ok, rev}
+    } catch {}
+    return null;
   },
   // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
   // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
@@ -80,7 +95,7 @@ const GameSync = {
   async deleteGame(code) {
     localStorage.removeItem('lab_' + code.toUpperCase());
     if (this.hasServer()) {
-      try { await fetch(this._url('game', code.toUpperCase()), { method: 'DELETE' }); } catch {}
+      try { await fetch(this._url('game', code.toUpperCase()), { method: 'DELETE', headers: { 'X-Admin-Key': 'LP-Spiele-2026' } }); } catch {}
     }
   },
   subscribe(code, cb) {
@@ -90,7 +105,7 @@ const GameSync = {
       if (this._session !== sid) return;
       const es = new EventSource(this._url('sse', code));
       this._es = es;
-      es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
+      es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(this._san(d)); } catch {} };
       es.addEventListener('reconnect', () => { es.close(); this._es = null; if (this._session === sid) setTimeout(connect, 200); });
       es.onerror = () => {
         es.close(); this._es = null;
@@ -297,6 +312,7 @@ async function _gsEnter(code) {
     showScreen('game-screen');
     showGameCode();
     const canvas = document.getElementById('maze-canvas');
+    if (renderer) renderer.destroy();
     renderer = new MazeRenderer(canvas);
     renderer.setMaze(mazeResult);
     renderBoard();
@@ -830,6 +846,7 @@ async function startGame() {
 
   // Init canvas (after screen is visible so resize() gets real dimensions)
   const canvas = document.getElementById('maze-canvas');
+  if (renderer) renderer.destroy();
   renderer = new MazeRenderer(canvas);
   renderer.setMaze(mazeResult);
   renderBoard();

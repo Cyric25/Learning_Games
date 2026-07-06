@@ -7,8 +7,17 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Admin-Key');
 header('Cache-Control: no-store, no-cache');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
+
+// Admin-Schutz für destruktive Wortlisten-Endpunkte (gleiches Token wie
+// api.php — Hürde gegen DevTools-Vandalismus, kein echtes Geheimnis)
+define('CN_ADMIN_KEY', 'LP-Spiele-2026');
+function requireAdminKey(): void {
+    $k = $_SERVER['HTTP_X_ADMIN_KEY'] ?? '';
+    if (!hash_equals(CN_ADMIN_KEY, $k)) err('forbidden', 403);
+}
 
 $action   = trim($_GET['action'] ?? '');
 $gamesDir = __DIR__ . '/../data/games/codenames';
@@ -57,9 +66,12 @@ function lockGame(string $pin, string $dir): void {
     $fp = @fopen($dir . '/' . $pin . '.lock', 'c');
     if ($fp && flock($fp, LOCK_EX)) {
         $GLOBALS['gameLockFp'] = $fp;
-    } elseif ($fp) {
-        fclose($fp);
+        return;
     }
+    if ($fp) fclose($fp);
+    // Ohne Lock NICHT fortfahren — sonst überschreibt z.B. ein Heartbeat
+    // (load→save des Vollzustands) einen parallelen guess_card
+    err('lock_error', 500);
 }
 
 function generatePin(): string {
@@ -125,7 +137,8 @@ function cleanupGames(string $dir): void {
         $age = time() - ($info['updated_at'] ?? $info['created_at'] ?? 0);
         if ($age > 86400) {
             @unlink($dir . '/' . $pin . '.json');
-            @unlink($dir . '/' . $pin . '.lock');
+            // .lock absichtlich behalten: unlink während ein Prozess flock
+            // hält, ließe einen zweiten auf neuer Inode "exklusiv" locken
             unset($reg[$pin]);
             $changed = true;
         }
@@ -217,9 +230,16 @@ case 'create_game': {
 
     cleanupGames($gamesDir);
 
-    // Unique PIN
-    $pin = generatePin();
-    for ($i = 0; $i < 50 && file_exists($gamesDir . '/' . $pin . '.json'); $i++) $pin = generatePin();
+    // Unique PIN — Datei exklusiv anlegen ('x' schlägt fehl, wenn sie schon
+    // existiert), damit zwei gleichzeitige create_game nicht dieselbe PIN
+    // bekommen und sich gegenseitig überschreiben
+    $pin = null;
+    for ($i = 0; $i < 50; $i++) {
+        $cand = generatePin();
+        $fh = @fopen($gamesDir . '/' . $cand . '.json', 'x');
+        if ($fh !== false) { fclose($fh); $pin = $cand; break; }
+    }
+    if ($pin === null) err('no_free_pin', 500);
 
     $playerId  = generateId(10);
     $firstTeam = rand(0, 1) ? 'red' : 'blue';
@@ -374,7 +394,9 @@ case 'get_state': {
     $playerId = san($_GET['player_id'] ?? '', 15);
     $game = loadGame($pin, $gamesDir);
     if (!$game) err('game_not_found', 404);
-    echo json_encode(filterState($game, $playerId));
+    $state = filterState($game, $playerId);
+    $state['server_now'] = time(); // für Online-Anzeige: Client-Uhren weichen ab
+    echo json_encode($state);
     exit;
 }
 
@@ -700,6 +722,7 @@ case 'get_wordlist': {
 // ── save_wordlist ─────────────────────────────────────────────────────────
 case 'save_wordlist': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
+    requireAdminKey();
     $b       = jsonBody();
     $name    = san($b['name'] ?? '', 80);
     $lang    = in_array($b['language'] ?? '', ['de','en','it','es','ru','fr']) ? $b['language'] : 'de';
@@ -763,6 +786,7 @@ case 'save_wordlist': {
 // ── delete_wordlist ───────────────────────────────────────────────────────
 case 'delete_wordlist': {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') err('POST required');
+    requireAdminKey();
     $b         = jsonBody();
     $id        = san($b['id'] ?? '', 40);
     $confirmId = san($b['confirm_id'] ?? '', 40);

@@ -27,12 +27,15 @@ const LsStorage = {
   },
 
   async checkServer() {
-    if (this._serverOk !== null) return this._serverOk;
-    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    if (window.location.protocol === 'file:') return false;
+    // Positiv dauerhaft cachen; negativ nur 15s — ein einzelner Timeout im
+    // Schul-WLAN darf das Gerät nicht dauerhaft offline schalten
+    if (this._serverOk === true) return true;
+    if (this._serverOk === false && Date.now() - (this._serverCheckedAt || 0) < 15000) return false;
     try {
       await fetch('../api.php?f=ls-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
       this._serverOk = true;
-    } catch { this._serverOk = false; }
+    } catch { this._serverOk = false; this._serverCheckedAt = Date.now(); }
     return this._serverOk;
   },
 
@@ -40,15 +43,24 @@ const LsStorage = {
     return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]};
   },
   _deser(d) {
-    return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};
+    const st = {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])};
+    // XSS-Schutz: emoji aus Remote-State klemmen (State ist per Code beschreibbar)
+    if (Array.isArray(st.teams)) st.teams.forEach(t => {
+      if (t && 'emoji' in t) { const e = String(t.emoji == null ? '' : t.emoji); t.emoji = (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; }
+    });
+    return st;
   },
 
   async save(gs) {
     if (!this._code) return;
-    const json = JSON.stringify(this._ser(gs));
-    localStorage.setItem('ls_gs_'+this._code, json);
+    const code = this._code; // gegen Code-Wechsel während await binden
+    const full = this._ser(gs);
+    localStorage.setItem('ls_gs_'+code, JSON.stringify(full));
     if (await this.checkServer()) {
-      try { await fetch('../api.php?f=ls-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+      // takenTeams wird server-seitig gemerged (Zukunftssicherheit,
+      // falls Leiterspiel exklusiven Team-Beitritt bekommt)
+      const { takenTeams, ...payload } = full;
+      try { await fetch('../api.php?f=ls-game&code='+code, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}); } catch {}
     }
   },
 
@@ -76,7 +88,7 @@ const LsStorage = {
   async deleteGame(code) {
     localStorage.removeItem('ls_gs_' + code.toUpperCase());
     if (await this.checkServer()) {
-      try { await fetch('../api.php?f=ls-game&code='+code, {method:'DELETE'}); } catch {}
+      try { await fetch('../api.php?f=ls-game&code='+code, {method:'DELETE', headers:{'X-Admin-Key': 'LP-Spiele-2026'}}); } catch {}
     }
   },
 
@@ -1602,7 +1614,14 @@ function askQuestion(questionOverride) {
   let question = questionOverride || null;
   if (!question) {
     question = pickQuestion();
-    if (!question) return;
+    if (!question) {
+      // Keine Frage verfügbar (z.B. Alt-Spielstand ohne activeCategoryIds):
+      // Würfel wieder freigeben statt still hängenzubleiben
+      alert('Keine passende Frage gefunden. Bitte Kategorienauswahl prüfen.');
+      gameState.pendingDice = null;
+      updateDiceButton(true);
+      return;
+    }
     gameState.usedQuestionIds.add(question.id);
     currentQuestion = question;
   } else {
@@ -2013,7 +2032,7 @@ function freeMove() {
           team.position = field.ladderTo;
           updatePieces();
           updateTeamList();
-          if (team.position === 100) { showWinner(); return; }
+          if (team.position === maxField) { showWinner(); return; } // Custom-Boards ≠100
           nextTurn();
         }, 600);
       } else if (field.snakeTo) {
@@ -2153,6 +2172,9 @@ async function _gsEnter(code) {
     if (gs.activeCategoryIds && fragenBank) {
       selectedCategoryIds = new Set(gs.activeCategoryIds);
       activeFragenBank = fragenBank.fragen.filter(q => selectedCategoryIds.has(q.kategorie));
+    } else if (fragenBank && !activeFragenBank) {
+      // Alt-Spielstand ohne activeCategoryIds: alle Fragen statt Deadlock
+      activeFragenBank = fragenBank.fragen;
     }
     showScreen('game-screen');
     renderBoard();

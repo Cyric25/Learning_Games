@@ -20,16 +20,32 @@ const GameSync = {
     const base = location.pathname.includes('/Labyrint-Quiz/') ? '../api.php' : './api.php';
     return base + '?f=labyrinth-' + s + (code ? '&code=' + encodeURIComponent(code) : '');
   },
+  // XSS-Schutz: color/emoji/symbolIcon aus Remote-State klemmen (der State ist
+  // von jedem mit dem Code per POST beschreibbar → sonst Stored-XSS via innerHTML)
+  _san(d) {
+    if (d && Array.isArray(d.teams)) d.teams.forEach(t => {
+      if (!t) return;
+      if ('color' in t) t.color = (typeof t.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(t.color)) ? t.color : '#888';
+      ['emoji', 'symbolIcon'].forEach(k => { if (k in t) { const e = String(t[k] == null ? '' : t[k]); t[k] = (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; } });
+    });
+    return d;
+  },
   async load(code) {
     if (this.hasServer()) {
-      try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return d; } } catch {}
+      try { const r = await fetch(this._url('game', code)); if (r.ok) { const d = await r.json(); if (d.meta) return this._san(d); } } catch {}
     }
-    try { const s = localStorage.getItem('lab_' + code); return s ? JSON.parse(s) : null; } catch { return null; }
+    try { const s = localStorage.getItem('lab_' + code); return s ? this._san(JSON.parse(s)) : null; } catch { return null; }
   },
   async save(code, state) {
     try { localStorage.setItem('lab_' + code, JSON.stringify(state)); } catch {}
-    if (!this.hasServer()) return;
-    try { await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state) }); } catch {}
+    if (!this.hasServer()) return null;
+    // takenTeams nur über mutate() schreiben (Server merged das Feld)
+    const { takenTeams, ...payload } = state;
+    try {
+      const r = await fetch(this._url('game', code), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.ok) return await r.json().catch(() => null); // {ok, rev}
+    } catch {}
+    return null;
   },
   // Optimistisches Speichern mit Compare-and-Swap (nur für umkämpfte Pfade wie
   // Beitritt/Kick): sendet _baseRev; bei 409 lädt der Server den aktuellen
@@ -70,7 +86,7 @@ const GameSync = {
       if (this._session !== sid) return;
       const es = new EventSource(this._url('sse', code));
       this._es = es;
-      es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(d); } catch {} };
+      es.onmessage = e => { try { const d = JSON.parse(e.data); if (d.meta) cb(this._san(d)); } catch {} };
       es.addEventListener('reconnect', () => { es.close(); this._es = null; if (this._session === sid) setTimeout(connect, 200); });
       es.onerror = () => {
         es.close(); this._es = null;
@@ -288,6 +304,7 @@ function buildLocalGrid() {
 
   const canvas = document.getElementById('maze-canvas');
   if (canvas && typeof MazeRenderer !== 'undefined') {
+    if (renderer) renderer.destroy();
     renderer = new MazeRenderer(canvas);
     renderer.setMaze(mazeResult);
   }
@@ -376,12 +393,9 @@ function onRemoteUpdate(data) {
     return;
   }
 
-  // Veraltete Echos eigener Saves ignorieren (nur Canvas aktualisieren)
-  if (data._rev && data._rev < _lastStateRev) {
-    applyStateToGrid(localGrid, data.symbols || []);
-    renderCanvas(data);
-    return;
-  }
+  // Veraltete Echos eigener Saves komplett ignorieren — auch NICHT rendern,
+  // sonst springen Figuren/Symbole sichtbar auf den alten Stand zurück
+  if (data._rev && data._rev < _lastStateRev) return;
   if (data._rev) _lastStateRev = Math.max(_lastStateRev, data._rev);
 
   remoteState = data;
@@ -392,6 +406,9 @@ function onRemoteUpdate(data) {
 
 function handleKicked() {
   clearTimer();
+  // Auch laufende Würfelanimation stoppen — deren Abschluss würde sonst
+  // per postState den Kick rückgängig machen (alter State inkl. uns selbst)
+  if (diceAnimId) { clearInterval(diceAnimId); diceAnimId = null; }
   document.getElementById('question-modal')?.classList.remove('active');
   GameSync.unsubscribe();
   localStorage.removeItem('lab_myteam_' + gameCode);
@@ -408,7 +425,19 @@ function handleKicked() {
 
   setTimeout(async () => {
     const state = await GameSync.load(gameCode);
-    if (state?.meta) { remoteState = state; showTeamSelect(state); }
+    if (state?.meta) {
+      remoteState = state;
+      showTeamSelect(state);
+      // Wieder abonnieren (wie nach joinGame): sonst sieht der Gekickte
+      // weder neu belegte Teams noch den Spielstart
+      GameSync.subscribe(gameCode, (data) => {
+        if (myTeamId !== null) return;
+        remoteState = data;
+        if (document.getElementById('team-select-screen')?.classList.contains('active')) {
+          showTeamSelect(data);
+        }
+      });
+    }
     else showScreen('join-screen');
   }, 1500);
 }
@@ -1011,14 +1040,17 @@ function clearTimer() { if (timerInterval) { clearInterval(timerInterval); timer
 
 // ── State posten ──────────────────────────────────────────────────
 function postState(newState) {
-  // Monoton steigender Zähler statt Client-Timestamp (Uhren-Skew!)
-  const rev = Math.max(_lastStateRev, remoteState?._rev || 0, newState._rev || 0) + 1;
-  newState._rev = rev;
-  _lastStateRev = rev;
+  if (myTeamId === null) return; // gekickt → nichts mehr schreiben
+  delete newState._rev; // Server vergibt _rev selbst (storedRev+1)
   remoteState = newState;
   applyStateToGrid(localGrid, newState.symbols || []);
   renderCanvas(newState);
-  GameSync.save(gameCode, newState);
+  // _lastStateRev erst aus der BESTÄTIGTEN Server-Antwort übernehmen —
+  // ein lokaler Vor-Inkrement würde bei fehlgeschlagenem POST (WLAN!)
+  // alle künftigen fremden Updates als "veraltetes Echo" verwerfen.
+  GameSync.save(gameCode, newState).then(j => {
+    if (j && j.rev) _lastStateRev = Math.max(_lastStateRev, j.rev);
+  });
 }
 
 // ── Zuschauer-Fragenansicht ───────────────────────────────────────

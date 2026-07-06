@@ -822,13 +822,6 @@ function findNodeForSave(catId, subcatId, subsubcatId, l4catId) {
   return (ss.subcategories || []).find(n => n.id === l4catId) || null;
 }
 
-function findNodeContainingQuestion(qId) {
-  for (const c of questionBank.categories) {
-    const result = GameModel._findNodeWithQuestion(c, qId);
-    if (result) return result;
-  }
-  return null;
-}
 
 async function saveQuestion() {
   const catId = document.getElementById('qm-cat').value;
@@ -879,6 +872,7 @@ async function saveQuestion() {
         if (q) {
           q.difficulty = diff; q.type = type; q.question = qText;
           q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint;
+          delete q.correctIndices; // Editor kennt nur Single-Auswahl; altes Multi-Array würde die Wertung dominieren
           if (!targetNode.questions) targetNode.questions = [];
           targetNode.questions.push(q);
         } else {
@@ -889,6 +883,7 @@ async function saveQuestion() {
         if (q) {
           q.difficulty = diff; q.type = type; q.question = qText;
           q.answer = answer; q.options = options; q.correctIndex = correctIndex; q.hint = hint;
+          delete q.correctIndices; // Editor kennt nur Single-Auswahl; altes Multi-Array würde die Wertung dominieren
         }
       }
     }

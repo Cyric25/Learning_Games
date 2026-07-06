@@ -1,6 +1,18 @@
 /* BsStorage — Schiffeversenken-Quiz
    API-Prefix: bs-   localStorage-Prefix: bs_gs_  */
 
+// XSS-Schutz für aus Remote-State stammende color/emoji (siehe _deser)
+function _bsSafeColor(c) { return typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888'; }
+function _bsSafeEmoji(e) { e = (e == null ? '' : String(e)); return (e.length <= 8 && !/[<>"'&]/.test(e)) ? e : '👥'; }
+function _bsSanitizeTeams(st) {
+  if (st && Array.isArray(st.teams)) st.teams.forEach(t => {
+    if (!t) return;
+    if ('color' in t) t.color = _bsSafeColor(t.color);
+    if ('emoji' in t) t.emoji = _bsSafeEmoji(t.emoji);
+  });
+  return st;
+}
+
 const BsStorage = {
   _code: null, _serverOk: null,
 
@@ -13,24 +25,36 @@ const BsStorage = {
   },
 
   async checkServer() {
-    if (this._serverOk !== null) return this._serverOk;
-    if (window.location.protocol === 'file:') { this._serverOk = false; return false; }
+    if (window.location.protocol === 'file:') return false;
+    // Positiv dauerhaft cachen; negativ nur 15s — ein einzelner Timeout im
+    // Schul-WLAN darf das Gerät nicht dauerhaft offline schalten
+    if (this._serverOk === true) return true;
+    if (this._serverOk === false && Date.now() - (this._serverCheckedAt || 0) < 15000) return false;
     try {
       await fetch('../api.php?f=bs-game&code=PING', {method:'HEAD', signal:AbortSignal.timeout(2000)});
       this._serverOk = true;
-    } catch { this._serverOk = false; }
+    } catch { this._serverOk = false; this._serverCheckedAt = Date.now(); }
     return this._serverOk;
   },
 
   _ser(gs)  { return {...gs, usedQuestionIds: [...(gs.usedQuestionIds instanceof Set ? gs.usedQuestionIds : (gs.usedQuestionIds||[]))]}; },
-  _deser(d) { return {...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}; },
+  // Bei der Deserialisierung von Remote-State color/emoji klemmen: der State
+  // ist von jedem mit dem Code per POST beschreibbar → ohne Klemmung wäre
+  // z.B. color='#fff"><img onerror=...>' ein Stored-XSS auf allen Geräten.
+  _deser(d) { return _bsSanitizeTeams({...d, usedQuestionIds: new Set(d.usedQuestionIds||[])}); },
 
   async save(gs) {
     if (!this._code) return;
-    const json = JSON.stringify(this._ser(gs));
-    localStorage.setItem('bs_gs_'+this._code, json);
-    if (await this.checkServer())
-      try { await fetch('../api.php?f=bs-game&code='+this._code, {method:'POST', body:json, headers:{'Content-Type':'application/json'}}); } catch {}
+    const code = this._code; // gegen Code-Wechsel während await binden
+    const full = this._ser(gs);
+    localStorage.setItem('bs_gs_'+code, JSON.stringify(full));
+    if (await this.checkServer()) {
+      // takenTeams NICHT mitsenden: das Feld wird nur über mutate()
+      // (Beitritt/Kick) geschrieben und server-seitig gemerged — sonst
+      // überschreibt ein veralteter Spielzug-Snapshot frische Beitritte.
+      const { takenTeams, ...payload } = full;
+      try { await fetch('../api.php?f=bs-game&code='+code, {method:'POST', body:JSON.stringify(payload), headers:{'Content-Type':'application/json'}}); } catch {}
+    }
   },
 
   // Optimistisches Speichern mit Compare-and-Swap: sendet _baseRev; bei 409
@@ -99,7 +123,7 @@ const BsStorage = {
   async deleteGame(code) {
     localStorage.removeItem('bs_gs_' + code.toUpperCase());
     if (await this.checkServer())
-      try { await fetch('../api.php?f=bs-game&code='+code, {method:'DELETE'}); } catch {}
+      try { await fetch('../api.php?f=bs-game&code='+code, {method:'DELETE', headers:{'X-Admin-Key': 'LP-Spiele-2026'}}); } catch {}
   },
 
   subscribe(code, cb) {
@@ -118,7 +142,17 @@ const BsStorage = {
       src = new EventSource('../api.php?f=bs-sse&code='+code);
       src.onmessage = e => { if(!stopped) emit(e.data); };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
-      src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
+      src.onerror = () => {
+        src&&src.close(); src=null;
+        if (stopped) return;
+        startPoll();
+        // Nach 10s SSE erneut versuchen — sonst pollen 25 Geräte für immer
+        setTimeout(() => {
+          if (stopped) return;
+          if (timer) { clearInterval(timer); timer = null; }
+          startSSE();
+        }, 10000);
+      };
     };
     const startPoll = () => {
       if(stopped||timer) return;

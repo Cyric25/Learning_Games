@@ -690,6 +690,7 @@
     };
 
     const canvas = document.getElementById('maze-canvas');
+    if (renderer) renderer.destroy();
     renderer = new MazeRenderer(canvas);
     renderer.setMaze({ grid, startPositions });
 

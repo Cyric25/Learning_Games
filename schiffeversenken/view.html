@@ -734,13 +734,18 @@ function onRemoteUpdate(data) {
 
 function handleKicked(data) {
   clearTimeout(window._kickTimer);
+  clearMCTimer(); // laufender MC-Timer würde sonst handleMCTimeout feuern und den Kick-Zug rückgängig machen
   if (bsSub) { bsSub.unsubscribe(); bsSub = null; }
   localStorage.removeItem('bs_myteam_' + gameCode);
   myTeamId = null;
   const errEl = document.getElementById('join-error');
   window._kickTimer = setTimeout(async () => {
     const state = await BsStorage.load(gameCode);
-    if (state && state.meta) { remoteState = state; showTeamSelect(state); }
+    if (state && state.meta) {
+      remoteState = state;
+      showTeamSelect(state);
+      startSSE(); // wieder abonnieren, damit belegte Teams/Spielstart live ankommen
+    }
     else showScreen('screen-join');
   }, 1500);
   document.getElementById('q-overlay').classList.add('hidden');
@@ -947,6 +952,7 @@ window.tapCell = tapCell;
 // ── Schuss abfeuern ───────────────────────────────────────────────
 async function fireShot() {
   if (submittingShot) return;
+  if (myTeamId === null) return; // gekickt → nichts mehr schreiben
   const input = document.getElementById('coord-input');
   const errEl = document.getElementById('shot-error');
   errEl.textContent = '';
@@ -997,10 +1003,15 @@ async function fireShot() {
     resolved: false
   };
   remoteState = ns0;
-  await BsStorage.save(ns0);
+  // Solo-Modus: nichts auf den Server schreiben (könnte sonst unter einem
+  // zuvor eingetippten fremden Code einen Müll-Spielstand anlegen)
+  if (!soloMode) await BsStorage.save(ns0);
 
   input.value = '';
   document.getElementById('shot-panel').classList.add('hidden');
+  // _shownLqId setzen, damit das SSE-Echo des eigenen Saves das Overlay
+  // nicht neu aufbaut (MC-Timer würde zurückspringen)
+  _shownLqId = ns0.liveQuestion.id;
   showQuestionOverlay(ns0.liveQuestion);
   submittingShot = false;
 }
@@ -1068,6 +1079,10 @@ async function startSolo() {
   soloMode = true;
   myTeamId = 0;
   gameCode  = 'SOLO';
+  // Evtl. gesetzten Code aus einem fehlgeschlagenen Join-Versuch löschen —
+  // sonst würde ein versehentlicher Save unter fremdem Code landen
+  BsStorage.setCode(null);
+  if (bsSub) { bsSub.unsubscribe(); bsSub = null; }
 
   remoteState = {
     meta: { gameCode: 'SOLO', title: 'Solo-Übung' },
@@ -1115,6 +1130,7 @@ function clearMCTimer() {
   if (el) el.classList.add('hidden');
 }
 async function handleMCTimeout() {
+  if (myTeamId === null) return; // gekickt → nichts mehr schreiben
   if (!remoteState || !remoteState.liveQuestion || submittingShot) return;
   submittingShot = true;
   const lq = remoteState.liveQuestion;
@@ -1192,6 +1208,7 @@ function renderMCResult(lq, mcOpts, result) {
 }
 
 async function submitMCAnswer(idx) {
+  if (myTeamId === null) return; // gekickt → nichts mehr schreiben
   if (!remoteState || !remoteState.liveQuestion) return;
   const lq = remoteState.liveQuestion;
   if (lq.selectedMcIndex !== null || submittingShot) return;

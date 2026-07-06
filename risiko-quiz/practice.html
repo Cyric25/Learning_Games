@@ -1051,7 +1051,10 @@
             updateStats(false, q);
             showFeedback(false, q);
           } else {
-            // Open: just show "Zeit abgelaufen"
+            // Open: "Zeit abgelaufen" anzeigen UND als falsch werten —
+            // sonst fehlt die Frage in der Statistik (Trefferquote verzerrt)
+            answered = true;
+            updateStats(false, selectedQs[currentIdx]);
             const fb = el('pr-feedback');
             fb.style.display = 'flex';
             fb.className = 'pr-feedback wrong';

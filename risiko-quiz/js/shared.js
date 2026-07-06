@@ -43,6 +43,16 @@ const StorageManager = {
     try { localStorage.setItem(key, JSON.stringify(data)); } catch { }
   },
 
+  // XSS-Schutz: team.color aus Remote-State klemmen. Der Spielstand ist von
+  // jedem mit dem Code per POST beschreibbar; Farben landen ungeescapt in
+  // style="background:..."-Interpolationen (Namen sind bereits escaped).
+  _sanitizeState(gs) {
+    if (gs && Array.isArray(gs.teams)) gs.teams.forEach(t => {
+      if (t && 'color' in t) t.color = (typeof t.color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(t.color)) ? t.color : '#888';
+    });
+    return gs;
+  },
+
   // ── Questions (zentral, unverändert) ────────────────────────
   async loadQuestions() {
     if (this._hasServer()) {
@@ -64,7 +74,7 @@ const StorageManager = {
       try {
         const r = await fetch(this._apiUrl('questions'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'LP-Spiele-2026' },
           body: JSON.stringify(questionBank)
         });
         return r.ok;
@@ -90,7 +100,7 @@ const StorageManager = {
       try {
         await fetch(this._apiUrl('games'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'LP-Spiele-2026' },
           body: JSON.stringify(registry)
         });
       } catch { }
@@ -105,13 +115,13 @@ const StorageManager = {
         const r = await fetch(this._apiUrl('game', { code }));
         if (r.ok) {
           const d = await r.json();
-          if (d.meta) { this._lsSet(this._LS_GS + '_' + code, d); return d; }
+          if (d.meta) { this._lsSet(this._LS_GS + '_' + code, d); return this._sanitizeState(d); }
           return null;
         }
       } catch { }
     }
     const local = this._lsGet(this._LS_GS + '_' + code);
-    return (local && local.meta) ? local : null;
+    return (local && local.meta) ? this._sanitizeState(local) : null;
   },
 
   async saveGameStateByCode(code, gameData) {
@@ -134,9 +144,51 @@ const StorageManager = {
     try { localStorage.removeItem(this._LS_GS + '_' + code); } catch { }
     if (this._hasServer()) {
       try {
-        await fetch(this._apiUrl('game', { code }), { method: 'DELETE' });
+        await fetch(this._apiUrl('game', { code }), { method: 'DELETE', headers: { 'X-Admin-Key': 'LP-Spiele-2026' } });
       } catch { }
     }
+  },
+
+  // Optimistisches Speichern mit Compare-and-Swap für umkämpfte
+  // Schüleraktionen ("Ich weiß es!", Zellen-Auswahl): sendet _baseRev; bei
+  // 409 wird auf dem aktuellen Server-Stand neu gemergt — so überschreiben
+  // sich gleichzeitige Meldungen mehrerer Teams nicht mehr gegenseitig.
+  // fn(draft) darf `false` zurückgeben → Aktion abbrechen (mutate → null).
+  async mutate(fn, tries = 6) {
+    const code = this._currentCode;
+    if (!code) return null;
+    let state = await this.loadGameStateByCode(code);
+    if (!state) return null;
+    for (let i = 0; i < tries; i++) {
+      const draft = JSON.parse(JSON.stringify(state));
+      if (fn(draft) === false) return null;
+      if (!this._hasServer()) {
+        this._lsSet(this._LS_GS + '_' + code, draft);
+        return draft;
+      }
+      const payload = { ...draft, _baseRev: state._rev || 0 };
+      delete payload.categories;
+      try {
+        const r = await fetch(this._apiUrl('game', { code }), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (r.status === 409) {
+          const cur = await r.json();
+          if (cur && cur.meta) { state = cur; continue; } // neu mergen
+          return null;
+        }
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          if (j.rev) draft._rev = j.rev;
+          this._lsSet(this._LS_GS + '_' + code, draft);
+          return this._sanitizeState(draft);
+        }
+      } catch { }
+      return null;
+    }
+    return null; // zu viele Konflikte
   },
 
   // ── GameState (dispatcht zu code-basiert wenn Code gesetzt) ─
@@ -150,13 +202,13 @@ const StorageManager = {
         const r = await fetch(this._apiUrl('gamestate'));
         if (r.ok) {
           const d = await r.json();
-          if (d.meta) { this._lsSet(this._LS_GS, d); return d; }
+          if (d.meta) { this._lsSet(this._LS_GS, d); return this._sanitizeState(d); }
           return null;
         }
       } catch { }
     }
     const local = this._lsGet(this._LS_GS);
-    return (local && local.meta) ? local : null;
+    return (local && local.meta) ? this._sanitizeState(local) : null;
   },
 
   async saveGameState(gameData) {
@@ -170,7 +222,7 @@ const StorageManager = {
       try {
         await fetch(this._apiUrl('gamestate'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'LP-Spiele-2026' },
           body: JSON.stringify(state)
         });
       } catch { }
@@ -194,7 +246,7 @@ const StorageManager = {
       const json = JSON.stringify(data);
       if (json === lastJson) return;
       lastJson = json;
-      callback(data);
+      callback(this._sanitizeState(data)); // color klemmen (SSE liefert rohen State)
     };
 
     const startSSE = () => {
@@ -314,6 +366,28 @@ const GameModel = {
       if (!registry[code]) return code;
     }
     return this.generateGameCode();
+  },
+
+  // Spielseitige Normalisierung: MC-Fragen ohne gültige Korrektmarkierung
+  // (z.B. MD-Import, bei dem die Antwort nicht in den Optionen stand →
+  // correctIndex=null) würden sonst automatisch als "Option A richtig"
+  // gewertet. Solche Fragen zu offenen Fragen degradieren, damit die
+  // Lehrkraft manuell bewertet. NUR spielseitig aufrufen, nicht im Admin
+  // (dort soll die Lehrkraft die MC-Frage reparieren können).
+  normalizePlayableQuestions(categories) {
+    let degraded = 0;
+    const walk = (node) => {
+      (node.questions || []).forEach(q => {
+        if (q.type !== 'mc') return;
+        const hasMulti = Array.isArray(q.correctIndices) && q.correctIndices.length > 0;
+        const hasSingle = typeof q.correctIndex === 'number' && q.correctIndex >= 0;
+        if (!hasMulti && !hasSingle) { q.type = 'open'; degraded++; }
+      });
+      (node.subcategories || []).forEach(walk);
+    };
+    (categories || []).forEach(walk);
+    if (degraded > 0) console.warn(`[Risiko-Quiz] ${degraded} MC-Frage(n) ohne markierte Lösung → als offene Frage behandelt.`);
+    return categories;
   },
 
   isTeamEliminated(team) {
@@ -956,12 +1030,15 @@ const MDParser = {
   },
 
   toMarkdown(categoriesOrGame) {
+    // Export im Format-A-Schema des Parsers: FLACHE Sektionen (`## Name`,
+    // Fragen als `### <difficulty>`). Verschachtelung wird über Pfadnamen
+    // ("Ober › Unter") abgebildet — tiefere Überschriften (####) würde der
+    // Parser ignorieren und der Re-Import eines Backups verlöre alle Fragen.
     const categories = categoriesOrGame.categories || [];
     let md = '';
-    const headings = ['##', '###', '####', '#####'];
 
-    function writeQuestion(q, prefix) {
-      let s = `${prefix} ${q.difficulty}\n`;
+    function writeQuestion(q) {
+      let s = `### ${q.difficulty}\n`;
       s += `- type: ${q.type}\n`;
       s += `- q: ${q.question}\n`;
       if (q.type === 'mc' && q.options && q.options.length > 0) {
@@ -973,27 +1050,22 @@ const MDParser = {
       return s;
     }
 
-    function writeNode(node, depth) {
-      const diffPrefix = headings[Math.min(depth + 1, headings.length - 1)];
-      const children = node.subcategories || [];
-      // Direkte Fragen an diesem Knoten
-      [...(node.questions || [])].sort((a, b) => a.difficulty - b.difficulty).forEach(q => {
-        md += writeQuestion(q, diffPrefix);
+    const walkExport = (node, path) => {
+      const qs = [...(node.questions || [])].sort((a, b) => a.difficulty - b.difficulty);
+      if (qs.length > 0) {
+        md += `## ${path.join(' › ')}\n\n`;
+        qs.forEach(q => { md += writeQuestion(q); });
+      }
+      (node.subcategories || []).forEach(child => {
+        // Hinweis: _getAllQuestionsInNode gehört zu GameModel, nicht MDParser
+        if (GameModel._getAllQuestionsInNode(child).length === 0) return;
+        walkExport(child, [...path, child.name]);
       });
-      // Kind-Knoten
-      children.forEach(child => {
-        if (this._getAllQuestionsInNode(child).length === 0) return;
-        md += `${headings[Math.min(depth + 1, headings.length - 1)]} ${child.name}\n\n`;
-        writeNode.call(this, child, depth + 1);
-      });
-    }
+    };
 
     categories.forEach(cat => {
-      (cat.subcategories || []).forEach(sub => {
-        if (this._getAllQuestionsInNode(sub).length === 0) return;
-        md += `## ${sub.name}\n\n`;
-        writeNode.call(this, sub, 1);
-      });
+      if (GameModel._getAllQuestionsInNode(cat).length === 0) return;
+      walkExport(cat, [cat.name]);
     });
     return md;
   }

@@ -365,8 +365,9 @@ async function init() {
 
   StorageManager.setGameCode(code);
 
-  // Questions einmalig laden
+  // Questions einmalig laden; MC ohne markierte Lösung → offene Frage
   questionsCache = await StorageManager.loadQuestions();
+  if (questionsCache && questionsCache.categories) GameModel.normalizePlayableQuestions(questionsCache.categories);
 
   // Erstes Laden
   await poll();
@@ -377,10 +378,12 @@ async function init() {
       onGameStateUpdate(gs);
     });
   } else {
-    // Offline-Fallback: Polling
-    setInterval(poll, 1000);
+    // Offline-Fallback: Polling (Handle merken, wird bei Spielende gestoppt)
+    offlinePollInterval = setInterval(poll, 1000);
   }
 }
+let offlinePollInterval = null;
+let endScreenShown = false;
 
 // ── SSE-Callback ────────────────────────────────────────────────
 function onGameStateUpdate(gs) {
@@ -389,11 +392,17 @@ function onGameStateUpdate(gs) {
 
     if (!gs?.meta) { myTeamId = null; showNoGame('Warte auf Spielstart…'); return; }
     if (gs.status === 'finished') {
+      if (endScreenShown) return; // idempotent: kein DOM-Rebuild pro Tick
+      endScreenShown = true;
+      // Polling/SSE stoppen — nach Spielende gibt es nichts mehr zu synchen
+      if (offlinePollInterval) { clearInterval(offlinePollInterval); offlinePollInterval = null; }
+      if (sseSubscription) { sseSubscription.unsubscribe(); sseSubscription = null; }
       // Kategorien anreichern, sonst zeigt getStats "0 von 0 Fragen gespielt"
       gs.categories = questionsCache?.categories || [];
       showEndScreen(gs);
       return;
     }
+    endScreenShown = false;
 
     if (myTeamId !== null && myTeamId !== 'spectator') {
       if (!gs.teams?.find(t => t.id === myTeamId)) myTeamId = null;
@@ -845,10 +854,15 @@ async function pressWeissNicht() {
   const btn = document.getElementById('btn-sq-weiss-nicht');
   btn.disabled = true; btn.textContent = '⏳ Warte auf Spielleiter…';
   try {
-    const gs = await StorageManager.loadGameState();
-    if (!gs?.liveQuestion) { btn.disabled = false; btn.textContent = '❓ Weiß nicht'; return; }
-    gs.liveQuestion.teamPassedQuestion = true;
-    await StorageManager.saveGameState(gs);
+    const result = await StorageManager.mutate((gs) => {
+      if (!gs.liveQuestion) return false;
+      // Nur das aktive Team darf passen — sonst könnte ein Gerät mit
+      // veralteter UI ein fremdes Team zum Passen zwingen (Punktabzug!)
+      const activeId = gs.liveQuestion.teamId ?? GameModel.getCurrentTeam(gs)?.id;
+      if (activeId !== myTeamId) return false;
+      gs.liveQuestion.teamPassedQuestion = true;
+    });
+    if (!result) { btn.disabled = false; btn.textContent = '❓ Weiß nicht'; }
   } catch { btn.disabled = false; btn.textContent = '❓ Weiß nicht'; }
 }
 
@@ -857,29 +871,32 @@ async function pressIchWeissEs() {
   const btn = document.getElementById('btn-sq-ich-weiss-es');
   btn.disabled = true;
   try {
-    const gs = await StorageManager.loadGameState();
-    if (!gs?.liveQuestion) { btn.disabled = false; return; }
-    const myTeam = gs.teams?.find(t => t.id === myTeamId);
-    if (!myTeam) { btn.disabled = false; return; }
-    const candidates = gs.liveQuestion.stealCandidates || [];
-    if (!candidates.find(c => c.teamId == myTeamId)) {
-      candidates.push({ teamId: myTeamId, teamName: myTeam.name, timestamp: Date.now() });
-      gs.liveQuestion.stealCandidates = candidates;
-      await StorageManager.saveGameState(gs);
-    }
-    hasRaisedHand = true; btn.textContent = '✋ Gemeldet!';
+    // CAS statt Load-Modify-Save: Melden sich zwei Teams fast gleichzeitig,
+    // löst der Server-409 einen Merge-Retry aus — keine Meldung geht verloren
+    const result = await StorageManager.mutate((gs) => {
+      if (!gs.liveQuestion) return false;
+      const myTeam = gs.teams?.find(t => t.id === myTeamId);
+      if (!myTeam) return false;
+      const candidates = gs.liveQuestion.stealCandidates || [];
+      if (!candidates.find(c => c.teamId == myTeamId)) {
+        candidates.push({ teamId: myTeamId, teamName: myTeam.name, timestamp: Date.now() });
+        gs.liveQuestion.stealCandidates = candidates;
+      }
+    });
+    if (result) { hasRaisedHand = true; btn.textContent = '✋ Gemeldet!'; }
+    else { btn.disabled = false; }
   } catch { btn.disabled = false; }
 }
 
 async function selectCell(slotIdx, diff) {
   if (!myTeamId || myTeamId === 'spectator') return;
   try {
-    const gs = await StorageManager.loadGameState();
-    if (!gs || gs.liveQuestion?.id || gs.pendingCellAction) return;
-    const activeTeam = GameModel.getActiveTeams(gs)[gs.currentTeamIndex];
-    if (!activeTeam || activeTeam.id !== myTeamId) return;
-    gs.pendingCellAction = { slotIdx, diff, teamId: myTeamId, timestamp: Date.now() };
-    await StorageManager.saveGameState(gs);
+    await StorageManager.mutate((gs) => {
+      if (!gs || gs.liveQuestion?.id || gs.pendingCellAction) return false;
+      const activeTeam = GameModel.getActiveTeams(gs)[gs.currentTeamIndex];
+      if (!activeTeam || activeTeam.id !== myTeamId) return false;
+      gs.pendingCellAction = { slotIdx, diff, teamId: myTeamId, timestamp: Date.now() };
+    });
   } catch {}
 }
 
@@ -890,11 +907,11 @@ function startSQTimer(lq, total) {
   const ringFill = document.getElementById('sq-ring-fill');
   const numEl   = document.getElementById('sq-timer-num');
   let soundPlayed = false;
-  // openedAt stammt von der Lehrergerät-Uhr — beim ersten Empfang auf die
-  // lokale Uhr normalisieren, sonst zeigt eine abweichende Geräteuhr
-  // sofort 0 Sekunden an (reine Anzeige, Wertung macht das Lehrergerät)
-  const startedLocal = Math.min(Date.now(), lq.openedAt || Date.now());
-  const base = (Date.now() - startedLocal > total * 1000) ? Date.now() : startedLocal;
+  // openedAt stammt von der Lehrergerät-Uhr — gegen vorlaufende Geräteuhr
+  // klemmen (reine Anzeige, Wertung macht das Lehrergerät). Kein Neustart
+  // bei abgelaufener Zeit: Nach einem Reload während einer alten Frage
+  // soll 0 angezeigt werden, nicht die volle Zeit.
+  const base = Math.min(Date.now(), lq.openedAt || Date.now());
   function tick() {
     const elapsed = Math.floor((Date.now() - base) / 1000);
     const remaining = Math.max(0, total - elapsed);

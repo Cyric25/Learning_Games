@@ -8,6 +8,22 @@
 
 $key = trim($_GET['f'] ?? '', '/');
 
+// ── Admin-Schutz ──────────────────────────────────────────────────
+// Destruktive Endpunkte (Fragendatenbank überschreiben, Spiele löschen,
+// Designer-Bibliotheken, Draft-Löschung) verlangen diesen Header. Das Token
+// steht zwangsläufig im Quelltext der Lehrkraft-Seiten — es ist eine Hürde
+// gegen Copy-Paste-Vandalismus, kein echtes Geheimnis.
+define('ADMIN_KEY', 'LP-Spiele-2026');
+function requireAdminKey() {
+    $k = $_SERVER['HTTP_X_ADMIN_KEY'] ?? '';
+    if (!hash_equals(ADMIN_KEY, $k)) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'forbidden']);
+        exit;
+    }
+}
+
 // ── Gemeinsame Helfer ─────────────────────────────────────────────
 
 function requireValidCode() {
@@ -56,6 +72,7 @@ function sseStream($path) {
     @ini_set('zlib.output_compression', false);
     while (ob_get_level()) ob_end_flush();
 
+    $lastStat = '';
     $lastSig = '';
     $start = time();
     $lastPing = 0;
@@ -71,13 +88,20 @@ function sseStream($path) {
 
         if (file_exists($path)) {
             clearstatcache(true, $path);
-            $sig = @filemtime($path) . ':' . @filesize($path) . ':' . @md5_file($path);
-            if ($sig !== $lastSig) {
-                $lastSig = $sig;
-                $data = @file_get_contents($path);
-                if ($data !== false && $data !== '') {
-                    echo "data: " . $data . "\n\n";
-                    @flush();
+            // Zweistufig: billiger mtime+size-Check pro Tick; md5 nur bei
+            // Änderung (erkennt mehrere Saves in derselben Sekunde bei
+            // gleicher Größe). Sonst rechnen 25 Streams ~83 Hashes/s.
+            $stat = @filemtime($path) . ':' . @filesize($path);
+            if ($stat !== $lastStat) {
+                $lastStat = $stat;
+                $sig = $stat . ':' . @md5_file($path);
+                if ($sig !== $lastSig) {
+                    $lastSig = $sig;
+                    $data = @file_get_contents($path);
+                    if ($data !== false && $data !== '') {
+                        echo "data: " . $data . "\n\n";
+                        @flush();
+                    }
                 }
             }
         }
@@ -93,87 +117,75 @@ function sseStream($path) {
     exit;
 }
 
+// ── Registry-Zugriff ──────────────────────────────────────────────
+// Alle Registry-Writes laufen über dieses eine Muster: exklusiver flock auf
+// einer separaten .lock-Datei (serialisiert Schreiber untereinander) plus
+// atomicWrite per tmp+rename (ungelockte LESER sehen nie halbe Dateien).
+// Vorher existierten zwei inkompatible Schreibwege (in-place unter flock vs.
+// rename), die sich gegenseitig Updates wegnehmen konnten.
+function withRegistry($gamesDir, callable $fn) {
+    $registryPath = $gamesDir . '/index.json';
+    $lock = @fopen($registryPath . '.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX)) { if ($lock) fclose($lock); return false; }
+    $registry = [];
+    if (file_exists($registryPath)) {
+        $registry = json_decode(@file_get_contents($registryPath), true) ?: [];
+    }
+    $result = $fn($registry);
+    $ok = true;
+    if (is_array($result)) { // null = keine Änderung
+        $ok = atomicWrite($registryPath, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    return $ok;
+}
+
 // ── Cleanup: Spiele älter als 24h löschen ─────────────────────────
 function cleanupExpiredGames($gamesDir) {
-    $registryPath = $gamesDir . '/index.json';
-    if (!file_exists($registryPath)) return;
-
-    $fp = fopen($registryPath, 'c+');
-    if (!$fp || !flock($fp, LOCK_EX)) { if ($fp) fclose($fp); return; }
-
-    $content = stream_get_contents($fp);
-    $registry = json_decode($content, true) ?: [];
-    $changed = false;
-    $now = time();
-    $maxAge = 24 * 60 * 60; // 24 Stunden
-
-    foreach ($registry as $code => $info) {
-        $timestamp = $info['updatedAt'] ?? $info['createdAt'] ?? null;
-        if (!$timestamp) continue;
-        $age = $now - strtotime($timestamp);
-        if ($age > $maxAge) {
-            $gamePath = $gamesDir . '/' . $code . '.json';
-            if (file_exists($gamePath)) @unlink($gamePath);
-            @unlink($gamePath . '.lock'); // CAS-Lockdatei mit aufräumen
-            unset($registry[$code]);
-            $changed = true;
+    if (!file_exists($gamesDir . '/index.json')) return;
+    withRegistry($gamesDir, function ($registry) use ($gamesDir) {
+        $changed = false;
+        $now = time();
+        $maxAge = 24 * 60 * 60; // 24 Stunden
+        foreach ($registry as $code => $info) {
+            $timestamp = $info['updatedAt'] ?? $info['createdAt'] ?? null;
+            if (!$timestamp) continue;
+            $ts = strtotime($timestamp);
+            if ($ts === false) continue; // kaputter Timestamp → NICHT löschen
+            if (($now - $ts) > $maxAge) {
+                $gamePath = $gamesDir . '/' . $code . '.json';
+                if (file_exists($gamePath)) @unlink($gamePath);
+                // .lock-Dateien absichtlich NICHT löschen: unlink während ein
+                // Prozess flock hält, ließe einen zweiten Prozess auf einer
+                // neuen Inode "exklusiv" locken → CAS-Atomarität gebrochen.
+                unset($registry[$code]);
+                $changed = true;
+            }
         }
-    }
-
-    if ($changed) {
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        fflush($fp);
-    }
-    flock($fp, LOCK_UN);
-    fclose($fp);
+        return $changed ? $registry : null;
+    });
 }
 
 function updateRegistryEntry($gamesDir, $code, $body, $defaultTitle) {
-    $registryPath = $gamesDir . '/index.json';
-    $retries = 3;
-    while ($retries-- > 0) {
-        $fp = fopen($registryPath, 'c+');
-        if (!$fp) break;
-        if (flock($fp, LOCK_EX)) {
-            $registry = json_decode(stream_get_contents($fp), true) ?: [];
-            $gameData = json_decode($body, true);
-            $registry[$code] = [
-                'title'     => $gameData['meta']['title'] ?? $defaultTitle,
-                'status'    => $gameData['phase'] ?? 'setup',
-                'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
-                'updatedAt' => date('c'),
-            ];
-            ftruncate($fp, 0);
-            rewind($fp);
-            fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-            fflush($fp);
-            flock($fp, LOCK_UN);
-            fclose($fp);
-            break;
-        }
-        fclose($fp);
-        usleep(50000);
-    }
+    withRegistry($gamesDir, function ($registry) use ($code, $body, $defaultTitle) {
+        $gameData = json_decode($body, true);
+        $registry[$code] = [
+            'title'     => $gameData['meta']['title'] ?? $defaultTitle,
+            'status'    => $gameData['phase'] ?? 'setup',
+            'createdAt' => $gameData['meta']['createdAt'] ?? date('c'),
+            'updatedAt' => date('c'),
+        ];
+        return $registry;
+    });
 }
 
 function removeRegistryEntry($gamesDir, $code) {
-    $registryPath = $gamesDir . '/index.json';
-    if (!file_exists($registryPath)) return;
-    $fp = fopen($registryPath, 'c+');
-    if ($fp && flock($fp, LOCK_EX)) {
-        $registry = json_decode(stream_get_contents($fp), true) ?: [];
+    if (!file_exists($gamesDir . '/index.json')) return;
+    withRegistry($gamesDir, function ($registry) use ($code) {
         unset($registry[$code]);
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($registry, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        fflush($fp);
-        flock($fp, LOCK_UN);
-        fclose($fp);
-    } elseif ($fp) {
-        fclose($fp);
-    }
+        return $registry;
+    });
 }
 
 // Registry-Endpunkt (?f=…-games): GET mit Cleanup, POST kompletter Snapshot
@@ -185,9 +197,12 @@ function registryEndpoint($gamesDir) {
         cleanupExpiredGames($gamesDir);
         echo file_exists($registryPath) ? file_get_contents($registryPath) : '{}';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireAdminKey(); // kompletter Registry-Snapshot = Lehrkraft-Aktion
         $body = readJsonBody();
-        atomicWrite($registryPath, $body)
-            ? print(json_encode(['ok' => true]))
+        $incoming = json_decode($body, true);
+        // Snapshot-POST unter demselben Lock wie alle anderen Registry-Writes
+        $ok = is_array($incoming) && withRegistry($gamesDir, fn($registry) => $incoming);
+        $ok ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     }
     exit;
@@ -216,11 +231,19 @@ function gameEndpoint($gamesDir, $defaultTitle) {
         $baseRev = array_key_exists('_baseRev', $incoming) ? (int)$incoming['_baseRev'] : null;
         unset($incoming['_baseRev']); // interne Feld, nicht persistieren
 
-        // Compare-and-Swap unter Lock: lesen → prüfen → schreiben ist atomar
-        $lock = fopen($path . '.lock', 'c');
-        if ($lock) flock($lock, LOCK_EX);
+        // Compare-and-Swap unter Lock: lesen → prüfen → schreiben ist atomar.
+        // Ohne Lock NICHT fortfahren — sonst liefe genau die Race, die CAS
+        // verhindern soll (stilles Weiterlaufen wäre schlimmer als ein 500).
+        $lock = @fopen($path . '.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX)) {
+            if ($lock) fclose($lock);
+            http_response_code(500);
+            echo json_encode(['error' => 'lock error']);
+            exit;
+        }
 
         $storedRev = 0;
+        $cur = null;
         if (file_exists($path)) {
             $cur = json_decode(@file_get_contents($path), true);
             if (is_array($cur)) $storedRev = (int)($cur['_rev'] ?? 0);
@@ -235,6 +258,15 @@ function gameEndpoint($gamesDir, $defaultTitle) {
             exit;
         }
 
+        // takenTeams wird server-seitig gemerged: Plain-Saves (Spielzüge)
+        // senden das Feld nicht mit — nur Beitritt/Kick (CAS-Saves) schreiben
+        // es. So können veraltete Spielzug-Snapshots keine frisch
+        // beigetretenen Teams "phantom-kicken".
+        if (!array_key_exists('takenTeams', $incoming) &&
+            is_array($cur) && array_key_exists('takenTeams', $cur)) {
+            $incoming['takenTeams'] = $cur['takenTeams'];
+        }
+
         $incoming['_rev'] = $storedRev + 1;
         $out = json_encode($incoming, JSON_UNESCAPED_UNICODE);
         $ok = atomicWrite($path, $out);
@@ -244,8 +276,9 @@ function gameEndpoint($gamesDir, $defaultTitle) {
         $ok ? print(json_encode(['ok' => true, 'rev' => $incoming['_rev']]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        requireAdminKey(); // Spiel löschen = Lehrkraft-Aktion
         if (file_exists($path)) @unlink($path);
-        @unlink($path . '.lock');
+        // .lock absichtlich behalten (siehe cleanupExpiredGames)
         removeRegistryEntry($gamesDir, $code);
         echo json_encode(['ok' => true]);
     }
@@ -274,6 +307,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Admin-Key');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
 
 // Statische Dateien (Legacy + Questions)
@@ -334,11 +368,13 @@ if ($key === 'er-game') {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($path) ? file_get_contents($path) : 'null';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireAdminKey(); // Escape-Room-Spiele schreibt nur der Editor
         $body = readJsonBody();
         atomicWrite($path, $body)
             ? print(json_encode(['ok' => true]))
             : (http_response_code(500) && print(json_encode(['error' => 'write error'])));
     } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+        requireAdminKey();
         if (file_exists($path)) @unlink($path);
         echo json_encode(['ok' => true]);
     }
@@ -353,6 +389,7 @@ if ($key === 'ls-boards') {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($libPath) ? file_get_contents($libPath) : '[]';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireAdminKey(); // Designer-Bibliothek schreibt nur die Lehrkraft
         $body = readJsonBody();
         atomicWrite($libPath, $body)
             ? print(json_encode(['ok' => true]))
@@ -369,6 +406,7 @@ if ($key === 'lab-mazes') {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo file_exists($libPath) ? file_get_contents($libPath) : '[]';
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        requireAdminKey(); // Designer-Bibliothek schreibt nur die Lehrkraft
         $body = readJsonBody();
         atomicWrite($libPath, $body)
             ? print(json_encode(['ok' => true]))
@@ -446,6 +484,7 @@ if ($key === 'draft') {
     $draftsPath = __DIR__ . '/data/drafts.json';
     $draftId = trim($_GET['id'] ?? '');
     if ($_SERVER['REQUEST_METHOD'] === 'DELETE' && $draftId !== '') {
+        requireAdminKey(); // Vorschläge löscht nur die Lehrkraft
         if (file_exists($draftsPath)) {
             $fp = fopen($draftsPath, 'c+');
             if ($fp && flock($fp, LOCK_EX)) {
@@ -476,13 +515,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo file_exists($path) ? file_get_contents($path) : '{}';
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // questions/gamestate schreibt nur die Lehrkraft. memory-pairs/settings
+    // bleiben offen (Memory-Admin ist nicht Teil dieser Umbau-Runde).
+    if ($key === 'questions' || $key === 'gamestate') requireAdminKey();
     $body = readJsonBody();
     $dir = dirname($path);
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
-    // Backup-Rotation vor Überschreiben (Schutz gegen versehentliches Leeren)
+    // Backup-Rotation vor Überschreiben, 3 Generationen — eine einzelne
+    // .bak wäre nach zwei schlechten Saves ebenfalls überschrieben
     if (file_exists($path) && @filesize($path) > 30) {
+        @copy($path . '.bak2', $path . '.bak3');
+        @copy($path . '.bak',  $path . '.bak2');
         @copy($path, $path . '.bak');
     }
     atomicWrite($path, $body)
