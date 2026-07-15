@@ -2,10 +2,17 @@
 // Analog risiko-quiz/js/shared.js (StorageManager) + _templates/spielverwaltung/XxxStorage.js
 
 const JoStorage = {
-  _code: null, _serverOk: null,
+  _code: null, _serverOk: null, _viewerId: null,
 
   setCode(c) { this._code = c ? c.toUpperCase() : null; },
   getCode()  { return this._code; },
+
+  // Eigene playerId des aufrufenden Geräts (nur Schülergerät – die
+  // Lehrkraft/Tafel setzt nie eine, sieht dadurch immer den vollen
+  // Zustand). Wird als ?playerId=… mitgeschickt, damit der Server das
+  // Geheimwort filtern kann, solange diese Person gerade rät.
+  setViewerId(id) { this._viewerId = id || null; },
+  _vp() { return this._viewerId ? '&playerId=' + encodeURIComponent(this._viewerId) : ''; },
 
   generateCode() {
     const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein O/I/0/1
@@ -24,12 +31,25 @@ const JoStorage = {
 
   // Spielernamen an der Vertrauensgrenze klemmen (Anzeigename kommt von
   // fremden Geräten) – analog zur XSS-Klemmung in anderen Spielen.
+  //
+  // Zusätzlich: PHP kodiert ein leeres JSON-Objekt {} beim Speichern/Laden
+  // als [] (json_decode($x,true) kennt keinen Unterschied zwischen leerem
+  // Objekt und leerem Array). `currentRound.clues` ist die einzige
+  // Dictionary-artige Stelle im Zustand (Schlüssel = playerId) und kommt
+  // nach einer leeren Runde als [] zurück. Ein Client, der dann per
+  // `clues[myPlayerId] = text` schreibt, verliert den Eintrag lautlos –
+  // JSON.stringify() serialisiert bei Arrays nur Index-Elemente, beliebige
+  // String-Properties werden stillschweigend verworfen. Deshalb hier auf
+  // ein echtes Objekt zurückklemmen, bevor irgendein Code damit arbeitet.
   _sanitizeState(gs) {
     if (Array.isArray(gs.players)) {
       gs.players = gs.players.map(p => ({
         ...p,
         name: String(p.name || '').replace(/[<>]/g, '').slice(0, 30)
       }));
+    }
+    if (gs.currentRound && Array.isArray(gs.currentRound.clues)) {
+      gs.currentRound.clues = {};
     }
     return gs;
   },
@@ -46,7 +66,7 @@ const JoStorage = {
     code = (code||this._code||'').toUpperCase();
     if (!code) return null;
     if (await this.checkServer())
-      try { const r = await fetch('../api.php?f=jo-game&code='+code); if (r.ok) { const d=await r.json(); if(d&&d.meta) return this._sanitizeState(d); } } catch {}
+      try { const r = await fetch('../api.php?f=jo-game&code='+code+this._vp()); if (r.ok) { const d=await r.json(); if(d&&d.meta) return this._sanitizeState(d); } } catch {}
     const s = localStorage.getItem('jo_gs_'+code);
     if (s) try { return this._sanitizeState(JSON.parse(s)); } catch {}
     return null;
@@ -91,7 +111,7 @@ const JoStorage = {
       }
       const payload = { ...draft, _baseRev: state._rev || 0 };
       try {
-        const r = await fetch('../api.php?f=jo-game&code='+code, {
+        const r = await fetch('../api.php?f=jo-game&code='+code+this._vp(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -118,14 +138,14 @@ const JoStorage = {
     let stopped = false, src = null, timer = null;
     const startSSE = () => {
       if (stopped) return;
-      src = new EventSource('../api.php?f=jo-sse&code='+code);
+      src = new EventSource('../api.php?f=jo-sse&code='+code+this._vp());
       src.onmessage = e => { if(stopped) return; try { const d=JSON.parse(e.data); if(d&&d.meta) cb(this._sanitizeState(d)); } catch {} };
       src.addEventListener('reconnect', () => { src&&src.close(); src=null; if(!stopped) setTimeout(startSSE,500); });
       src.onerror = () => { src&&src.close(); src=null; if(!stopped) startPoll(); };
     };
     const startPoll = () => {
       if(stopped||timer) return;
-      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=jo-game&code='+code); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._sanitizeState(d));} } catch {} };
+      const fn = async () => { if(stopped) return; try { const r=await fetch('../api.php?f=jo-game&code='+code+this._vp()); if(r.ok){const d=await r.json();if(d&&d.meta)cb(this._sanitizeState(d));} } catch {} };
       fn(); timer = setInterval(fn, 1000);
     };
     const startLocalPoll = () => {

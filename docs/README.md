@@ -29,6 +29,7 @@ und enthält die Styling-Paletten und Copy-Paste-Muster im Detail.
 | [Labyrinth-Quiz](spiele/labyrinth.md) | `Labyrint-Quiz/` | Canvas-Labyrinth | Ja (SSE) | zentrale DB |
 | [Schiffeversenken-Quiz](spiele/schiffeversenken.md) | `schiffeversenken/` | Schiffe versenken | Ja (SSE) | zentrale DB |
 | [Codenames](spiele/codenames.md) | `codenames/` | Wortraten (Teams) | Ja (Polling) | eigene Wortlisten |
+| [Just One](spiele/just-one.md) | `just-one/` | Kooperatives Worträtsel | Ja (SSE, viewer-gefiltert) | eigene Begriffs-DB |
 | [Escape Room](spiele/escape-room.md) | `escape-room/` | Rätselräume | Nein (localStorage) | eigene, im Spiel |
 | [Memory](spiele/memory.md) | `memory/` | Paare finden (Singleplayer) | Nein | eigene Paar-DB |
 | [Lernkarten](spiele/lernkarten.md) | `lernkarten/` | Spaced Repetition (SM-2) | Nein | zentrale DB + Memory |

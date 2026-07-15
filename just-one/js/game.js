@@ -196,6 +196,7 @@ async function proceedToLobby() {
 function showLobbyScreen() {
   const code = JoStorage.getCode();
   document.getElementById('lobby-code-val').textContent = code || '----';
+  document.getElementById('lobby-board-link').href = 'board.html?code=' + code;
   const count = JoWordlistModel.pooledWords(wordlistData, gameState.activeCategoryIds).length;
   document.getElementById('lobby-summary').textContent =
     gameState.activeCategoryIds.length + ' Unterkategorie(n) · ' + count + ' Begriffe · ' + gameState.settings.targetRounds + ' Runden';
@@ -232,6 +233,15 @@ async function kickPlayer(playerId) {
     draft.players = (draft.players || []).filter(p => p.id !== playerId);
     draft.turnOrder = (draft.turnOrder || []).filter(id => id !== playerId);
     if (draft.currentTurnIdx >= draft.turnOrder.length) draft.currentTurnIdx = 0;
+    if (draft.currentRound) {
+      if (draft.currentRound.guesserId === playerId) {
+        // Rater:in entfernt → Runde kann nicht fortgesetzt werden
+        draft.currentRound = null;
+      } else {
+        delete draft.currentRound.clues[playerId];
+        draft.currentRound.struckIds = (draft.currentRound.struckIds || []).filter(id => id !== playerId);
+      }
+    }
   });
   if (ns) {
     gameState = ns;
@@ -250,7 +260,7 @@ async function startGame() {
   gameState.currentRound = null;
   await JoStorage.save(gameState);
   showScreen('game-screen');
-  renderPlayerChips('game-player-list', gameState.players || [], true);
+  renderGameScreen(gameState);
 }
 
 // ── Live-Sync (Lobby + Spiel) ─────────────────────────────────────
@@ -264,12 +274,191 @@ function onGameStateUpdate(state) {
   if (state.phase === 'lobby') {
     renderPlayerChips('lobby-player-list', state.players || [], true);
     updateLobbyPlayerHint();
-  } else if (state.phase === 'playing') {
+  } else if (state.phase === 'playing' || state.phase === 'finished') {
     if (!document.getElementById('game-screen').classList.contains('active')) {
       showScreen('game-screen');
     }
-    renderPlayerChips('game-player-list', state.players || [], true);
+    renderGameScreen(state);
   }
+}
+
+// ── Rundenlogik (Lehrkraft) ─────────────────────────────────────────
+// Das Lehrkraft-Gerät setzt nie eine JoStorage-ViewerId und sieht dadurch
+// immer den vollständigen Zustand inkl. Geheimwort (siehe filterJoState()
+// in api.php) – nur die Rater:in bekommt es serverseitig herausgefiltert.
+
+function drawNextRound(state) {
+  if (!state.turnOrder.length) return false;
+  const pool = JoWordlistModel.pooledWords(wordlistData, state.activeCategoryIds);
+  const draw = JoWordlistModel.drawWord(pool, state.usedWordIds);
+  if (!draw) return false;
+  state.usedWordIds.push(draw.id);
+  const guesserId = state.turnOrder[state.currentTurnIdx % state.turnOrder.length];
+  state.currentRound = {
+    guesserId, secretWord: draw.word, phase: 'collecting',
+    clues: {}, struckIds: [], result: null
+  };
+  return true;
+}
+
+async function beginNextRound() {
+  if ((gameState.players || []).length < 3) return;
+  const ok = drawNextRound(gameState);
+  if (!ok) gameState.phase = 'finished';
+  await JoStorage.save(gameState);
+  renderGameScreen(gameState);
+}
+
+async function forceCloseClues() {
+  const ns = await JoStorage.mutate(draft => {
+    const r = draft.currentRound;
+    if (!r || r.phase !== 'collecting') return false;
+    r.struckIds = joComputeDuplicateStrikes(r.clues);
+    r.phase = 'review';
+  });
+  if (ns) onGameStateUpdate(ns);
+}
+
+async function toggleStrike(pid) {
+  const r = gameState.currentRound;
+  if (!r) return;
+  const idx = (r.struckIds || []).indexOf(pid);
+  if (idx >= 0) r.struckIds.splice(idx, 1);
+  else (r.struckIds = r.struckIds || []).push(pid);
+  await JoStorage.save(gameState);
+  renderGameScreen(gameState);
+}
+
+async function releaseClues() {
+  gameState.currentRound.phase = 'revealed';
+  await JoStorage.save(gameState);
+  renderGameScreen(gameState);
+}
+
+async function confirmAutoMiss() {
+  await resolveRound(false);
+}
+
+async function resolveRound(result) {
+  const r = gameState.currentRound;
+  gameState.roundsPlayed += 1;
+  if (result) gameState.correctCount += 1;
+  r.phase = 'resolved';
+  r.result = result;
+  // Rater-Rotation für die nächste Runde vorbereiten
+  gameState.currentTurnIdx = (gameState.currentTurnIdx + 1) % Math.max(1, gameState.turnOrder.length);
+  await JoStorage.save(gameState);
+  renderGameScreen(gameState);
+}
+
+async function endGame() {
+  gameState.phase = 'finished';
+  gameState.currentRound = null;
+  await JoStorage.save(gameState);
+  renderGameScreen(gameState);
+}
+
+function renderGameScreen(state) {
+  const roundNum = state.roundsPlayed + (state.currentRound ? 1 : 0);
+  document.getElementById('game-round-info').textContent =
+    'Runde ' + Math.min(roundNum, state.settings.targetRounds) + ' von ' + state.settings.targetRounds + ' · ' + state.correctCount + ' richtig';
+  document.getElementById('game-board-link').href = 'board.html?code=' + JoStorage.getCode();
+  renderPlayerChips('game-player-list', state.players || [], true);
+
+  const body = document.getElementById('game-body');
+  if (state.phase === 'finished') { body.innerHTML = renderFinishedHtml(state); return; }
+
+  const r = state.currentRound;
+  if (!r) { body.innerHTML = renderNoRoundHtml(state); return; }
+  if (r.phase === 'collecting') body.innerHTML = renderCollectingHtml(state, r);
+  else if (r.phase === 'review') body.innerHTML = renderReviewHtml(state, r);
+  else if (r.phase === 'revealed') body.innerHTML = renderRevealedHtml(state, r);
+  else if (r.phase === 'resolved') body.innerHTML = renderResolvedHtml(state, r);
+}
+
+function renderNoRoundHtml(state) {
+  if ((state.players || []).length < 3) {
+    return `<div class="game-card">
+      <div class="round-banner">Warte auf mehr Spieler:innen</div>
+      <div class="round-subtext">Mindestens 3 Spieler:innen nötig (aktuell ${(state.players || []).length}).</div>
+    </div>`;
+  }
+  return `<div class="game-card">
+    <div class="round-banner">Bereit für Runde ${state.roundsPlayed + 1} von ${state.settings.targetRounds}</div>
+    <button class="setup-btn" onclick="beginNextRound()">&#9658; Runde starten</button>
+  </div>`;
+}
+
+function renderCollectingHtml(state, r) {
+  const expected = joExpectedClueCount(state);
+  const submitted = Object.keys(r.clues).length;
+  const chips = (state.players || []).filter(p => p.id !== r.guesserId).map(p =>
+    `<span class="progress-chip${r.clues[p.id] ? ' done' : ''}">${escHtml(p.name)}</span>`).join('');
+  return `<div class="game-card">
+    <div class="round-banner">🙈 ${escHtml(joPlayerName(state, r.guesserId))} rät diese Runde</div>
+    <div class="round-subtext">${submitted} von ${expected} Hinweisen abgegeben</div>
+    <div class="progress-chips">${chips}</div>
+    <button class="btn btn-secondary" onclick="forceCloseClues()">Hinweise jetzt schließen</button>
+  </div>`;
+}
+
+function renderReviewHtml(state, r) {
+  const dupIds = new Set(joComputeDuplicateStrikes(r.clues));
+  const rows = Object.keys(r.clues).map(pid => {
+    const struck = (r.struckIds || []).includes(pid);
+    return `<div class="mod-row${struck ? ' struck' : ''}">
+      <span class="mod-name">${escHtml(joPlayerName(state, pid))}</span>
+      <span class="mod-text">${escHtml(r.clues[pid])}</span>
+      ${dupIds.has(pid) ? '<span class="mod-reason">Duplikat</span>' : ''}
+      <button class="mod-toggle" onclick="toggleStrike('${pid}')">${struck ? 'Wiederherstellen' : 'Streichen'}</button>
+    </div>`;
+  }).join('');
+  const survivors = joSurvivingClueTexts(r).length;
+  return `<div class="game-card">
+    <div class="round-banner">Hinweise prüfen</div>
+    <div class="round-subtext">Duplikate sind bereits markiert. Weitere ungültige Hinweise (Wortfamilie, Fremdsprache, erfunden) manuell streichen.</div>
+    <div class="mod-list">${rows || '<p style="color:var(--text-secondary);">Keine Hinweise abgegeben.</p>'}</div>
+    ${survivors > 0
+      ? `<button class="setup-btn" onclick="releaseClues()">Freigeben (${survivors} Hinweis${survivors === 1 ? '' : 'e'})</button>`
+      : `<button class="setup-btn btn-wrong" onclick="confirmAutoMiss()">Fehlversuch bestätigen &amp; weiter</button>`}
+  </div>`;
+}
+
+function renderRevealedHtml(state, r) {
+  const chips = joSurvivingClueTexts(r).map(w => `<span class="reveal-chip">${escHtml(w)}</span>`).join('');
+  return `<div class="game-card">
+    <div class="round-banner">🙈 ${escHtml(joPlayerName(state, r.guesserId))} darf raten</div>
+    <div class="round-subtext">Hinweise:</div>
+    <div class="reveal-list">${chips}</div>
+    <div class="round-subtext">Antwort wurde laut gesagt – richtig?</div>
+    <div class="result-actions">
+      <button class="setup-btn btn-correct" onclick="resolveRound(true)">✓ Richtig</button>
+      <button class="setup-btn btn-wrong" onclick="resolveRound(false)">✗ Falsch</button>
+    </div>
+  </div>`;
+}
+
+function renderResolvedHtml(state, r) {
+  const isLast = state.roundsPlayed >= state.settings.targetRounds;
+  return `<div class="game-card">
+    <div class="round-banner">${r.result ? '✅ Richtig!' : '❌ Leider falsch'}</div>
+    <div class="resolved-word">${escHtml(r.secretWord)}</div>
+    <div class="resolved-result ${r.result ? 'correct' : 'wrong'}">Stand: ${state.correctCount} von ${state.roundsPlayed} Runden</div>
+    <button class="setup-btn" onclick="${isLast ? 'endGame()' : 'beginNextRound()'}">${isLast ? 'Spiel beenden' : 'Nächste Runde ▶'}</button>
+  </div>`;
+}
+
+function renderFinishedHtml(state) {
+  const total = state.roundsPlayed || 0;
+  const pct = total > 0 ? Math.round((state.correctCount / total) * 100) : 0;
+  const rating = joRatingText(state.correctCount, total);
+  return `<div class="game-card">
+    <div class="round-banner">🏁 Spiel beendet</div>
+    <div class="finish-score">${state.correctCount} / ${total}</div>
+    <div class="finish-bar-wrap"><div class="finish-bar" style="width:${pct}%"></div></div>
+    <div class="finish-rating"><span class="emoji">${rating.emoji}</span>${escHtml(rating.label)}</div>
+    <a class="lobby-back-link" style="color:var(--text-secondary);" onclick="resetToSelector()">&#8592; Zurück zum Spielwähler</a>
+  </div>`;
 }
 
 // ── Spielwähler-Aktionen ────────────────────────────────────────────
@@ -284,12 +473,10 @@ async function _gsEnter(code) {
   if (gs.phase === 'lobby') {
     showLobbyScreen();
     subscribeGame(code);
-  } else if (gs.phase === 'playing') {
+  } else if (gs.phase === 'playing' || gs.phase === 'finished') {
     showScreen('game-screen');
-    renderPlayerChips('game-player-list', gs.players || [], true);
-    subscribeGame(code);
-  } else if (gs.phase === 'finished') {
-    showScreen('game-screen');
+    renderGameScreen(gs);
+    if (gs.phase === 'playing') subscribeGame(code);
   } else {
     showScreen('setup-screen');
     document.getElementById('setup-game-title').value = gs.meta.title === 'Just One' ? '' : gs.meta.title;

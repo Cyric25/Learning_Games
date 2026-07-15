@@ -809,6 +809,32 @@
           </div>
         </div>
 
+        <!-- Just One -->
+        <div class="game-card" data-game="just-one">
+          <button class="game-toggle" onclick="toggleGameVisibility('just-one')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #4c1d95, #db2777);">
+            <span class="card-emoji">🤫</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Just One</div>
+            <div class="card-desc">
+              Kooperatives Worträtsel: Eine Person rät, alle anderen schreiben geheim
+              je einen Ein-Wort-Hinweis. Gleiche Hinweise werden gestrichen – volles Team,
+              ein gemeinsames Ergebnis. Mit eigenen Begriffslisten und Tafelansicht.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Kooperativ</span>
+              <span class="tag">Wörter</span>
+              <span class="tag">Multiplayer</span>
+              <span class="tag">Tafelansicht</span>
+            </div>
+            <div class="card-actions">
+              <a href="just-one/index.html" class="btn btn-play" style="background: linear-gradient(135deg, #4c1d95, #db2777);">▶ Spielen</a>
+              <a href="just-one/admin.html" class="btn btn-admin teacher-only">📝 Begriffe</a>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -863,7 +889,7 @@
   const DEFAULT_ENABLED = ['slf', 'risiko'];
 
   // Neu hinzugefügte Spiele, die bei bestehenden Nutzern automatisch aktiviert werden
-  const NEW_GAMES = ['lernkarten', 'schiffeversenken'];
+  const NEW_GAMES = ['lernkarten', 'schiffeversenken', 'just-one'];
 
   // ── Theme ────────────────────────────────────────────────
   function applyTheme(dark) {

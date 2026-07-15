@@ -93,6 +93,23 @@ Spiele/
       labyrinth.js              ← Spiellogik (Setup, Turns, Fragen, Scoring)
     css/
       labyrinth.css             ← Styles (Light default, body.dark)
+  just-one/
+    index.html                  ← Just One Lehrkraft (Spielwähler + Setup + Kategorien + Moderation)
+    view.html                   ← Schülergerät (Beitritt, Warteraum, Hinweis-Eingabe / Rater-Ansicht)
+    board.html                  ← Tafelansicht (viewer-gefiltert, Sentinel '*')
+    admin.html                  ← Eigener Begriffs-Editor (Kategorien/Unterkategorien, MD-Import)
+    js/
+      shared.js                 ← JoStorage (Spielverwaltung, mutate/CAS, Viewer-Filterung)
+      game.js                   ← Lehrkraft-Logik (Setup, Rundenablauf, Moderation, Scoring)
+      play.js                   ← Schülergerät-Logik (Beitritt, Kick-Erkennung, Hinweise, Raten)
+      board.js                  ← Tafel-Rendering
+      round-shared.js           ← Rundenlogik-Helfer (Duplikat-Erkennung, Bewertungsskala)
+      wordlist-shared.js        ← JoWordlistStorage + JoWordlistModel + JoWordlistMDParser
+      admin.js                  ← Begriffs-Editor-Logik
+    css/
+      just-one.css              ← Basis-Styles (Standard Orange/Dunkelblau)
+      game.css                  ← Spielwähler/Setup/Lobby/Runden-Styles
+      admin.css                 ← Begriffsverwaltungs-Styles
 ```
 
 ---
@@ -118,6 +135,7 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 | `Labyrint-Quiz/index.html` | Light (Mystisch-Lila) | `body.dark` |
 | `Labyrint-Quiz/admin.html` | Light (Mystisch-Lila) | `body.dark` |
 | `lernkarten/index.html` | Light (Orange Standard) | `body.dark` |
+| `just-one/index.html` / `view.html` / `board.html` / `admin.html` | Light (Orange Standard) | `body.dark` |
 
 **JS-Muster (immer gleich, nur `'dark'`/`'light'` und Klassenname tauschen):**
 
@@ -280,6 +298,7 @@ Das Risiko-Quiz-Format ist das Master-Format. Spiele, die ein anderes internes F
 | Memory | `memory/data/pairs.json` | Paare (sideA/sideB) statt Fragen |
 | Stadt Land Fluss | `categories.json` | Kategorienamen statt Fragen |
 | Escape Room | localStorage | Raumgebundene Fragen mit Codes/Hotspots |
+| Just One | `data/just-one/wordlists.json` | Offener Begriffs-Pool statt Fragen; Codenames-Wortlisten bewusst nicht wiederverwendet (dort fest auf 25 Wörter) |
 
 ### Master-Format (`questions.json`)
 ```json
@@ -375,6 +394,7 @@ Spiele, die paralleles Spielen unterstützen, verwenden das **Spielverwaltungs-M
 | Labyrinth-Quiz | Nein — Einzelspiel | — |
 | Memory | Nein — Singleplayer | — |
 | Escape Room | Nein — eigenes Multi-Team-System | — |
+| Just One | Ja (index.html Spielwähler, `jo-` prefix, offenes Spieler-Roster statt fixer Teams) | view.html via SSE (aktiv mitspielend) + board.html (Tafel, viewer-gefiltert) |
 
 ---
 
@@ -988,6 +1008,37 @@ Nutzt das **Spielverwaltungs-Muster** → siehe `## Spielverwaltung`.
 - Spielwähler in `index.html` (erster Screen `#game-selector`)
 - Schüler-App: `view.html` — Code eingeben, Team wählen, Würfeln, MC antworten
 - Bonus-Felder (roll_again, free_move, swap) werden nur vom Lehrkraft-Device behandelt
+
+---
+
+## Just One
+
+### Architektur
+- Kooperatives Worträtsel: pro Runde eine Rater:in, alle anderen schreiben
+  geheim je einen Ein-Wort-Hinweis; Duplikate werden automatisch gestrichen,
+  die Lehrkraft kann weitere ungültige Hinweise manuell streichen
+- **Eigene Begriffsdatenbank** (`data/just-one/wordlists.json`), nicht die
+  zentrale Fragendatenbank und nicht die Codenames-Wortlisten (dort fest auf
+  25 Wörter) — siehe Abschnitt "Zentrale Fragendatenbank →
+  Spiele mit eigener Datenbank"
+- Details, Rundenablauf, Sync-Besonderheiten: `docs/spiele/just-one.md`
+
+### Einzige Ausnahme im Projekt: Viewer-gefilterter State
+Alle anderen Spiele synchronisieren denselben JSON-Zustand an jedes Gerät.
+Just One filtert `currentRound.secretWord` serverseitig pro Betrachter
+(`filterJoState()` in `api.php`, angewendet über einen optionalen
+`$filterFn`-Parameter in `gameEndpoint()`/`sseStream()` — für alle anderen
+Spiele-Prefixe `null`, also unverändert). Client schickt `?playerId=…`
+(`JoStorage.setViewerId()`); die Tafelansicht schickt den Sentinel `'*'` und
+wird dadurch immer wie die Rater:in behandelt (Klasse könnte mitschauen).
+
+### Spielverwaltung + Schüleransicht
+Nutzt das **Spielverwaltungs-Muster** (`jo-` Prefix) mit einer Abweichung:
+**offenes Spieler-Roster** statt fixer Teamliste (`takenTeams`) — beliebig
+viele Personen treten mit selbstgewähltem Namen bei, `playerId` in
+`localStorage` (analog `codenames/game.js` `getOrCreatePlayerId`). Kick
+entfernt aus `players[]` **und** `turnOrder[]`. Zusätzlich `board.html`
+(Tafelansicht, viewer-gefiltert wie oben).
 
 ---
 

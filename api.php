@@ -56,12 +56,39 @@ function readJsonBody() {
     return $body;
 }
 
+// ── Just One: Geheimwort vor der Rater:in verbergen ───────────────
+// Einziges Spiel im Projekt, das den synchronisierten Zustand pro
+// Betrachter unterschiedlich ausliefern muss: alle anderen Spiele teilen
+// denselben JSON-Zustand mit jedem Gerät, weil es dort keine Information
+// gibt, die vor einer bestimmten Person verborgen werden müsste. Just One
+// durchbricht das — die Rater:in darf das Geheimwort in keinem
+// Netzwerk-Payload sehen, sonst ist die Kernmechanik der Runde hinfällig.
+// $viewerPlayerId kommt als ?playerId=… vom Client; die Lehrkraft sendet
+// keins mit und sieht dadurch immer den vollständigen Zustand. Die
+// Tafelansicht (board.html) schickt den festen Sentinel-Wert '*' — sie wird
+// von der ganzen Klasse inkl. der aktuellen Rater:in eingesehen, daher immer
+// wie die Rater:in behandeln (nie das Geheimwort zeigen, solange die Runde
+// nicht aufgelöst ist), unabhängig davon wer gerade tatsächlich rät.
+function filterJoState($state, $viewerPlayerId) {
+    if (!is_array($state)) return $state;
+    $round = $state['currentRound'] ?? null;
+    if (!is_array($round) || ($round['phase'] ?? '') === 'resolved') return $state;
+    $isGuesserViewer = $viewerPlayerId !== '' && $viewerPlayerId !== null && $viewerPlayerId === ($round['guesserId'] ?? null);
+    $isBoardViewer = $viewerPlayerId === '*';
+    if ($isGuesserViewer || $isBoardViewer) {
+        unset($state['currentRound']['secretWord']);
+    }
+    return $state;
+}
+
 // SSE-Stream für eine Spielstand-Datei.
 // - Signatur (mtime+size+md5) statt nur mtime: erkennt auch mehrere Saves
 //   innerhalb derselben Sekunde (filemtime hat 1s-Auflösung).
 // - Keepalive-Kommentar alle 2s, damit connection_aborted() abgebrochene
 //   Clients erkennt und den PHP-Worker freigibt (wichtig bei 25+ Geräten).
-function sseStream($path) {
+// - $filterFn (optional): wendet vor jedem emittierten Event einen
+//   Callback($decodedState, $viewerId) an — bisher nur für Just One nötig.
+function sseStream($path, $filterFn = null, $viewerId = null) {
     header('Content-Type: text/event-stream; charset=utf-8');
     header('Cache-Control: no-cache');
     header('Connection: keep-alive');
@@ -99,6 +126,10 @@ function sseStream($path) {
                     $lastSig = $sig;
                     $data = @file_get_contents($path);
                     if ($data !== false && $data !== '') {
+                        if ($filterFn) {
+                            $decoded = json_decode($data, true);
+                            if (is_array($decoded)) $data = json_encode($filterFn($decoded, $viewerId), JSON_UNESCAPED_UNICODE);
+                        }
                         echo "data: " . $data . "\n\n";
                         @flush();
                     }
@@ -217,13 +248,21 @@ function registryEndpoint($gamesDir) {
 //     HTTP 409 + aktueller Stand im Body, damit der Client neu mergen kann.
 //   - Ohne `_baseRev` (autoritative Schreiber, Legacy-Clients) wird direkt
 //     geschrieben — voll rückwärtskompatibel.
-function gameEndpoint($gamesDir, $defaultTitle) {
+//   - $filterFn (optional): siehe filterJoState() — filtert die GET- und
+//     409-Konflikt-Antwort pro Betrachter (?playerId=…), bisher nur `jo-`.
+function gameEndpoint($gamesDir, $defaultTitle, $filterFn = null) {
     $code = requireValidCode();
+    $viewerPlayerId = $filterFn ? mb_substr(trim($_GET['playerId'] ?? ''), 0, 64) : null;
     if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
     $path = $gamesDir . '/' . $code . '.json';
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        echo file_exists($path) ? file_get_contents($path) : '{}';
+        $data = file_exists($path) ? file_get_contents($path) : '{}';
+        if ($filterFn) {
+            $decoded = json_decode($data, true);
+            if (is_array($decoded)) $data = json_encode($filterFn($decoded, $viewerPlayerId), JSON_UNESCAPED_UNICODE);
+        }
+        echo $data;
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body = readJsonBody();
         $incoming = json_decode($body, true);
@@ -254,7 +293,12 @@ function gameEndpoint($gamesDir, $defaultTitle) {
             if ($lock) { flock($lock, LOCK_UN); fclose($lock); }
             http_response_code(409);
             header('X-Current-Rev: ' . $storedRev);
-            echo file_exists($path) ? file_get_contents($path) : '{}';
+            $data = file_exists($path) ? file_get_contents($path) : '{}';
+            if ($filterFn) {
+                $decoded = json_decode($data, true);
+                if (is_array($decoded)) $data = json_encode($filterFn($decoded, $viewerPlayerId), JSON_UNESCAPED_UNICODE);
+            }
+            echo $data;
             exit;
         }
 
@@ -299,7 +343,9 @@ $gameDirs = [
 foreach ($gameDirs as $prefix => [$dir, $title]) {
     if ($key === $prefix . 'sse') {
         $code = requireValidCode();
-        sseStream($dir . '/' . $code . '.json');
+        $filterFn = $prefix === 'jo-' ? 'filterJoState' : null;
+        $viewerId = $filterFn ? mb_substr(trim($_GET['playerId'] ?? ''), 0, 64) : null;
+        sseStream($dir . '/' . $code . '.json', $filterFn, $viewerId);
     }
 }
 
@@ -335,7 +381,10 @@ try {
 // ── Registry- und Per-Game-Endpunkte für alle Spiele ─────────────
 foreach ($gameDirs as $prefix => [$dir, $title]) {
     if ($key === $prefix . 'games') registryEndpoint($dir);
-    if ($key === $prefix . 'game')  gameEndpoint($dir, $title === 'Spiel' ? 'Spiel ' . strtoupper(trim($_GET['code'] ?? '')) : $title);
+    if ($key === $prefix . 'game') {
+        $filterFn = $prefix === 'jo-' ? 'filterJoState' : null;
+        gameEndpoint($dir, $title === 'Spiel' ? 'Spiel ' . strtoupper(trim($_GET['code'] ?? '')) : $title, $filterFn);
+    }
 }
 
 // ── Escape Room Library: ?f=er-library ───────────────────────────

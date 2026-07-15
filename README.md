@@ -21,7 +21,7 @@ Copy-Paste-Muster).
 ## Spiele
 
 Risiko-Quiz · QuizPfad · Leiterspiel-Quiz · Labyrinth-Quiz · Schiffeversenken-Quiz
-· Codenames · Escape Room · Memory · Lernkarten · Stadt-Land-Fluss
+· Codenames · Just One · Escape Room · Memory · Lernkarten · Stadt-Land-Fluss
 
 Einstiegspunkt: `spiele.html`. Zentraler Frageneditor: `admin.html`.
 

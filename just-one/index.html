@@ -104,7 +104,8 @@
       <span class="lobby-code-label">Spielcode</span>
       <span class="lobby-code-value" id="lobby-code-val">----</span>
     </div>
-    <p class="lobby-hint">Spieler:innen treten mit diesem Code über die Übersicht bei.</p>
+    <p class="lobby-hint">Spieler:innen treten mit diesem Code über die Übersicht bei.<br>
+      <a id="lobby-board-link" href="#" target="_blank" style="color:var(--accent-light,var(--accent));">📺 Tafelansicht öffnen ↗</a></p>
 
     <div class="player-list" id="lobby-player-list"></div>
     <div class="player-count-hint" id="lobby-player-hint"></div>
@@ -113,17 +114,21 @@
     <a class="lobby-back-link" onclick="confirmAbandonLobby()">&#8592; Zurück</a>
   </div>
 
-  <!-- ── Screen 5: Spiel (Platzhalter – Rundenlogik folgt) ────────── -->
-  <div class="screen" id="game-screen" style="align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem;">
-    <h2 style="color:var(--accent);">🤫 Just One läuft</h2>
-    <p style="color:var(--text-secondary);max-width:480px;">Die Rundenlogik folgt in der nächsten Ausbaustufe. Aktuell sind Beitritt, Warteraum und Kick funktionsfähig.</p>
-    <div class="player-list" id="game-player-list" style="margin-top:1rem;"></div>
-    <a class="lobby-back-link" style="color:var(--text-secondary);" onclick="confirmAbandonLobby()">&#8592; Zurück zum Spielwähler</a>
+  <!-- ── Screen 5: Spiel ───────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="game-header">
+      <div class="game-round-info" id="game-round-info">Runde 1</div>
+      <a class="header-btn" id="game-board-link" href="#" target="_blank" style="text-decoration:none;">📺 Tafel</a>
+      <button class="header-btn" onclick="confirmAbandonLobby()">&#8592; Verlassen</button>
+    </div>
+    <div class="game-body" id="game-body"></div>
+    <div class="player-list" id="game-player-list"></div>
   </div>
 
   <!-- ── Scripts ───────────────────────────────────────────────── -->
   <script src="js/wordlist-shared.js"></script>
   <script src="js/shared.js"></script>
+  <script src="js/round-shared.js"></script>
   <script src="js/game.js"></script>
 
   <!-- Theme Toggle -->

@@ -62,16 +62,17 @@
     <p class="kicked-msg">Du wurdest von der Lehrkraft entfernt.</p>
   </div>
 
-  <!-- ── Screen: Spiel (Platzhalter – Rundenlogik folgt) ──────────── -->
-  <div class="screen view-wrap" id="screen-game">
-    <h1>🤫 Just One läuft</h1>
-    <p>Die Rundenlogik folgt in der nächsten Ausbaustufe.</p>
-    <div class="player-list" id="game-wait-player-list"></div>
+  <!-- ── Screen: Spiel ─────────────────────────────────────────── -->
+  <div class="screen" id="screen-game" style="flex-direction:column;">
+    <div class="game-header">
+      <div class="game-round-info" id="p-game-round-info">Runde 1</div>
+    </div>
+    <div class="game-body" id="p-game-body"></div>
   </div>
 
   <!-- ── Scripts ───────────────────────────────────────────────── -->
-  <script src="js/wordlist-shared.js"></script>
   <script src="js/shared.js"></script>
+  <script src="js/round-shared.js"></script>
   <script src="js/play.js"></script>
 
   <!-- Theme (folgt dem gewählten Theme, kein eigener Toggle nötig) -->

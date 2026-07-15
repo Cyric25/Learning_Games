@@ -154,6 +154,79 @@
 .player-count-hint { color: rgba(255,255,255,0.75); font-size: 0.85rem; margin-bottom: 1rem; }
 .player-count-hint.ok { color: #6ee7a0; }
 
+/* ── Spielbildschirm (#game-screen) ─────────────────────────────── */
+#game-screen {
+  position: fixed; inset: 0; background: var(--bg-body);
+  flex-direction: column; overflow-y: auto;
+}
+.game-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1.2rem; background: rgba(0,0,0,0.15);
+}
+.game-round-info { color: #fff; font-weight: 700; font-size: 1.05rem; }
+.game-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 1.5rem; gap: 1rem;
+}
+.game-card {
+  background: var(--bg-container); border-radius: 16px; padding: 1.5rem;
+  width: 100%; max-width: 560px; box-shadow: var(--shadow);
+  color: var(--text-primary); text-align: center;
+}
+.round-banner { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin-bottom: 0.6rem; }
+.round-subtext { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem; }
+
+/* Fortschritt: wer hat schon abgegeben */
+.progress-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-bottom: 1rem; }
+.progress-chip {
+  padding: 0.3rem 0.8rem; border-radius: 16px; font-size: 0.85rem;
+  background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border);
+}
+.progress-chip.done { background: var(--success); color: #fff; border-color: var(--success); }
+
+/* Hinweis-Eingabe */
+.clue-input-row { display: flex; gap: 0.6rem; margin-top: 0.4rem; }
+.clue-input-row input { flex: 1; padding: 0.7rem 1rem; font-size: 1.05rem; }
+
+/* Moderationsliste (Lehrkraft, Phase "review") */
+.mod-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; text-align: left; }
+.mod-row {
+  display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem 0.9rem;
+  background: var(--bg-card); border-radius: 10px;
+}
+.mod-row .mod-name { font-size: 0.8rem; color: var(--text-secondary); min-width: 90px; }
+.mod-row .mod-text { flex: 1; font-size: 1.05rem; font-weight: 600; }
+.mod-row.struck .mod-text { text-decoration: line-through; color: var(--text-secondary); }
+.mod-row .mod-reason { font-size: 0.75rem; color: var(--danger); }
+.mod-row .mod-toggle {
+  border: 1px solid var(--border); background: none; border-radius: 8px;
+  padding: 4px 10px; cursor: pointer; font-size: 0.8rem; color: var(--text-primary);
+}
+.mod-row.struck .mod-toggle { color: var(--danger); border-color: var(--danger); }
+
+/* Aufgedeckte Hinweise */
+.reveal-list { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-bottom: 1.2rem; }
+.reveal-chip {
+  padding: 0.5rem 1.1rem; border-radius: 20px; background: var(--tag-bg); color: var(--tag-color);
+  font-weight: 700; font-size: 1.1rem;
+}
+
+.result-actions { display: flex; gap: 0.8rem; justify-content: center; }
+.btn-correct { background: var(--success); color: #fff; }
+.btn-wrong { background: var(--danger); color: #fff; }
+
+.resolved-word { font-size: 1.6rem; font-weight: 800; color: var(--accent); margin: 0.4rem 0; }
+.resolved-result { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+.resolved-result.correct { color: var(--success); }
+.resolved-result.wrong { color: var(--danger); }
+
+/* Spielende */
+.finish-score { font-size: clamp(2rem,6vw,3rem); font-weight: 800; color: var(--accent); margin: 0.6rem 0; }
+.finish-bar-wrap { height: 14px; background: var(--bg-card); border-radius: 7px; overflow: hidden; margin: 0.8rem 0 1.2rem; }
+.finish-bar { height: 100%; background: var(--btn-play-bg); border-radius: 7px; transition: width 0.4s; }
+.finish-rating { font-size: 1.3rem; font-weight: 700; margin-bottom: 1.2rem; }
+.finish-rating .emoji { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
+
 /* Responsive */
 @media (max-width: 540px) {
   #setup-screen, #category-screen { padding: 1.2rem; }
