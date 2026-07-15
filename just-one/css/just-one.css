@@ -1,0 +1,118 @@
+/* just-one.css – Basis-Styles für Just One (Header, Buttons, Formulare)
+   Standard-Palette: Orange (Light-Standard) / Dunkelblau (body.dark) */
+
+:root {
+  --bg-body:         linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+  --bg-primary:      #fdfaf8;
+  --bg-container:    #ffffff;
+  --bg-card:         #f8f9fa;
+  --bg-card-back:    #fff3ee;
+  --bg-option:       #fff3ee;
+  --bg-option-hover: #ffe0d0;
+
+  --accent:          #E34F20;
+  --accent-dark:     #c73518;
+  --accent-light:    #f7971e;
+
+  --text-primary:    #1e293b;
+  --text-secondary:  #64748b;
+
+  --border:          #e0e0e0;
+  --card-hover-border: #E34F20;
+  --card-shadow-hover: 0 12px 35px rgba(227,79,32,0.2);
+  --shadow:          0 4px 20px rgba(227,79,32,0.12);
+  --tag-bg:          #ffe8df;
+  --tag-color:       #c73518;
+
+  --btn-play-bg:     linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+
+  --success:         #16a34a;
+  --danger:          #dc2626;
+  --warning:         #d97706;
+}
+
+body.dark {
+  --bg-body:         linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  --bg-primary:      #16213e;
+  --bg-container:    #16213e;
+  --bg-card:         #1a2744;
+  --bg-card-back:    #0f3460;
+  --bg-option:       #1a2744;
+  --bg-option-hover: #1a4a80;
+
+  --accent:          #f7971e;
+  --accent-dark:     #E34F20;
+
+  --text-primary:    #ffffff;
+  --text-secondary:  #a8a8b3;
+  --border:          rgba(255,255,255,0.12);
+
+  --success:         #2ecc71;
+  --danger:          #e74c3c;
+  --warning:         #f39c12;
+  --shadow:          0 4px 20px rgba(0,0,0,0.30);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-body);
+  color: var(--text-primary);
+}
+
+/* ── Header ──────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-container);
+  border-bottom: 1px solid var(--border);
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.header h1 { font-size: 1.2rem; margin: 0; color: var(--accent); }
+.header-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+.header-btn:hover { background: var(--bg-option-hover); border-color: var(--accent); }
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.88; }
+.btn-primary { background: var(--btn-play-bg); color: #fff; }
+.btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; }
+
+/* ── Formulare ───────────────────────────────────────── */
+input[type="text"], select, textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+input[type="text"]:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}

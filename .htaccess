@@ -5,7 +5,7 @@ RewriteEngine On
 
 # Disable output buffering/compression for SSE (alle Spiel-Prefixe).
 # Hinweis: SetEnvIf Request_URI sieht den Query-String nicht — daher RewriteCond.
-RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-)?sse(&|$)
+RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-|jo-)?sse(&|$)
 RewriteRule ^api\.php$ - [E=no-gzip:1,E=dont-vary:1]
 
 # Spielstände/Drafts nur über api.php: Direktzugriff verbieten. Sonst leakt

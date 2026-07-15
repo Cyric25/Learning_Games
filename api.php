@@ -4,7 +4,7 @@
 //         api.php?f=games          (Registry aller Spiele)
 //         api.php?f=game&code=XXXX (Spielstand pro Spiel)
 //         api.php?f=sse&code=XXXX  (Server-Sent Events Stream)
-// Weitere Spiele nutzen dieselben Endpunkte mit Prefix (ls-, bs-, qp-, labyrinth-).
+// Weitere Spiele nutzen dieselben Endpunkte mit Prefix (ls-, bs-, qp-, labyrinth-, jo-).
 
 $key = trim($_GET['f'] ?? '', '/');
 
@@ -292,6 +292,7 @@ $gameDirs = [
     'bs-'        => [__DIR__ . '/schiffeversenken/data/games',   'Spiel'],
     'labyrinth-' => [__DIR__ . '/data/games/labyrinth',          'Labyrinth-Quiz'],
     'qp-'        => [__DIR__ . '/data/games/quizpfad',           'QuizPfad'],
+    'jo-'        => [__DIR__ . '/data/games/just-one',           'Just One'],
 ];
 
 // ── SSE-Endpunkte (eigene Header, kein JSON) ─────────────────────
@@ -316,6 +317,7 @@ $files = [
     'gamestate'    => __DIR__ . '/data/risiko-gamestate.json',
     'memory-pairs'     => __DIR__ . '/data/memory/pairs.json',
     'settings'     => __DIR__ . '/data/settings.json',
+    'jo-words'     => __DIR__ . '/data/just-one/wordlists.json',
 ];
 
 // Auto-Migration: alte questions.json → neuer Pfad
@@ -515,9 +517,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo file_exists($path) ? file_get_contents($path) : '{}';
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // questions/gamestate schreibt nur die Lehrkraft. memory-pairs/settings
-    // bleiben offen (Memory-Admin ist nicht Teil dieser Umbau-Runde).
-    if ($key === 'questions' || $key === 'gamestate') requireAdminKey();
+    // questions/gamestate/jo-words schreibt nur die Lehrkraft. memory-pairs/
+    // settings bleiben offen (Memory-Admin ist nicht Teil dieser Umbau-Runde).
+    if ($key === 'questions' || $key === 'gamestate' || $key === 'jo-words') requireAdminKey();
     $body = readJsonBody();
     $dir = dirname($path);
     if (!is_dir($dir)) {

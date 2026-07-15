@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Just One – Mitspielen</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤫</text></svg>">
+  <link rel="stylesheet" href="css/just-one.css">
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    .view-wrap {
+      position: fixed; inset: 0; background: var(--bg-body);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem; text-align: center;
+    }
+    .view-wrap h1 { color: #fff; font-size: clamp(1.6rem,5vw,2.4rem); margin: 0 0 1.2rem; }
+    .view-wrap p { color: rgba(255,255,255,0.85); margin: 0 0 1.5rem; }
+    #name-input {
+      font-size: 1.3rem; text-align: center; padding: 0.6em 1em; width: 100%; max-width: 320px;
+      background: var(--bg-container); color: var(--text-primary);
+      border: 2px solid var(--border); border-radius: 12px; outline: none;
+    }
+    #name-input:focus { border-color: var(--accent); }
+    .kicked-msg { color: #fff; font-size: 1.1rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Screen: Code eingeben ─────────────────────────────────── -->
+  <div class="screen active view-wrap" id="screen-join">
+    <h1>🤫 Just One</h1>
+    <p>Spielcode eingeben, um beizutreten.</p>
+    <input id="join-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+      placeholder="CODE"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')submitCode()">
+    <button class="setup-btn" style="margin-top:1.2rem;" onclick="submitCode()">Weiter &rarr;</button>
+    <div id="join-error" class="gs-join-error"></div>
+  </div>
+
+  <!-- ── Screen: Name eingeben ─────────────────────────────────── -->
+  <div class="screen view-wrap" id="screen-name">
+    <h1>🤫 Just One</h1>
+    <p>Wie heißt du?</p>
+    <input id="name-input" type="text" maxlength="30" autocomplete="off" placeholder="Dein Name"
+      onkeydown="if(event.key==='Enter')submitName()">
+    <button class="setup-btn" style="margin-top:1.2rem;" onclick="submitName()">Beitreten &rarr;</button>
+    <div id="name-error" class="gs-join-error"></div>
+  </div>
+
+  <!-- ── Screen: Warteraum ─────────────────────────────────────── -->
+  <div class="screen view-wrap" id="screen-wait">
+    <h1>🕓 Warteraum</h1>
+    <p id="wait-my-name"></p>
+    <div class="player-list" id="wait-player-list"></div>
+    <p style="color:rgba(255,255,255,0.7);font-size:0.9rem;">Die Lehrkraft startet das Spiel, sobald genug Mitspieler:innen da sind.</p>
+  </div>
+
+  <!-- ── Screen: Gekickt ───────────────────────────────────────── -->
+  <div class="screen view-wrap" id="screen-kicked">
+    <h1>👋</h1>
+    <p class="kicked-msg">Du wurdest von der Lehrkraft entfernt.</p>
+  </div>
+
+  <!-- ── Screen: Spiel (Platzhalter – Rundenlogik folgt) ──────────── -->
+  <div class="screen view-wrap" id="screen-game">
+    <h1>🤫 Just One läuft</h1>
+    <p>Die Rundenlogik folgt in der nächsten Ausbaustufe.</p>
+    <div class="player-list" id="game-wait-player-list"></div>
+  </div>
+
+  <!-- ── Scripts ───────────────────────────────────────────────── -->
+  <script src="js/wordlist-shared.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/play.js"></script>
+
+  <!-- Theme (folgt dem gewählten Theme, kein eigener Toggle nötig) -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    document.body.classList.toggle('dark', localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

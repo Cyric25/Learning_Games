@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Just One – Begriffsverwaltung</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤫</text></svg>">
+  <link rel="stylesheet" href="css/just-one.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-left">
+      <a href="../spiele.html" class="header-btn" title="Zurück zur Übersicht" style="text-decoration:none;">&#8592;</a>
+      <h1>Just One – Begriffsverwaltung</h1>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a href="index.html" class="header-btn" style="text-decoration:none;">▶ Spielen</a>
+      <button class="header-btn" id="btn-theme" title="Design wechseln" onclick="toggleTheme()">🌙 Darkmode</button>
+    </div>
+  </div>
+
+  <div class="admin-wrap">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('categories')">Kategorien</button>
+      <button class="tab-btn" onclick="switchTab('words')">Begriffe</button>
+      <button class="tab-btn" onclick="switchTab('import')">MD-Import</button>
+    </div>
+
+    <!-- ── Tab: Kategorien ─────────────────────────────── -->
+    <div class="tab-content active" id="tab-categories">
+      <div class="cat-tree" id="admin-cat-tree"></div>
+      <div class="cat-actions">
+        <input type="text" id="new-cat-name" placeholder="Neue Kategorie…">
+        <button class="btn btn-primary btn-sm" onclick="addCategory()">+ Kategorie</button>
+      </div>
+    </div>
+
+    <!-- ── Tab: Begriffe ───────────────────────────────── -->
+    <div class="tab-content" id="tab-words">
+      <div class="word-select-row">
+        <select id="word-cat-select" onchange="onWordCatChange()">
+          <option value="">– Kategorie wählen –</option>
+        </select>
+        <select id="word-subcat-select" onchange="renderWordEditor()" disabled>
+          <option value="">– Unterkategorie wählen –</option>
+        </select>
+      </div>
+      <textarea id="word-textarea" placeholder="Ein Begriff pro Zeile…" disabled></textarea>
+      <div class="word-count" id="word-count"></div>
+      <button class="btn btn-primary" id="btn-save-words" onclick="saveWords()" style="display:none;">Speichern</button>
+      <div class="save-status" id="save-status"></div>
+    </div>
+
+    <!-- ── Tab: MD-Import ──────────────────────────────── -->
+    <div class="tab-content" id="tab-import">
+      <p class="import-hint">
+        Format: <code>## Kategorie</code> → <code>### Unterkategorie</code> → <code>- Begriff</code>
+      </p>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <button class="btn btn-secondary" style="margin:0;" onclick="document.getElementById('import-file').click()">📂 Datei öffnen</button>
+        <input type="file" id="import-file" accept=".md,.txt"
+               style="position:absolute;opacity:0;width:0;height:0;overflow:hidden;"
+               onchange="handleImportFile(this)">
+        <span id="import-filename" style="font-size:0.85rem;color:var(--text-secondary);"></span>
+      </div>
+      <textarea id="import-textarea" placeholder="## Tiere
+### Haustiere
+- Hund
+- Katze
+- Wellensittich"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+        ondragleave="this.style.borderColor=''"
+        ondrop="handleImportDrop(event)"></textarea>
+      <button class="btn btn-secondary" onclick="previewImport()">Vorschau</button>
+      <div class="import-preview" id="import-preview" style="display:none;"></div>
+      <button class="btn btn-primary" id="btn-confirm-import" onclick="confirmImport()" style="display:none;margin-top:8px;">Import bestätigen</button>
+      <div class="save-status" id="import-status"></div>
+    </div>
+  </div>
+
+  <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="js/wordlist-shared.js"></script>
+  <script src="js/admin.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(active) {
+      document.body.classList.toggle('dark', active);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = active ? '☀️ Lightmode' : '🌙 Darkmode';
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>
