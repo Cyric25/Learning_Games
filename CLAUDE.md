@@ -110,6 +110,32 @@ Spiele/
       just-one.css              ← Basis-Styles (Standard Orange/Dunkelblau)
       game.css                  ← Spielwähler/Setup/Lobby/Runden-Styles
       admin.css                 ← Begriffsverwaltungs-Styles
+  insider/
+    index.html                  ← Insider Lehrkraft (Spielwähler + Setup + Kategorien + Moderation)
+    view.html                   ← Schülergerät (Beitritt, Rollenkarte, Timer, Abstimmung)
+    board.html                  ← Tafelansicht (viewer-gefiltert, Sentinel '*')
+    admin.html                  ← Verweis auf just-one/admin.html (gemeinsame Begriffs-DB)
+    js/
+      shared.js                 ← InStorage (Duplikat von JoStorage, Prefix in-)
+      round-shared.js           ← Timer-Helfer (game/play/board)
+      vote-shared.js            ← Abstimmungs-Helfer — auch von Hochstapler eingebunden!
+      game.js                   ← Lehrkraft-Logik (Rollen, Timer, Abstimmung, Auflösung)
+      play.js                   ← Schülergerät-Logik (Beitritt, Rollenkarte, Stimmabgabe)
+      board.js                  ← Tafel-Rendering
+    css/
+      insider.css               ← Alle Styles (Standard Orange/Dunkelblau)
+  hochstapler/
+    index.html                  ← Hochstapler Lehrkraft (Spielwähler + Setup + Kategorien + Moderation)
+    view.html                   ← Schülergerät (Beitritt, Wort-/Rollenkarte, Abstimmung)
+    board.html                  ← Tafelansicht (viewer-gefiltert, Sentinel '*')
+    admin.html                  ← Verweis auf just-one/admin.html (gemeinsame Begriffs-DB)
+    js/
+      shared.js                 ← HsStorage (Duplikat von JoStorage, Prefix hs-)
+      game.js                   ← Lehrkraft-Logik (Rollen, Hinweisrunden, Abstimmung, letzte Chance)
+      play.js                   ← Schülergerät-Logik (Beitritt, Rollenkarte, Stimmabgabe)
+      board.js                  ← Tafel-Rendering
+    css/
+      hochstapler.css           ← Alle Styles (Duplikat von insider.css + Sprechreihenfolge)
 ```
 
 ---
@@ -136,6 +162,7 @@ So bleibt das gewählte Theme beim Navigieren zwischen Spielen erhalten.
 | `Labyrint-Quiz/admin.html` | Light (Mystisch-Lila) | `body.dark` |
 | `lernkarten/index.html` | Light (Orange Standard) | `body.dark` |
 | `just-one/index.html` / `view.html` / `board.html` / `admin.html` | Light (Orange Standard) | `body.dark` |
+| `insider/*` und `hochstapler/*` (alle Seiten) | Light (Orange Standard) | `body.dark` |
 
 **JS-Muster (immer gleich, nur `'dark'`/`'light'` und Klassenname tauschen):**
 
@@ -299,6 +326,8 @@ Das Risiko-Quiz-Format ist das Master-Format. Spiele, die ein anderes internes F
 | Stadt Land Fluss | `categories.json` | Kategorienamen statt Fragen |
 | Escape Room | localStorage | Raumgebundene Fragen mit Codes/Hotspots |
 | Just One | `data/just-one/wordlists.json` | Offener Begriffs-Pool statt Fragen; Codenames-Wortlisten bewusst nicht wiederverwendet (dort fest auf 25 Wörter) |
+| Insider | **teilt** die Just-One-Begriffs-DB | Braucht einzelne Geheimwörter; `wordlist-shared.js` wird per `<script src>` eingebunden, kein eigener Editor (admin.html = Verweis auf `just-one/admin.html`) |
+| Hochstapler | **teilt** die Just-One-Begriffs-DB | wie Insider |
 
 ### Master-Format (`questions.json`)
 ```json
@@ -395,6 +424,8 @@ Spiele, die paralleles Spielen unterstützen, verwenden das **Spielverwaltungs-M
 | Memory | Nein — Singleplayer | — |
 | Escape Room | Nein — eigenes Multi-Team-System | — |
 | Just One | Ja (index.html Spielwähler, `jo-` prefix, offenes Spieler-Roster statt fixer Teams) | view.html via SSE (aktiv mitspielend) + board.html (Tafel, viewer-gefiltert) |
+| Insider | Ja (index.html Spielwähler, `in-` prefix, offenes Spieler-Roster) | view.html via SSE (Rollen + Abstimmung) + board.html (Tafel, viewer-gefiltert) |
+| Hochstapler | Ja (index.html Spielwähler, `hs-` prefix, offenes Spieler-Roster) | view.html via SSE (Rollen + Abstimmung) + board.html (Tafel, viewer-gefiltert) |
 
 ---
 
@@ -1023,14 +1054,24 @@ Nutzt das **Spielverwaltungs-Muster** → siehe `## Spielverwaltung`.
   Spiele mit eigener Datenbank"
 - Details, Rundenablauf, Sync-Besonderheiten: `docs/spiele/just-one.md`
 
-### Einzige Ausnahme im Projekt: Viewer-gefilterter State
-Alle anderen Spiele synchronisieren denselben JSON-Zustand an jedes Gerät.
+### Viewer-gefilterter State (Just One, Insider, Hochstapler)
+Die meisten Spiele synchronisieren denselben JSON-Zustand an jedes Gerät.
 Just One filtert `currentRound.secretWord` serverseitig pro Betrachter
 (`filterJoState()` in `api.php`, angewendet über einen optionalen
-`$filterFn`-Parameter in `gameEndpoint()`/`sseStream()` — für alle anderen
-Spiele-Prefixe `null`, also unverändert). Client schickt `?playerId=…`
-(`JoStorage.setViewerId()`); die Tafelansicht schickt den Sentinel `'*'` und
-wird dadurch immer wie die Rater:in behandelt (Klasse könnte mitschauen).
+`$filterFn`-Parameter in `gameEndpoint()`/`sseStream()` — Zuordnung im
+`$gameFilters`-Array, für alle übrigen Spiele-Prefixe `null`, also
+unverändert). Client schickt `?playerId=…` (`JoStorage.setViewerId()`); die
+Tafelansicht schickt den Sentinel `'*'` und wird dadurch immer wie die
+Rater:in behandelt (Klasse könnte mitschauen).
+
+Insider (`filterInsiderState`) und Hochstapler (`filterHsState`) nutzen
+denselben Mechanismus mit einer Erweiterung: Dort schreiben **gefilterte**
+Viewer während der Runde (Abstimmung per `mutate()`), daher stellt
+`protectSecretRoundFields()` beim POST die Geheimfelder (`secretWord`,
+`insiderId` bzw. `impostorIds`; `$gameProtectedFields`-Array) aus dem
+gespeicherten Stand wieder her, solange `currentRound.num` übereinstimmt —
+analog zum `takenTeams`-Merge. Neue Runden brauchen deshalb zwingend eine
+neue `num`.
 
 ### Spielverwaltung + Schüleransicht
 Nutzt das **Spielverwaltungs-Muster** (`jo-` Prefix) mit einer Abweichung:
@@ -1039,6 +1080,43 @@ viele Personen treten mit selbstgewähltem Namen bei, `playerId` in
 `localStorage` (analog `codenames/game.js` `getOrCreatePlayerId`). Kick
 entfernt aus `players[]` **und** `turnOrder[]`. Zusätzlich `board.html`
 (Tafelansicht, viewer-gefiltert wie oben).
+
+---
+
+## Insider
+
+### Architektur
+- Deduktionsspiel (nach Oink Games): Master beantwortet mündliche
+  Ja/Nein-Fragen zum Geheimwort, ein heimlicher Insider hilft mit; nach
+  Erraten digitale Abstimmung „Wer war der Insider?"
+- **Begriffe aus der Just-One-Begriffs-DB** (`wordlist-shared.js` per
+  `<script src>` eingebunden, admin.html = Verweis auf `just-one/admin.html`)
+- Spielverwaltung wie Just One (`in-` Prefix, offenes Roster), Rundenphasen
+  `roleReveal → questioning → voting → voteClosed → resolved`
+- Viewer-Filter + Geheimfeld-Schutz: siehe „Viewer-gefilterter State" oben
+- Timer nur als `timerStartedAt`+`timerSec` im State, Restzeit lokal gerechnet
+- Abstimmung: letzte Stimme schließt im selben `mutate()` (`vtCloseVote` in
+  `insider/js/vote-shared.js`), Gleichstand → einmalige Stichwahl; Aufdecken
+  nur durch die Lehrkraft (nur ihr Gerät kennt `insiderId`)
+- Details: `docs/spiele/insider.md`
+
+---
+
+## Hochstapler
+
+### Architektur
+- Bluffspiel (Imposter-Prinzip): alle sehen das Geheimwort außer dem
+  Hochstapler; mündliche Hinweisrunden in gemischter Sprechreihenfolge,
+  dann digitale Abstimmung; enttarnter Hochstapler hat eine letzte Chance
+  (Wort mündlich erraten, Lehrkraft wertet)
+- **Begriffe aus der Just-One-Begriffs-DB**, Abstimmungs-Helfer aus
+  `../insider/js/vote-shared.js` (Cross-Include wie `wordlist-shared.js`)
+- Spielverwaltung wie Just One (`hs-` Prefix, offenes Roster), Rundenphasen
+  `roleReveal → hinting → voting → voteClosed → (lastChance) → resolved`
+- Optional 2 Hochstapler (Setup-Schalter, ab 5 Spieler:innen); der Filter
+  reduziert `impostorIds` auf die eigene Id — sie kennen einander nicht
+- Viewer-Filter + Geheimfeld-Schutz: siehe „Viewer-gefilterter State" oben
+- Details: `docs/spiele/hochstapler.md`
 
 ---
 

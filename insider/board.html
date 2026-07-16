@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insider – Tafelansicht</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+  <link rel="stylesheet" href="css/insider.css">
+  <style>
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .board-screen { display: none; }
+    .board-screen.active { display: flex; }
+
+    #board-join {
+      position: fixed; inset: 0; background: var(--bg-body);
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 1rem; padding: 2rem; text-align: center;
+    }
+    #board-join h1 { color: #fff; font-size: clamp(1.8rem,5vw,2.6rem); margin: 0; }
+
+    #board-main {
+      position: fixed; inset: 0; background: var(--bg-body);
+      flex-direction: column;
+    }
+    .board-top-bar {
+      display: flex; align-items: center; gap: 1rem; padding: 0.8rem 1.4rem;
+      background: rgba(0,0,0,0.2); color: #fff;
+    }
+    .board-top-bar .btb-code { font-family: monospace; font-weight: 800; letter-spacing: 0.1em; }
+    .board-top-bar .btb-round { margin-left: auto; font-weight: 700; }
+    .board-main-body {
+      flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem;
+    }
+    .board-card {
+      background: var(--bg-container); border-radius: 20px; padding: clamp(1.5rem,4vw,3rem);
+      width: 100%; max-width: 760px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .board-banner { font-size: clamp(1.4rem,3.5vw,2.2rem); font-weight: 800; color: var(--accent); margin-bottom: 0.6rem; }
+    .board-sub { color: var(--text-secondary); font-size: clamp(0.95rem,2vw,1.2rem); margin-bottom: 1.2rem; }
+    .board-word { font-size: clamp(1.8rem,5vw,3rem); font-weight: 800; color: var(--accent); margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+
+  <div class="board-screen active" id="board-join">
+    <h1>🕵️ Insider – Tafel</h1>
+    <input id="board-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+      placeholder="CODE"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')boardJoin()">
+    <button class="setup-btn" onclick="boardJoin()">Verbinden &rarr;</button>
+    <div id="board-join-error" class="gs-join-error"></div>
+    <a href="../spiele.html" style="color:rgba(255,255,255,0.75);font-size:0.9rem;text-decoration:none;">&larr; Übersicht</a>
+  </div>
+
+  <div class="board-screen" id="board-main">
+    <div class="board-top-bar">
+      <span>🕵️ Insider</span>
+      <span class="btb-code" id="btb-code"></span>
+      <span class="btb-round" id="btb-round"></span>
+    </div>
+    <div class="board-main-body">
+      <div class="board-card" id="board-content"></div>
+    </div>
+  </div>
+
+  <script src="js/shared.js"></script>
+  <script src="js/round-shared.js"></script>
+  <script src="js/vote-shared.js"></script>
+  <script src="js/board.js"></script>
+
+  <script>
+  (function () {
+    document.body.classList.toggle('dark', localStorage.getItem('spiele_theme') === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

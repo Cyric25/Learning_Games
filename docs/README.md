@@ -30,6 +30,8 @@ und enthält die Styling-Paletten und Copy-Paste-Muster im Detail.
 | [Schiffeversenken-Quiz](spiele/schiffeversenken.md) | `schiffeversenken/` | Schiffe versenken | Ja (SSE) | zentrale DB |
 | [Codenames](spiele/codenames.md) | `codenames/` | Wortraten (Teams) | Ja (Polling) | eigene Wortlisten |
 | [Just One](spiele/just-one.md) | `just-one/` | Kooperatives Worträtsel | Ja (SSE, viewer-gefiltert) | eigene Begriffs-DB |
+| [Insider](spiele/insider.md) | `insider/` | Deduktion (Geheimwort + Insider) | Ja (SSE, viewer-gefiltert) | Just-One-Begriffs-DB |
+| [Hochstapler](spiele/hochstapler.md) | `hochstapler/` | Bluff (Imposter-Prinzip) | Ja (SSE, viewer-gefiltert) | Just-One-Begriffs-DB |
 | [Escape Room](spiele/escape-room.md) | `escape-room/` | Rätselräume | Nein (localStorage) | eigene, im Spiel |
 | [Memory](spiele/memory.md) | `memory/` | Paare finden (Singleplayer) | Nein | eigene Paar-DB |
 | [Lernkarten](spiele/lernkarten.md) | `lernkarten/` | Spaced Repetition (SM-2) | Nein | zentrale DB + Memory |

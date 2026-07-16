@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hochstapler</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
+  <link rel="stylesheet" href="css/hochstapler.css">
+</head>
+<body>
+
+  <!-- ── Screen 1: Spielwähler ─────────────────────────────────── -->
+  <div class="screen active" id="game-selector">
+    <h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;text-align:center;">🎭 Hochstapler</h1>
+    <p style="color:rgba(255,255,255,0.85);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;text-align:center;">Spielcode eingeben um beizutreten</p>
+
+    <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+      placeholder="CODE"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')joinAsStudent()">
+
+    <button class="setup-btn" style="margin-top:1.2rem;" onclick="joinAsStudent()">Beitreten &rarr;</button>
+    <div id="gs-join-error" class="gs-join-error"></div>
+
+    <hr class="gs-divider">
+    <div class="gs-teacher-section">
+      <p style="color:rgba(255,255,255,0.85);font-size:0.95rem;margin:0 0 0.8rem;">Oder als Lehrkraft:</p>
+      <div id="gs-game-list" class="gs-game-list"></div>
+      <button class="setup-btn" style="background:var(--success);" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+    </div>
+
+    <div style="margin-top:1.5rem;display:flex;gap:1rem;">
+      <a href="admin.html" style="color:rgba(255,255,255,0.75);font-size:0.9rem;text-decoration:none;">⚙ Begriffsverwaltung</a>
+      <a href="../spiele.html" style="color:rgba(255,255,255,0.75);font-size:0.9rem;text-decoration:none;">&larr; Übersicht</a>
+    </div>
+  </div>
+
+  <!-- ── Screen 2: Setup ───────────────────────────────────────── -->
+  <div class="screen" id="setup-screen">
+    <div class="setup-inner">
+      <div id="setup-code-banner" style="display:none;text-align:center;margin-bottom:1rem;padding:0.6rem 1.2rem;background:var(--bg-card);border-radius:12px;border:2px solid var(--accent);">
+        <span style="color:var(--text-secondary);font-size:0.85rem;">Spielcode:</span>
+        <span style="color:var(--accent);font-size:1.4rem;font-weight:800;letter-spacing:0.15em;margin-left:0.5rem;cursor:pointer;" onclick="copyCode(this)" id="setup-code-value"></span>
+      </div>
+
+      <div class="setup-title">Einstellungen</div>
+      <p class="setup-subtitle">Hinweisrunden festlegen — Begriffe werden im nächsten Schritt gewählt.</p>
+
+      <div class="settings-section-label">⚙ Spieleinstellungen</div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">📝 Spieltitel</div>
+          <div class="settings-row-desc">Optionaler Name für diese Runde</div>
+        </div>
+        <input type="text" id="setup-game-title" placeholder="z.B. Klasse 3BT" maxlength="60" class="settings-text-input">
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">🗣 Hinweisrunden</div>
+          <div class="settings-row-desc">Wie oft jede Person ein Hinweiswort nennt</div>
+        </div>
+        <div class="param-row" id="hint-rounds-row"></div>
+      </div>
+
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-title">🎭 Hochstapler</div>
+          <div class="settings-row-desc">2 nur bei großen Gruppen (ab 5 Spieler:innen); sie kennen einander nicht</div>
+        </div>
+        <div class="param-row" id="impostors-row"></div>
+      </div>
+
+      <div class="setup-error" id="setup-error"></div>
+      <div class="setup-actions">
+        <button class="setup-btn" onclick="proceedToCategories()">Weiter &#9658;</button>
+        <button class="setup-btn setup-btn-ghost" onclick="resetToSelector()">&#8592; Zurück</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 3: Kategorien ──────────────────────────────────── -->
+  <div class="screen" id="category-screen">
+    <div class="cat-screen-container">
+      <div class="cat-screen-title" style="text-align:center;">Begriffe wählen</div>
+      <p class="setup-subtitle">Welche Themenbereiche sollen im Spiel vorkommen? (Begriffe aus der Just-One-Datenbank)</p>
+
+      <div class="cat-select-toolbar">
+        <button class="btn btn-secondary btn-sm" onclick="selectAllSubcats()">Alle</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectNoSubcats()">Keine</button>
+      </div>
+
+      <div id="cat-select-list"></div>
+      <div class="cat-select-info" id="cat-select-info"></div>
+
+      <div class="setup-error" id="category-error"></div>
+      <div class="setup-actions">
+        <button class="setup-btn" onclick="proceedToLobby()">Weiter &#9658;</button>
+        <button class="setup-btn setup-btn-ghost" onclick="showScreen('setup-screen')">&#8592; Zurück</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 4: Lobby ───────────────────────────────────────── -->
+  <div class="screen" id="lobby-screen">
+    <div class="lobby-title">Warteraum</div>
+    <p class="lobby-summary" id="lobby-summary">Kategorien</p>
+
+    <div class="lobby-code-box" onclick="copyCode(this.querySelector('.lobby-code-value'))">
+      <span class="lobby-code-label">Spielcode</span>
+      <span class="lobby-code-value" id="lobby-code-val">----</span>
+    </div>
+    <p class="lobby-hint">Spieler:innen treten mit diesem Code über die Übersicht bei.<br>
+      <a id="lobby-board-link" href="#" target="_blank" style="color:var(--accent-light,var(--accent));">📺 Tafelansicht öffnen ↗</a></p>
+
+    <div class="player-list" id="lobby-player-list"></div>
+    <div class="player-count-hint" id="lobby-player-hint"></div>
+
+    <button class="setup-btn" style="background:var(--success);" id="btn-start-game" onclick="startGame()" disabled>&#9658; Spiel starten</button>
+    <a class="lobby-back-link" onclick="confirmAbandonLobby()">&#8592; Zurück</a>
+  </div>
+
+  <!-- ── Screen 5: Spiel ───────────────────────────────────────── -->
+  <div class="screen" id="game-screen">
+    <div class="game-header">
+      <div class="game-round-info" id="game-round-info">Runde 1</div>
+      <a class="header-btn" id="game-board-link" href="#" target="_blank" style="text-decoration:none;">📺 Tafel</a>
+      <button class="header-btn" onclick="confirmAbandonLobby()">&#8592; Verlassen</button>
+    </div>
+    <div class="game-body" id="game-body"></div>
+    <div class="player-list" id="game-player-list"></div>
+  </div>
+
+  <!-- ── Scripts ───────────────────────────────────────────────── -->
+  <script src="../just-one/js/wordlist-shared.js"></script>
+  <script src="../insider/js/vote-shared.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/game.js"></script>
+
+  <!-- Theme Toggle -->
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(active) {
+      document.body.classList.toggle('dark', active);
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

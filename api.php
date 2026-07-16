@@ -57,11 +57,11 @@ function readJsonBody() {
 }
 
 // ── Just One: Geheimwort vor der Rater:in verbergen ───────────────
-// Einziges Spiel im Projekt, das den synchronisierten Zustand pro
-// Betrachter unterschiedlich ausliefern muss: alle anderen Spiele teilen
-// denselben JSON-Zustand mit jedem Gerät, weil es dort keine Information
-// gibt, die vor einer bestimmten Person verborgen werden müsste. Just One
-// durchbricht das — die Rater:in darf das Geheimwort in keinem
+// Just One, Insider und Hochstapler liefern den synchronisierten Zustand
+// pro Betrachter unterschiedlich aus ($gameFilters weiter unten); alle
+// anderen Spiele teilen denselben JSON-Zustand mit jedem Gerät, weil es
+// dort keine Information gibt, die vor einer bestimmten Person verborgen
+// werden müsste. Bei Just One darf die Rater:in das Geheimwort in keinem
 // Netzwerk-Payload sehen, sonst ist die Kernmechanik der Runde hinfällig.
 // $viewerPlayerId kommt als ?playerId=… vom Client; die Lehrkraft sendet
 // keins mit und sieht dadurch immer den vollständigen Zustand. Die
@@ -79,6 +79,65 @@ function filterJoState($state, $viewerPlayerId) {
         unset($state['currentRound']['secretWord']);
     }
     return $state;
+}
+
+// ── Insider: Geheimwort + Insider-Identität pro Betrachter filtern ──
+// Gleicher Mechanismus wie filterJoState(). Ohne playerId (Lehrkraft) wird
+// nichts gefiltert. Bürger und Tafel ('*') sehen weder Geheimwort noch
+// Insider; Master sieht das Wort, aber nicht den Insider; der Insider sieht
+// beides (nur die eigene Identität). Ab phase 'resolved' wird alles
+// aufgedeckt.
+function filterInsiderState($state, $viewerPlayerId) {
+    if (!is_array($state)) return $state;
+    if ($viewerPlayerId === '' || $viewerPlayerId === null) return $state; // Lehrkraft
+    $round = $state['currentRound'] ?? null;
+    if (!is_array($round) || ($round['phase'] ?? '') === 'resolved') return $state;
+    $keepWord = $viewerPlayerId === ($round['masterId'] ?? null)
+             || $viewerPlayerId === ($round['insiderId'] ?? null);
+    if (!$keepWord) unset($state['currentRound']['secretWord']);
+    if ($viewerPlayerId !== ($round['insiderId'] ?? null)) unset($state['currentRound']['insiderId']);
+    return $state;
+}
+
+// ── Hochstapler: Geheimwort vor dem/den Hochstapler(n) verbergen ────
+// Ehrliche sehen das Wort; Hochstapler und Tafel ('*') nicht. impostorIds
+// wird auf höchstens die eigene Identität reduziert — bei zwei Hochstaplern
+// kennen sie einander nicht. Ab phase 'resolved' wird alles aufgedeckt.
+function filterHsState($state, $viewerPlayerId) {
+    if (!is_array($state)) return $state;
+    if ($viewerPlayerId === '' || $viewerPlayerId === null) return $state; // Lehrkraft
+    $round = $state['currentRound'] ?? null;
+    if (!is_array($round) || ($round['phase'] ?? '') === 'resolved') return $state;
+    $impostors = $round['impostorIds'] ?? [];
+    if (!is_array($impostors)) $impostors = [];
+    $isImpostor = in_array($viewerPlayerId, $impostors, true);
+    if ($isImpostor || $viewerPlayerId === '*') unset($state['currentRound']['secretWord']);
+    $state['currentRound']['impostorIds'] = $isImpostor ? [$viewerPlayerId] : [];
+    return $state;
+}
+
+// ── Geheimfeld-Schutz beim Schreiben (Insider/Hochstapler) ──────────
+// Schüler-Clients arbeiten auf dem viewer-gefilterten Stand (ohne
+// secretWord/insiderId/impostorIds). Ihre POSTs (Abstimmung per CAS) würden
+// die Geheimfelder sonst aus dem gespeicherten Spielstand löschen. Analog
+// zum takenTeams-Merge stellt der Server die geschützten Felder aus dem
+// gespeicherten Stand wieder her — aber nur innerhalb DERSELBEN Runde
+// (num-Vergleich), damit beim Rundenwechsel keine Felder einer alten Runde
+// wiederauferstehen. Lehrkraft-Saves (ungefiltert, Felder vorhanden und
+// identisch) sind davon effektiv unberührt; geändert werden Geheimfelder
+// nur über eine neue Runde (neue num).
+function protectSecretRoundFields($incoming, $cur, $fields) {
+    if (!is_array($incoming) || !is_array($cur)) return $incoming;
+    $in = $incoming['currentRound'] ?? null;
+    $st = $cur['currentRound'] ?? null;
+    if (!is_array($in) || !is_array($st)) return $incoming;
+    if (!isset($in['num']) || !isset($st['num']) || $in['num'] !== $st['num']) return $incoming;
+    foreach ($fields as $f) {
+        if (array_key_exists($f, $st)) {
+            $incoming['currentRound'][$f] = $st[$f];
+        }
+    }
+    return $incoming;
 }
 
 // SSE-Stream für eine Spielstand-Datei.
@@ -249,8 +308,10 @@ function registryEndpoint($gamesDir) {
 //   - Ohne `_baseRev` (autoritative Schreiber, Legacy-Clients) wird direkt
 //     geschrieben — voll rückwärtskompatibel.
 //   - $filterFn (optional): siehe filterJoState() — filtert die GET- und
-//     409-Konflikt-Antwort pro Betrachter (?playerId=…), bisher nur `jo-`.
-function gameEndpoint($gamesDir, $defaultTitle, $filterFn = null) {
+//     409-Konflikt-Antwort pro Betrachter (?playerId=…) — `jo-`/`in-`/`hs-`.
+//   - $protectFields (optional): siehe protectSecretRoundFields() — stellt
+//     viewer-gefilterte Geheimfelder beim POST wieder her — `in-`/`hs-`.
+function gameEndpoint($gamesDir, $defaultTitle, $filterFn = null, $protectFields = null) {
     $code = requireValidCode();
     $viewerPlayerId = $filterFn ? mb_substr(trim($_GET['playerId'] ?? ''), 0, 64) : null;
     if (!is_dir($gamesDir)) mkdir($gamesDir, 0755, true);
@@ -311,6 +372,12 @@ function gameEndpoint($gamesDir, $defaultTitle, $filterFn = null) {
             $incoming['takenTeams'] = $cur['takenTeams'];
         }
 
+        // Geheimfeld-Schutz (Insider/Hochstapler): viewer-gefilterte Clients
+        // dürfen die Geheimfelder der laufenden Runde nicht wegschreiben.
+        if ($protectFields) {
+            $incoming = protectSecretRoundFields($incoming, $cur, $protectFields);
+        }
+
         $incoming['_rev'] = $storedRev + 1;
         $out = json_encode($incoming, JSON_UNESCAPED_UNICODE);
         $ok = atomicWrite($path, $out);
@@ -337,13 +404,28 @@ $gameDirs = [
     'labyrinth-' => [__DIR__ . '/data/games/labyrinth',          'Labyrinth-Quiz'],
     'qp-'        => [__DIR__ . '/data/games/quizpfad',           'QuizPfad'],
     'jo-'        => [__DIR__ . '/data/games/just-one',           'Just One'],
+    'in-'        => [__DIR__ . '/data/games/insider',            'Insider'],
+    'hs-'        => [__DIR__ . '/data/games/hochstapler',        'Hochstapler'],
+];
+
+// Viewer-gefilterte Spiele: Filterfunktion (GET/SSE/409) und beim Schreiben
+// zu schützende Geheimfelder der laufenden Runde (siehe die filter*- bzw.
+// protectSecretRoundFields-Kommentare oben).
+$gameFilters = [
+    'jo-' => 'filterJoState',
+    'in-' => 'filterInsiderState',
+    'hs-' => 'filterHsState',
+];
+$gameProtectedFields = [
+    'in-' => ['secretWord', 'insiderId'],
+    'hs-' => ['secretWord', 'impostorIds'],
 ];
 
 // ── SSE-Endpunkte (eigene Header, kein JSON) ─────────────────────
 foreach ($gameDirs as $prefix => [$dir, $title]) {
     if ($key === $prefix . 'sse') {
         $code = requireValidCode();
-        $filterFn = $prefix === 'jo-' ? 'filterJoState' : null;
+        $filterFn = $gameFilters[$prefix] ?? null;
         $viewerId = $filterFn ? mb_substr(trim($_GET['playerId'] ?? ''), 0, 64) : null;
         sseStream($dir . '/' . $code . '.json', $filterFn, $viewerId);
     }
@@ -382,8 +464,9 @@ try {
 foreach ($gameDirs as $prefix => [$dir, $title]) {
     if ($key === $prefix . 'games') registryEndpoint($dir);
     if ($key === $prefix . 'game') {
-        $filterFn = $prefix === 'jo-' ? 'filterJoState' : null;
-        gameEndpoint($dir, $title === 'Spiel' ? 'Spiel ' . strtoupper(trim($_GET['code'] ?? '')) : $title, $filterFn);
+        $filterFn = $gameFilters[$prefix] ?? null;
+        $protectFields = $gameProtectedFields[$prefix] ?? null;
+        gameEndpoint($dir, $title === 'Spiel' ? 'Spiel ' . strtoupper(trim($_GET['code'] ?? '')) : $title, $filterFn, $protectFields);
     }
 }
 

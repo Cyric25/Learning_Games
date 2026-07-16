@@ -6,7 +6,7 @@ JSON-Dateien unter `data/`.
 
 ## 1. `api.php` — Query-Parameter `?f=<endpoint>`
 
-Die fünf Multi-Game-Spiele nutzen dasselbe Endpunkt-Trio mit einem Prefix. Die
+Die Multi-Game-Spiele nutzen dasselbe Endpunkt-Trio mit einem Prefix. Die
 Prefix→Verzeichnis-Zuordnung steht in `api.php` im Array `$gameDirs`:
 
 | Prefix | Spiel | Verzeichnis |
@@ -16,6 +16,20 @@ Prefix→Verzeichnis-Zuordnung steht in `api.php` im Array `$gameDirs`:
 | `bs-` | Schiffeversenken | `schiffeversenken/data/games/` |
 | `labyrinth-` | Labyrinth | `data/games/labyrinth/` |
 | `qp-` | QuizPfad | `data/games/quizpfad/` |
+| `jo-` | Just One | `data/games/just-one/` |
+| `in-` | Insider | `data/games/insider/` |
+| `hs-` | Hochstapler | `data/games/hochstapler/` |
+
+**Viewer-gefilterte Spiele** (`jo-`/`in-`/`hs-`): GET-, SSE- und
+409-Antworten laufen durch eine Filterfunktion pro Betrachter
+(`?playerId=…`, Lehrkraft ohne `playerId` sieht alles, Tafel sendet den
+Sentinel `'*'`) — Zuordnung in `$gameFilters`. Für `in-`/`hs-` stellt
+`protectSecretRoundFields()` beim POST zusätzlich die viewer-gefilterten
+Geheimfelder (`secretWord`, `insiderId` bzw. `impostorIds`; Zuordnung in
+`$gameProtectedFields`) aus dem gespeicherten Stand wieder her, solange die
+`currentRound.num` übereinstimmt — sonst würde die Stimmabgabe eines
+gefilterten Clients die Geheimnisse der laufenden Runde löschen (analog zum
+`takenTeams`-Merge, s. u.).
 
 ### Pro-Spiel-Endpunkte
 
@@ -162,7 +176,7 @@ Options -Indexes
 <IfModule mod_rewrite.c>
 RewriteEngine On
 # SSE: Kompression/Buffering aus (alle Spiel-Prefixe)
-RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-)?sse(&|$)
+RewriteCond %{QUERY_STRING} (^|&)f=(ls-|bs-|qp-|labyrinth-|jo-|in-|hs-)?sse(&|$)
 RewriteRule ^api\.php$ - [E=no-gzip:1,E=dont-vary:1]
 # Spielstände/Drafts nur über api.php erreichbar
 RewriteRule ^(data/games/|schiffeversenken/data/games/|data/drafts\.json|data/risiko-gamestate\.json) - [F]

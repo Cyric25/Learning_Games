@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insider – Begriffsverwaltung</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+  <link rel="stylesheet" href="css/insider.css">
+  <style>
+    body { overflow: auto; }
+    .admin-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: clamp(16px, 3vh, 40px) clamp(16px, 3vw, 40px);
+    }
+    .admin-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; flex-wrap: wrap; gap: 10px;
+    }
+    .admin-header h1 { font-size: 1.5rem; color: #fff; margin: 0; }
+    .admin-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <h1>🕵️ Insider – Begriffsverwaltung</h1>
+      <div class="admin-header-btns">
+        <a href="index.html" class="header-btn" style="text-decoration:none;">▶ Spielen</a>
+        <a href="../spiele.html" class="header-btn" style="text-decoration:none;">← Übersicht</a>
+        <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+      </div>
+    </div>
+
+    <div class="admin-card" style="background:var(--bg-container);border:2px solid var(--border);border-radius:14px;padding:24px;text-align:center;">
+      <h2 style="color:var(--accent);margin-bottom:12px;">Begriffsdatenbank von Just One</h2>
+      <p style="color:var(--text-secondary);margin-bottom:20px;font-size:1rem;line-height:1.6;">
+        Insider verwendet die Begriffsdatenbank von Just One.<br>
+        Kategorien und Begriffe werden dort gepflegt und stehen beiden Spielen zur Verfügung.
+      </p>
+      <a href="../just-one/admin.html" class="btn btn-primary"
+         style="display:inline-block;padding:12px 28px;text-decoration:none;border-radius:12px;font-weight:700;font-size:1rem;">
+        ⚙ Begriffsverwaltung öffnen
+      </a>
+      <p style="color:var(--text-secondary);margin-top:16px;font-size:0.85rem;">
+        Im Spiel-Setup wählst du dann die gewünschten Unterkategorien aus.
+      </p>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const KEY = 'spiele_theme';
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      var el = document.getElementById('btn-theme');
+      if (el) el.textContent = dark ? '☀️ Lightmode' : '🌙 Darkmode';
+    }
+    window.toggleTheme = function () {
+      var isDark = !document.body.classList.contains('dark');
+      localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    };
+    applyTheme(localStorage.getItem(KEY) === 'dark');
+  })();
+  </script>
+
+</body>
+</html>

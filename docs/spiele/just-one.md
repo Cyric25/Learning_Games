@@ -44,10 +44,12 @@ zentralen DB aber ohne beliebige Tiefe. MD-Import-Dialekt:
 
 ## Kernentscheidung: Viewer-gefilterter State
 
-Alle anderen Spiele im Projekt synchronisieren denselben JSON-Zustand an jedes
-Gerät. Just One ist die **einzige Ausnahme**: die Rater:in einer Runde darf
-das Geheimwort (`currentRound.secretWord`) in keinem Netzwerk-Payload sehen,
-sonst ist die Rate-Runde sinnlos.
+Die meisten Spiele im Projekt synchronisieren denselben JSON-Zustand an jedes
+Gerät. Just One war die erste Ausnahme (inzwischen nutzen auch
+[Insider](insider.md) und [Hochstapler](hochstapler.md) denselben
+Mechanismus): die Rater:in einer Runde darf das Geheimwort
+(`currentRound.secretWord`) in keinem Netzwerk-Payload sehen, sonst ist die
+Rate-Runde sinnlos.
 
 - `api.php` bekommt dafür `filterJoState($state, $viewerPlayerId)` — angewendet
   in `gameEndpoint()` (GET-Antwort **und** 409-Konflikt-Antwort) sowie in

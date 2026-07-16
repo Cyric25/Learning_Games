@@ -1,0 +1,358 @@
+/* hochstapler.css – Hochstapler: alle Styles (Basis + Spielwähler/Setup/
+   Lobby/Spiel). Standard-Palette: Orange (Light-Standard) / Dunkelblau
+   (body.dark). Dokumentiertes Duplikat von insider/css/insider.css (dort
+   wiederum aus just-one/css/*), plus Sprechreihenfolge-Chips,
+   minus Timer-Block — siehe docs/spiele/hochstapler.md. */
+
+:root {
+  --bg-body:         linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+  --bg-primary:      #fdfaf8;
+  --bg-container:    #ffffff;
+  --bg-card:         #f8f9fa;
+  --bg-card-back:    #fff3ee;
+  --bg-option:       #fff3ee;
+  --bg-option-hover: #ffe0d0;
+
+  --accent:          #E34F20;
+  --accent-dark:     #c73518;
+  --accent-light:    #f7971e;
+
+  --text-primary:    #1e293b;
+  --text-secondary:  #64748b;
+
+  --border:          #e0e0e0;
+  --card-hover-border: #E34F20;
+  --card-shadow-hover: 0 12px 35px rgba(227,79,32,0.2);
+  --shadow:          0 4px 20px rgba(227,79,32,0.12);
+  --tag-bg:          #ffe8df;
+  --tag-color:       #c73518;
+
+  --btn-play-bg:     linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+
+  --success:         #16a34a;
+  --danger:          #dc2626;
+  --warning:         #d97706;
+}
+
+body.dark {
+  --bg-body:         linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+  --bg-primary:      #16213e;
+  --bg-container:    #16213e;
+  --bg-card:         #1a2744;
+  --bg-card-back:    #0f3460;
+  --bg-option:       #1a2744;
+  --bg-option-hover: #1a4a80;
+
+  --accent:          #f7971e;
+  --accent-dark:     #E34F20;
+
+  --text-primary:    #ffffff;
+  --text-secondary:  #a8a8b3;
+  --border:          rgba(255,255,255,0.12);
+
+  --success:         #2ecc71;
+  --danger:          #e74c3c;
+  --warning:         #f39c12;
+  --shadow:          0 4px 20px rgba(0,0,0,0.30);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-body);
+  color: var(--text-primary);
+}
+
+/* ── Header / Buttons / Formulare (Basis) ────────────────────────── */
+.header-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+.header-btn:hover { background: var(--bg-option-hover); border-color: var(--accent); }
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.88; }
+.btn-primary { background: var(--btn-play-bg); color: #fff; }
+.btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; }
+
+input[type="text"], select, textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+input[type="text"]:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Screen-Mechanik ─────────────────────────────────────────────── */
+.screen { display: none; }
+.screen.active { display: flex; }
+
+/* ── Spielwähler (#game-selector) ──────────────────────────────── */
+#game-selector {
+  position: fixed; inset: 0;
+  background: var(--bg-body);
+  z-index: 600;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 2rem; overflow-y: auto;
+}
+.gs-code-input {
+  font-size: clamp(2rem,5vw,3.5rem); text-align: center; letter-spacing: 0.3em;
+  width: 7em; padding: 0.5em 0.3em;
+  background: var(--bg-container); color: var(--text-primary);
+  border: 2px solid var(--border); border-radius: 14px; font-family: monospace; font-weight: 700;
+  outline: none; text-transform: uppercase; transition: border-color 0.2s;
+}
+.gs-code-input:focus { border-color: var(--accent); }
+.gs-join-error { color: #fff; min-height: 1.5em; margin-top: 0.8rem; font-size: 0.95rem; font-weight: 600; text-align: center; }
+.gs-divider { border: none; border-top: 1px solid rgba(255,255,255,0.3); margin: 2rem 0 1.2rem; width: 100%; max-width: 520px; }
+.gs-teacher-section { text-align: center; width: 100%; max-width: 520px; }
+.gs-game-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 40vh; overflow-y: auto; margin-bottom: 0.8rem; text-align: left; }
+.gs-empty { color: rgba(255,255,255,0.85); font-style: italic; }
+.gs-game-card {
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--bg-container); border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 0.7rem 1rem; cursor: pointer; transition: border-color 0.2s;
+}
+.gs-game-card:hover { border-color: var(--accent); }
+.gs-game-code { font-size: 1.2rem; font-weight: 800; font-family: monospace; letter-spacing: 0.1em; color: var(--accent); min-width: 5ch; }
+.gs-game-info { flex: 1; min-width: 0; }
+.gs-game-title { font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-game-meta { font-size: 0.8rem; color: var(--text-secondary); }
+.gs-btn-delete {
+  background: none; border: 1px solid var(--border); color: var(--danger);
+  border-radius: 8px; width: 28px; height: 28px; cursor: pointer;
+}
+.gs-btn-delete:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* ── Setup + Kategorie-Screen ────────────────────────────────────── */
+#setup-screen, #category-screen {
+  position: fixed; inset: 0;
+  background: var(--bg-primary);
+  z-index: 490;
+  flex-direction: column; align-items: center;
+  overflow-y: auto; padding: 2rem;
+}
+.setup-inner, .cat-screen-container { width: 100%; max-width: 560px; display: flex; flex-direction: column; }
+.setup-title, .cat-screen-title {
+  color: var(--accent); font-size: 2rem; font-weight: 700;
+  margin-bottom: 0.5rem; text-align: center;
+}
+.setup-subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; text-align: center; }
+
+.settings-section-label {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-secondary); margin-bottom: 0.8rem; padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border);
+}
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: var(--bg-card); border-radius: 12px; padding: 0.9rem 1.2rem;
+  margin-bottom: 0.6rem; border: 2px solid transparent; transition: border-color 0.2s;
+}
+.settings-row-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.settings-row-desc { color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.1rem; }
+.settings-text-input {
+  width: 200px; padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-option); color: var(--text-primary); font-size: 0.95rem;
+  font-family: inherit; outline: none; transition: border-color 0.2s;
+}
+.settings-text-input:focus { border-color: var(--accent); }
+
+.param-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.param-btn {
+  padding: 0.4rem 0.9rem; border-radius: 8px; border: 2px solid var(--border);
+  background: var(--bg-option); color: var(--text-primary); font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.param-btn:hover { border-color: var(--accent); }
+.param-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.setup-btn {
+  padding: 1rem 2rem; border-radius: 12px; border: none; font-size: 1.1rem; font-weight: 700;
+  cursor: pointer; background: var(--btn-play-bg); color: #fff;
+  transition: transform 0.15s, box-shadow 0.15s; font-family: inherit;
+  text-decoration: none; display: inline-flex; align-items: center;
+}
+.setup-btn:hover { transform: scale(1.03); box-shadow: var(--shadow); }
+.setup-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.setup-btn-ghost { background: var(--bg-card) !important; border: 1px solid var(--border) !important; color: var(--text-primary) !important; }
+.setup-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-top: 1.5rem; padding-bottom: 2rem; }
+.setup-error { color: var(--danger); font-size: 0.9rem; font-weight: 600; min-height: 1.2em; text-align: center; margin-bottom: 0.5rem; }
+
+/* ── Kategorie-Auswahl (Just-One-Begriffs-DB: 2 Ebenen) ──────────── */
+.cat-select-group { background: var(--bg-card); border-radius: 12px; margin-bottom: 0.6rem; overflow: hidden; }
+.cat-select-header {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1rem; cursor: pointer;
+}
+.cat-select-header:hover { background: var(--bg-option-hover); }
+.cat-select-header .cat-name { flex: 1; font-weight: 700; }
+.cat-select-header .cat-meta { font-size: 0.8rem; color: var(--text-secondary); }
+.cat-select-subs { padding: 0 1rem 0.6rem 2.4rem; display: none; }
+.cat-select-group.open .cat-select-subs { display: block; }
+.cat-select-sub { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0; }
+.cat-select-sub label { flex: 1; cursor: pointer; }
+.cat-select-sub .sub-count { font-size: 0.78rem; color: var(--text-secondary); }
+.cat-select-toolbar { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+.cat-select-info { font-size: 0.85rem; color: var(--text-secondary); margin: 0.6rem 0 1rem; text-align: center; }
+.cat-select-info.empty { color: var(--danger); font-weight: 600; }
+
+/* ── Lobby-Screen (Lehrkraft) ────────────────────────────────────── */
+#lobby-screen {
+  position: fixed; inset: 0; background: rgba(10,10,30,0.95); z-index: 600;
+  flex-direction: column; align-items: center; justify-content: center;
+  padding: 2rem; text-align: center;
+}
+.lobby-title { color: var(--accent-light, var(--accent)); font-size: clamp(2rem,5vw,3rem); font-weight: 700; margin-bottom: 0.5rem; }
+.lobby-summary { color: rgba(255,255,255,0.75); font-size: 1rem; margin-bottom: 1rem; }
+.lobby-code-box {
+  background: rgba(255,255,255,0.08); border: 2px solid var(--accent-light, var(--accent));
+  border-radius: 14px; padding: 0.8rem 2rem; cursor: pointer; margin: 0.6rem 0 1.2rem;
+  transition: opacity 0.2s; display: inline-block;
+}
+.lobby-code-box:hover { opacity: 0.85; }
+.lobby-code-label { color: rgba(255,255,255,0.7); font-size: 0.85rem; display: block; margin-bottom: 0.2rem; }
+.lobby-code-value { color: #fff; font-size: clamp(1.6rem,4vw,2.5rem); font-weight: 800; letter-spacing: 0.2em; font-family: monospace; }
+.lobby-hint { color: rgba(255,255,255,0.7); font-size: 0.9rem; margin-bottom: 1rem; }
+.lobby-back-link { color: rgba(255,255,255,0.7); font-size: 0.9rem; cursor: pointer; margin-top: 0.8rem; display: inline-block; }
+.lobby-back-link:hover { color: #fff; }
+
+/* Live-Spielerliste (Lobby + Warteraum) */
+.player-list {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;
+  max-width: 560px; margin: 0 auto 1rem; max-height: 30vh; overflow-y: auto;
+}
+.player-chip {
+  display: flex; align-items: center; gap: 0.4rem;
+  background: rgba(255,255,255,0.1); border-radius: 20px; padding: 0.4rem 0.9rem;
+  font-size: 0.9rem; color: #fff;
+}
+.player-chip .kick-btn {
+  background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer;
+  font-size: 0.85rem; padding: 0; line-height: 1;
+}
+.player-chip .kick-btn:hover { color: var(--danger); }
+.player-count-hint { color: rgba(255,255,255,0.75); font-size: 0.85rem; margin-bottom: 1rem; }
+.player-count-hint.ok { color: #6ee7a0; }
+
+/* ── Spielbildschirm (#game-screen / #screen-game) ───────────────── */
+#game-screen, #screen-game {
+  position: fixed; inset: 0; background: var(--bg-body);
+  flex-direction: column; overflow-y: auto;
+}
+.game-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 1.2rem; background: rgba(0,0,0,0.15);
+}
+.game-round-info { color: #fff; font-weight: 700; font-size: 1.05rem; }
+.game-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 1.5rem; gap: 1rem;
+}
+.game-card {
+  background: var(--bg-container); border-radius: 16px; padding: 1.5rem;
+  width: 100%; max-width: 560px; box-shadow: var(--shadow);
+  color: var(--text-primary); text-align: center;
+}
+.round-banner { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin-bottom: 0.6rem; }
+.round-subtext { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem; }
+
+/* Geheimwort-Box (nur Lehrkraft-Ansicht) */
+.secret-word-box {
+  background: var(--bg-card-back); border: 2px dashed var(--accent);
+  border-radius: 12px; padding: 0.7rem 1rem; margin-bottom: 1rem;
+  font-size: 1.15rem;
+}
+
+/* ── Sprechreihenfolge (Hinweisrunden) ───────────────────────────── */
+.speak-order { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-bottom: 1rem; }
+.speak-chip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.4rem 0.9rem; border-radius: 18px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  font-size: 0.95rem; font-weight: 600; color: var(--text-primary);
+}
+.speak-chip.me { border-color: var(--accent); background: var(--bg-card-back); }
+.speak-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.4em; height: 1.4em; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 0.78rem; font-weight: 800;
+}
+
+/* ── Rollenkarte (Schülergerät, gedrückt halten zum Anzeigen) ────── */
+.role-card { margin: 0.6rem 0 1rem; }
+.role-secret {
+  background: var(--bg-card-back); border-radius: 14px; padding: 1.2rem;
+  filter: blur(14px); user-select: none; pointer-events: none;
+  transition: filter 0.15s;
+}
+.role-secret.revealed { filter: none; }
+.role-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.4rem; }
+.role-word { font-size: 1.7rem; font-weight: 800; color: var(--accent); margin: 0.3rem 0 0.5rem; }
+.role-hint { color: var(--text-secondary); font-size: 0.9rem; }
+.reveal-btn { margin-top: 0.7rem; touch-action: none; }
+
+/* ── Abstimmung ──────────────────────────────────────────────────── */
+.vote-list { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin-bottom: 1rem; }
+.vote-btn {
+  padding: 0.7rem 1.3rem; border-radius: 12px; border: 2px solid var(--border);
+  background: var(--bg-option); color: var(--text-primary);
+  font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+}
+.vote-btn:hover { border-color: var(--accent); }
+.vote-btn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Ergebnis-Zähler */
+.results-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-bottom: 1rem; }
+.result-chip {
+  padding: 0.4rem 0.9rem; border-radius: 16px; background: var(--tag-bg); color: var(--tag-color);
+  font-size: 0.9rem; font-weight: 700;
+}
+
+/* Moderations-/Verlaufsliste */
+.mod-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; text-align: left; }
+.mod-row {
+  display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem 0.9rem;
+  background: var(--bg-card); border-radius: 10px;
+}
+.mod-row .mod-name { font-size: 0.8rem; color: var(--text-secondary); min-width: 90px; }
+.mod-row .mod-text { flex: 1; font-size: 1.05rem; font-weight: 600; }
+
+.result-actions { display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap; }
+.btn-correct { background: var(--success) !important; color: #fff; }
+.btn-wrong { background: var(--danger) !important; color: #fff; }
+
+.resolved-word { font-size: 1.6rem; font-weight: 800; color: var(--accent); margin: 0.4rem 0; }
+
+/* Responsive */
+@media (max-width: 540px) {
+  #setup-screen, #category-screen { padding: 1.2rem; }
+  .settings-row { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .settings-text-input { width: 100%; }
+}

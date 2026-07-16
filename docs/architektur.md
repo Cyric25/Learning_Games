@@ -40,6 +40,9 @@ Spiele/
       leiterspiel/  <CODE>.json + index.json (+ .lock)
       labyrinth/    <CODE>.json + index.json (+ .lock)
       quizpfad/     <CODE>.json + index.json (+ .lock)
+      just-one/     <CODE>.json + index.json (+ .lock)
+      insider/      <CODE>.json + index.json (+ .lock)
+      hochstapler/  <CODE>.json + index.json (+ .lock)
       codenames/    <PIN>.json + index.json (+ .lock)
   schiffeversenken/data/games/  <CODE>.json + index.json (+ .lock)
 
@@ -156,6 +159,9 @@ Details und Protokoll: [api-referenz.md → Nebenläufigkeit](api-referenz.md#ne
 | QuizPfad | `QpStorage` | `qp-` | `qp_gs_` | inline in `quizpfad.js` + `view.html` + `board.html` |
 | Labyrinth | `GameSync` | `labyrinth-` | `lab_` | inline in `play.js` + `labyrinth.js` + `board.html` |
 | Schiffeversenken | `BsStorage` | `bs-` | `bs_gs_` | `schiffeversenken/js/shared.js` |
+| Just One | `JoStorage` | `jo-` | `jo_gs_` | `just-one/js/shared.js` |
+| Insider | `InStorage` | `in-` | `in_gs_` | `insider/js/shared.js` (Duplikat von `JoStorage`) |
+| Hochstapler | `HsStorage` | `hs-` | `hs_gs_` | `hochstapler/js/shared.js` (Duplikat von `JoStorage`) |
 | Codenames | (eigenes `apiPost`) | action-basiert | — | `codenames/game.js` + `admin.html` |
 
 Alle server-synchronisierten Objekte (außer Codenames) bieten dieselbe

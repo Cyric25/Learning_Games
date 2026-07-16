@@ -835,6 +835,60 @@
           </div>
         </div>
 
+        <!-- Insider -->
+        <div class="game-card" data-game="insider">
+          <button class="game-toggle" onclick="toggleGameVisibility('insider')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #0f3460, #E34F20);">
+            <span class="card-emoji">🕵️</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Insider</div>
+            <div class="card-desc">
+              Deduktionsspiel: Die Klasse errät ein Geheimwort mit Ja/Nein-Fragen an
+              den Master – doch ein heimlicher Insider hilft mit. Wird das Wort erraten,
+              beginnt die Jagd: Wer war der Insider? Fragen mündlich, Rollen &amp;
+              Abstimmung auf den Schülergeräten.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Deduktion</span>
+              <span class="tag">Wörter</span>
+              <span class="tag">Multiplayer</span>
+              <span class="tag">Tafelansicht</span>
+            </div>
+            <div class="card-actions">
+              <a href="insider/index.html" class="btn btn-play" style="background: linear-gradient(135deg, #0f3460, #E34F20);">▶ Spielen</a>
+              <a href="just-one/admin.html" class="btn btn-admin teacher-only">📝 Begriffe</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hochstapler -->
+        <div class="game-card" data-game="hochstapler">
+          <button class="game-toggle" onclick="toggleGameVisibility('hochstapler')" title="Sichtbarkeit umschalten"></button>
+          <div class="card-banner" style="background: linear-gradient(135deg, #7c2d12, #db2777);">
+            <span class="card-emoji">🎭</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Hochstapler</div>
+            <div class="card-desc">
+              Bluffspiel: Alle kennen das Geheimwort – außer dem Hochstapler. Reihum
+              nennt jede Person mündlich ein Hinweiswort, der Hochstapler blufft mit.
+              Danach digitale Abstimmung: Wer fliegt auf? Enttarnt bleibt ihm eine
+              letzte Chance, das Wort zu erraten.
+            </div>
+            <div class="card-tags">
+              <span class="tag">Bluff</span>
+              <span class="tag">Wörter</span>
+              <span class="tag">Multiplayer</span>
+              <span class="tag">Tafelansicht</span>
+            </div>
+            <div class="card-actions">
+              <a href="hochstapler/index.html" class="btn btn-play" style="background: linear-gradient(135deg, #7c2d12, #db2777);">▶ Spielen</a>
+              <a href="just-one/admin.html" class="btn btn-admin teacher-only">📝 Begriffe</a>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -889,7 +943,7 @@
   const DEFAULT_ENABLED = ['slf', 'risiko'];
 
   // Neu hinzugefügte Spiele, die bei bestehenden Nutzern automatisch aktiviert werden
-  const NEW_GAMES = ['lernkarten', 'schiffeversenken', 'just-one'];
+  const NEW_GAMES = ['lernkarten', 'schiffeversenken', 'just-one', 'insider', 'hochstapler'];
 
   // ── Theme ────────────────────────────────────────────────
   function applyTheme(dark) {
