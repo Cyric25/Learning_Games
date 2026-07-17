@@ -87,6 +87,11 @@ body.gs-theme-dark #screen-start.gs-screen {
    auf sehr schmalen Handys. */
 .gs-screen .gs-code-input {
   box-sizing: border-box;
+  /* flex:none überschreibt das flex:1 aus den spieleigenen .gs-code-input-
+     Regeln — sonst wächst das Feld im Flex-Spalten-Layout vertikal (hoher
+     Kasten). Höhe rein aus font-size + padding. */
+  flex: 0 0 auto;
+  height: auto;
   font-size: 2.6rem;
   text-align: center;
   letter-spacing: 0.4em;
@@ -320,6 +325,8 @@ body.gs-theme-dark #screen-start.gs-screen {
   letter-spacing: 0.04em;
 }
 .gs-screen .gs-text-input {
+  flex: 0 0 auto;
+  height: auto;
   width: 14em;
   max-width: 90vw;
   padding: 11px 14px;
