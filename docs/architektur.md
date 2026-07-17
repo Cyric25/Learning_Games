@@ -26,8 +26,12 @@ Spiele/
   CLAUDE.md                Verbindliche Kurzreferenz (Styling, Muster)
   categories.json          Stadt-Land-Fluss Legacy-Kategorien
 
+  js/rich-content.js       Gemeinsames Rendering: Text + KaTeX + Bilder (alle Spiele)
+  lib/katex/               KaTeX lokal, zentral (früher memory/lib/katex)
+
   data/                    NICHT im Deploy-ZIP (Laufzeitdaten)
     questions.json         ZENTRALE Fragendatenbank (alle Quiz-Spiele)
+    images/                Zentrale Bild-Ablage (?f=image-upload; bleibt HTTP-lesbar)
     questions.json.bak[2/3] Rotierende Backups (Server-seitig)
     drafts.json            Eingereichte Fragen-Vorschläge
     settings.json          Diverse Einstellungen

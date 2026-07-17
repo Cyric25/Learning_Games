@@ -1,4 +1,4 @@
-/* labyrinth.js – Lehrerboard v3 (multi-device, SSE) */
+﻿/* labyrinth.js – Lehrerboard v3 (multi-device, SSE) */
 
 // ── Konstanten ───────────────────────────────────────────────────
 const TEAM_SYMBOL_ICONS = ['👑', '⚔️', '💎', '🔮', '🗝️', '📜'];
@@ -971,8 +971,8 @@ function showTeacherEvalModal(aq) {
   const aEl = document.getElementById('te-answer');
   if (teamEl) teamEl.textContent = team ? `${team.emoji} ${team.name}` : '';
   if (trigEl) trigEl.textContent = aq.contextType === 'door' ? '🔒 Tür öffnen' : '🔮 Symbol einsammeln';
-  if (qEl) qEl.textContent = aq.question;
-  if (aEl) aEl.textContent = aq.answer || '–';
+  if (qEl) qEl.innerHTML = renderRichContent(aq.question);
+  if (aEl) aEl.innerHTML = aq.answer ? renderRichContent(aq.answer) : '–';
   _teacherEvalQuestionId = aq.id;
   modal.style.display = 'flex';
   teacherEvalVisible = true;

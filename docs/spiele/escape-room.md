@@ -67,3 +67,14 @@ iOS-Export, `allPuzzlesSolved`). Beim Ändern immer beide prüfen.
 
 Ausführlicher MD-Import-Dialekt und Explorer/360°-Details in
 `CLAUDE.md → ## Escape Room`.
+
+## Rich-Content (seit Juli 2026)
+
+Fragetexte, MC-Optionen, Hints, Rätselkarten (Text) und Note-Hotspots rendern
+über `js/rich-content.js` (Formeln `$…$`, Bilder `![Alt](data/images/…)`) —
+in **beiden** Dateien identisch (`index.html` UND `standalone.html`,
+Divergenz-Falle!). Nur die Lehrkraft-Datei hat zusätzlich „Bild hochladen →
+Marker kopieren" (zentrale Ablage, Admin-Token) — analog zum fehlenden
+Löschen-Button in `standalone.html`. Wird `standalone.html` solo (ohne
+Projektordner) kopiert, degradieren Formeln zum Quelltext. Im MD-Import steht
+`\|` in Fragen-/Optionen-Zeilen für ein literales Pipe.

@@ -886,7 +886,7 @@ function openQuestion(slot, questionId) {
   // Fill modal
   document.getElementById('modal-category').textContent = slot.displayName;
   document.getElementById('modal-risk').textContent = `Risiko: ${q.difficulty} Punkte`;
-  document.getElementById('modal-question-text').textContent = q.question;
+  document.getElementById('modal-question-text').innerHTML = renderRichContent(q.question);
   document.getElementById('modal-answer-reveal').style.display = 'none';
 
   // Team info
@@ -907,7 +907,7 @@ function openQuestion(slot, questionId) {
         const btn = document.createElement('button');
         btn.className = 'mc-option';
         btn.dataset.idx = i;
-        btn.textContent = opt;
+        btn.innerHTML = renderRichContent(opt);
         btn.addEventListener('click', () => {
           if (modalResolved) return;
           if (pendingMultiSel.has(i)) { pendingMultiSel.delete(i); btn.classList.remove('mc-selected-pending'); }
@@ -936,7 +936,7 @@ function openQuestion(slot, questionId) {
       q.options.forEach((opt, i) => {
         const btn = document.createElement('button');
         btn.className = 'mc-option';
-        btn.textContent = opt;
+        btn.innerHTML = renderRichContent(opt);
         btn.dataset.idx = i;
         btn.addEventListener('click', () => selectMcAnswer(i));
         mcContainer.appendChild(btn);
@@ -948,8 +948,8 @@ function openQuestion(slot, questionId) {
   const slInfoEl = document.getElementById('modal-sl-info');
   if (slInfoEl) {
     let html = `<span class="sl-label">🔒 Spielleiter</span>`;
-    html += `<span class="sl-answer">${escHtml(q.answer || '–')}</span>`;
-    if (q.hint) html += `<span class="sl-hint">💡 ${escHtml(q.hint)}</span>`;
+    html += `<span class="sl-answer">${renderRichContent(q.answer || '–')}</span>`;
+    if (q.hint) html += `<span class="sl-hint">💡 ${renderRichContent(q.hint)}</span>`;
     slInfoEl.innerHTML = html;
     slInfoEl.style.display = 'block';
   }
@@ -1087,7 +1087,7 @@ async function timerExpired() {
         else if (selectedMcArr.includes(i)) btn.classList.add('wrong');
       });
       const revealEl = document.getElementById('modal-answer-reveal');
-      revealEl.textContent = '⏱ Zeit! Antwort: ' + q.answer;
+      revealEl.innerHTML = '⏱ Zeit! Antwort: ' + renderRichContent(q.answer || '');
       revealEl.style.display = 'block';
       if (gameData.liveQuestion) gameData.liveQuestion.answer = q.answer || '';
     } else {
@@ -1117,7 +1117,7 @@ function showAnswerForOpen() {
   // Antwort-Text anzeigen (open und MC)
   if (q.answer) {
     const revealEl = document.getElementById('modal-answer-reveal');
-    revealEl.textContent = '✓ Antwort: ' + q.answer;
+    revealEl.innerHTML = '✓ Antwort: ' + renderRichContent(q.answer);
     revealEl.style.display = 'block';
   }
 
@@ -1248,7 +1248,7 @@ function resolveQuestion(correct) {
   // Antwort-Reveal auf Spielleiter-Bildschirm – nicht bei timer-abgelaufener offener Frage
   if (gameData.meta.settings.showCorrectAnswer && !openQuestionTimerExpired) {
     const revealEl = document.getElementById('modal-answer-reveal');
-    revealEl.textContent = '✓ Antwort: ' + (q?.answer || '');
+    revealEl.innerHTML = '✓ Antwort: ' + renderRichContent(q?.answer || '');
     revealEl.style.display = 'block';
   }
 
@@ -1465,7 +1465,7 @@ function endStealPhase() {
   if (gameData.meta.settings.showCorrectAnswer && _q && !openQuestionTimerExpired) {
     const revealEl = document.getElementById('modal-answer-reveal');
     if (revealEl.style.display === 'none') {
-      revealEl.textContent = '✓ Antwort: ' + (_q.answer || '');
+      revealEl.innerHTML = '✓ Antwort: ' + renderRichContent(_q.answer || '');
       revealEl.style.display = 'block';
     }
   }

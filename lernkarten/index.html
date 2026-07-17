@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Lernkarten</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
-  <link rel="stylesheet" href="../memory/lib/katex/katex.min.css">
+  <!-- KaTeX-CSS injiziert js/rich-content.js (zentrales lib/katex/) -->
   <style>
     /* ─── CSS Variablen: Light (Standard) ─────────────── */
     :root {
@@ -636,7 +636,8 @@
     </div>
   </div>
 
-  <script src="../memory/lib/katex/katex.min.js"></script>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
   <script>
   // ═══════════════════════════════════════════════════════════
   //  LERNKARTEN – SM-2 Spaced Repetition System
@@ -675,14 +676,13 @@
     var c = content || '';
     var isFormula = type === 'formula' || (c.startsWith('$') && c.trimEnd().endsWith('$'));
     if (isFormula && c) {
-      try { katex.render(stripDollar(c), el, { throwOnError: false, displayMode: false }); }
-      catch (e) { el.textContent = c; }
+      el.innerHTML = renderRichContent('$' + stripDollar(c) + '$');
     } else if (type === 'image' && c) {
       var img = document.createElement('img');
       img.src = c; img.alt = '';
       el.appendChild(img);
     } else {
-      el.textContent = c;
+      el.innerHTML = renderRichContent(c); // Text darf $…$ / ![…](…) enthalten
     }
   }
 
@@ -1123,7 +1123,7 @@
       card.options.forEach(function(opt, i) {
         var div = document.createElement('div');
         div.className = 'mc-opt';
-        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + escHtml(opt) + '</span>';
+        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + renderRichContent(opt) + '</span>';
         mcFront.appendChild(div);
       });
     } else {
@@ -1167,7 +1167,7 @@
       card.options.forEach(function(opt, i) {
         var div = document.createElement('div');
         div.className = 'mc-opt ' + (i === card.correctIndex ? 'correct' : 'wrong');
-        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + escHtml(opt) + '</span>';
+        div.innerHTML = '<span class="opt-letter">' + (letters[i]||i+1) + '</span><span>' + renderRichContent(opt) + '</span>';
         mcBack.appendChild(div);
       });
     }

@@ -143,3 +143,11 @@ nach Trefferquote (nicht die Skala aus der Spielschachtel):
 
 Standard-Palette Orange (Light) / Dunkelblau (`body.dark`), kein
 spielspezifischer Grund für Abweichung.
+
+## Rich-Content (seit Juli 2026)
+
+Begriffe dürfen `$…$`-Formeln und `![Alt](data/images/…)`-Bilder enthalten;
+Geheimwort-Anzeigen laufen über `renderRichContent()` (`js/rich-content.js`).
+Die Begriffsverwaltung hat Upload-Button + Vorschau der Cursor-Zeile. Der
+Hinweis-Duplikatvergleich (`joComputeDuplicateStrikes`) vergleicht weiterhin
+reinen Text. Gilt genauso für Insider und Hochstapler (gleiche Begriffs-DB).

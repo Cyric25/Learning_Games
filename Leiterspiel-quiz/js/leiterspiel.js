@@ -1,4 +1,4 @@
-/* leiterspiel.js – Schlangen & Leitern mit Wissensfragen */
+﻿/* leiterspiel.js – Schlangen & Leitern mit Wissensfragen */
 
 // ── Multi-Correct Helpers ────────────────────────────────────
 function isMcCorrect(q, selectedArr) {
@@ -1644,7 +1644,7 @@ function askQuestion(questionOverride) {
   diffEl.textContent = diffLabelMap[difficulty] || difficulty;
   diffEl.className = 'modal-difficulty diff-' + (diffCssMap[difficulty] || difficulty);
 
-  document.getElementById('q-text').textContent = question.frage;
+  document.getElementById('q-text').innerHTML = renderRichContent(question.frage);
 
   // Timer
   const timerSecs = TIMER_SECONDS[difficulty];
@@ -1673,7 +1673,7 @@ function askQuestion(questionOverride) {
       question.antworten.forEach((ans, idx) => {
         const btn = document.createElement('button');
         btn.className = 'answer-btn';
-        btn.textContent = ans;
+        btn.innerHTML = renderRichContent(ans);
         btn.onclick = () => selectAnswer(btn, idx, question);
         optionsDiv.appendChild(btn);
       });
@@ -1684,7 +1684,7 @@ function askQuestion(questionOverride) {
       question.antworten.forEach((ans, idx) => {
         const btn = document.createElement('button');
         btn.className = 'answer-btn';
-        btn.textContent = ans;
+        btn.innerHTML = renderRichContent(ans);
         btn.addEventListener('click', () => {
           if (questionResolved) return;
           if (pending.has(idx)) { pending.delete(idx); btn.classList.remove('mc-selected-pending'); }
@@ -1718,7 +1718,7 @@ function askQuestion(questionOverride) {
     openSection.style.display = '';
     document.getElementById('q-show-answer').style.display = '';
     document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-open-answer').textContent = question.erklaerung || 'Keine Antwort hinterlegt';
+    document.getElementById('q-open-answer').innerHTML = question.erklaerung ? renderRichContent(question.erklaerung) : 'Keine Antwort hinterlegt';
     document.getElementById('q-open-actions').style.display = 'none';
   }
 
@@ -1820,7 +1820,7 @@ async function resolveQuestion(correct) {
   }
 
   if (currentQuestion && currentQuestion.erklaerung) {
-    document.getElementById('q-explanation-text').textContent = currentQuestion.erklaerung;
+    document.getElementById('q-explanation-text').innerHTML = renderRichContent(currentQuestion.erklaerung);
     document.getElementById('q-explanation').classList.add('visible');
   }
 

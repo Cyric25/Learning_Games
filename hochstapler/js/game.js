@@ -1,4 +1,4 @@
-// game.js – Hochstapler: Lehrkraft-Logik (Spielwähler, Setup, Kategorien,
+﻿// game.js – Hochstapler: Lehrkraft-Logik (Spielwähler, Setup, Kategorien,
 // Lobby, Rundenmoderation). Struktur nach just-one/js/game.js bzw.
 // insider/js/game.js; Begriffe kommen aus der Just-One-Begriffs-DB
 // (../just-one/js/wordlist-shared.js), Abstimmungs-Helfer aus
@@ -505,7 +505,7 @@ function renderNoRoundHtml(state) {
 function renderRoleRevealHtml(state, r) {
   return `<div class="game-card">
     <div class="round-banner">🎭 Rollen sind verteilt</div>
-    <div class="secret-word-box">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="secret-word-box">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="round-subtext">
       Hochstapler: <strong>${impostorNamesHtml(state, r)}</strong> 🤫<br>
       Alle schauen jetzt auf ihr Gerät. Nur die Hochstapler sehen das Wort NICHT.
@@ -518,7 +518,7 @@ function renderHintingHtml(state, r) {
   const max = state.settings.hintRounds;
   return `<div class="game-card">
     <div class="round-banner">🗣 Hinweisrunde ${r.hintRound} von ${max}</div>
-    <div class="secret-word-box">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="secret-word-box">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="round-subtext">Reihum nennt jede Person mündlich EIN Hinweiswort (das Geheimwort selbst ist tabu):</div>
     ${speakOrderHtml(state, r)}
     <div class="result-actions" style="margin-top:1rem;">
@@ -560,7 +560,7 @@ function renderLastChanceHtml(state, r) {
     <div class="round-banner">⚡ Letzte Chance!</div>
     <div class="round-subtext"><strong>${escHtml(vtPlayerName(state, r.votedId))}</strong> ist Hochstapler und wurde enttarnt –
       errät er/sie jetzt mündlich das Geheimwort, gewinnt er/sie trotzdem.</div>
-    <div class="secret-word-box">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="secret-word-box">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="result-actions">
       <button class="setup-btn btn-wrong" onclick="lastChanceResolve(true)">✓ Wort erraten – Hochstapler gewinnt</button>
       <button class="setup-btn btn-correct" onclick="lastChanceResolve(false)">✗ Falsch – Ehrliche gewinnen</button>
@@ -572,7 +572,7 @@ function renderResolvedHtml(state, r) {
   const rt = RESULT_TEXT[r.result] || { emoji: '❔', label: '' };
   return `<div class="game-card">
     <div class="round-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-    <div class="resolved-word">${escHtml(r.secretWord)}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord)}</div>
     <div class="round-subtext">Hochstapler: <strong>${impostorNamesHtml(state, r)}</strong> · ${escHtml(resultDetail(r))}</div>
     ${resultsSummaryHtml(state)}
     <div class="result-actions">
@@ -586,7 +586,7 @@ function renderFinishedHtml(state) {
   const history = (state.roundHistory || []).map(h => {
     const rt = RESULT_TEXT[h.result] || { emoji: '❔' };
     return `<div class="mod-row"><span class="mod-name">R${h.num}</span>
-      <span class="mod-text">${escHtml(h.word)} · ${(h.impostorNames || []).map(escHtml).join(' &amp; ')}</span>
+      <span class="mod-text">${renderRichContent(h.word)} · ${(h.impostorNames || []).map(escHtml).join(' &amp; ')}</span>
       <span>${rt.emoji}</span></div>`;
   }).join('');
   return `<div class="game-card">

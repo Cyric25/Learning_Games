@@ -470,6 +470,80 @@ foreach ($gameDirs as $prefix => [$dir, $title]) {
     }
 }
 
+// ── Zentrale Bild-Ablage (Rich-Content): data/images/ ────────────
+// Upload nur aus Lehrkraft-Editoren (Admin-Token). Dateinamen vergibt der
+// Server selbst (Traversal-Schutz); kein SVG (XSS-Risiko), kein Base64 in
+// den Datenbanken (Quota-Falle). data/images/ bleibt per HTTP lesbar
+// (statischer Fallback-Grundsatz, keine Deny-Regel in .htaccess).
+if ($key === 'image-upload') {
+    requireAdminKey();
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error' => 'POST erwartet']); exit; }
+    $imgDir = __DIR__ . '/data/images';
+    if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
+
+    if (empty($_FILES['image']) || !is_uploaded_file($_FILES['image']['tmp_name'] ?? '')) {
+        http_response_code(400); echo json_encode(['error' => 'kein Bild im Feld "image"']); exit;
+    }
+    $f = $_FILES['image'];
+    if (($f['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || ($f['size'] ?? 0) <= 0) {
+        http_response_code(400); echo json_encode(['error' => 'Upload-Fehler']); exit;
+    }
+    if ($f['size'] > 2 * 1024 * 1024) {
+        http_response_code(413); echo json_encode(['error' => 'Bild größer als 2 MB']); exit;
+    }
+    $allowed = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                'webp' => 'image/webp', 'gif' => 'image/gif'];
+    $ext = strtolower(pathinfo($f['name'] ?? '', PATHINFO_EXTENSION));
+    if (!isset($allowed[$ext])) {
+        http_response_code(400); echo json_encode(['error' => 'Nur jpg/jpeg/png/webp/gif erlaubt']); exit;
+    }
+    // MIME zusätzlich prüfen, wenn fileinfo verfügbar ist (Shared Hosting)
+    if (function_exists('finfo_open')) {
+        $fi = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $fi ? finfo_file($fi, $f['tmp_name']) : null;
+        if ($fi) finfo_close($fi);
+        if ($mime !== null && !in_array($mime, array_values($allowed), true)) {
+            http_response_code(400); echo json_encode(['error' => 'Dateiinhalt ist kein erlaubtes Bildformat']); exit;
+        }
+    }
+    // Namen serverseitig neu vergeben: nur [A-Za-z0-9_-], kein Traversal möglich
+    $name = 'img_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 6) . '.' . $ext;
+    // move_uploaded_file schreibt atomar genug (rename vom Upload-Tempfile)
+    if (!@move_uploaded_file($f['tmp_name'], $imgDir . '/' . $name)) {
+        http_response_code(500); echo json_encode(['error' => 'Speichern fehlgeschlagen']); exit;
+    }
+    echo json_encode(['ok' => true, 'path' => 'data/images/' . $name]);
+    exit;
+}
+
+if ($key === 'images') { // Liste für die Bildverwaltung (Editor)
+    requireAdminKey();
+    $imgDir = __DIR__ . '/data/images';
+    $list = [];
+    if (is_dir($imgDir)) {
+        foreach (scandir($imgDir) as $n) {
+            if (preg_match('/^img_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $n)) {
+                $list[] = ['name' => $n, 'path' => 'data/images/' . $n, 'size' => @filesize($imgDir . '/' . $n)];
+            }
+        }
+    }
+    echo json_encode($list, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($key === 'image') { // DELETE &name=… (Bildverwaltung)
+    requireAdminKey();
+    if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') { http_response_code(405); echo json_encode(['error' => 'DELETE erwartet']); exit; }
+    $name = trim($_GET['name'] ?? '');
+    if (!preg_match('/^img_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $name)) {
+        http_response_code(400); echo json_encode(['error' => 'ungültiger Name']); exit;
+    }
+    $path = __DIR__ . '/data/images/' . $name;
+    if (file_exists($path)) @unlink($path);
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 // ── Escape Room Library: ?f=er-library ───────────────────────────
 if ($key === 'er-library') {
     $erDir = __DIR__ . '/data/escape-room';

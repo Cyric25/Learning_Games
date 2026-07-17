@@ -72,3 +72,4 @@ ein versioniertes Voll-Archiv. Details in [entwicklung.md](entwicklung.md#backup
 - **Multi-Game:** Jede Klasse/Gruppe spielt unter einem eigenen 4-stelligen Code (`A3K7`); Schüler treten über `view.html?code=XXXX` bei. → [architektur.md](architektur.md#multi-game)
 - **Echtzeit-Sync:** Server-Sent Events (SSE) mit Polling-Fallback; umkämpfte Schreibzugriffe laufen über optimistische Nebenläufigkeit (`_rev` + 409). → [api-referenz.md](api-referenz.md#nebenlaeufigkeit)
 - **Gemischtes Schreibmodell:** Das Lehrergerät schreibt autoritativ direkt; umkämpfte Aktionen (Team-Beitritt, Kick, Steal-Meldung) nutzen Compare-and-Swap. → [architektur.md](architektur.md#schreibmodell)
+- **Rich-Content:** Alle Inhalts-Strings dürfen `$…$`-Formeln (KaTeX) und `![Alt](data/images/…)`-Bilder enthalten; gerendert wird zentral über `js/rich-content.js`, Bilder lädt der Editor über `api.php?f=image-upload` hoch. → [datenformate.md §0](datenformate.md)

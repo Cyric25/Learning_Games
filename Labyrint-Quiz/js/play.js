@@ -1,4 +1,4 @@
-/* play.js – Team-Gerät Controller v1 */
+﻿/* play.js – Team-Gerät Controller v1 */
 
 // ── Konstanten ───────────────────────────────────────────────────
 const TEAM_SYMBOL_ICONS = ['👑', '⚔️', '💎', '🔮', '🗝️', '📜'];
@@ -741,7 +741,7 @@ function showQuestionModal() {
   if (questionContext.type === 'door') { trigger.textContent = '🔒 Tür öffnen'; trigger.className = 'modal-trigger trigger-door'; }
   else { trigger.textContent = `${myTeam.symbolIcon} Symbol einsammeln`; trigger.className = 'modal-trigger trigger-symbol'; }
 
-  document.getElementById('q-text').textContent = q.question;
+  document.getElementById('q-text').innerHTML = renderRichContent(q.question);
   document.getElementById('q-result').textContent = '';
   document.getElementById('q-result').className = 'modal-result';
   document.getElementById('q-result').style.display = 'none';
@@ -762,7 +762,7 @@ function showQuestionModal() {
       q.options.forEach((opt, i) => {
         const btn = document.createElement('button');
         btn.className = 'answer-btn';
-        btn.textContent = opt;
+        btn.innerHTML = renderRichContent(opt);
         btn.dataset.idx = i;
         btn.onclick = () => {
           if (btn.disabled) return;
@@ -786,7 +786,7 @@ function showQuestionModal() {
       optEl.appendChild(confirmBtn);
     } else {
       q.options.forEach((opt, i) => {
-        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = opt;
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(opt);
         btn.onclick = () => resolveChoice(i); optEl.appendChild(btn);
       });
     }

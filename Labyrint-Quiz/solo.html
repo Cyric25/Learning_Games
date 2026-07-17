@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -200,6 +200,8 @@
       #solo-play-area { flex: 1; min-height: 0; overflow-y: auto; padding: 0.5rem; }
     }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -965,7 +967,7 @@
     if (questionCtx.type==='door') { trigger.textContent='🔒 Tür öffnen'; trigger.className='modal-trigger trigger-door'; }
     else { trigger.textContent=soloState.team.symbolIcon+' Symbol einsammeln'; trigger.className='modal-trigger trigger-symbol'; }
 
-    document.getElementById('q-text').textContent=q.question;
+    document.getElementById('q-text').innerHTML=renderRichContent(q.question);
     document.getElementById('q-result').textContent='';
     document.getElementById('q-result').className='modal-result';
     document.getElementById('q-continue').className='modal-continue';
@@ -977,7 +979,7 @@
       optEl.style.display=''; openSec.style.display='none'; optEl.innerHTML='';
       q.options.forEach((opt,i)=>{
         const btn=document.createElement('button');
-        btn.className='answer-btn'; btn.textContent=opt;
+        btn.className='answer-btn'; btn.innerHTML=renderRichContent(opt);
         btn.onclick=()=>resolveChoice(i);
         optEl.appendChild(btn);
       });
@@ -985,7 +987,7 @@
     } else {
       optEl.style.display='none'; openSec.style.display='';
       const ansEl=document.getElementById('q-open-answer');
-      ansEl.textContent=q.answer||q.hint||'(keine Musterlösung)';
+      ansEl.innerHTML=(q.answer||q.hint)?renderRichContent(q.answer||q.hint):'(keine Musterlösung)';
       ansEl.className='open-answer-text';
       document.getElementById('q-show-answer').style.display='';
       document.getElementById('q-open-actions').className='open-actions';

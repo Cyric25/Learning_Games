@@ -1,4 +1,4 @@
-// board.js – Insider: Tafelansicht (reine Projektion, keine Eingaben)
+﻿// board.js – Insider: Tafelansicht (reine Projektion, keine Eingaben)
 // Nutzt denselben InStorage wie Lehrkraft/Schülergerät, aber mit dem festen
 // Viewer-Sentinel '*': der Server verbirgt Geheimwort UND Insider-Identität
 // einer laufenden Runde IMMER – die Tafel ist für die ganze Klasse sichtbar.
@@ -108,7 +108,7 @@ function renderBoard(state) {
   } else if (r.phase === 'resolved') {
     const rt = B_RESULT_TEXT[r.result] || { emoji: '❔', label: '' };
     el.innerHTML = `<div class="board-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-      <div class="board-word">${escHtml(r.secretWord || '')}</div>
+      <div class="board-word">${renderRichContent(r.secretWord || '')}</div>
       <div class="board-sub">Der Insider war: <strong>${escHtml(vtPlayerName(state, r.insiderId))}</strong></div>
       ${boardResultsHtml(state)}`;
   }

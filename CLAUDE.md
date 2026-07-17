@@ -26,11 +26,16 @@ Interaktive Unterrichtsspiele für Klassenzimmer / digitale Tafel. Kein Build-Sy
 Spiele/
   spiele.html                   ← Spielübersicht (Startseite) — Light/Dark Mode + Fragendatenbank-Button
   admin.html                    ← Zentrale Fragendatenbank (Frageneditor, MD-Import, Export)
-  api.php                       ← PHP-API für Webhosting (Multi-Game + SSE)
+  api.php                       ← PHP-API für Webhosting (Multi-Game + SSE + Bild-Upload)
   .htaccess                     ← Apache-Routing, SSE-Buffering
   categories.json               ← Kategoriedaten (Stadt Land Fluss legacy)
+  js/
+    rich-content.js             ← Gemeinsames Rendering: Text + KaTeX-Formeln + Bilder (ALLE Spiele/Editoren)
+  lib/
+    katex/                      ← KaTeX lokal, zentral (JS + CSS + Fonts; früher memory/lib/katex)
   data/
     questions.json              ← ZENTRALE Fragendatenbank (alle Quiz-Spiele)
+    images/                     ← Zentrale Bild-Ablage (?f=image-upload, Admin-Token)
   stadt-land-fluss/
     index.html                  ← Stadt Land Fluss Spiel — Light/Dark Mode
     categories.json
@@ -43,11 +48,9 @@ Spiele/
       memory-admin.js           ← Admin-Logik (Pair-Editor, Import)
     css/
       memory.css                ← Styles (Dark/Light, Card-Flip, responsive)
-    lib/
-      katex/                    ← KaTeX lokal (JS + CSS + Fonts)
     data/
       pairs.json                ← Memory-Paare Datenbank
-      images/                   ← Hochgeladene Bilder für Karten
+      images/                   ← Hochgeladene Bilder für Karten (Legacy; neu: data/images/ zentral)
   quizpfad/
     index.html                  ← QuizPfad Spiel (Spielwähler + Setup + Board + Modals)
     view.html                   ← Schüleransicht (SSE-Live, Code-Beitritt, Mini-Board)
@@ -301,6 +304,33 @@ Für Seiten mit Light-als-Standard (SLF, index):
 
 ---
 
+## Rich-Content: Formeln + Bilder (alle Spiele)
+
+Alle Inhaltsfelder (Fragen, Optionen, Antworten, Hints, Begriffe, Kategorien,
+Rätselkarten, Notizen) bleiben **reine Strings**; beim Rendern interpretiert
+das gemeinsame Modul `js/rich-content.js` Inline-Marker:
+`$...$` (KaTeX inline, kein Leerzeichen direkt nach/vor dem `$`),
+`$$...$$` (display), `![Alt](data/images/… oder https://…)` (Bild, src wird
+geklemmt), `\$`/`\|` (literale Zeichen). Reine Text-Strings bleiben gültig —
+keine Migration.
+
+**Regeln für neuen/geänderten Code:**
+- Anzeige IMMER über `renderRichContent(str)` (escaped Text selbst — nie
+  zusätzlich escapen, nie rohes `innerHTML = str`). Für Stellen ohne HTML
+  (Codenames-Karten, Duplikat-Vergleiche): `richToPlainText(str)`.
+- Einbindung pro Seite: `<script src="…/lib/katex/katex.min.js">` +
+  `<script src="…/js/rich-content.js">` (Pfadtiefe beachten). Das KaTeX-CSS
+  injiziert das Modul selbst; ohne KaTeX degradieren Formeln zu Quelltext.
+- Editoren: Upload via `rcUploadImage(file)` (POST `?f=image-upload`,
+  Admin-Token, Ablage `data/images/`, kein SVG, max 2 MB), Live-Vorschau via
+  `rcBindPreview(input, previewEl)`. **Kein Base64 in Datenbanken.**
+- MD-Dialekte mit `|`-Trennern: Inhalte escapen `|` als `\|`
+  (`MDParser._splitEscapedPipes`-Muster, Roundtrip bleibt verlustfrei).
+- Bildverwaltung (Liste/Löschen): zentrale `admin.html` → Karte
+  „🖼 Bildverwaltung" (`?f=images`, `?f=image` DELETE).
+
+---
+
 ## Zentrale Fragendatenbank
 
 ### Prinzip
@@ -500,7 +530,9 @@ cellKey = `${categoryId}-${subcategoryId}-${difficulty}`
 
 ### Architektur
 - Singleplayer-Spiel: Paare finden (Text, Formeln, Bilder)
-- KaTeX lokal gebündelt in `memory/lib/katex/` für Formel-Rendering
+- KaTeX kommt aus dem zentralen `lib/katex/` (früher `memory/lib/katex/`);
+  Text/Formeln rendern über `js/rich-content.js`, der Bild-Typ behält das
+  Legacy-Verhalten (beliebige URL/Pfad, Bestandsdaten!)
 - `memory-shared.js` enthält `MemoryStorageManager` + `MemoryModel` + `MemoryMDParser`
 - API-Endpunkt: `?f=memory-pairs` (GET/POST)
 

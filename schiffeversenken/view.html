@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -290,6 +290,8 @@
     }
     #board-view-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -1157,10 +1159,10 @@ function showQuestionOverlay(lq) {
   const overlay = document.getElementById('q-overlay');
   document.getElementById('q-coord').textContent = lq.coordinate;
   document.getElementById('q-category').textContent = lq.question.kategorieName || '';
-  document.getElementById('q-text').textContent = lq.question.question || '';
+  document.getElementById('q-text').innerHTML = renderRichContent(lq.question.question || '');
 
   const hint = document.getElementById('q-hint');
-  if (lq.question.hint) { hint.textContent = `💡 ${lq.question.hint}`; hint.style.display = ''; }
+  if (lq.question.hint) { hint.innerHTML = '💡 ' + renderRichContent(lq.question.hint); hint.style.display = ''; }
   else hint.style.display = 'none';
 
   const result = document.getElementById('q-result');
@@ -1174,7 +1176,7 @@ function showQuestionOverlay(lq) {
     // MC: noch nicht beantwortet
     openWait.classList.add('hidden');
     mcOpts.innerHTML = (lq.question.options||[]).map((opt, i) =>
-      `<button class="mc-opt" onclick="submitMCAnswer(${i})">${escapeHtml(opt)}</button>`
+      `<button class="mc-opt" onclick="submitMCAnswer(${i})">${renderRichContent(opt)}</button>`
     ).join('');
     startMCTimer(remoteState.mcTimerSeconds || 0);
   } else if (isMC && lq.autoCorrect !== null) {
@@ -1195,7 +1197,7 @@ function renderMCResult(lq, mcOpts, result) {
     let cls = 'mc-opt';
     if (i === lq.question.correctIndex) cls += ' opt-correct';
     else if (i === lq.selectedMcIndex && !lq.autoCorrect) cls += ' opt-wrong';
-    return `<button class="${cls}" disabled>${escapeHtml(opt)}</button>`;
+    return `<button class="${cls}" disabled>${renderRichContent(opt)}</button>`;
   }).join('');
   result.style.display = '';
   if (lq.autoCorrect) {
@@ -1276,7 +1278,7 @@ function showSpectatorQuestion(lq) {
 
   document.getElementById('q-coord').textContent = lq.coordinate;
   document.getElementById('q-category').textContent = q.kategorieName || '';
-  document.getElementById('q-text').textContent = q.question || '';
+  document.getElementById('q-text').innerHTML = renderRichContent(q.question || '');
 
   const hint = document.getElementById('q-hint');
   if (q.hint) { hint.textContent = `💡 ${q.hint}`; hint.style.display = ''; }

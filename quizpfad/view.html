@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -138,6 +138,8 @@
     .kicked-box { background: var(--bg-card); border-radius: 20px; padding: 2rem; max-width: 360px; text-align: center; }
     .kicked-box h2 { color: var(--danger); margin-bottom: 0.5rem; }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -598,7 +600,7 @@
     document.getElementById('q-diff').textContent =
       (lq.difficulty || q.difficulty || '?') + ' Pkt. · ' +
       lq.advanceAmount + ' Feld' + (lq.advanceAmount !== 1 ? 'er' : '') + ' bei ✓';
-    document.getElementById('q-text').textContent = q.frage || '';
+    document.getElementById('q-text').innerHTML = renderRichContent(q.frage || '');
 
     const myTurnNote = document.getElementById('q-my-turn-note');
     myTurnNote.style.display = isMyTurn && !lq.resolved ? 'block' : 'none';
@@ -626,7 +628,7 @@
       (q.antworten || []).forEach((ans, i) => {
         const div = document.createElement('button');
         div.className = 'q-opt';
-        div.textContent = ans;
+        div.innerHTML = renderRichContent(ans);
         div.disabled = !canAnswer;
         if (canAnswer) {
           div.onclick = isMulti

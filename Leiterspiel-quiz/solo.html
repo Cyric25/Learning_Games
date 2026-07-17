@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -64,6 +64,8 @@
     .hs-row-new { background: rgba(227,79,32,0.1); font-weight: 700; }
     body.dark .hs-row-new { background: rgba(247,151,30,0.12); }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -750,7 +752,7 @@ function askQuestion(question) {
   diffEl.textContent = { leicht: 'Leicht', mittel: 'Mittel', schwer: 'Schwer' }[diff] || diff;
   diffEl.className = 'modal-difficulty diff-' + ({ leicht: 'easy', mittel: 'medium', schwer: 'hard' }[diff] || diff);
 
-  document.getElementById('q-text').textContent = question.frage;
+  document.getElementById('q-text').innerHTML = renderRichContent(question.frage);
 
   const timerSecs = TIMER_SECONDS[diff] || 30;
   document.getElementById('q-timer-text').textContent = timerSecs + 's';
@@ -768,14 +770,14 @@ function askQuestion(question) {
     const isMulti = Array.isArray(question.correctIndices) && question.correctIndices.length > 0;
     if (!isMulti) {
       question.antworten.forEach((ans, idx) => {
-        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = ans;
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(ans);
         btn.onclick = () => selectAnswer(btn, idx, question);
         optDiv.appendChild(btn);
       });
     } else {
       const pending = new Set(), allBtns = [];
       question.antworten.forEach((ans, idx) => {
-        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.textContent = ans;
+        const btn = document.createElement('button'); btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(ans);
         btn.addEventListener('click', () => {
           if (questionResolved) return;
           if (pending.has(idx)) { pending.delete(idx); btn.classList.remove('mc-selected-pending'); }
@@ -797,7 +799,7 @@ function askQuestion(question) {
     optDiv.style.display = 'none'; openSec.style.display = '';
     document.getElementById('q-show-answer').style.display = '';
     document.getElementById('q-open-answer').style.display = 'none';
-    document.getElementById('q-open-answer').textContent = question.erklaerung || 'Keine Antwort hinterlegt';
+    document.getElementById('q-open-answer').innerHTML = question.erklaerung ? renderRichContent(question.erklaerung) : 'Keine Antwort hinterlegt';
     document.getElementById('q-open-actions').style.display = 'none';
   }
 
@@ -856,7 +858,7 @@ function resolveQuestion(correct) {
     document.getElementById('q-result').className = 'modal-result visible wrong-result';
   }
   if (currentQuestion && currentQuestion.erklaerung) {
-    document.getElementById('q-explanation-text').textContent = currentQuestion.erklaerung;
+    document.getElementById('q-explanation-text').innerHTML = renderRichContent(currentQuestion.erklaerung);
     document.getElementById('q-explanation').classList.add('visible');
   }
   document.getElementById('q-continue').classList.add('visible');

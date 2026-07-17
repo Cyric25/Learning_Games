@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -147,6 +147,8 @@
       .board-right-col  { max-width: 42vw; }
     }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -362,7 +364,7 @@
       panel.innerHTML =
         '<div class="bqp-active">' +
           '<div class="bqp-team-badge" style="background:' + (team?.color||'#888') + '">' + (team?.emoji||'') + ' ' + _bEsc(team?.name||'') + '</div>' +
-          '<div class="bqp-question" style="font-size:1.1rem;opacity:0.7">' + _bEsc(aq.question) + '</div>' +
+          '<div class="bqp-question" style="font-size:1.1rem;opacity:0.7">' + renderRichContent(aq.question) + '</div>' +
           '<div class="bqp-result ' + (aq.questionResult ? 'correct' : 'wrong') + '">' + (aq.questionResult ? '✓ Richtig!' : '✗ Falsch!') + '</div>' +
         '</div>';
       clearBoardTimer();
@@ -389,7 +391,7 @@
           aq.options.map(opt =>
             '<div style="padding:0.3rem 0.7rem;border-radius:6px;font-size:clamp(0.82rem,1.5vw,0.95rem);' +
             'background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-card);">' +
-            _bEsc(opt) + '</div>'
+            renderRichContent(opt) + '</div>'
           ).join('') + '</div>'
       : '';
 
@@ -400,7 +402,7 @@
           '<div class="bqp-context">' + contextLabel + '</div>' +
         '</div>' +
         '<div class="bqp-timer-wrap"><div class="bqp-timer-bar" id="bqp-tbar" style="width:100%"></div></div>' +
-        '<div class="bqp-question">' + _bEsc(aq.question) + '</div>' +
+        '<div class="bqp-question">' + renderRichContent(aq.question) + '</div>' +
         optionsHtml +
       '</div>';
 

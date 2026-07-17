@@ -1,4 +1,4 @@
-// board.js – Just One: Tafelansicht (reine Projektion, keine Eingaben)
+﻿// board.js – Just One: Tafelansicht (reine Projektion, keine Eingaben)
 // Nutzt denselben JoStorage wie Lehrkraft/Schülergerät, aber mit dem festen
 // Viewer-Sentinel '*': der Server behandelt die Tafel wie die Rater:in und
 // verbirgt das Geheimwort einer laufenden Runde IMMER – die Tafel ist für
@@ -83,7 +83,7 @@ function renderBoard(state) {
       <div class="board-reveal-list">${chips || '<span class="board-sub">Keine gültigen Hinweise übrig.</span>'}</div>`;
   } else if (r.phase === 'resolved') {
     el.innerHTML = `<div class="board-banner">${r.result ? '✅ Richtig!' : '❌ Leider falsch'}</div>
-      <div class="board-word">${escHtml(r.secretWord)}</div>
+      <div class="board-word">${renderRichContent(r.secretWord)}</div>
       <div class="board-sub">Stand: ${state.correctCount} von ${state.roundsPlayed} Runden</div>`;
   }
 }

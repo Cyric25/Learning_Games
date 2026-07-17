@@ -301,6 +301,8 @@
       .radio-group { gap: 0.5rem; }
     }
   </style>
+  <script src="lib/katex/katex.min.js"></script>
+  <script src="js/rich-content.js"></script>
 </head>
 <body>
 
@@ -403,6 +405,8 @@
     <div class="form-group">
       <label>Fragetext</label>
       <textarea id="f-question" placeholder="Deine Frage…" maxlength="500"></textarea>
+      <div class="label-opt" style="margin-top:4px;font-size:0.78rem;">Formeln: <code>$x^2$</code> · Bilder: <code>![Text](https://…)</code> · <code>\$</code> = Dollarzeichen</div>
+      <div class="rc-preview" id="f-question-preview" style="display:none;"></div>
     </div>
 
     <!-- Offene Antwort -->
@@ -410,6 +414,7 @@
       <div class="form-group">
         <label>Korrekte Antwort</label>
         <textarea id="f-answer" placeholder="Die richtige Antwort auf deine Frage…" maxlength="300" rows="2"></textarea>
+        <div class="rc-preview" id="f-answer-preview" style="display:none;"></div>
       </div>
     </div>
 
@@ -422,6 +427,7 @@
           <span>Mehrere richtige Antworten möglich</span>
         </label>
         <div class="mc-options" id="mc-options-container"></div>
+        <div class="rc-preview" id="f-option-preview" style="display:none;"></div>
         <button type="button" class="btn-add-opt" id="btn-add-mc" onclick="addMcOption()">+ Option hinzufügen</button>
       </div>
     </div>
@@ -430,6 +436,7 @@
     <div class="form-group">
       <label>Hinweis <span class="label-opt">(optional)</span></label>
       <input type="text" id="f-hint" placeholder="Ein Tipp für Mitschüler…" maxlength="200">
+      <div class="rc-preview" id="f-hint-preview" style="display:none;"></div>
     </div>
 
     <button type="button" class="submit-btn" id="submit-btn" onclick="submitSuggestion()">
@@ -841,6 +848,26 @@ function escHtml(str) {
 // ── Init ───────────────────────────────────────────────────────────
 initCategories();
 renderMcOptions();
+</script>
+<script>
+// Rich-Content-Live-Vorschau (Formeln/Bild-Marker); Upload gibt es hier
+// bewusst nicht — der Upload-Endpunkt verlangt das Admin-Token, das nicht
+// in eine Schülerseite gehört. Bilder nur als https://-URL.
+document.addEventListener('DOMContentLoaded', function () {
+  ['f-question', 'f-answer', 'f-hint'].forEach(function (id) {
+    rcBindPreview(document.getElementById(id), document.getElementById(id + '-preview'));
+  });
+  var cont = document.getElementById('mc-options-container');
+  var prev = document.getElementById('f-option-preview');
+  if (cont && prev) {
+    cont.addEventListener('input', function (e) {
+      var v = (e.target && e.target.value) || '';
+      var has = /[$!\\]/.test(v);
+      prev.innerHTML = has ? renderRichContent(v) : '';
+      prev.style.display = has ? '' : 'none';
+    });
+  }
+});
 </script>
 </body>
 </html>

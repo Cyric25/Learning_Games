@@ -1,4 +1,4 @@
-// game.js – Insider: Lehrkraft-Logik (Spielwähler, Setup, Kategorien, Lobby,
+﻿// game.js – Insider: Lehrkraft-Logik (Spielwähler, Setup, Kategorien, Lobby,
 // Rundenmoderation). Struktur nach just-one/js/game.js; Begriffe kommen aus
 // der Just-One-Begriffs-DB (../just-one/js/wordlist-shared.js).
 //
@@ -471,7 +471,7 @@ function renderNoRoundHtml(state) {
 function renderRoleRevealHtml(state, r) {
   return `<div class="game-card">
     <div class="round-banner">🎭 Rollen sind verteilt</div>
-    <div class="secret-word-box">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="secret-word-box">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="round-subtext">
       Master: <strong>${escHtml(vtPlayerName(state, r.masterId))}</strong> ·
       Insider: <strong>${escHtml(vtPlayerName(state, r.insiderId))}</strong> 🤫<br>
@@ -485,7 +485,7 @@ function renderQuestioningHtml(state, r) {
   return `<div class="game-card">
     <div class="round-banner">❓ Frage-Runde läuft</div>
     <div class="timer-remaining big"></div>
-    <div class="secret-word-box">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="secret-word-box">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="round-subtext">${escHtml(vtPlayerName(state, r.masterId))} beantwortet Ja/Nein-Fragen („Ja" / „Nein" / „Weiß nicht").</div>
     <div class="result-actions">
       <button class="setup-btn btn-correct" onclick="wordGuessedYes()">✓ Wort erraten → Abstimmung</button>
@@ -525,7 +525,7 @@ function renderResolvedHtml(state, r) {
   const rt = RESULT_TEXT[r.result] || { emoji: '❔', label: '' };
   return `<div class="game-card">
     <div class="round-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-    <div class="resolved-word">${escHtml(r.secretWord)}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord)}</div>
     <div class="round-subtext">Der Insider war: <strong>${escHtml(vtPlayerName(state, r.insiderId))}</strong> 🕵️</div>
     ${resultsSummaryHtml(state)}
     <div class="result-actions">
@@ -539,7 +539,7 @@ function renderFinishedHtml(state) {
   const history = (state.roundHistory || []).map(h => {
     const rt = RESULT_TEXT[h.result] || { emoji: '❔' };
     return `<div class="mod-row"><span class="mod-name">R${h.num}</span>
-      <span class="mod-text">${escHtml(h.word)} · Insider: ${escHtml(h.insiderName)}</span>
+      <span class="mod-text">${renderRichContent(h.word)} · Insider: ${escHtml(h.insiderName)}</span>
       <span>${rt.emoji}</span></div>`;
   }).join('');
   return `<div class="game-card">

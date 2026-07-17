@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -216,6 +216,8 @@
     .winner-title { font-size: clamp(2rem,5vw,3.5rem); font-weight: 800; margin: 16px 0 8px; }
     .winner-team { font-size: clamp(1.5rem,3.5vw,2.5rem); font-weight: 700; }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -505,7 +507,7 @@
             if (correct.includes(i)) cls += ' correct';
             else if (i === lq.selectedMcIndex) cls += ' wrong';
           }
-          return `<div class="${cls}">${esc(ans)}</div>`;
+          return `<div class="${cls}">${renderRichContent(ans)}</div>`;
         }).join('') +
       '</div>';
     }
@@ -522,7 +524,7 @@
         `<span class="q-card-team" style="background:${team ? team.color : '#888'}">${team ? esc(team.name) : ''}</span>` +
         `<span class="q-card-diff">${diffStr}</span>` +
       `</div>` +
-      `<div class="q-card-text">${esc(q.frage || '')}</div>` +
+      `<div class="q-card-text">${renderRichContent(q.frage || '')}</div>` +
       optsHtml +
       resultHtml;
   }

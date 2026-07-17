@@ -318,6 +318,8 @@
   <span id="status-text">Verbinde…</span>
 </div>
 
+<script src="../lib/katex/katex.min.js"></script>
+<script src="../js/rich-content.js"></script>
 <script src="js/shared.js"></script>
 <script>
 // ── Kompatibilität ──────────────────────────────────────────────
@@ -653,7 +655,7 @@ function buildSQ(q, gs, lq) {
   const sub = GameModel.findSubcategoryForQuestion(gs, lq.id);
   document.getElementById('sq-category').textContent = cat && sub ? `${cat.name} / ${sub.name}` : (cat?.name || '');
   document.getElementById('sq-risk').textContent = q.difficulty + ' Punkte';
-  document.getElementById('sq-text').textContent = q.question;
+  document.getElementById('sq-text').innerHTML = renderRichContent(q.question);
   document.getElementById('sq-answer').style.display = 'none';
 
   const mcEl = document.getElementById('sq-mc');
@@ -670,7 +672,7 @@ function buildSQ(q, gs, lq) {
       q.options.forEach((opt, idx) => {
         const d = document.createElement('div');
         d.className = 'sq-mc-opt clickable';
-        d.textContent = opt;
+        d.innerHTML = renderRichContent(opt);
         d.addEventListener('click', () => {
           if (pendingMultiSel.has(idx)) { pendingMultiSel.delete(idx); d.classList.remove('mc-selected-pending'); }
           else { pendingMultiSel.add(idx); d.classList.add('mc-selected-pending'); }
@@ -691,7 +693,7 @@ function buildSQ(q, gs, lq) {
       q.options.forEach((opt, idx) => {
         const d = document.createElement('div');
         d.className = 'sq-mc-opt' + (isMyTurn ? ' clickable' : '');
-        d.textContent = opt;
+        d.innerHTML = renderRichContent(opt);
         if (isMyTurn) d.addEventListener('click', () => selectMcOption(idx, q, lq));
         mcEl.appendChild(d);
       });
@@ -785,7 +787,7 @@ function showSQAnswer(q, lq) {
       else if (selectedArr.includes(i)) el.classList.add('wrong');
     });
   }
-  if (lq.answer) { const el = document.getElementById('sq-answer'); el.textContent = '✓ Antwort: ' + lq.answer; el.style.display = 'block'; }
+  if (lq.answer) { const el = document.getElementById('sq-answer'); el.innerHTML = '✓ Antwort: ' + renderRichContent(lq.answer); el.style.display = 'block'; }
   ['btn-sq-weiss-nicht','btn-sq-ich-weiss-es','steal-picked-banner'].forEach(id => document.getElementById(id).style.display = 'none');
 }
 

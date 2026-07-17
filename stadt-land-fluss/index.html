@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
@@ -539,6 +539,8 @@
             .category-add-form { flex-direction: column; }
         }
     </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
     <div class="container">
@@ -853,7 +855,7 @@
             selectedCategories.forEach(name => {
                 const tag = document.createElement('span');
                 tag.className = 'active-cat-tag';
-                tag.textContent = name;
+                tag.innerHTML = renderRichContent(name);
                 container.appendChild(tag);
             });
         }
@@ -880,7 +882,7 @@
                 check.textContent = '✓';
 
                 const label = document.createElement('span');
-                label.textContent = cat.name;
+                label.innerHTML = renderRichContent(cat.name);
                 label.style.flex = '1';
 
                 const deleteBtn = document.createElement('button');

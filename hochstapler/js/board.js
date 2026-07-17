@@ -1,4 +1,4 @@
-// board.js – Hochstapler: Tafelansicht (reine Projektion, keine Eingaben)
+﻿// board.js – Hochstapler: Tafelansicht (reine Projektion, keine Eingaben)
 // Nutzt denselben HsStorage wie Lehrkraft/Schülergerät, aber mit dem festen
 // Viewer-Sentinel '*': der Server verbirgt das Geheimwort einer laufenden
 // Runde IMMER (die Tafel wird von der ganzen Klasse inkl. Hochstapler
@@ -102,7 +102,7 @@ function renderBoard(state) {
     const rt = B_RESULT_TEXT[r.result] || { emoji: '❔', label: '' };
     const names = (r.impostorIds || []).map(id => escHtml(vtPlayerName(state, id))).join(' &amp; ');
     el.innerHTML = `<div class="board-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-      <div class="board-word">${escHtml(r.secretWord || '')}</div>
+      <div class="board-word">${renderRichContent(r.secretWord || '')}</div>
       <div class="board-sub">Hochstapler: <strong>${names}</strong></div>
       ${boardResultsHtml(state)}`;
   }

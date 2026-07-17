@@ -212,6 +212,14 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-bottom:1rem;">🖼 Bildverwaltung <span style="font-weight:400;font-size:0.8rem;color:var(--text-secondary);">(data/images/ – von allen Spielen nutzbar)</span></h3>
+      <div class="btn-group" style="margin-bottom:0.8rem;">
+        <button class="btn btn-secondary" id="btn-rc-images-refresh">🔄 Liste laden</button>
+      </div>
+      <div id="rc-image-list" style="display:flex;flex-wrap:wrap;gap:0.6rem;"></div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
       <h3 style="margin-bottom:1rem;">Statistik</h3>
       <div id="stats-info" style="color:var(--text-secondary);font-size:0.9rem;"></div>
     </div>
@@ -289,12 +297,14 @@
     <div class="form-group">
       <label>Fragetext</label>
       <textarea id="dm-question" rows="3" placeholder="Fragetext…"></textarea>
+      <div class="rc-preview" id="dm-question-preview" style="display:none;"></div>
     </div>
 
     <div id="dm-open-section">
       <div class="form-group">
         <label>Korrekte Antwort</label>
         <textarea id="dm-answer" rows="2" placeholder="Antwort…"></textarea>
+        <div class="rc-preview" id="dm-answer-preview" style="display:none;"></div>
       </div>
     </div>
 
@@ -379,12 +389,18 @@
     <div class="form-group">
       <label>Fragetext</label>
       <textarea id="qm-question" rows="3" placeholder="Fragetext eingeben..."></textarea>
+      <div class="rc-help" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:0.8rem;color:var(--text-secondary);">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-rc-upload">📤 Bild einfügen</button>
+        <span>Formeln: <code>$x^2$</code> · Bilder: <code>![Text](https://…)</code> · <code>\$</code> = Dollarzeichen</span>
+      </div>
+      <div class="rc-preview" id="qm-question-preview" style="display:none;"></div>
     </div>
 
     <div id="qm-open-section">
       <div class="form-group">
         <label>Korrekte Antwort</label>
         <textarea id="qm-answer" rows="2" placeholder="Antwort..."></textarea>
+        <div class="rc-preview" id="qm-answer-preview" style="display:none;"></div>
       </div>
     </div>
 
@@ -396,6 +412,7 @@
           <span>Mehrere richtige Antworten möglich</span>
         </label>
         <div class="mc-options-editor" id="qm-mc-options"></div>
+        <div class="rc-preview" id="qm-option-preview" style="display:none;"></div>
         <button class="btn btn-secondary btn-sm" id="btn-add-mc-option" style="margin-top:0.5rem;">+ Option hinzufügen</button>
       </div>
       <div class="form-group">
@@ -407,6 +424,7 @@
     <div class="form-group">
       <label>Hinweis <span style="color:var(--text-secondary);font-size:0.85rem;">(optional)</span></label>
       <input type="text" id="qm-hint" placeholder="Lösungshinweis (optional)">
+      <div class="rc-preview" id="qm-hint-preview" style="display:none;"></div>
     </div>
 
     <div id="qm-alert" style="margin-bottom:0.8rem;"></div>
@@ -451,7 +469,126 @@
   </div>
 </div>
 
+<script src="lib/katex/katex.min.js"></script>
+<script src="js/rich-content.js"></script>
 <script src="risiko-quiz/js/shared.js"></script>
+
+<!-- ── Rich-Content: Vorschau, Bild-Upload, Bildverwaltung ────────── -->
+<input type="file" id="rc-upload-input" accept=".jpg,.jpeg,.png,.webp,.gif" style="display:none;">
+<script>
+(function () {
+  // Letztes fokussiertes Rich-Content-Feld (Ziel für "Bild einfügen")
+  var RC_FIELD_IDS = ['qm-question', 'qm-answer', 'qm-hint', 'dm-question', 'dm-answer', 'dm-hint'];
+  var lastRichField = null;
+
+  document.addEventListener('focusin', function (e) {
+    var t = e.target;
+    if (!t) return;
+    if (RC_FIELD_IDS.indexOf(t.id) !== -1 ||
+        (t.closest && t.closest('.mc-options-editor') && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'))) {
+      lastRichField = t;
+    }
+  });
+
+  // Marker an der Cursorposition einfügen
+  function insertAtCursor(el, text) {
+    var start = el.selectionStart ?? el.value.length;
+    var end = el.selectionEnd ?? el.value.length;
+    el.value = el.value.slice(0, start) + text + el.value.slice(end);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
+    el.selectionStart = el.selectionEnd = start + text.length;
+  }
+
+  document.getElementById('btn-rc-upload').addEventListener('click', function () {
+    document.getElementById('rc-upload-input').click();
+  });
+
+  document.getElementById('rc-upload-input').addEventListener('change', async function () {
+    var file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    try {
+      var path = await rcUploadImage(file);
+      var target = lastRichField || document.getElementById('qm-question');
+      insertAtCursor(target, '![Bild](' + path + ')');
+    } catch (e) {
+      alert('Bild-Upload fehlgeschlagen: ' + e.message);
+    }
+  });
+
+  // Live-Vorschauen (nur sichtbar, wenn Marker vorkommen)
+  document.addEventListener('DOMContentLoaded', function () {
+    RC_FIELD_IDS.forEach(function (id) {
+      var input = document.getElementById(id);
+      var prev = document.getElementById(id + '-preview');
+      if (input && prev) rcBindPreview(input, prev);
+    });
+    // MC-Optionen: eine gemeinsame Vorschau für das fokussierte Options-Feld
+    ['qm-mc-options', 'dm-mc-options'].forEach(function (cid) {
+      var cont = document.getElementById(cid);
+      var prev = document.getElementById('qm-option-preview');
+      if (!cont || !prev) return;
+      cont.addEventListener('input', function (e) {
+        var v = (e.target && e.target.value) || '';
+        var has = /[$!\\]/.test(v);
+        prev.innerHTML = has ? renderRichContent(v) : '';
+        prev.style.display = has ? '' : 'none';
+      });
+    });
+    document.getElementById('btn-rc-images-refresh').addEventListener('click', rcLoadImageList);
+  });
+
+  // ── Bildverwaltung (Liste + Kopieren + Löschen, Admin-Token) ──
+  async function rcLoadImageList() {
+    var listEl = document.getElementById('rc-image-list');
+    listEl.innerHTML = '<span style="color:var(--text-secondary);">Lade…</span>';
+    try {
+      var r = await fetch('api.php?f=images', { headers: { 'X-Admin-Key': 'LP-Spiele-2026' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var imgs = await r.json();
+      if (!imgs.length) { listEl.innerHTML = '<span style="color:var(--text-secondary);">Keine Bilder hochgeladen.</span>'; return; }
+      listEl.innerHTML = '';
+      imgs.forEach(function (img) {
+        var card = document.createElement('div');
+        card.style.cssText = 'width:150px;border:1px solid var(--border);border-radius:10px;padding:6px;text-align:center;';
+        var kb = Math.round((img.size || 0) / 1024);
+        card.innerHTML =
+          '<img src="' + img.path + '" alt="" style="max-width:100%;max-height:80px;border-radius:6px;">' +
+          '<div style="font-size:0.65rem;color:var(--text-secondary);word-break:break-all;margin:4px 0;">' + img.name + ' (' + kb + ' KB)</div>';
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-secondary btn-sm';
+        copyBtn.textContent = '📋 Marker';
+        copyBtn.title = 'Bild-Marker in die Zwischenablage kopieren';
+        copyBtn.addEventListener('click', function () {
+          navigator.clipboard.writeText('![Bild](' + img.path + ')').then(function () {
+            copyBtn.textContent = '✓'; setTimeout(function () { copyBtn.textContent = '📋 Marker'; }, 1200);
+          }).catch(function () {});
+        });
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-secondary btn-sm';
+        delBtn.textContent = '🗑';
+        delBtn.title = 'Bild löschen';
+        delBtn.style.marginLeft = '4px';
+        delBtn.addEventListener('click', async function () {
+          if (!confirm('Bild ' + img.name + ' löschen? Fragen, die es verwenden, zeigen es danach nicht mehr an.')) return;
+          try {
+            await fetch('api.php?f=image&name=' + encodeURIComponent(img.name), {
+              method: 'DELETE', headers: { 'X-Admin-Key': 'LP-Spiele-2026' }
+            });
+          } catch (e) {}
+          rcLoadImageList();
+        });
+        card.appendChild(copyBtn);
+        card.appendChild(delBtn);
+        listEl.appendChild(card);
+      });
+    } catch (e) {
+      listEl.innerHTML = '<span style="color:var(--danger);">Liste konnte nicht geladen werden (' + e.message + ').</span>';
+    }
+  }
+})();
+</script>
 <script>
 // admin.html liegt im Root → API-Pfad korrigieren (shared.js nutzt ../api.php für Unterordner)
 StorageManager._apiUrl = function(resource, params) {

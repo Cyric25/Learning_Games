@@ -50,6 +50,12 @@
         </select>
       </div>
       <textarea id="word-textarea" placeholder="Ein Begriff pro Zeile…" disabled></textarea>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0;font-size:0.8rem;color:var(--text-secondary);">
+        <button type="button" class="btn btn-secondary" style="margin:0;" onclick="document.getElementById('rc-upload-input').click()">📤 Bild einfügen</button>
+        <span>Formeln: <code>$x^2$</code> · <code>\$</code> = Dollarzeichen · Vorschau zeigt die Cursor-Zeile</span>
+      </div>
+      <input type="file" id="rc-upload-input" accept=".jpg,.jpeg,.png,.webp,.gif" style="display:none;" onchange="rcHandleWordUpload(this)">
+      <div class="rc-preview" id="word-line-preview" style="display:none;"></div>
       <div class="word-count" id="word-count"></div>
       <button class="btn btn-primary" id="btn-save-words" onclick="saveWords()" style="display:none;">Speichern</button>
       <div class="save-status" id="save-status"></div>
@@ -83,8 +89,49 @@
   </div>
 
   <!-- ── Scripts ─────────────────────────────────────────── -->
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
   <script src="js/wordlist-shared.js"></script>
   <script src="js/admin.js"></script>
+
+  <!-- Rich-Content: Bild-Upload + Vorschau der Cursor-Zeile -->
+  <script>
+  async function rcHandleWordUpload(input) {
+    var file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    var ta = document.getElementById('word-textarea');
+    if (!ta || ta.disabled) { alert('Bitte zuerst eine Unterkategorie wählen.'); return; }
+    try {
+      var path = await rcUploadImage(file);
+      var marker = '![Bild](' + path + ')';
+      var start = ta.selectionStart ?? ta.value.length;
+      var end = ta.selectionEnd ?? ta.value.length;
+      ta.value = ta.value.slice(0, start) + marker + ta.value.slice(end);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + marker.length;
+    } catch (e) {
+      alert('Bild-Upload fehlgeschlagen: ' + e.message);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var ta = document.getElementById('word-textarea');
+    var prev = document.getElementById('word-line-preview');
+    if (!ta || !prev) return;
+    function updateLinePreview() {
+      var pos = ta.selectionStart ?? 0;
+      var line = ta.value.slice(0, pos).split('\n').pop() + ta.value.slice(pos).split('\n')[0];
+      var has = /[$!\\]/.test(line);
+      prev.innerHTML = has ? renderRichContent(line.trim()) : '';
+      prev.style.display = has ? '' : 'none';
+    }
+    ta.addEventListener('input', updateLinePreview);
+    ta.addEventListener('click', updateLinePreview);
+    ta.addEventListener('keyup', updateLinePreview);
+  });
+  </script>
 
   <!-- Theme Toggle -->
   <script>

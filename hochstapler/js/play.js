@@ -1,4 +1,4 @@
-// play.js – Hochstapler: Schülergerät (Beitritt, Wort-/Rollenanzeige,
+﻿// play.js – Hochstapler: Schülergerät (Beitritt, Wort-/Rollenanzeige,
 // Abstimmung). Struktur nach just-one/js/play.js bzw. insider/js/play.js.
 //
 // Das Geheimwort wird serverseitig vor dem/den Hochstapler(n) verborgen und
@@ -188,7 +188,7 @@ function roleCardHtml(r) {
       <div class="role-hint">Du kennst das Geheimwort nicht. Höre gut zu, bluffe mit einem passenden Hinweiswort – und flieg nicht auf!</div>`;
   } else {
     inner = `<div class="role-name">✅ Du kennst das Wort</div>
-      <div class="role-word">${escHtml(r.secretWord || '')}</div>
+      <div class="role-word">${renderRichContent(r.secretWord || '')}</div>
       <div class="role-hint">Nenne ein passendes Hinweiswort – aber das Geheimwort selbst ist tabu!</div>`;
   }
   return `<div class="role-card">
@@ -293,7 +293,7 @@ function renderPResolvedHtml(state, r) {
   const names = (r.impostorIds || []).map(id => escHtml(vtPlayerName(state, id))).join(' &amp; ');
   return `<div class="game-card">
     <div class="round-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-    <div class="resolved-word">${escHtml(r.secretWord || '')}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord || '')}</div>
     <div class="round-subtext">Hochstapler: <strong>${names}</strong>${wasMe ? ' – also du! 🎭' : ''}</div>
     <div class="round-subtext">Die Lehrkraft startet die nächste Runde …</div>
   </div>`;

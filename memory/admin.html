@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -6,7 +6,7 @@
   <title>Memory – Admin</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
   <link rel="stylesheet" href="css/memory.css">
-  <link rel="stylesheet" href="lib/katex/katex.min.css">
+  <!-- KaTeX-CSS injiziert js/rich-content.js (zentrales lib/katex/) -->
   <style>
     /* ── Admin-spezifische Styles ────────────────────────── */
     .admin-wrap {
@@ -270,8 +270,12 @@
     </div>
   </div>
 
+  <!-- Verstecktes Datei-Feld für den Bild-Upload (pickImage/handleImageUpload) -->
+  <input type="file" id="rc-upload-input" accept=".jpg,.jpeg,.png,.webp,.gif" style="display:none" onchange="handleImageUpload(this)">
+
   <!-- ── Scripts ─────────────────────────────────────────── -->
-  <script src="lib/katex/katex.min.js"></script>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
   <script src="js/memory-shared.js?v=146"></script>
   <script src="js/memory-admin.js?v=146"></script>
 

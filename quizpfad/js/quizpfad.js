@@ -1,4 +1,4 @@
-/* quizpfad.js – Spiellogik */
+﻿/* quizpfad.js – Spiellogik */
 
 // XSS-Schutz: color aus Remote-State klemmen (State ist per Code beschreibbar)
 function _qpSafeColor(c) { return typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888'; }
@@ -472,7 +472,7 @@ function applyRemoteAnswer(lq) {
 
   const explEl = document.getElementById('q-explanation');
   if (lq.question.erklaerung) {
-    document.getElementById('q-explanation-text').textContent = lq.question.erklaerung;
+    document.getElementById('q-explanation-text').innerHTML = renderRichContent(lq.question.erklaerung);
     explEl.classList.add('visible');
   }
 
@@ -982,7 +982,7 @@ function showQuestionModal(question, lq) {
   document.getElementById('q-difficulty').textContent =
     `${diff || '?'} Pkt. · ${advance} Feld${advance !== 1 ? 'er' : ''} bei ✓`;
 
-  document.getElementById('q-text').textContent = question.frage;
+  document.getElementById('q-text').innerHTML = renderRichContent(question.frage);
 
   const hintEl = document.getElementById('q-hint');
   if (question.erklaerung && question.typ === 'offen') {
@@ -996,7 +996,7 @@ function showQuestionModal(question, lq) {
 
   const explEl = document.getElementById('q-explanation');
   explEl.classList.remove('visible');
-  document.getElementById('q-explanation-text').textContent = question.erklaerung || '';
+  document.getElementById('q-explanation-text').innerHTML = renderRichContent(question.erklaerung || '');
   document.getElementById('q-continue').classList.remove('visible');
 
   const optionsDiv = document.getElementById('q-options');
@@ -1013,7 +1013,7 @@ function showQuestionModal(question, lq) {
     if (!isMulti) {
       question.antworten.forEach((ans, i) => {
         const btn = document.createElement('button');
-        btn.className = 'answer-btn'; btn.textContent = ans;
+        btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(ans);
         btn.onclick = () => selectAnswer(btn, i, question);
         optionsDiv.appendChild(btn);
       });
@@ -1022,7 +1022,7 @@ function showQuestionModal(question, lq) {
       const allBtns = [];
       question.antworten.forEach((ans, i) => {
         const btn = document.createElement('button');
-        btn.className = 'answer-btn'; btn.textContent = ans;
+        btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(ans);
         btn.addEventListener('click', () => {
           if (pendingQuestionResult && pendingQuestionResult.resolved) return;
           if (pending.has(i)) { pending.delete(i); btn.classList.remove('mc-selected-pending'); }
@@ -1222,13 +1222,13 @@ function showDuelQuestion(question, team1Idx, team2Idx, phase) {
   document.getElementById('q-cat-icon').textContent = '⚔️';
   document.getElementById('q-cat-name').textContent = 'Duell: ' + team.name;
   document.getElementById('q-difficulty').textContent = (question.difficulty || '?') + ' Pkt.';
-  document.getElementById('q-text').textContent = question.frage;
+  document.getElementById('q-text').innerHTML = renderRichContent(question.frage);
   document.getElementById('q-hint').style.display = 'none';
 
   const resultEl = document.getElementById('q-result');
   resultEl.className = 'modal-result'; resultEl.textContent = '';
   document.getElementById('q-explanation').classList.remove('visible');
-  document.getElementById('q-explanation-text').textContent = question.erklaerung || '';
+  document.getElementById('q-explanation-text').innerHTML = renderRichContent(question.erklaerung || '');
   document.getElementById('q-continue').classList.remove('visible');
 
   const optionsDiv = document.getElementById('q-options');
@@ -1241,7 +1241,7 @@ function showDuelQuestion(question, team1Idx, team2Idx, phase) {
     optionsDiv.style.display = 'flex';
     question.antworten.forEach((ans, i) => {
       const btn = document.createElement('button');
-      btn.className = 'answer-btn'; btn.textContent = ans;
+      btn.className = 'answer-btn'; btn.innerHTML = renderRichContent(ans);
       btn.onclick = () => {
         if (pendingQuestionResult && pendingQuestionResult.resolved) return;
         const correct = i === question.richtig;

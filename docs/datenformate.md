@@ -1,5 +1,36 @@
 # Datenformate
 
+## 0. Rich-Content: Formeln + Bilder in allen Inhalts-Strings
+
+Alle Inhaltsfelder des Projekts (Fragen, Optionen, Antworten, Hints,
+Rätselkarten, Begriffe, Kategorien, Notizen) sind **weiterhin reine Strings**
+— zusätzlich werden beim Rendern Inline-Marker interpretiert
+(`js/rich-content.js`, eine Quelle der Wahrheit für alle Seiten):
+
+| Syntax | Bedeutung |
+|--------|-----------|
+| `$...$` | KaTeX-Formel (inline). Zählt **nur**, wenn direkt nach dem öffnenden und vor dem schließenden `$` kein Leerzeichen steht — „5 $ und 10 $" bleibt Text. |
+| `$$...$$` | KaTeX-Formel (display, zentriert) |
+| `![Alt](Quelle)` | Bild. Quelle wird geklemmt: nur `data/images/<datei>` (zentrale Upload-Ablage) oder `https://…` — alles andere wird verworfen (nur Alt-Text). |
+| `\$` / `\|` | literales Dollar- bzw. Pipe-Zeichen |
+
+**Rückwärtskompatibel:** reine Text-Strings bleiben unverändert gültig, keine
+Migration nötig. Text wird immer escaped (XSS-Vertrauensgrenze,
+[architektur.md §8](architektur.md#sicherheit)). Ohne geladenes KaTeX
+degradieren Formeln zum escapten Quelltext.
+
+API des Moduls: `renderRichContent(str) → HTML` (alle Anzeige-Stellen),
+`richToPlainText(str)` (Stellen ohne HTML: Codenames-Karten, Vergleiche wie
+`joComputeDuplicateStrikes`), `rcUploadImage(file)` + `rcBindPreview(...)`
+(Editoren). KaTeX liegt zentral unter `lib/katex/` (aus `memory/lib/`
+verschoben); das CSS injiziert das Modul selbst. Memory behält sein
+strukturiertes `{type, content}`-Format — nur sein Renderer delegiert an das
+Modul; der Bild-Typ rendert Legacy-URLs unverändert.
+
+Bilder werden über `api.php?f=image-upload` (Admin-Token) nach `data/images/`
+hochgeladen — **kein Base64 in den Datenbanken** (Quota-Falle). Details:
+[api-referenz.md](api-referenz.md).
+
 ## 1. Zentrale Fragendatenbank (`data/questions.json`)
 
 Das **Master-Format**. Von der zentralen `admin.html` bearbeitet; jedes
@@ -204,6 +235,14 @@ Eine `##`-Sektion pro (Blatt-)Kategorie, Fragen als `### <difficulty>`:
 Verschachtelte Kategorien werden über Pfadnamen abgebildet: `## Ober › Unter`.
 Der Export (`MDParser.toMarkdown`) erzeugt exakt dieses Format — ein Export lässt
 sich verlustfrei re-importieren (per Roundtrip-Test abgesichert).
+
+**Pipes in Inhalten (`\|`):** In den pipe-separierten Zeilen (Optionen `o:`,
+Memory-Paare, Escape-Room-Fragen) steht `\|` für ein literales `|` im Inhalt
+(z. B. LaTeX `$|x|$`). Der Export escapet automatisch, der Import macht genau
+eine Escape-Ebene rückgängig — der Roundtrip bleibt verlustfrei
+(`MDParser._splitEscapedPipes` bzw. gleichnamige Helfer in Memory/Escape Room).
+Rich-Content-Marker (`$…$`, `![…](…)`) sind Teil des Strings und werden von
+allen MD-Dialekten unverändert transportiert.
 
 Es gibt zusätzlich ein **Format B** (`## NNN Punkte` + `### Frage N (Offen)`),
 das der Parser automatisch erkennt (`/^## \d+\s+Punkte$/`).

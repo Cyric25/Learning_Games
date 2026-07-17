@@ -1,4 +1,4 @@
-// play.js – Just One: Schülergerät (Beitritt, Warteraum, Kick-Erkennung)
+﻿// play.js – Just One: Schülergerät (Beitritt, Warteraum, Kick-Erkennung)
 // Rundenlogik (Hinweis-Eingabe / Rater-Ansicht) folgt in einer späteren Ausbaustufe.
 
 let code = null;
@@ -216,7 +216,7 @@ function renderPCollectingHtml(state, r, isGuesser) {
   }
   return `<div class="game-card">
     <div class="round-banner">Dein Hinweis?</div>
-    <div class="round-subtext">Geheimwort: <strong>${escHtml(r.secretWord)}</strong></div>
+    <div class="round-subtext">Geheimwort: <strong>${renderRichContent(r.secretWord)}</strong></div>
     <div class="clue-input-row">
       <input id="clue-input" maxlength="60" placeholder="Ein Wort…" autocomplete="off" onkeydown="if(event.key==='Enter')submitClue()">
       <button class="setup-btn" onclick="submitClue()">Senden</button>
@@ -244,7 +244,7 @@ function renderPRevealedHtml(state, r, isGuesser) {
 function renderPResolvedHtml(state, r) {
   return `<div class="game-card">
     <div class="round-banner">${r.result ? '✅ Richtig!' : '❌ Leider falsch'}</div>
-    <div class="resolved-word">${escHtml(r.secretWord)}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord)}</div>
     <div class="resolved-result ${r.result ? 'correct' : 'wrong'}">Stand: ${state.correctCount} von ${state.roundsPlayed} Runden</div>
     <div class="round-subtext">Die Lehrkraft startet die nächste Runde …</div>
   </div>`;

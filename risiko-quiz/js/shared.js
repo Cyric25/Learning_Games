@@ -900,7 +900,7 @@ const MDParser = {
         } else if (content.startsWith('a:')) {
           currentQuestion.answer = content.substring(2).trim();
         } else if (content.startsWith('o:')) {
-          currentQuestion.options = content.substring(2).trim().split('|').map(o => o.trim());
+          currentQuestion.options = MDParser._splitEscapedPipes(content.substring(2).trim()).map(o => o.trim());
         } else if (content.startsWith('hint:')) {
           currentQuestion.hint = content.substring(5).trim();
         }
@@ -1029,6 +1029,23 @@ const MDParser = {
     return { errors, warnings };
   },
 
+  // Split an '|', aber \| als literales Pipe behandeln und entescapen
+  // (für LaTeX-Inhalte, z.B. $|x|$): Export escapet '|' → '\|', Import macht
+  // genau eine Ebene rückgängig → verlustfreier Roundtrip. Bewusst ohne
+  // Regex-Lookbehind (ältere iPad-Safaris).
+  _splitEscapedPipes(str) {
+    const parts = [];
+    let cur = '';
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === '\\' && str[i + 1] === '|') { cur += '|'; i++; continue; }
+      if (ch === '|') { parts.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    parts.push(cur);
+    return parts;
+  },
+
   toMarkdown(categoriesOrGame) {
     // Export im Format-A-Schema des Parsers: FLACHE Sektionen (`## Name`,
     // Fragen als `### <difficulty>`). Verschachtelung wird über Pfadnamen
@@ -1042,7 +1059,9 @@ const MDParser = {
       s += `- type: ${q.type}\n`;
       s += `- q: ${q.question}\n`;
       if (q.type === 'mc' && q.options && q.options.length > 0) {
-        s += `- o: ${q.options.join(' | ')}\n`;
+        // '|' im Optionstext (z.B. LaTeX-Beträge) als \| escapen — sonst
+        // zerfällt die Option beim Re-Import (Roundtrip-Garantie)
+        s += `- o: ${q.options.map(o => String(o).replace(/\|/g, '\\|')).join(' | ')}\n`;
       }
       s += `- a: ${q.answer}\n`;
       if (q.hint) s += `- hint: ${q.hint}\n`;

@@ -187,8 +187,40 @@ function buildSideEditor(side, data, idx) {
     '<input type="text" value="' + escAttr(data.content) + '" ' +
       'oninput="updateContent(' + idx + ', \'' + side + '\', this.value)" ' +
       'placeholder="Inhalt…">' +
+    '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px;" ' +
+      'onclick="pickImage(' + idx + ', \'' + side + '\')">📤 Bild hochladen</button>' +
     '<div class="side-preview" id="preview-' + idx + '-' + side + '"></div>' +
   '</div>';
+}
+
+// ── Bild-Upload (zentrale API, js/rich-content.js → rcUploadImage) ──
+// Der Pfad wird relativ zur Memory-Seite gespeichert (../data/images/…),
+// weil Memory type 'image' als direkte URL/Pfad rendert (Legacy-Format).
+let _imgUploadTarget = null;
+
+function pickImage(idx, side) {
+  _imgUploadTarget = { idx: idx, side: side };
+  document.getElementById('rc-upload-input').click();
+}
+
+async function handleImageUpload(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file || !_imgUploadTarget) return;
+  try {
+    const path = await rcUploadImage(file); // 'data/images/img_….png'
+    const cat = pairsData.categories.find(c => c.id === selectedCatId);
+    if (!cat) return;
+    const key = _imgUploadTarget.side === 'A' ? 'sideA' : 'sideB';
+    const s = cat.pairs[_imgUploadTarget.idx][key];
+    s.type = 'image';
+    s.content = '../' + path;
+    renderPairs();
+  } catch (e) {
+    alert('Bild-Upload fehlgeschlagen: ' + e.message);
+  } finally {
+    _imgUploadTarget = null;
+  }
 }
 
 function stripMathDelimiters(s) {
@@ -208,6 +240,11 @@ function renderPreview(side, data, idx) {
     (content.startsWith('$') && content.trimEnd().endsWith('$'));
 
   if (looksLikeFormula && content) {
+    // Gemeinsames Modul (js/rich-content.js), Fallback auf direktes KaTeX
+    if (window.renderRichContent) {
+      el.innerHTML = renderRichContent('$' + stripMathDelimiters(content) + '$');
+      return;
+    }
     try {
       katex.render(stripMathDelimiters(content), el, { throwOnError: false, displayMode: false });
     } catch {

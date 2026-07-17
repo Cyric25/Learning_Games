@@ -99,3 +99,8 @@ Späteinsteiger:innen kommen ans Ende der Master-Rotation.
 
 Standard-Palette Orange (Light) / Dunkelblau (`body.dark`), kein
 spielspezifisches Theme.
+
+## Rich-Content (seit Juli 2026)
+
+Begriffe aus der Just-One-DB dürfen Formeln/Bilder enthalten; Rollenkarten,
+Auflösung und Tafel rendern über `renderRichContent()` (`js/rich-content.js`).

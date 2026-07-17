@@ -1,4 +1,4 @@
-// play.js – Insider: Schülergerät (Beitritt, Rollenanzeige, Abstimmung)
+﻿// play.js – Insider: Schülergerät (Beitritt, Rollenanzeige, Abstimmung)
 // Struktur nach just-one/js/play.js.
 //
 // Geheimwort und Insider-Identität werden serverseitig gefiltert (siehe
@@ -201,11 +201,11 @@ function roleCardHtml(r) {
   let inner;
   if (role === 'master') {
     inner = `<div class="role-name">🎩 Du bist der Master</div>
-      <div class="role-word">${escHtml(r.secretWord || '')}</div>
+      <div class="role-word">${renderRichContent(r.secretWord || '')}</div>
       <div class="role-hint">Beantworte die Fragen nur mit „Ja", „Nein" oder „Weiß nicht".</div>`;
   } else if (role === 'insider') {
     inner = `<div class="role-name">🤫 Du bist der INSIDER</div>
-      <div class="role-word">${escHtml(r.secretWord || '')}</div>
+      <div class="role-word">${renderRichContent(r.secretWord || '')}</div>
       <div class="role-hint">Hilf unauffällig mit gezielten Fragen – lass dich nicht enttarnen!</div>`;
   } else {
     inner = `<div class="role-name">👥 Du bist Bürger:in</div>
@@ -299,7 +299,7 @@ function renderPResolvedHtml(state, r) {
   const wasMe = r.insiderId === myPlayerId;
   return `<div class="game-card">
     <div class="round-banner">${rt.emoji} ${escHtml(rt.label)}</div>
-    <div class="resolved-word">${escHtml(r.secretWord || '')}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord || '')}</div>
     <div class="round-subtext">Der Insider war: <strong>${escHtml(vtPlayerName(state, r.insiderId))}</strong>${wasMe ? ' – also du! 🤫' : ''}</div>
     <div class="round-subtext">Die Lehrkraft startet die nächste Runde …</div>
   </div>`;

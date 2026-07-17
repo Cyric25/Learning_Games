@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -11,6 +11,8 @@
     body:not(.teacher) .gs-btn-delete     { display: none !important; }
     body.teacher        .gs-teacher-hint  { display: none !important; }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -741,12 +743,12 @@ function showQuestionModal(lq) {
   document.getElementById('modal-team-dot').style.background = team.color;
   document.getElementById('modal-team-name').textContent = `${team.emoji} ${team.name}`;
   document.getElementById('modal-coord').textContent = lq.coordinate;
-  document.getElementById('modal-question').textContent = lq.question.question || '';
+  document.getElementById('modal-question').innerHTML = renderRichContent(lq.question.question || '');
   const catEl = document.getElementById('modal-category');
   if (catEl) catEl.textContent = lq.question.kategorieName || '';
 
   const hint = document.getElementById('modal-hint');
-  if (lq.question.hint) { hint.textContent = `💡 ${lq.question.hint}`; hint.style.display = ''; }
+  if (lq.question.hint) { hint.innerHTML = '💡 ' + renderRichContent(lq.question.hint); hint.style.display = ''; }
   else { hint.style.display = 'none'; }
 
   const opts = document.getElementById('modal-mc-options');
@@ -765,7 +767,7 @@ function showQuestionModal(lq) {
         if (i === lq.question.correctIndex) cls += ' correct';
         else if (i === lq.selectedMcIndex && !lq.autoCorrect) cls += ' wrong';
       }
-      return `<div class="${cls}">${escapeHtml(opt)}</div>`;
+      return `<div class="${cls}">${renderRichContent(opt)}</div>`;
     }).join('');
 
     btns.innerHTML = '';
@@ -775,7 +777,7 @@ function showQuestionModal(lq) {
     // Offene Frage: Spielleiter entscheidet
     opts.innerHTML = '';
     if (lq.question.answer) {
-      result.textContent = `Musterlösung: ${lq.question.answer}`;
+      result.innerHTML = 'Musterlösung: ' + renderRichContent(lq.question.answer);
       result.className = 'modal-result-banner waiting';
     } else {
       result.className = 'modal-result-banner hidden';

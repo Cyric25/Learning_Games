@@ -158,7 +158,7 @@ const MemoryMDParser = {
       }
       if (line.startsWith('- ') && currentCat) {
         const content = line.substring(2).trim();
-        const parts = content.split('|').map(p => p.trim());
+        const parts = this._splitEscapedPipes(content).map(p => p.trim());
 
         if (parts.length >= 4) {
           const typeA = this._normalizeType(parts[0]);
@@ -187,6 +187,22 @@ const MemoryMDParser = {
     if (s.startsWith('$$') && s.endsWith('$$') && s.length > 4) return s.slice(2, -2).trim();
     if (s.startsWith('$') && s.endsWith('$') && s.length > 2) return s.slice(1, -1).trim();
     return s;
+  },
+
+  // Split an '|', aber \| als literales Pipe behandeln und entescapen
+  // (für LaTeX-Inhalte, z.B. $|x|$) — gleiche Logik wie
+  // MDParser._splitEscapedPipes in risiko-quiz/js/shared.js.
+  _splitEscapedPipes(str) {
+    const parts = [];
+    let cur = '';
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === '\\' && str[i + 1] === '|') { cur += '|'; i++; continue; }
+      if (ch === '|') { parts.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    parts.push(cur);
+    return parts;
   },
 
   // Bereinigt bereits gespeicherte Paare: entfernt $ aus Formel-Inhalten

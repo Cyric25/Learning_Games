@@ -50,3 +50,10 @@ Rollen: `spymaster` (sieht alle Kartenfarben), `operative` (rät), `spectator`.
 `apiPost` / `apiGet` · `doJoin` · `doRefresh` / `handleStateUpdate` ·
 `renderScoreBar` / `renderCardGrid` / `renderClueArea` · `doSubmitClue` ·
 `doGuessCard` · `doEndTurn`.
+
+## Rich-Content (seit Juli 2026)
+
+Codenames-Karten zeigen bewusst **reinen Text**: Kartenwörter laufen durch
+`richToPlainText()` (`js/rich-content.js`) — `$…$`-Formeln erscheinen als
+TeX-Quelltext, Bild-Marker als Alt-Text. Der Wortlisten-Editor weist darauf
+hin. Hinweiswörter der Spymaster bleiben unverändert escaped.

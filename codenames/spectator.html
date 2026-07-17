@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -200,6 +200,7 @@
   </div>
 </div>
 
+<script src="../js/rich-content.js"></script>
 <script>
 'use strict';
 
@@ -336,7 +337,7 @@ function renderBoard(gs) {
       div.className += ` revealed team-${card.team}`;
       if (newlyRevealed.has(i)) div.classList.add('just-revealed');
     }
-    div.innerHTML = `<span class="spec-card-word">${escHtml(card.word)}</span>`;
+    div.innerHTML = `<span class="spec-card-word">${escHtml(richToPlainText(card.word))}</span>`;
     grid.appendChild(div);
   });
 

@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════════
    Codenames — game.js
    Spiellogik, Übersetzungen, Polling (1.5 s), alle Screens
 ═══════════════════════════════════════════════════════════════ */
@@ -880,7 +880,7 @@ function renderCardGrid(gs) {
       div.addEventListener('click', () => doGuessCard(i));
     }
 
-    div.innerHTML = `<span class="cn-card-word">${esc(card.word)}</span>`;
+    div.innerHTML = `<span class="cn-card-word">${esc(richToPlainText(card.word))}</span>`;
     grid.appendChild(div);
   });
 }
@@ -1012,7 +1012,7 @@ function renderEnd(gs) {
   // Mini board for end screen
   const boardHtml = (gs.cards || []).map(c =>
     `<div class="cn-card revealed team-${c.team}" style="min-height:44px">
-      <span class="cn-card-word" style="font-size:0.7rem">${esc(c.word)}</span>
+      <span class="cn-card-word" style="font-size:0.7rem">${esc(richToPlainText(c.word))}</span>
     </div>`
   ).join('');
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -843,6 +843,8 @@
       body.admin-mode .room-editor-body { display: block !important; }
     }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -1582,13 +1584,13 @@
       const fails = progress.failCounts[q.id] || 0;
       const area = document.getElementById('question-area');
       let html = '<div class="admin-card" style="background:var(--bg-card);border-color:var(--border);">';
-      html += '<h3 style="font-size:1.15rem;margin-bottom:16px;color:var(--text-primary);font-family:\'Crimson Text\',serif;font-weight:600;">' + esc(q.text) + '</h3>';
+      html += '<h3 style="font-size:1.15rem;margin-bottom:16px;color:var(--text-primary);font-family:\'Crimson Text\',serif;font-weight:600;">' + renderRichContent(q.text) + '</h3>';
 
       if (q.type === 'multiple_choice') {
         (q.options || []).forEach((opt, i) => {
           // Kein Antwort-Parameter im onclick: die richtige Antwort stünde
           // sonst für Schüler sichtbar im DOM (checkMC nutzt q.correctAnswer)
-          html += '<button class="option-btn" onclick="checkMC(this, ' + i + ')">' + esc(opt) + '</button>';
+          html += '<button class="option-btn" onclick="checkMC(this, ' + i + ')">' + renderRichContent(opt) + '</button>';
         });
       } else if (q.type === 'text_input') {
         html += '<div style="display:flex;gap:8px;">' +
@@ -1602,7 +1604,7 @@
 
       // Hint
       if (fails >= 2 && q.hint) {
-        html += '<div class="hint-box">💡 ' + esc(q.hint) + '</div>';
+        html += '<div class="hint-box">💡 ' + renderRichContent(q.hint) + '</div>';
       }
 
       html += '</div>';
@@ -1818,7 +1820,7 @@
           (hs.noteImage ? '<img src="' + escAttr(hs.noteImage) + '" class="q-media" alt="">' : '') +
           (hs.noteVideo ? '<video src="' + escAttr(hs.noteVideo) + '" class="q-media-video" controls></video>' : '') +
           '<div style="color:var(--text-primary);margin-top:14px;white-space:pre-line;font-size:1.05rem;line-height:1.7;">' +
-            esc(hs.noteText || '(Kein Text hinterlegt)') +
+            renderRichContent(hs.noteText || '(Kein Text hinterlegt)') +
           '</div>' +
           '<div class="mt-16 text-center"><button class="btn-ghost" onclick="closeHotspotModal()">Schließen</button></div>';
         modal.classList.remove('hidden');
@@ -1854,7 +1856,7 @@
           const q = room.questions.find(qq => qq.id === qid);
           if (!q) return null;
           return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">' +
-            '<span style="color:var(--text-secondary);font-size:0.85rem;">' + esc(q.text) + '</span><br>' +
+            '<span style="color:var(--text-secondary);font-size:0.85rem;">' + renderRichContent(q.text) + '</span><br>' +
             '<span style="color:var(--gold);font-weight:600;">→ ' + esc(q.correctAnswer) + '</span></div>';
         }).filter(Boolean);
         if (qSummaries.length > 0) {
@@ -1899,7 +1901,7 @@
 
       if (qToShow.type === 'multiple_choice') {
         (qToShow.options || []).forEach((opt, i) => {
-          html += '<button class="option-btn" onclick="checkHotspotMC(this,' + i + ')">' + esc(opt) + '</button>';
+          html += '<button class="option-btn" onclick="checkHotspotMC(this,' + i + ')">' + renderRichContent(opt) + '</button>';
         });
       } else if (qToShow.type === 'text_input') {
         html += '<div style="display:flex;gap:8px;">' +
@@ -1916,7 +1918,7 @@
       }
 
       if (fails >= 2 && qToShow.hint) {
-        html += '<div class="hint-box">💡 ' + esc(qToShow.hint) + '</div>';
+        html += '<div class="hint-box">💡 ' + renderRichContent(qToShow.hint) + '</div>';
       }
       html += '</div>';
       html += '<div class="text-center"><button class="btn-ghost" onclick="closeHotspotModal()">← Zurück zum Raum</button></div>';
@@ -2217,7 +2219,7 @@
       if (pc.type === 'image' && pc.content) {
         html += '<img src="' + escAttr(pc.content) + '" alt="Rätselkarte">';
       } else if (pc.type === 'text' && pc.content) {
-        html += '<div class="puzzle-card-text">' + esc(pc.content) + '</div>';
+        html += '<div class="puzzle-card-text">' + renderRichContent(pc.content) + '</div>';
       }
 
       // Code digits — shuffled so the order doesn't reveal the code
@@ -2280,7 +2282,7 @@
       document.getElementById('hotspot-modal-body').innerHTML =
         '<h3 style="color:var(--success);font-family:\'Cinzel\',serif;margin-bottom:12px;">✅ Gelöste Frage</h3>' +
         '<div style="text-align:left;">' +
-          '<p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:8px;">' + esc(q.text) + '</p>' +
+          '<p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:8px;">' + renderRichContent(q.text) + '</p>' +
           '<p style="color:var(--gold);font-weight:600;font-size:1.05rem;">→ ' + esc(q.correctAnswer) + '</p>' +
         '</div>' +
         (q.codeDigit ? '<p style="color:var(--text-secondary);margin-top:12px;">Code-Ziffer: <strong style="color:var(--gold);font-size:1.3rem;">' + esc(q.codeDigit) + '</strong></p>' : '') +
@@ -3056,7 +3058,7 @@
             else if (key === 'frage' || key === 'q' || key === 'question' || key === 'text') currentQuestion.text = val;
             else if (key === 'antwort' || key === 'a' || key === 'answer' || key === 'correct') currentQuestion.correctAnswer = val;
             else if (key === 'optionen' || key === 'o' || key === 'options') {
-              currentQuestion.options = val.split('|').map(s => s.trim());
+              currentQuestion.options = erSplitEscapedPipes(val).map(s => s.trim());
               currentQuestion.type = 'multiple_choice';
             }
             else if (key === 'hinweis' || key === 'hint') currentQuestion.hint = val;
@@ -3068,7 +3070,7 @@
 
         // Hotspot lines: - icon | label | x | y | codeDigit | questionIds  OR  - icon | label | x | y (exit)
         if (section === 'hotspots' && currentRoom && trimmed.startsWith('-')) {
-          const parts = trimmed.substring(1).trim().split('|').map(s => s.trim());
+          const parts = erSplitEscapedPipes(trimmed.substring(1).trim()).map(s => s.trim());
           if (parts.length >= 4) {
             const icon = parts[0] || '🔍';
             const label = parts[1] || '';
@@ -3096,7 +3098,7 @@
         // Inline question format: - typ | frage | optionen/antwort | antwort | hinweis | ziffer
         if (section === 'fragen' && currentRoom && trimmed.startsWith('-') && trimmed.includes('|') && !currentQuestion) {
           finishQuestion();
-          const parts = trimmed.substring(1).trim().split('|').map(s => s.trim());
+          const parts = erSplitEscapedPipes(trimmed.substring(1).trim()).map(s => s.trim());
           if (parts.length >= 3) {
             questionCounter++;
             const typ = parts[0].toLowerCase();
@@ -3515,6 +3517,7 @@
         '</div>';
 
         html += '<label class="admin-label" style="margin-top:0;">Fragetext</label>';
+        html += '<div style="font-size:0.72rem;color:#999;margin-bottom:2px;">Formeln: $x^2$ &middot; Bilder: ![Text](data/images/&hellip; oder https://&hellip;) &middot; \\$ = Dollarzeichen</div>';
         html += '<textarea class="admin-textarea q-text" rows="2">' + esc(q.text || '') + '</textarea>';
 
         const _isInteractive = q.type === 'error_find' || q.type === 'line_connect';
@@ -4378,5 +4381,21 @@
 
   })();
   </script>
+<script>
+// Split an '|', aber \| als literales Pipe behandeln und entescapen (für
+// LaTeX-Inhalte in Fragen/Optionen, z.B. $|x|$) — gleiche Logik wie
+// MDParser._splitEscapedPipes in risiko-quiz/js/shared.js.
+window.erSplitEscapedPipes = function (str) {
+  var parts = [], cur = '';
+  for (var i = 0; i < str.length; i++) {
+    var ch = str[i];
+    if (ch === '\\' && str[i + 1] === '|') { cur += '|'; i++; continue; }
+    if (ch === '|') { parts.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  parts.push(cur);
+  return parts;
+};
+</script>
 </body>
 </html>

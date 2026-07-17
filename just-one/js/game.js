@@ -1,4 +1,4 @@
-// game.js – Just One: Lehrkraft-Logik (Spielwähler, Setup, Kategorien, Lobby)
+﻿// game.js – Just One: Lehrkraft-Logik (Spielwähler, Setup, Kategorien, Lobby)
 // Rundenlogik (collecting/review/revealed/resolved) folgt in einer späteren Ausbaustufe.
 
 let gameState = null;
@@ -442,7 +442,7 @@ function renderResolvedHtml(state, r) {
   const isLast = state.roundsPlayed >= state.settings.targetRounds;
   return `<div class="game-card">
     <div class="round-banner">${r.result ? '✅ Richtig!' : '❌ Leider falsch'}</div>
-    <div class="resolved-word">${escHtml(r.secretWord)}</div>
+    <div class="resolved-word">${renderRichContent(r.secretWord)}</div>
     <div class="resolved-result ${r.result ? 'correct' : 'wrong'}">Stand: ${state.correctCount} von ${state.roundsPlayed} Runden</div>
     <button class="setup-btn" onclick="${isLast ? 'endGame()' : 'beginNextRound()'}">${isLast ? 'Spiel beenden' : 'Nächste Runde ▶'}</button>
   </div>`;

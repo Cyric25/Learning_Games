@@ -33,3 +33,12 @@ Paare matchen, Züge/Zeit zählen) → Ergebnis (Sterne, Statistik).
 
 `renderCategoryList` · `startGame` · `renderBoard` / `renderCardContent` ·
 `flipCard` · `checkMatch` · `showResult`.
+
+## Rich-Content (seit Juli 2026)
+
+KaTeX kommt aus dem zentralen `lib/katex/` (früher `memory/lib/katex/`).
+Text- und Formel-Seiten rendern über `js/rich-content.js`; der Bild-Typ
+behält das Legacy-Verhalten (beliebige URL/Pfad — Bestandsdaten!). Der Admin
+hat pro Seite einen Upload-Button (zentrale Ablage `data/images/`, gespeichert
+als `../data/images/…` relativ zur Memory-Seite). MD-Import versteht `\|`
+für literale Pipes im Inhalt.

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -93,6 +93,8 @@
       .solo-own-area { min-height:55vh; flex-shrink:0; }
     }
   </style>
+  <script src="../lib/katex/katex.min.js"></script>
+  <script src="../js/rich-content.js"></script>
 </head>
 <body>
 
@@ -742,17 +744,17 @@ function showQuestion(coord) {
   modal._q = q;
   document.getElementById('modal-coord').textContent     = coord;
   document.getElementById('modal-category').textContent  = q.kategorieName || '';
-  document.getElementById('modal-question').textContent  = q.question || '';
+  document.getElementById('modal-question').innerHTML  = renderRichContent(q.question || '');
   document.getElementById('modal-result').style.display  = 'none';
   document.getElementById('answer-reveal').style.display = 'none';
   document.getElementById('modal-btns').innerHTML        = '';
   const hint = document.getElementById('modal-hint');
-  if (q.hint) { hint.textContent = `💡 ${q.hint}`; hint.style.display = ''; } else hint.style.display = 'none';
+  if (q.hint) { hint.innerHTML = '💡 ' + renderRichContent(q.hint); hint.style.display = ''; } else hint.style.display = 'none';
   const isMC = q.type === 'mc' || q.type === 'multiple_choice';
   const tb = document.getElementById('timer-bar-wrap'), tf = document.getElementById('timer-bar-fill');
   if (isMC) {
     document.getElementById('modal-mc-options').innerHTML = (q.options||[])
-      .map((opt,i) => `<button class="mc-option" onclick="submitMC(${i})">${escapeHtml(opt)}</button>`).join('');
+      .map((opt,i) => `<button class="mc-option" onclick="submitMC(${i})">${renderRichContent(opt)}</button>`).join('');
     if (mcTimerSec > 0) {
       tb.style.display = ''; tf.style.width = '100%'; let rem = mcTimerSec;
       if (mcTimerHandle) clearInterval(mcTimerHandle);
@@ -765,7 +767,7 @@ function showQuestion(coord) {
     document.getElementById('modal-mc-options').innerHTML = '';
     tb.style.display = 'none';
     if (mcTimerHandle) { clearInterval(mcTimerHandle); mcTimerHandle = null; }
-    if (q.answer) { document.getElementById('answer-reveal-text').textContent = q.answer; document.getElementById('answer-reveal').style.display = ''; }
+    if (q.answer) { document.getElementById('answer-reveal-text').innerHTML = renderRichContent(q.answer); document.getElementById('answer-reveal').style.display = ''; }
     document.getElementById('modal-btns').innerHTML =
       `<button class="btn-modal-correct" onclick="resolveOpen(true)">✓ Richtig</button>
        <button class="btn-modal-wrong"   onclick="resolveOpen(false)">✗ Falsch</button>`;

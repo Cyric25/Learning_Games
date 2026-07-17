@@ -168,17 +168,26 @@ function renderCardContent(el, card) {
   const looksLikeFormula = card.type === 'formula' ||
     (content.startsWith('$') && content.trimEnd().endsWith('$'));
 
+  // Text + Formeln laufen über das gemeinsame Modul (js/rich-content.js);
+  // Typ 'image' behält das Legacy-Verhalten (beliebige URL/Pfad), damit
+  // Bestandsdaten nicht brechen — Neuanlagen nutzen den Upload im Admin.
   if (looksLikeFormula) {
-    try {
-      katex.render(stripped, el, { throwOnError: false, displayMode: false });
-    } catch {
-      el.textContent = content;
+    if (window.renderRichContent) {
+      el.innerHTML = renderRichContent('$' + stripped + '$');
+    } else {
+      try {
+        katex.render(stripped, el, { throwOnError: false, displayMode: false });
+      } catch {
+        el.textContent = content;
+      }
     }
   } else if (card.type === 'image') {
     var img = document.createElement('img');
     img.src = content;
     img.alt = 'Bild';
     el.appendChild(img);
+  } else if (window.renderRichContent) {
+    el.innerHTML = renderRichContent(content); // Text darf jetzt $…$/![…](…) enthalten
   } else {
     el.textContent = content;
   }

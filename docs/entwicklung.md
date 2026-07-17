@@ -101,6 +101,14 @@ es), der Server merged es. Sonst Phantom-Kicks.
 `color`/`emoji`/`symbolIcon` aus dem Sync-Zustand bei der Deserialisierung
 klemmen (nicht an jeder Render-Stelle). Nutzertexte immer escapen.
 
+### Rich-Content nur über js/rich-content.js
+Inhalts-Strings (Fragen, Optionen, Antworten, Begriffe, …) werden mit
+`renderRichContent()` angezeigt (escaped selbst, rendert `$…$`-Formeln und
+`![…](…)`-Bilder mit geklemmter src) bzw. `richToPlainText()` für Stellen ohne
+HTML. Keine eigenen Formel-/Bild-Renderer bauen; pro Seite
+`lib/katex/katex.min.js` + `js/rich-content.js` einbinden. Details:
+[datenformate.md §0](datenformate.md) und `CLAUDE.md → Rich-Content`.
+
 ### Change-Detection im `subscribe`
 Callback nur bei tatsächlicher Änderung aufrufen (JSON-Vergleich), sonst
 Dauer-Re-Renders / flackernde Timer & Eingabefelder.

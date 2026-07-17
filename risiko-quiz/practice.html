@@ -693,6 +693,8 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
+<script src="../lib/katex/katex.min.js"></script>
+<script src="../js/rich-content.js"></script>
 <script src="js/shared.js"></script>
 <script>
   // ── State ─────────────────────────────────────────────────
@@ -909,11 +911,11 @@
     el('pr-q-cat-label').textContent = q._subName || '';
 
     // Question text
-    el('pr-q-text').textContent = q.question;
+    el('pr-q-text').innerHTML = renderRichContent(q.question);
 
     // Hint
     if (q.hint) {
-      el('pr-q-hint').textContent = `Hinweis: ${q.hint}`;
+      el('pr-q-hint').innerHTML = 'Hinweis: ' + renderRichContent(q.hint);
       el('pr-q-hint').style.display = '';
     } else {
       el('pr-q-hint').style.display = 'none';
@@ -934,7 +936,7 @@
       el('pr-reveal-btn').style.display = '';
       el('pr-answer-box').style.display = 'none';
       el('pr-self-rate').style.display = 'none';
-      el('pr-answer-text').textContent = q.answer || '';
+      el('pr-answer-text').innerHTML = renderRichContent(q.answer || '');
     }
 
     // Timer
@@ -953,7 +955,7 @@
     (q.options || []).forEach((opt, idx) => {
       const btn = document.createElement('button');
       btn.className = 'pr-mc-btn';
-      btn.innerHTML = `<span class="pr-mc-letter">${letters[idx]}</span>${escHtml(opt)}`;
+      btn.innerHTML = `<span class="pr-mc-letter">${letters[idx]}</span>${renderRichContent(opt)}`;
       btn.onclick = () => selectMcOption(idx, q);
       container.appendChild(btn);
     });
