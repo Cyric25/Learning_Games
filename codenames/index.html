@@ -54,54 +54,45 @@
      SCREEN 1: START
 ═══════════════════════════════════════════════════════════ -->
 <div id="screen-start" class="screen gs-screen">
-  <div class="gs-container">
-    <div class="gs-header">
-      <div class="gs-title">🕵️ Codenames</div>
-      <div class="gs-header-btns">
-        <a href="../spiele.html" class="btn btn-secondary">← Übersicht</a>
-        <button id="btn-theme" class="btn btn-secondary" onclick="toggleTheme()">☀️ Lightmode</button>
-      </div>
+  <h1 class="gs-title">🕵️ Codenames</h1>
+  <p class="gs-subtitle" data-t="tagline"></p>
+
+  <!-- Language selector -->
+  <div class="lang-row">
+    <button class="lang-btn" data-lang="de" onclick="setLang('de')">🇩🇪 DE</button>
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">🇬🇧 EN</button>
+    <button class="lang-btn" data-lang="it" onclick="setLang('it')">🇮🇹 IT</button>
+    <button class="lang-btn" data-lang="es" onclick="setLang('es')">🇪🇸 ES</button>
+    <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">🇷🇺 RU</button>
+    <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button>
+  </div>
+
+  <!-- Name -->
+  <div class="cn-field">
+    <label class="cn-label" data-t="name_label"></label>
+    <input id="start-name" class="gs-text-input" type="text" maxlength="30"
+      data-t-ph="name_ph"
+      onkeydown="if(event.key==='Enter')document.getElementById('start-pin').focus()">
+  </div>
+
+  <!-- PIN + Join -->
+  <label class="cn-label" data-t="pin_label"></label>
+  <input id="start-pin" class="gs-code-input" type="text"
+    maxlength="4" data-t-ph="pin_ph"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')doJoin()">
+  <button class="btn-join-student" onclick="doJoin()" data-t="btn_join"></button>
+  <div id="start-error" class="gs-join-error"></div>
+
+  <div class="gs-teacher">
+    <div class="gs-teacher-buttons">
+      <button class="btn-create-game" onclick="goToCreate()" data-t="btn_create"></button>
     </div>
-    <div class="gs-body">
+  </div>
 
-      <p class="gs-subtitle" data-t="tagline"></p>
-
-      <!-- Language selector -->
-      <div class="lang-row">
-        <button class="lang-btn" data-lang="de" onclick="setLang('de')">🇩🇪 DE</button>
-        <button class="lang-btn" data-lang="en" onclick="setLang('en')">🇬🇧 EN</button>
-        <button class="lang-btn" data-lang="it" onclick="setLang('it')">🇮🇹 IT</button>
-        <button class="lang-btn" data-lang="es" onclick="setLang('es')">🇪🇸 ES</button>
-        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">🇷🇺 RU</button>
-        <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button>
-      </div>
-
-      <!-- Name -->
-      <div class="cn-field">
-        <label class="cn-label" data-t="name_label"></label>
-        <input id="start-name" class="gs-text-input" type="text" maxlength="30"
-          data-t-ph="name_ph"
-          onkeydown="if(event.key==='Enter')document.getElementById('start-pin').focus()">
-      </div>
-
-      <!-- PIN + Join -->
-      <label class="cn-label" data-t="pin_label"></label>
-      <div class="gs-join-row">
-        <input id="start-pin" class="gs-code-input" type="text"
-          maxlength="4" data-t-ph="pin_ph"
-          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-          onkeydown="if(event.key==='Enter')doJoin()">
-        <button class="btn-join-student" onclick="doJoin()" data-t="btn_join"></button>
-      </div>
-      <div id="start-error" class="gs-join-error"></div>
-
-      <hr class="gs-divider">
-
-      <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-success btn-lg" onclick="goToCreate()" data-t="btn_create"></button>
-      </div>
-
-    </div>
+  <div class="gs-footer">
+    <a href="../spiele.html">← Zurück zur Übersicht</a>
+    <button id="btn-theme" class="gs-theme-toggle" onclick="toggleTheme()">☀️ Lightmode</button>
   </div>
 </div>
 

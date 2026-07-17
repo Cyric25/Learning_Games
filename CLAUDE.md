@@ -1181,25 +1181,32 @@ Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspie
 
 **Überall, wo dieselbe Spiel-erstellen-Logik verwendet wird** (Spielwähler:
 Code-Beitritt + Spielliste + „+ Neues Spiel erstellen"), **sieht der
-Startscreen auch gleich aus** — Risiko-Quiz-Optik über die gemeinsame Datei
+Startscreen auch gleich aus** — exakt wie der Risiko-Quiz-Startscreen
+(`risiko-quiz/index.html` `#join-screen`): **zentriertes** Layout mit großem
+Titel, großem CODE-Feld, „Beitreten"-Button, Trennlinie, Spielleiter-Bereich
+und „Zurück zur Übersicht". Umgesetzt über die gemeinsame Datei
 `css/spielwaehler.css` (Hell- und Dunkel-Palette fest eingebaut, unabhängig
 von der Farbwelt des Spiels; die eigene Spiel-Palette gilt erst NACH dem
 Spielwähler). Einbindung pro Spiel:
 
 1. `<link rel="stylesheet" href="../css/spielwaehler.css">` (nach der Spiel-CSS)
-2. Selector-Screen bekommt die Klasse **`gs-screen`** und das kanonische
-   gs-Markup (`gs-container` → `gs-header`/`gs-body`; Referenz:
-   `just-one/index.html`)
+2. Selector-Screen bekommt die Klasse **`gs-screen`** und das kanonische,
+   **zentrierte** Markup (Referenz: `just-one/index.html`):
+   `h1.gs-title` → `p.gs-subtitle` → `input.gs-code-input` →
+   `button.btn-join-student` → `div.gs-join-error` →
+   `div.gs-teacher` (Label + `gs-game-list` + `gs-teacher-buttons` mit
+   `btn-create-game`; bei gegateten Spielen zusätzlich `gs-teacher-action`/
+   `gs-teacher-hint`) → `div.gs-footer` (Zurück-Link + `gs-theme-toggle`).
+   KEIN `gs-container`/`gs-header`/`gs-body`-Kartenwrapper mehr.
 3. Dunkel-Zuordnung: Seiten mit Shared-Theme wie gehabt über `body.dark`;
    Seiten mit eigenem Theme-System (Codenames) spiegeln ihren Dunkelzustand
    zusätzlich als `body.gs-theme-dark`.
 
 Umgestellt: QuizPfad, Leiterspiel, Schiffeversenken, Just One, Insider,
-Hochstapler, Codenames; Referenz-Optik ist der Risiko-Quiz-Spielwähler
-(`risiko-quiz/admin.html`). Die alten ungescopten `gs-*`-Stile in den
-Spiel-CSS bleiben bewusst bestehen (die Beitrittsscreens von `view.html`/
-`board.html` nutzen sie weiter) — `css/spielwaehler.css` überstimmt sie im
-Spielwähler durch Scoping auf `.gs-screen`.
+Hochstapler, Codenames. Die alten ungescopten `gs-*`-Stile in den Spiel-CSS
+bleiben bewusst bestehen (die Beitrittsscreens von `view.html`/`board.html`
+nutzen sie weiter) — `css/spielwaehler.css` überstimmt sie im Spielwähler
+durch Scoping auf `.gs-screen`.
 
 ---
 

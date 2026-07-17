@@ -3,24 +3,24 @@
    Regel (siehe CLAUDE.md → Spielverwaltung und docs/entwicklung.md §4):
    Überall, wo dieselbe Spiel-erstellen-Logik (Spielverwaltung: Code-Beitritt
    + Spielliste + „Neues Spiel erstellen") verwendet wird, sieht der
-   Startscreen auch gleich aus — in der Risiko-Quiz-Optik, unabhängig von der
-   Farbwelt des jeweiligen Spiels. Die eigene Spiel-Palette gilt erst NACH dem
-   Spielwähler.
+   Startscreen auch gleich aus — exakt wie der Risiko-Quiz-Startscreen
+   (risiko-quiz/index.html #join-screen): ZENTRIERTES Layout, großer Titel,
+   großes CODE-Feld, „Beitreten"-Button, Trennlinie, Spielleiter-Bereich,
+   „Zurück zur Übersicht". Unabhängig von der Farbwelt des Spiels; die eigene
+   Spiel-Palette gilt erst NACH dem Spielwähler.
 
    Verwendung pro Spiel:
      1. <link rel="stylesheet" href="../css/spielwaehler.css"> (nach der
         Spiel-CSS einbinden)
-     2. Selector-Screen bekommt die Klasse "gs-screen" und das kanonische
-        gs-Markup (Referenz: risiko-quiz/admin.html bzw. just-one/index.html)
+     2. Selector-Screen bekommt die Klasse "gs-screen" und das kanonische,
+        ZENTRIERTE Markup (Referenz: just-one/index.html).
      3. Dunkel-Zuordnung: Seiten mit Shared-Theme setzen wie gehabt
         body.dark; Seiten mit eigenem Theme-System (Codenames) spiegeln ihren
         Dunkelzustand als body.gs-theme-dark.
 
    Alle Regeln sind unter .gs-screen gescopet und überstimmen so bewusst die
    älteren, ungescopten gs-*-Stile der einzelnen Spiele (die dort für die
-   view/board-Beitrittsscreens weiterhin gebraucht werden). Für den
-   Screen-Container selbst sind die bekannten IDs mit aufgeführt, um
-   bestehende #game-selector-Regeln (ID-Spezifität) zu überstimmen. */
+   view/board-Beitrittsscreens weiterhin gebraucht werden). */
 
 /* ── Palette: Risiko-Quiz Light (Standard) ───────────────────────── */
 .gs-screen,
@@ -47,6 +47,7 @@
   padding: 2rem;
   overflow-y: auto;
   color: var(--gs-text);
+  text-align: center;
 }
 
 /* ── Palette: Risiko-Quiz Dark ───────────────────────────────────── */
@@ -66,168 +67,94 @@ body.gs-theme-dark #screen-start.gs-screen {
   --gs-danger:     #e74c3c;
 }
 
-/* ── Container ────────────────────────────────────────────────────
-   Kein Karten-Look mehr (keine Box/Schatten/Rahmen) — Inhalt liegt
-   direkt auf dem .gs-screen-Hintergrund, analog zu Risiko-Quiz. */
-.gs-screen .gs-container {
-  width: 100%;
-  max-width: 640px;
-  text-align: left;
-  background: none;
-  border: none;
-  border-radius: 0;
-  overflow: visible;
-  box-shadow: none;
-}
-
-.gs-screen .gs-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  padding: 0 0 1.2rem;
-  margin-bottom: 1.2rem;
-  border-bottom: 1px solid var(--gs-border);
-  background: none;
-}
-
+/* ── Titel + Untertitel (zentriert) ──────────────────────────────── */
 .gs-screen .gs-title {
-  font-size: clamp(1.4rem, 3vw, 1.9rem);
-  font-weight: 700;
   color: var(--gs-accent);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+  line-height: 1.1;
 }
-
-.gs-screen .gs-header-btns { display: flex; gap: 0.6rem; }
-
-.gs-screen .gs-body {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.gs-screen .gs-section-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--gs-text);
-  margin: 0 0 4px;
-}
-
 .gs-screen .gs-subtitle {
   color: var(--gs-text-2);
-  font-size: 0.9rem;
-  margin: 0 0 1rem;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  margin: 0 0 2rem;
 }
 
-/* ── Buttons (Risiko-Quiz-System) ────────────────────────────────── */
-.gs-screen .btn {
-  padding: 0.6rem 1.3rem;
-  border-radius: 8px;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: inherit;
-  text-decoration: none;
-  line-height: 1.2;
-}
-.gs-screen .btn:hover  { opacity: 0.85; transform: none; }
-.gs-screen .btn:active { transform: scale(0.98); }
-.gs-screen .btn-primary   { background: var(--gs-accent);  color: #fff; }
-.gs-screen .btn-success   { background: var(--gs-success); color: #fff; }
-.gs-screen .btn-secondary { background: var(--gs-card); color: var(--gs-text); border: 1px solid var(--gs-border); }
-.gs-screen .btn-lg { padding: 0.9rem 2rem; font-size: 1.05rem; border-radius: 10px; }
-
-/* ── Beitreten-Zeile ─────────────────────────────────────────────── */
-.gs-screen .gs-join-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-
+/* ── Code-Eingabe (großes zentriertes Feld) ──────────────────────── */
 .gs-screen .gs-code-input {
-  flex: 1;
-  width: auto;
-  min-width: 0;
-  padding: 10px 14px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 6px;
+  font-size: clamp(2rem, 5vw, 3.5rem);
   text-align: center;
-  text-transform: uppercase;
-  font-family: 'Consolas', 'SF Mono', monospace;
-  background: var(--gs-card);
-  border: 2px solid var(--gs-border);
-  border-radius: 12px;
+  letter-spacing: 0.4em;
+  width: 7em;
+  max-width: 90vw;
+  padding: 0.5em 0.3em;
+  background: var(--gs-panel);
   color: var(--gs-text);
+  border: 2px solid var(--gs-border);
+  border-radius: 14px;
+  font-family: inherit;
+  font-weight: 700;
   outline: none;
+  text-transform: uppercase;
   transition: border-color 0.2s;
 }
 .gs-screen .gs-code-input:focus { border-color: var(--gs-accent); }
-.gs-screen .gs-code-input::placeholder { color: var(--gs-text-2); letter-spacing: 4px; opacity: 0.7; }
+.gs-screen .gs-code-input::placeholder { color: var(--gs-text-2); opacity: 0.65; }
 
-/* Freitext-Feld (z.B. Codenames-Spielername) */
-.gs-screen .gs-text-input {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 1rem;
-  font-family: inherit;
-  background: var(--gs-card);
-  border: 2px solid var(--gs-border);
-  border-radius: 12px;
-  color: var(--gs-text);
-  outline: none;
-  transition: border-color 0.2s;
-}
-.gs-screen .gs-text-input:focus { border-color: var(--gs-accent); }
-.gs-screen .gs-text-input::placeholder { color: var(--gs-text-2); opacity: 0.7; }
-
+/* ── Beitreten-Button (groß, Akzent) ─────────────────────────────── */
 .gs-screen .btn-join-student {
-  padding: 12px 20px;
+  margin-top: 1.2rem;
+  padding: 0.8rem 3rem;
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  font-weight: 700;
   background: var(--gs-accent);
   color: #fff;
   border: none;
   border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 700;
-  font-family: inherit;
   cursor: pointer;
-  white-space: nowrap;
   transition: opacity 0.2s;
+  font-family: inherit;
 }
-.gs-screen .btn-join-student:hover { opacity: 0.9; }
+.gs-screen .btn-join-student:hover { opacity: 0.85; }
 
 .gs-screen .gs-join-error {
   color: var(--gs-danger);
-  font-size: 0.85rem;
+  margin-top: 1rem;
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 600;
   min-height: 1.2em;
-  margin-top: 6px;
-  text-align: left;
 }
 
-.gs-screen .gs-divider {
-  border: none;
+/* ── Spielleiter-/Lehrkraft-Bereich (unter Trennlinie) ───────────── */
+.gs-screen .gs-teacher {
+  margin-top: 2.5rem;
   border-top: 1px solid var(--gs-border);
-  margin: 20px 0;
+  padding-top: 1.5rem;
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+.gs-screen .gs-teacher-label {
+  color: var(--gs-text-2);
+  font-size: 0.95rem;
+  margin: 0;
 }
 
-/* ── Spielliste ──────────────────────────────────────────────────── */
+/* ── Spielliste (zentriert, Karten linksbündig lesbar) ───────────── */
 .gs-screen .gs-game-list {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 50vh;
+  max-height: 40vh;
   overflow-y: auto;
-  margin: 0;
   text-align: left;
 }
-
 .gs-screen .gs-empty { color: var(--gs-text-2); font-style: italic; }
-
 .gs-screen .gs-game-card {
   display: flex;
   align-items: center;
@@ -240,7 +167,6 @@ body.gs-theme-dark #screen-start.gs-screen {
   transition: border-color 0.2s, background 0.2s;
 }
 .gs-screen .gs-game-card:hover { border-color: var(--gs-accent); background: var(--gs-card-hover); }
-
 .gs-screen .gs-game-code {
   font-size: 1.3rem;
   font-weight: 800;
@@ -249,9 +175,7 @@ body.gs-theme-dark #screen-start.gs-screen {
   color: var(--gs-accent);
   min-width: 5ch;
 }
-
 .gs-screen .gs-game-info  { flex: 1; min-width: 0; }
-
 .gs-screen .gs-game-title {
   font-weight: 600;
   font-size: 1rem;
@@ -260,11 +184,8 @@ body.gs-theme-dark #screen-start.gs-screen {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .gs-screen .gs-game-meta { font-size: 0.82rem; color: var(--gs-text-2); margin-top: 0.15rem; }
-
 .gs-screen .gs-game-actions { flex-shrink: 0; }
-
 .gs-screen .gs-btn-delete {
   background: none;
   border: 1px solid var(--gs-border);
@@ -277,17 +198,101 @@ body.gs-theme-dark #screen-start.gs-screen {
 }
 .gs-screen .gs-btn-delete:hover { background: var(--gs-danger); color: #fff; border-color: var(--gs-danger); }
 
-/* ── Codenames-Sonderfall (i18n-Felder im gs-Look) ───────────────── */
-.gs-screen .cn-label {
-  display: block;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--gs-text-2);
-  margin-bottom: 0.35rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* ── Spielleiter-Buttons (Reihe, zentriert) ──────────────────────── */
+.gs-screen .gs-teacher-buttons {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
-.gs-screen .lang-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0 0 1.2rem; }
+.gs-screen .btn-create-game {
+  padding: 0.6rem 2rem;
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  font-weight: 700;
+  background: var(--gs-success);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-family: inherit;
+}
+.gs-screen .btn-create-game:hover { opacity: 0.85; }
+/* Sekundärer Akzent-Button (z.B. „Laufendes Spiel fortsetzen") */
+.gs-screen .btn-resume-game {
+  padding: 0.6rem 2rem;
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  font-weight: 700;
+  background: var(--gs-accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-family: inherit;
+}
+.gs-screen .btn-resume-game:hover { opacity: 0.85; }
+.gs-screen .btn-selector-secondary {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: var(--gs-card);
+  color: var(--gs-text);
+  border: 1px solid var(--gs-border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.gs-screen .btn-selector-secondary:hover { opacity: 0.85; }
+
+.gs-screen .gs-teacher-hint { margin-top: 0.2rem; }
+.gs-screen .gs-teacher-hint button {
+  padding: 0.35rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  background: none;
+  border: 1px solid var(--gs-border);
+  color: var(--gs-text-2);
+}
+
+/* ── Fußzeile (Zurück-Link + Theme-Umschalter) ───────────────────── */
+.gs-screen .gs-footer {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.gs-screen .gs-footer a {
+  color: var(--gs-text-2);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.gs-screen .gs-footer a:hover { color: var(--gs-accent); }
+.gs-screen .gs-theme-toggle {
+  background: none;
+  border: 1px solid var(--gs-border);
+  color: var(--gs-text-2);
+  border-radius: 8px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ── Codenames-Sonderfelder (Sprache, Name) — zentriert ──────────── */
+.gs-screen .lang-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0 0 1.4rem;
+}
 .gs-screen .lang-btn {
   background: var(--gs-card);
   border: 1.5px solid var(--gs-border);
@@ -300,10 +305,33 @@ body.gs-theme-dark #screen-start.gs-screen {
 }
 .gs-screen .lang-btn:hover  { border-color: var(--gs-accent); color: var(--gs-text); }
 .gs-screen .lang-btn.active { border-color: var(--gs-accent); color: var(--gs-accent); font-weight: 600; background: var(--gs-card-hover); }
+.gs-screen .cn-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gs-text-2);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gs-screen .gs-text-input {
+  width: 14em;
+  max-width: 90vw;
+  padding: 11px 14px;
+  font-size: 1.05rem;
+  text-align: center;
+  font-family: inherit;
+  background: var(--gs-panel);
+  border: 2px solid var(--gs-border);
+  border-radius: 12px;
+  color: var(--gs-text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.gs-screen .gs-text-input:focus { border-color: var(--gs-accent); }
+.gs-screen .gs-text-input::placeholder { color: var(--gs-text-2); opacity: 0.65; }
 
 /* Responsive */
 @media (max-width: 540px) {
-  .gs-screen { padding: 1rem; }
-  .gs-screen .gs-body { padding: 1.1rem; }
-  .gs-screen .gs-header { padding: 1rem 1.1rem; }
+  .gs-screen { padding: 1.2rem; }
 }

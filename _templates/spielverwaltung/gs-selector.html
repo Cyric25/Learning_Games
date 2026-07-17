@@ -2,47 +2,36 @@
      Erster Screen in der Spiel-HTML-Datei (.screen.active).
      EINHEITLICHER LOOK (verbindlich): css/spielwaehler.css einbinden
      (<link rel="stylesheet" href="../css/spielwaehler.css">) — die Klasse
-     "gs-screen" unten aktiviert die Risiko-Quiz-Optik unabhängig von der
-     Spiel-Palette. Siehe CLAUDE.md → Spielverwaltung → Einheitlicher
-     Spielwähler-Look.
+     "gs-screen" aktiviert das ZENTRIERTE Risiko-Quiz-Layout unabhängig von
+     der Spiel-Palette. Siehe CLAUDE.md → Spielverwaltung → Einheitlicher
+     Spielwähler-Look. Referenz-Markup: just-one/index.html.
      ERSETZEN:
        "🎮 Spielname"  → Emoji + Spielname
        joinAsStudent() → bleibt (globale Function Declaration)
        createNewGame() → bleibt (globale Function Declaration)
-       "view.html"     → Pfad zur Schüleransicht (falls abweichend)
+       "admin.html"    → Editor-Link entfernen/anpassen (falls kein Editor)
      ──────────────────────────────────────────────────────────────── -->
 <div class="screen active gs-screen" id="game-selector">
-  <div class="gs-container">
-    <div class="gs-header">
-      <h1 style="font-size:clamp(1.5rem,3vw,2rem);margin:0;">🎮 Spielname</h1>
-      <div style="display:flex;gap:0.6rem;">
-        <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
-        <button class="btn btn-secondary" onclick="toggleTheme()">🌙</button>
-      </div>
+  <h1 class="gs-title">🎮 Spielname</h1>
+  <p class="gs-subtitle">Spielcode eingeben um beizutreten</p>
+
+  <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')joinAsStudent()">
+  <button class="btn-join-student" onclick="joinAsStudent()">Beitreten</button>
+  <div class="gs-join-error" id="gs-join-error"></div>
+
+  <div class="gs-teacher">
+    <p class="gs-teacher-label">Oder als Lehrkraft:</p>
+    <div id="gs-game-list" class="gs-game-list"></div>
+    <div class="gs-teacher-buttons">
+      <button class="btn-create-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+      <!-- optional: <a href="admin.html" class="btn-selector-secondary">⚙ Editor</a> -->
     </div>
-    <div class="gs-body">
+  </div>
 
-      <!-- Schüler: Beitreten -->
-      <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Schüler/in beitreten</h2>
-      <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Gib den Code deiner Lehrkraft ein.</p>
-      <div class="gs-join-row">
-        <input type="text" id="gs-code-input" class="gs-code-input" maxlength="4" placeholder="CODE"
-          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-          onkeydown="if(event.key==='Enter')joinAsStudent()">
-        <button class="btn btn-primary" onclick="joinAsStudent()">Beitreten &#8594;</button>
-      </div>
-      <div class="gs-join-error" id="gs-join-error"></div>
-
-      <hr class="gs-divider">
-
-      <!-- Lehrkraft: Spiele verwalten -->
-      <h2 style="font-size:1.1rem;margin:0 0 0.3rem;">Als Lehrkraft</h2>
-      <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.8rem;">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
-      <div id="gs-game-list" class="gs-game-list"></div>
-      <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;">
-        <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
-      </div>
-
-    </div>
+  <div class="gs-footer">
+    <a href="../spiele.html">&#8592; Zurück zur Übersicht</a>
+    <button class="gs-theme-toggle" onclick="toggleTheme()">🌓 Design</button>
   </div>
 </div>

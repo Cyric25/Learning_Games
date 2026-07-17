@@ -17,45 +17,35 @@
 </head>
 <body>
 
-<!-- ── Spielwähler ────────────────────────────────────────────────── -->
+<!-- ── Spielwähler (einheitlicher Look, css/spielwaehler.css) ── -->
 <div class="screen active gs-screen" id="game-selector">
-  <div class="gs-container">
-    <div class="gs-header">
-      <div class="gs-title">⚓ Schiffeversenken-Quiz</div>
-      <div class="gs-header-btns">
-        <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
-        <button id="btn-theme-gs" class="btn btn-secondary" onclick="toggleTheme()" title="Design wechseln">🌓</button>
-      </div>
+  <h1 class="gs-title">⚓ Schiffeversenken-Quiz</h1>
+  <p class="gs-subtitle">Spielcode eingeben um beizutreten</p>
+
+  <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+    placeholder="CODE"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')joinAsStudent()">
+  <button class="btn-join-student" onclick="joinAsStudent()">Beitreten</button>
+  <div id="gs-join-error" class="gs-join-error"></div>
+
+  <div class="gs-teacher">
+    <p class="gs-teacher-label">Oder als Spielleiter:</p>
+    <div class="gs-teacher-action" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:0.8rem;">
+      <div id="gs-game-list" class="gs-game-list"></div>
     </div>
-    <div class="gs-body">
-
-      <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
-      <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
-      <div class="gs-join-row">
-        <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
-          placeholder="CODE"
-          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-          onkeydown="if(event.key==='Enter')joinAsStudent()">
-        <button class="btn-join-student" onclick="joinAsStudent()">Beitreten &rarr;</button>
-      </div>
-      <div id="gs-join-error" class="gs-join-error"></div>
-
-      <hr class="gs-divider">
-
-      <div class="gs-teacher-action">
-        <h2 class="gs-section-title">Laufende Spiele</h2>
-        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder verwalte Spiele im Lehrermodus.</p>
-        <div id="gs-game-list" class="gs-game-list"></div>
-      </div>
-      <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
-        <a href="solo.html" class="btn btn-secondary">⚓ Solo spielen</a>
-      </div>
-      <div class="gs-teacher-hint" style="margin-top:.8rem;">
-        <button onclick="activateTeacherMode()" style="padding:.35rem .9rem;border-radius:8px;cursor:pointer;font-size:.85rem;background:none;border:1px solid rgba(128,128,128,.35);color:rgba(128,128,128,.8);">🔒 Spielverwaltung (Lehrermodus)</button>
-      </div>
-
+    <div class="gs-teacher-buttons">
+      <button class="btn-create-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+      <a href="solo.html" class="btn-selector-secondary">⚓ Solo spielen</a>
     </div>
+    <div class="gs-teacher-hint">
+      <button onclick="activateTeacherMode()">🔒 Spielverwaltung (Lehrermodus)</button>
+    </div>
+  </div>
+
+  <div class="gs-footer">
+    <a href="../spiele.html">&#8592; Zurück zur Übersicht</a>
+    <button id="btn-theme-gs" class="gs-theme-toggle" onclick="toggleTheme()">🌓 Design</button>
   </div>
 </div>
 
