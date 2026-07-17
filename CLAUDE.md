@@ -1177,6 +1177,32 @@ Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspie
 
 ---
 
+### Einheitlicher Spielwähler-Look (verbindliche Regel)
+
+**Überall, wo dieselbe Spiel-erstellen-Logik verwendet wird** (Spielwähler:
+Code-Beitritt + Spielliste + „+ Neues Spiel erstellen"), **sieht der
+Startscreen auch gleich aus** — Risiko-Quiz-Optik über die gemeinsame Datei
+`css/spielwaehler.css` (Hell- und Dunkel-Palette fest eingebaut, unabhängig
+von der Farbwelt des Spiels; die eigene Spiel-Palette gilt erst NACH dem
+Spielwähler). Einbindung pro Spiel:
+
+1. `<link rel="stylesheet" href="../css/spielwaehler.css">` (nach der Spiel-CSS)
+2. Selector-Screen bekommt die Klasse **`gs-screen`** und das kanonische
+   gs-Markup (`gs-container` → `gs-header`/`gs-body`; Referenz:
+   `just-one/index.html`)
+3. Dunkel-Zuordnung: Seiten mit Shared-Theme wie gehabt über `body.dark`;
+   Seiten mit eigenem Theme-System (Codenames) spiegeln ihren Dunkelzustand
+   zusätzlich als `body.gs-theme-dark`.
+
+Umgestellt: QuizPfad, Leiterspiel, Schiffeversenken, Just One, Insider,
+Hochstapler, Codenames; Referenz-Optik ist der Risiko-Quiz-Spielwähler
+(`risiko-quiz/admin.html`). Die alten ungescopten `gs-*`-Stile in den
+Spiel-CSS bleiben bewusst bestehen (die Beitrittsscreens von `view.html`/
+`board.html` nutzen sie weiter) — `css/spielwaehler.css` überstimmt sie im
+Spielwähler durch Scoping auf `.gs-screen`.
+
+---
+
 ### Konzept & Ablauf
 
 1. **Spielwähler** — Lehrkraft sieht alle aktiven Spiele, erstellt neues Spiel → **4-stelliger Code** (`A3K7`)

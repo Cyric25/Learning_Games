@@ -6,32 +6,44 @@
   <title>Hochstapler</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>">
   <link rel="stylesheet" href="css/hochstapler.css">
+  <link rel="stylesheet" href="../css/spielwaehler.css">
 </head>
 <body>
 
-  <!-- ── Screen 1: Spielwähler ─────────────────────────────────── -->
-  <div class="screen active" id="game-selector">
-    <h1 style="color:#fff;font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;text-align:center;">🎭 Hochstapler</h1>
-    <p style="color:rgba(255,255,255,0.85);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;text-align:center;">Spielcode eingeben um beizutreten</p>
+  <!-- ── Screen 1: Spielwähler (einheitlicher Look, css/spielwaehler.css) ── -->
+  <div class="screen active gs-screen" id="game-selector">
+    <div class="gs-container">
+      <div class="gs-header">
+        <div class="gs-title">🎭 Hochstapler</div>
+        <div class="gs-header-btns">
+          <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
+          <button class="btn btn-secondary" onclick="toggleTheme()" title="Design wechseln">🌓</button>
+        </div>
+      </div>
+      <div class="gs-body">
 
-    <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
-      placeholder="CODE"
-      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-      onkeydown="if(event.key==='Enter')joinAsStudent()">
+        <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
+        <p class="gs-subtitle">Gib den Code deiner Lehrkraft ein.</p>
+        <div class="gs-join-row">
+          <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+            placeholder="CODE"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+            onkeydown="if(event.key==='Enter')joinAsStudent()">
+          <button class="btn-join-student" onclick="joinAsStudent()">Beitreten &rarr;</button>
+        </div>
+        <div id="gs-join-error" class="gs-join-error"></div>
 
-    <button class="setup-btn" style="margin-top:1.2rem;" onclick="joinAsStudent()">Beitreten &rarr;</button>
-    <div id="gs-join-error" class="gs-join-error"></div>
+        <hr class="gs-divider">
 
-    <hr class="gs-divider">
-    <div class="gs-teacher-section">
-      <p style="color:rgba(255,255,255,0.85);font-size:0.95rem;margin:0 0 0.8rem;">Oder als Lehrkraft:</p>
-      <div id="gs-game-list" class="gs-game-list"></div>
-      <button class="setup-btn" style="background:var(--success);" onclick="createNewGame()">+ Neues Spiel erstellen</button>
-    </div>
+        <h2 class="gs-section-title">Als Lehrkraft</h2>
+        <p class="gs-subtitle">Wähle ein bestehendes Spiel oder erstelle ein neues.</p>
+        <div id="gs-game-list" class="gs-game-list"></div>
+        <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+          <a href="admin.html" class="btn btn-secondary">⚙ Begriffsverwaltung</a>
+        </div>
 
-    <div style="margin-top:1.5rem;display:flex;gap:1rem;">
-      <a href="admin.html" style="color:rgba(255,255,255,0.75);font-size:0.9rem;text-decoration:none;">⚙ Begriffsverwaltung</a>
-      <a href="../spiele.html" style="color:rgba(255,255,255,0.75);font-size:0.9rem;text-decoration:none;">&larr; Übersicht</a>
+      </div>
     </div>
   </div>
 

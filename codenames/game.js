@@ -1050,6 +1050,10 @@ window.doGoHome = function() {
   const KEY = 'spiele_theme';
   function apply(light) {
     document.body.classList.toggle('light', light);
+    // Einheitlicher Spielwähler-Look (css/spielwaehler.css): Codenames hat
+    // ein eigenes Theme-System (Dark = Standard, kein body.dark) und
+    // spiegelt seinen Dunkelzustand deshalb als gs-theme-dark.
+    document.body.classList.toggle('gs-theme-dark', !light);
     document.querySelectorAll('#btn-theme').forEach(el => {
       el.textContent = light ? '🌙 Darkmode' : '☀️ Lightmode';
     });

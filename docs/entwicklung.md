@@ -145,6 +145,9 @@ Wenn der Fragebogen (§0) „Multi-Device + zentrale DB" ergibt:
    destruktiven Aufrufen.
 5. `index.html` (Spielwähler + Setup + Board), `view.html`, optional
    `board.html`/`solo.html`. `admin.html` als Verweis auf `../admin.html`.
+   **Der Spielwähler nutzt den einheitlichen Look:** `css/spielwaehler.css`
+   einbinden + Klasse `gs-screen` am Selector-Screen (verbindliche Regel,
+   siehe `CLAUDE.md → Spielverwaltung → Einheitlicher Spielwähler-Look`).
 6. Konvertierung `convertRQto<Spiel>` mit True-Leaf-Regel; `activeCategoryIds`
    für Resume speichern.
 7. Spiel in `spiele.html` registrieren (`DEFAULT_ENABLED`/`NEW_GAMES`).

@@ -6,6 +6,7 @@
   <title>QuizPfad</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
   <link rel="stylesheet" href="css/quizpfad.css">
+  <link rel="stylesheet" href="../css/spielwaehler.css">
   <style>
     body:not(.teacher) .gs-teacher-action { display: none !important; }
     body:not(.teacher) .gs-btn-delete     { display: none !important; }
@@ -17,13 +18,13 @@
 <body>
 
   <!-- ── Game Selector ──────────────────────────────────── -->
-  <div class="screen" id="game-selector">
+  <div class="screen gs-screen" id="game-selector">
     <div class="gs-container">
       <div class="gs-header">
         <div class="gs-title">🎲 QuizPfad</div>
-        <div style="display:flex;gap:8px;">
-          <a href="../spiele.html" class="header-btn">← Übersicht</a>
-          <button class="header-btn" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
+        <div class="gs-header-btns">
+          <a href="../spiele.html" class="btn btn-secondary">← Übersicht</a>
+          <button class="btn btn-secondary" id="btn-theme" onclick="toggleTheme()">🌙 Darkmode</button>
         </div>
       </div>
       <div class="gs-body">
@@ -45,7 +46,7 @@
           <div id="gs-game-list" class="gs-game-list"></div>
         </div>
         <div style="margin-top:1.2rem;">
-          <button class="btn-start-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+          <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
         </div>
         <div class="gs-teacher-hint" style="margin-top:0.8rem;text-align:center;">
           <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Spielverwaltung (Lehrermodus)</button>

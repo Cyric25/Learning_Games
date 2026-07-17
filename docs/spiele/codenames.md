@@ -57,3 +57,10 @@ Codenames-Karten zeigen bewusst **reinen Text**: Kartenwörter laufen durch
 `richToPlainText()` (`js/rich-content.js`) — `$…$`-Formeln erscheinen als
 TeX-Quelltext, Bild-Marker als Alt-Text. Der Wortlisten-Editor weist darauf
 hin. Hinweiswörter der Spymaster bleiben unverändert escaped.
+## Einheitlicher Startscreen (seit Juli 2026)
+
+Der Start-/Beitrittsscreen nutzt den einheitlichen Spielwaehler-Look aus
+`css/spielwaehler.css` (Risiko-Quiz-Optik, Klasse `gs-screen`). Da Codenames
+ein eigenes Theme-System hat (Dark = Standard, `body.light` = Override),
+spiegelt `game.js` den Dunkelzustand zusaetzlich als `body.gs-theme-dark` —
+daran haengt die dunkle Palette des gemeinsamen Spielwaehler-Stylesheets.

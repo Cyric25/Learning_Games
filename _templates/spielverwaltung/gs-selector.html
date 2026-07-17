@@ -1,12 +1,17 @@
 <!-- ── Spielwähler ────────────────────────────────────────────────────
      Erster Screen in der Spiel-HTML-Datei (.screen.active).
+     EINHEITLICHER LOOK (verbindlich): css/spielwaehler.css einbinden
+     (<link rel="stylesheet" href="../css/spielwaehler.css">) — die Klasse
+     "gs-screen" unten aktiviert die Risiko-Quiz-Optik unabhängig von der
+     Spiel-Palette. Siehe CLAUDE.md → Spielverwaltung → Einheitlicher
+     Spielwähler-Look.
      ERSETZEN:
        "🎮 Spielname"  → Emoji + Spielname
        joinAsStudent() → bleibt (globale Function Declaration)
        createNewGame() → bleibt (globale Function Declaration)
        "view.html"     → Pfad zur Schüleransicht (falls abweichend)
      ──────────────────────────────────────────────────────────────── -->
-<div class="screen active" id="game-selector">
+<div class="screen active gs-screen" id="game-selector">
   <div class="gs-container">
     <div class="gs-header">
       <h1 style="font-size:clamp(1.5rem,3vw,2rem);margin:0;">🎮 Spielname</h1>

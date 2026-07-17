@@ -61,7 +61,11 @@ Screens ohne Spielverwaltung (z.B. QuizPfad):
 2. **HTML**: Setup-Screen einfügen → `setup-screen.html`
 3. **HTML**: Kategorie-Screen einfügen → `cat-selector.html`
 4. **HTML**: Lobby-Screen einfügen → `lobby-screen.html`
-5. **CSS**: `gs-styles.css` + `setup-screen.css` + `cat-selector.css` in Spiel-CSS kopieren
+5. **CSS**: `../css/spielwaehler.css` einbinden — der Spielwähler bekommt damit
+   den **einheitlichen Look** (Risiko-Quiz-Optik, Klasse `gs-screen`,
+   verbindliche Regel, siehe `CLAUDE.md → Einheitlicher Spielwähler-Look`).
+   `gs-styles.css` nur noch für die Beitrittsscreens von view/board kopieren;
+   `setup-screen.css` + `cat-selector.css` wie gehabt in die Spiel-CSS:
    - Variante A (Leiterspiel: `--bg-sidebar`/`--bg-field`/`--border`) oder
    - Variante B (Labyrinth: `--bg-secondary`/`--bg-card`/`--border-card`) wählen
    - `--bg-primary` in `:root` + `body.dark` definieren (flache Farbe, kein Gradient)

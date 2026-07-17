@@ -1,4 +1,10 @@
-/* ── Spielwähler CSS (kanonische Version) ────────────────────────────
+/* ── Spielwähler CSS ─────────────────────────────────────────────────
+   HINWEIS (Juli 2026): Für den SPIELWÄHLER selbst gilt der einheitliche
+   Look aus css/spielwaehler.css (Klasse "gs-screen", Risiko-Quiz-Optik) —
+   diese Datei hier braucht ein neues Spiel nur noch für die
+   Beitrittsscreens von view.html/board.html bzw. als Referenz für die
+   Varianten A/B. Siehe CLAUDE.md → Einheitlicher Spielwähler-Look.
+   ────────────────────────────────────────────────────────────────────
    Variable-Variante A: "Sidebar"-Stil (Leiterspiel, Lernkarten, …)
      --bg-sidebar   → Container-Hintergrund
      --bg-field     → Karten-Hintergrund

@@ -27,6 +27,7 @@ Spiele/
   categories.json          Stadt-Land-Fluss Legacy-Kategorien
 
   js/rich-content.js       Gemeinsames Rendering: Text + KaTeX + Bilder (alle Spiele)
+  css/spielwaehler.css     Einheitlicher Spielwähler-Look (Risiko-Optik, alle Spiele mit Spielverwaltung)
   lib/katex/               KaTeX lokal, zentral (früher memory/lib/katex)
 
   data/                    NICHT im Deploy-ZIP (Laufzeitdaten)
