@@ -63,17 +63,25 @@ Zeitstempel).
 | `?f=er-game&id=game_N` | POST/DELETE | Escape-Room-Spiel speichern/löschen | ✔ |
 | `?f=ls-boards` | GET/POST | Leiterspiel-Designer-Bretter | POST: ✔ |
 | `?f=lab-mazes` | GET/POST | Labyrinth-Designer-Labyrinthe | POST: ✔ |
-| `?f=image-upload` | POST | Bild in zentrale Ablage `data/images/` hochladen (multipart, Feld `image`) | ✔ |
-| `?f=images` | GET | Liste der hochgeladenen Bilder (Bildverwaltung) | ✔ |
+| `?f=image-upload` | POST | Bild in zentrale Ablage `data/images/` hochladen (multipart, Feld `image`; Prefix `img_`) | ✔ |
+| `?f=draft-image-upload` | POST | Bild aus `vorschlaege.html` hochladen (Prefix `imgv_`, Mengendeckel 200) | – |
+| `?f=images` | GET | Liste der hochgeladenen Bilder (`img_` + `imgv_`, Bildverwaltung) | ✔ |
 | `?f=image&name=X` | DELETE | Bild löschen | ✔ |
 
-**Bild-Upload-Härtung:** Extension- **und** MIME-Whitelist
+**Bild-Upload-Härtung** (beide Upload-Pfade, gemeinsame
+`storeUploadedImage()`): Extension- **und** MIME-Whitelist
 `jpg/jpeg/png/webp/gif` (bewusst **kein SVG** — XSS-Risiko), max. 2 MB,
-Dateinamen vergibt der Server (`img_<zeitstempel>_<rand>.<ext>`, nur
-`[A-Za-z0-9_-]` → kein Path Traversal). `data/images/` bleibt per HTTP
-**lesbar** (statischer Fallback-Grundsatz, keine Deny-Regel in `.htaccess`) —
-die Clients referenzieren die Bilder direkt über `![Alt](data/images/…)`
-(siehe [datenformate.md §0](datenformate.md)).
+Dateinamen vergibt der Server (`img[v]_<zeitstempel>_<rand>.<ext>`, nur
+`[A-Za-z0-9_-]` → kein Path Traversal). Der Schüler-Pfad
+`draft-image-upload` ist bewusst **offen** (analog `?f=drafts` POST — das
+Admin-Token gehört nicht in eine Schülerseite) und zusätzlich durch einen
+Mengendeckel gehärtet: maximal 200 `imgv_`-Bilder, bei vollem Kontingent
+HTTP 429 (Ablehnung statt stiller Löschung, sonst brächen Bilder bereits
+eingereichter Vorschläge — Aufräumen über die Bildverwaltung).
+`data/images/` bleibt per HTTP **lesbar** (statischer Fallback-Grundsatz,
+keine Deny-Regel in `.htaccess`) — die Clients referenzieren die Bilder
+direkt über `![Alt](data/images/…)` (siehe
+[datenformate.md §0](datenformate.md)).
 
 **Drafts-Härtung:** `?f=drafts` POST akzeptiert nur ein Whitelist-Schema (Typ
 `mc`/`open`, Difficulty aus `{100..500}`, gekürzte Strings), begrenzt die

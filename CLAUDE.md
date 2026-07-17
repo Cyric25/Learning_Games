@@ -324,6 +324,9 @@ keine Migration.
 - Editoren: Upload via `rcUploadImage(file)` (POST `?f=image-upload`,
   Admin-Token, Ablage `data/images/`, kein SVG, max 2 MB), Live-Vorschau via
   `rcBindPreview(input, previewEl)`. **Kein Base64 in Datenbanken.**
+- Schülerseite `vorschlaege.html`: Upload über den OFFENEN Endpunkt
+  `?f=draft-image-upload` (Prefix `imgv_`, Mengendeckel 200, HTTP 429 bei
+  vollem Kontingent) — das Admin-Token gehört nicht in Schülerseiten.
 - MD-Dialekte mit `|`-Trennern: Inhalte escapen `|` als `\|`
   (`MDParser._splitEscapedPipes`-Muster, Roundtrip bleibt verlustfrei).
 - Bildverwaltung (Liste/Löschen): zentrale `admin.html` → Karte

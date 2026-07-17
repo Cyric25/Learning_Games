@@ -27,9 +27,10 @@ verschoben); das CSS injiziert das Modul selbst. Memory behält sein
 strukturiertes `{type, content}`-Format — nur sein Renderer delegiert an das
 Modul; der Bild-Typ rendert Legacy-URLs unverändert.
 
-Bilder werden über `api.php?f=image-upload` (Admin-Token) nach `data/images/`
-hochgeladen — **kein Base64 in den Datenbanken** (Quota-Falle). Details:
-[api-referenz.md](api-referenz.md).
+Bilder werden über `api.php?f=image-upload` (Admin-Token, Lehrkraft-Editoren)
+bzw. `?f=draft-image-upload` (offener Schüler-Pfad aus `vorschlaege.html`,
+Prefix `imgv_`, Mengendeckel) nach `data/images/` hochgeladen — **kein Base64
+in den Datenbanken** (Quota-Falle). Details: [api-referenz.md](api-referenz.md).
 
 ## 1. Zentrale Fragendatenbank (`data/questions.json`)
 

@@ -475,8 +475,9 @@ foreach ($gameDirs as $prefix => [$dir, $title]) {
 // Server selbst (Traversal-Schutz); kein SVG (XSS-Risiko), kein Base64 in
 // den Datenbanken (Quota-Falle). data/images/ bleibt per HTTP lesbar
 // (statischer Fallback-Grundsatz, keine Deny-Regel in .htaccess).
-if ($key === 'image-upload') {
-    requireAdminKey();
+// Gemeinsame Validierung + Ablage für beide Upload-Pfade (Lehrkraft 'img_',
+// Schüler-Vorschläge 'imgv_'). Beendet die Anfrage immer selbst.
+function storeUploadedImage($prefix) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error' => 'POST erwartet']); exit; }
     $imgDir = __DIR__ . '/data/images';
     if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
@@ -507,7 +508,7 @@ if ($key === 'image-upload') {
         }
     }
     // Namen serverseitig neu vergeben: nur [A-Za-z0-9_-], kein Traversal möglich
-    $name = 'img_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 6) . '.' . $ext;
+    $name = $prefix . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 6) . '.' . $ext;
     // move_uploaded_file schreibt atomar genug (rename vom Upload-Tempfile)
     if (!@move_uploaded_file($f['tmp_name'], $imgDir . '/' . $name)) {
         http_response_code(500); echo json_encode(['error' => 'Speichern fehlgeschlagen']); exit;
@@ -516,13 +517,35 @@ if ($key === 'image-upload') {
     exit;
 }
 
+if ($key === 'image-upload') {
+    requireAdminKey();
+    storeUploadedImage('img_');
+}
+
+// ── Bild-Upload aus Fragen-Vorschlägen: ?f=draft-image-upload ────
+// Bewusst OHNE Admin-Token (Schüler-Pfad, analog ?f=drafts POST). Zusätzlich
+// zur Typ-/Größen-Härtung gilt ein Mengendeckel: maximal 200 Vorschlags-
+// Bilder (Prefix imgv_). Bei vollem Kontingent wird ABGELEHNT statt still
+// gelöscht — sonst brächen Bilder bereits eingereichter Vorschläge.
+// Aufräumen übernimmt die Bildverwaltung der zentralen admin.html.
+if ($key === 'draft-image-upload') {
+    $existing = glob(__DIR__ . '/data/images/imgv_*');
+    if (is_array($existing) && count($existing) >= 200) {
+        http_response_code(429);
+        echo json_encode(['error' => 'Bild-Kontingent für Vorschläge erschöpft – bitte die Lehrkraft informieren.']);
+        exit;
+    }
+    storeUploadedImage('imgv_');
+}
+
 if ($key === 'images') { // Liste für die Bildverwaltung (Editor)
     requireAdminKey();
     $imgDir = __DIR__ . '/data/images';
     $list = [];
     if (is_dir($imgDir)) {
         foreach (scandir($imgDir) as $n) {
-            if (preg_match('/^img_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $n)) {
+            // img_ = Lehrkraft-Upload, imgv_ = Schüler-Vorschlag
+            if (preg_match('/^imgv?_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $n)) {
                 $list[] = ['name' => $n, 'path' => 'data/images/' . $n, 'size' => @filesize($imgDir . '/' . $n)];
             }
         }
@@ -535,7 +558,7 @@ if ($key === 'image') { // DELETE &name=… (Bildverwaltung)
     requireAdminKey();
     if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') { http_response_code(405); echo json_encode(['error' => 'DELETE erwartet']); exit; }
     $name = trim($_GET['name'] ?? '');
-    if (!preg_match('/^img_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $name)) {
+    if (!preg_match('/^imgv?_[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/', $name)) {
         http_response_code(400); echo json_encode(['error' => 'ungültiger Name']); exit;
     }
     $path = __DIR__ . '/data/images/' . $name;
