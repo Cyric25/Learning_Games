@@ -1183,30 +1183,89 @@ Referenz-Implementierungen: Risiko-Quiz (`admin.html` + `shared.js`), Leiterspie
 Code-Beitritt + Spielliste + „+ Neues Spiel erstellen"), **sieht der
 Startscreen auch gleich aus** — exakt wie der Risiko-Quiz-Startscreen
 (`risiko-quiz/index.html` `#join-screen`): **zentriertes** Layout mit großem
-Titel, großem CODE-Feld, „Beitreten"-Button, Trennlinie, Spielleiter-Bereich
-und „Zurück zur Übersicht". Umgesetzt über die gemeinsame Datei
-`css/spielwaehler.css` (Hell- und Dunkel-Palette fest eingebaut, unabhängig
-von der Farbwelt des Spiels; die eigene Spiel-Palette gilt erst NACH dem
-Spielwähler). Einbindung pro Spiel:
+Titel, großem CODE-Feld (**feste Größe**), „Beitreten"-Button, Trennlinie,
+Spielleiter-/Lehrkraft-Bereich und „Zurück zur Übersicht".
 
-1. `<link rel="stylesheet" href="../css/spielwaehler.css">` (nach der Spiel-CSS)
+Umgesetzt über die gemeinsame Datei **`css/spielwaehler.css`** (Hell- und
+Dunkel-Palette in Risiko-Farben fest eingebaut, unabhängig von der Farbwelt
+des Spiels; die eigene Spiel-Palette gilt erst NACH dem Spielwähler). Alle
+Regeln sind auf **`.gs-screen`** gescopet und überstimmen so die älteren,
+ungescopten `gs-*`-Stile in den einzelnen Spiel-CSS (die dort für die
+Beitrittsscreens von `view.html`/`board.html` weiter gebraucht werden).
+
+**Einbindung pro Spiel:**
+
+1. `<link rel="stylesheet" href="../css/spielwaehler.css">` (NACH der Spiel-CSS)
 2. Selector-Screen bekommt die Klasse **`gs-screen`** und das kanonische,
-   **zentrierte** Markup (Referenz: `just-one/index.html`):
-   `h1.gs-title` → `p.gs-subtitle` → `input.gs-code-input` →
-   `button.btn-join-student` → `div.gs-join-error` →
-   `div.gs-teacher` (Label + `gs-game-list` + `gs-teacher-buttons` mit
-   `btn-create-game`; bei gegateten Spielen zusätzlich `gs-teacher-action`/
-   `gs-teacher-hint`) → `div.gs-footer` (Zurück-Link + `gs-theme-toggle`).
-   KEIN `gs-container`/`gs-header`/`gs-body`-Kartenwrapper mehr.
-3. Dunkel-Zuordnung: Seiten mit Shared-Theme wie gehabt über `body.dark`;
-   Seiten mit eigenem Theme-System (Codenames) spiegeln ihren Dunkelzustand
-   zusätzlich als `body.gs-theme-dark`.
+   zentrierte Markup (siehe unten). KEIN `gs-container`/`gs-header`/`gs-body`-
+   Kartenwrapper.
+3. Dunkel-Zuordnung: Seiten mit Shared-Theme (`spiele_theme`) wie gehabt über
+   `body.dark`; Seiten mit eigenem Theme-System (Codenames) spiegeln ihren
+   Dunkelzustand zusätzlich als `body.gs-theme-dark` (im Theme-Toggle setzen).
 
-Umgestellt: QuizPfad, Leiterspiel, Schiffeversenken, Just One, Insider,
-Hochstapler, Codenames. Die alten ungescopten `gs-*`-Stile in den Spiel-CSS
-bleiben bewusst bestehen (die Beitrittsscreens von `view.html`/`board.html`
-nutzen sie weiter) — `css/spielwaehler.css` überstimmt sie im Spielwähler
-durch Scoping auf `.gs-screen`.
+**Kanonisches Markup** (Referenz: `just-one/index.html`; Reihenfolge einhalten):
+
+```html
+<div class="screen active gs-screen" id="game-selector">
+  <h1 class="gs-title">🎲 Spielname</h1>
+  <p class="gs-subtitle">Spielcode eingeben um beizutreten</p>
+
+  <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4"
+    autocomplete="off" spellcheck="false" placeholder="CODE"
+    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+    onkeydown="if(event.key==='Enter')joinAsStudent()">
+  <button class="btn-join-student" onclick="joinAsStudent()">Beitreten</button>
+  <div id="gs-join-error" class="gs-join-error"></div>
+
+  <div class="gs-teacher">
+    <p class="gs-teacher-label">Oder als Lehrkraft:</p>
+    <!-- Gegatete Spiele (QuizPfad/Leiterspiel/Schiffeversenken/Labyrinth):
+         Spielliste in .gs-teacher-action wickeln (via body.teacher sichtbar). -->
+    <div id="gs-game-list" class="gs-game-list"></div>
+    <div class="gs-teacher-buttons">
+      <button class="btn-create-game" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+      <!-- optional: <a href="admin.html" class="btn-selector-secondary">⚙ Editor</a> -->
+    </div>
+  </div>
+
+  <div class="gs-footer">
+    <a href="../spiele.html">← Zurück zur Übersicht</a>
+    <button class="gs-theme-toggle" onclick="toggleTheme()">🌓 Design</button>
+  </div>
+</div>
+```
+
+**Klassen-Referenz** (alle in `css/spielwaehler.css`, gescopet auf `.gs-screen`):
+`gs-title`, `gs-subtitle`, `gs-code-input`, `btn-join-student`, `gs-join-error`,
+`gs-teacher`, `gs-teacher-label`, `gs-game-list` (+ `gs-game-card`/`gs-game-code`/
+`gs-game-info`/`gs-game-title`/`gs-game-meta`/`gs-btn-delete`), `gs-teacher-buttons`,
+`btn-create-game`, `btn-resume-game`, `btn-selector-secondary`, `gs-teacher-hint`,
+`gs-footer`, `gs-theme-toggle`; Codenames-Sonderfelder `lang-row`/`lang-btn`/
+`cn-label`/`gs-text-input`.
+
+**Lehrermodus-Gate** (nur QuizPfad/Leiterspiel/Schiffeversenken/Labyrinth):
+Spielliste in `<div class="gs-teacher-action">` wickeln, Gate-Button als
+`<div class="gs-teacher-hint"><button onclick="activateTeacherMode()">🔒 …</button></div>`;
+das kurze Style-Snippet im `<head>` bleibt:
+`body:not(.teacher) .gs-teacher-action{display:none!important}` /
+`body.teacher .gs-teacher-hint{display:none!important}` /
+`body:not(.teacher) .gs-btn-delete{display:none!important}`.
+
+**⚠️ Fallstricke:**
+- **CODE-Feld feste Größe, nicht neu stylen:** `.gs-screen .gs-code-input` hat
+  bewusst eine **feste** `font-size` (kein `clamp()`/`vw`) → mit `width:7em` ist
+  das Feld in allen Spielen/Viewports gleich groß. Nicht in der Spiel-CSS
+  überschreiben.
+- **`flex:1` aus alter Spiel-CSS:** Viele Spiel-CSS haben noch ein ungescoptes
+  `.gs-code-input { flex:1 }` (für die frühere `gs-join-row`). Da das Feld jetzt
+  direktes Kind des **Flex-Spalten**-Containers `.gs-screen` ist, würde `flex:1`
+  es **vertikal** strecken (hoher Kasten). `css/spielwaehler.css` neutralisiert
+  das zentral mit `flex:0 0 auto` — nicht wieder aufheben.
+- **Reihenfolge Input → Button:** Code-Feld und „Beitreten" sind getrennte
+  Block-Elemente untereinander (nicht in einer `gs-join-row` nebeneinander).
+
+Umgestellt: Risiko-Quiz (Referenz), QuizPfad, Leiterspiel, Schiffeversenken,
+Labyrinth-Quiz, Just One, Insider, Hochstapler, Codenames.
 
 ---
 
