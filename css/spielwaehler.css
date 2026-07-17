@@ -81,14 +81,19 @@ body.gs-theme-dark #screen-start.gs-screen {
   margin: 0 0 2rem;
 }
 
-/* ── Code-Eingabe (großes zentriertes Feld) ──────────────────────── */
+/* ── Code-Eingabe (großes zentriertes Feld, feste Größe) ─────────────
+   Feste font-size (kein clamp/vw) → mit width:7em ist die Feldgröße in
+   ALLEN Spielen und auf allen Viewports identisch. max-width als Schutz
+   auf sehr schmalen Handys. */
 .gs-screen .gs-code-input {
-  font-size: clamp(2rem, 5vw, 3.5rem);
+  box-sizing: border-box;
+  font-size: 2.6rem;
   text-align: center;
   letter-spacing: 0.4em;
+  text-indent: 0.4em; /* gleicht die trailing letter-spacing beim Zentrieren aus */
   width: 7em;
   max-width: 90vw;
-  padding: 0.5em 0.3em;
+  padding: 0.45em 0.3em;
   background: var(--gs-panel);
   color: var(--gs-text);
   border: 2px solid var(--gs-border);
