@@ -8,16 +8,16 @@
 :root {
   --bg-body:        linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
   --bg-container:   #16213e;
-  --bg-card:        #1a2744;
-  --bg-card-hover:  #1e3060;
+  --bg-card:        #0f3460;
+  --bg-card-hover:  #1a4a80;
   --bg-input:       rgba(255,255,255,0.07);
   --bg-btn:         #1a2744;
-  --accent:         #e2b96f;
-  --accent-dark:    #c9973f;
+  --accent:         #e94560;
+  --accent-dark:    #E34F20;
   --text-primary:   #ffffff;
   --text-secondary: #a8a8b3;
   --border:         rgba(255,255,255,0.12);
-  --border-focus:   rgba(226,185,111,0.6);
+  --border-focus:   rgba(233,69,96,0.6);
   --shadow:         0 4px 24px rgba(0,0,0,0.4);
   --shadow-card:    0 2px 8px rgba(0,0,0,0.35);
   --success:        #2ecc71;
@@ -42,20 +42,23 @@
 
 /* ── Theme-Variablen: Light ────────────────────────────────────── */
 body.light {
-  --bg-body:        linear-gradient(135deg, #f0f4f8 0%, #dce8f5 100%);
+  --bg-body:        #fdf6f0;
   --bg-container:   #ffffff;
-  --bg-card:        #f5f8fc;
-  --bg-card-hover:  #eaf0f8;
+  --bg-card:        #fff3ee;
+  --bg-card-hover:  #ffe0d0;
   --bg-input:       #f8fafc;
   --bg-btn:         #f0f4f8;
-  --accent:         #c9973f;
-  --accent-dark:    #a67a2a;
-  --text-primary:   #1a1a2e;
-  --text-secondary: #5a6a7e;
+  --accent:         #E34F20;
+  --accent-dark:    #c73518;
+  --text-primary:   #1a1a1a;
+  --text-secondary: #666666;
   --border:         rgba(0,0,0,0.12);
-  --border-focus:   rgba(201,151,63,0.7);
+  --border-focus:   rgba(227,79,32,0.7);
   --shadow:         0 4px 20px rgba(0,0,0,0.12);
   --shadow-card:    0 2px 8px rgba(0,0,0,0.10);
+  --success:        #28a745;
+  --danger:         #dc3545;
+  --warning:        #e67e22;
   --cn-hidden:      #dce8f5;
   --cn-hidden-hover:#c8d8ec;
   --cn-text-hidden: #2a3a55;
@@ -159,7 +162,7 @@ button { cursor: pointer; font-family: inherit; }
 .lang-btn:hover { border-color: var(--accent); color: var(--text-primary); }
 .lang-btn.active {
   border-color: var(--accent);
-  background: rgba(226,185,111,0.15);
+  background: rgba(233,69,96,0.15);
   color: var(--accent);
   font-weight: 600;
 }
@@ -429,7 +432,7 @@ button { cursor: pointer; font-family: inherit; }
   transition: all 0.15s;
 }
 .role-spectator-btn:hover { border-color: var(--accent); color: var(--text-primary); }
-.role-spectator-btn.active-spectator { border-color: var(--accent); background: rgba(226,185,111,0.15); color: var(--accent); font-weight: 700; }
+.role-spectator-btn.active-spectator { border-color: var(--accent); background: rgba(233,69,96,0.15); color: var(--accent); font-weight: 700; }
 /* Player list in lobby */
 .players-card {
   background: var(--bg-container);
@@ -472,7 +475,7 @@ button { cursor: pointer; font-family: inherit; }
 }
 .player-badge.red  { background: var(--cn-red-light); border-color: var(--cn-red); color: var(--cn-red); }
 .player-badge.blue { background: var(--cn-blue-light); border-color: var(--cn-blue); color: var(--cn-blue); }
-.player-badge.host { color: var(--accent); border-color: var(--accent); background: rgba(226,185,111,0.1); }
+.player-badge.host { color: var(--accent); border-color: var(--accent); background: rgba(233,69,96,0.1); }
 /* Settings in lobby (host only) */
 .lobby-settings {
   background: var(--bg-container);

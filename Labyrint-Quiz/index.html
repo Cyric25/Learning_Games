@@ -6,6 +6,7 @@
   <title>Labyrinth-Quiz</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
   <link rel="stylesheet" href="css/labyrinth.css">
+  <link rel="stylesheet" href="../css/spielwaehler.css">
   <style>
     body:not(.teacher) .gs-teacher-action { display: none !important; }
     body:not(.teacher) .gs-btn-delete     { display: none !important; }
@@ -17,46 +18,44 @@
 <body>
 
   <!-- ── Spielwähler ───────────────────────────────────────────────── -->
-  <div class="screen active" id="game-selector">
-    <h1 style="color:var(--accent);font-size:clamp(2rem,5vw,3rem);margin:0 0 0.5rem;text-align:center;">🏰 Labyrinth-Quiz</h1>
-    <p style="color:var(--text-secondary);font-size:clamp(1rem,2vw,1.2rem);margin:0 0 2rem;text-align:center;">Spielcode eingeben um beizutreten</p>
-    <input id="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
-      placeholder="CODE"
-      style="font-size:clamp(2rem,5vw,3.5rem);text-align:center;letter-spacing:0.4em;
-        width:7em;padding:0.5em 0.3em;background:var(--bg-card);color:var(--text-primary);
-        border:2px solid var(--border-card);border-radius:14px;font-family:monospace;font-weight:700;
-        outline:none;text-transform:uppercase;transition:border-color 0.2s;"
-      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-      onkeydown="if(event.key==='Enter')joinAsStudent()"
-      onfocus="this.style.borderColor='var(--accent)'"
-      onblur="this.style.borderColor='var(--border-card)'">
-    <button onclick="joinAsStudent()"
-      style="margin-top:1.2rem;padding:0.8rem 3rem;font-size:clamp(1.1rem,2vw,1.4rem);
-        font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:12px;
-        cursor:pointer;transition:opacity 0.2s;"
-      onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-      Beitreten →
-    </button>
-    <div id="gs-join-error" style="color:var(--danger);min-height:1.5em;margin-top:0.8rem;font-size:0.95rem;font-weight:600;text-align:center;"></div>
-    <div style="margin-top:2.5rem;border-top:1px solid var(--border-card);padding-top:1.5rem;text-align:center;width:100%;max-width:520px;">
-      <div class="gs-teacher-action" style="text-align:center;margin-bottom:0.8rem;">
-        <p style="color:var(--text-secondary);font-size:0.95rem;margin:0 0 0.8rem;">Laufende Spiele:</p>
-        <div id="gs-game-list" class="gs-game-list" style="margin-bottom:0.8rem;text-align:left;"></div>
+  <div class="screen active gs-screen" id="game-selector">
+    <div class="gs-container">
+      <div class="gs-header">
+        <div class="gs-title">🏰 Labyrinth-Quiz</div>
+        <div class="gs-header-btns">
+          <a href="../spiele.html" class="btn btn-secondary">&#8592; Übersicht</a>
+          <button class="btn btn-secondary" onclick="toggleTheme()" title="Design wechseln">🌓</button>
+        </div>
       </div>
-      <button onclick="createNewGame()"
-        style="padding:0.6rem 2rem;font-size:clamp(0.95rem,1.5vw,1.1rem);font-weight:700;
-          background:var(--success);color:#fff;border:none;border-radius:10px;cursor:pointer;
-          transition:opacity 0.2s;"
-        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-        + Neues Spiel erstellen
-      </button>
-      <div class="gs-teacher-hint" style="margin-top:0.8rem;">
-        <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Spielverwaltung (Lehrermodus)</button>
+      <div class="gs-body">
+
+        <h2 class="gs-section-title">Als Schüler/in beitreten</h2>
+        <p class="gs-subtitle">Spielcode eingeben um beizutreten.</p>
+        <div class="gs-join-row">
+          <input id="gs-code-input" class="gs-code-input" type="text" maxlength="4" autocomplete="off" spellcheck="false"
+            placeholder="CODE"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+            onkeydown="if(event.key==='Enter')joinAsStudent()">
+          <button class="btn-join-student" onclick="joinAsStudent()">Beitreten &rarr;</button>
+        </div>
+        <div id="gs-join-error" class="gs-join-error"></div>
+
+        <hr class="gs-divider">
+
+        <div class="gs-teacher-action">
+          <h2 class="gs-section-title">Laufende Spiele</h2>
+          <p class="gs-subtitle">Wähle ein bestehendes Spiel oder verwalte Spiele im Lehrermodus.</p>
+          <div id="gs-game-list" class="gs-game-list"></div>
+        </div>
+        <div style="display:flex;gap:0.8rem;margin-top:1.2rem;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-success btn-lg" onclick="createNewGame()">+ Neues Spiel erstellen</button>
+          <a href="solo.html" class="btn btn-secondary">🛡️ Solo spielen</a>
+        </div>
+        <div class="gs-teacher-hint" style="margin-top:0.8rem;">
+          <button onclick="activateTeacherMode()" style="padding:0.35rem 0.9rem;border-radius:8px;cursor:pointer;font-size:0.85rem;background:none;border:1px solid rgba(128,128,128,0.35);color:rgba(128,128,128,0.8);">🔒 Spielverwaltung (Lehrermodus)</button>
+        </div>
+
       </div>
-    </div>
-    <div style="margin-top:1.5rem;display:flex;gap:1.2rem;justify-content:center;align-items:center;flex-wrap:wrap;">
-      <a href="../spiele.html" style="color:var(--text-secondary);font-size:0.9rem;text-decoration:none;">← Zurück zur Übersicht</a>
-      <a href="solo.html" style="color:var(--accent);font-size:0.9rem;text-decoration:none;font-weight:600;">🛡️ Solo spielen</a>
     </div>
   </div>
 

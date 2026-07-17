@@ -66,16 +66,18 @@ body.gs-theme-dark #screen-start.gs-screen {
   --gs-danger:     #e74c3c;
 }
 
-/* ── Container-Karte ─────────────────────────────────────────────── */
+/* ── Container ────────────────────────────────────────────────────
+   Kein Karten-Look mehr (keine Box/Schatten/Rahmen) — Inhalt liegt
+   direkt auf dem .gs-screen-Hintergrund, analog zu Risiko-Quiz. */
 .gs-screen .gs-container {
   width: 100%;
   max-width: 640px;
-  background: var(--gs-panel);
-  border: 1px solid var(--gs-border);
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
   text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
 }
 
 .gs-screen .gs-header {
@@ -84,8 +86,10 @@ body.gs-theme-dark #screen-start.gs-screen {
   justify-content: space-between;
   gap: 0.6rem;
   flex-wrap: wrap;
-  padding: 1.2rem 1.5rem;
+  padding: 0 0 1.2rem;
+  margin-bottom: 1.2rem;
   border-bottom: 1px solid var(--gs-border);
+  background: none;
 }
 
 .gs-screen .gs-title {
@@ -97,7 +101,7 @@ body.gs-theme-dark #screen-start.gs-screen {
 .gs-screen .gs-header-btns { display: flex; gap: 0.6rem; }
 
 .gs-screen .gs-body {
-  padding: 1.5rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
 }

@@ -3,21 +3,21 @@
 /* ── Light Theme (Standard Orange) ───────────────────────────────── */
 :root {
   --bg-primary:     #fdf6f0;
-  --bg-secondary:   #fff3ee;
-  --bg-card:        #ffffff;
-  --bg-card-hover:  #fff3ee;
-  --text-primary:   #1e293b;
-  --text-secondary: #64748b;
+  --bg-secondary:   #ffffff;
+  --bg-card:        #fff3ee;
+  --bg-card-hover:  #ffe0d0;
+  --text-primary:   #1a1a1a;
+  --text-secondary: #666666;
   --accent:         #E34F20;
   --accent-light:   #ffe8df;
   --accent-hover:   #c73518;
-  --border:         rgba(227,79,32,0.15);
+  --border:         rgba(0,0,0,0.1);
   --border-card:    #e0d5cf;
   --shadow:         0 2px 8px rgba(227,79,32,0.10);
   --shadow-lg:      0 8px 32px rgba(227,79,32,0.15);
-  --success:        #16a34a;
-  --danger:         #dc2626;
-  --warning:        #d97706;
+  --success:        #28a745;
+  --danger:         #dc3545;
+  --warning:        #e67e22;
 
   /* Maze-Canvas – mittelalterlicher Stein/Pergament-Stil */
   --maze-wall:       #2c1810;
@@ -39,14 +39,14 @@
 
 /* ── Dark Mode (Standard Dunkelblau) ─────────────────────────────── */
 body.dark {
-  --bg-primary:     #16213e;
-  --bg-secondary:   #1a1a2e;
-  --bg-card:        #1a2744;
+  --bg-primary:     #1a1a2e;
+  --bg-secondary:   #16213e;
+  --bg-card:        #0f3460;
   --bg-card-hover:  #1a4a80;
   --text-primary:   #ffffff;
   --text-secondary: #a8a8b3;
-  --accent:         #f7971e;
-  --accent-light:   rgba(247,151,30,0.12);
+  --accent:         #e94560;
+  --accent-light:   rgba(233,69,96,0.12);
   --accent-hover:   #E34F20;
   --border:         rgba(255,255,255,0.12);
   --border-card:    rgba(255,255,255,0.15);
@@ -71,7 +71,7 @@ html,body { height:100%; }
 
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
+  background: linear-gradient(135deg, #e94560 0%, #E34F20 100%);
   color: var(--text-primary);
   transition: background 0.35s, color 0.35s;
   overflow: hidden;
@@ -563,7 +563,7 @@ body:not(.dark) #maze-canvas        { border-color: var(--border-card); box-shad
 /* ── Game Code Banner ─────────────────────────────────────────────── */
 .game-code-display {
   display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;
-  background: rgba(247,151,30,0.15); border: 1px solid rgba(247,151,30,0.4);
+  background: rgba(233,69,96,0.15); border: 1px solid rgba(233,69,96,0.4);
   border-radius: 6px; padding: 0.35rem 0.8rem; margin-bottom: 0.4rem;
   flex-wrap: wrap;
 }
@@ -759,7 +759,7 @@ body:not(.dark) #maze-canvas        { border-color: var(--border-card); box-shad
 }
 .team-item.active {
   border-color: var(--accent);
-  background: rgba(247,151,30,0.15);
+  background: rgba(233,69,96,0.15);
 }
 
 .team-figure { font-size: 1.2rem; width:28px; text-align:center; }

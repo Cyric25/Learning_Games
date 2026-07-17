@@ -3,23 +3,23 @@
 :root {
   --bg-body: linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
   --bg-board: #fdfaf8;
-  --bg-primary: #fdfaf8;
+  --bg-primary: #fdf6f0;
   --bg-sidebar: #ffffff;
   --bg-field: #fff3ee;
   --bg-field-hover: #ffe0d0;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
   --text-light: #94a3b8;
   --accent: #E34F20;
   --accent-warm: #f7971e;
   --accent-red: #c73518;
-  --border: #e0e0e0;
+  --border: rgba(0, 0, 0, 0.1);
   --border-strong: rgba(0, 0, 0, 0.2);
   --shadow: 0 4px 20px rgba(227, 79, 32, 0.12);
   --shadow-lg: 0 8px 32px rgba(227, 79, 32, 0.18);
-  --success: #16a34a;
-  --danger: #dc2626;
-  --warning: #d97706;
+  --success: #28a745;
+  --danger: #dc3545;
+  --warning: #e67e22;
   --field-easy: #66bb6a;
   --field-medium: #fdd835;
   --field-hard: #ef5350;
@@ -35,14 +35,14 @@
 body.dark {
   --bg-body: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
   --bg-board: #16213e;
-  --bg-primary: #16213e;
+  --bg-primary: #1a1a2e;
   --bg-sidebar: #16213e;
-  --bg-field: #1a2744;
+  --bg-field: #0f3460;
   --bg-field-hover: #1a4a80;
   --text-primary: #ffffff;
   --text-secondary: #a8a8b3;
   --text-light: #6b7280;
-  --accent: #f7971e;
+  --accent: #e94560;
   --accent-warm: #E34F20;
   --accent-red: #e74c3c;
   --border: rgba(255, 255, 255, 0.12);

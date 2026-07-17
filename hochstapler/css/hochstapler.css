@@ -6,9 +6,9 @@
 
 :root {
   --bg-body:         linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
-  --bg-primary:      #fdfaf8;
+  --bg-primary:      #fdf6f0;
   --bg-container:    #ffffff;
-  --bg-card:         #f8f9fa;
+  --bg-card:         #fff3ee;
   --bg-card-back:    #fff3ee;
   --bg-option:       #fff3ee;
   --bg-option-hover: #ffe0d0;
@@ -17,10 +17,10 @@
   --accent-dark:     #c73518;
   --accent-light:    #f7971e;
 
-  --text-primary:    #1e293b;
-  --text-secondary:  #64748b;
+  --text-primary:    #1a1a1a;
+  --text-secondary:  #666666;
 
-  --border:          #e0e0e0;
+  --border:          rgba(0,0,0,0.1);
   --card-hover-border: #E34F20;
   --card-shadow-hover: 0 12px 35px rgba(227,79,32,0.2);
   --shadow:          0 4px 20px rgba(227,79,32,0.12);
@@ -29,22 +29,23 @@
 
   --btn-play-bg:     linear-gradient(135deg, #f7971e 0%, #E34F20 100%);
 
-  --success:         #16a34a;
-  --danger:          #dc2626;
-  --warning:         #d97706;
+  --success:         #28a745;
+  --danger:          #dc3545;
+  --warning:         #e67e22;
 }
 
 body.dark {
   --bg-body:         linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
-  --bg-primary:      #16213e;
+  --bg-primary:      #1a1a2e;
   --bg-container:    #16213e;
-  --bg-card:         #1a2744;
+  --bg-card:         #0f3460;
   --bg-card-back:    #0f3460;
   --bg-option:       #1a2744;
   --bg-option-hover: #1a4a80;
 
-  --accent:          #f7971e;
+  --accent:          #e94560;
   --accent-dark:     #E34F20;
+  --btn-play-bg:     var(--accent);
 
   --text-primary:    #ffffff;
   --text-secondary:  #a8a8b3;
